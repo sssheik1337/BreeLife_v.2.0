@@ -213,5 +213,12 @@ document.addEventListener('DOMContentLoaded', function() {
     generateSummary();
     calculateBMI();
     
-    // Add event listener to save button
-    const saveButton =
+    // Добавляем обработчик для кнопки сохранения
+    const saveButton = document.querySelector('a.btn-primary');
+    if (saveButton) {
+        saveButton.addEventListener('click', function(event) {
+            event.preventDefault();
+            saveAndContinue();
+        });
+    }
+});

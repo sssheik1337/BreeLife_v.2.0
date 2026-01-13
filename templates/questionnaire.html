@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Оценка Здоровья - Health Bloom</title>
+    <title>BreeLife</title>
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
-    <script src="https://unpkg.com/feather-icons"></script>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/static/css/style.css">
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
       body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
@@ -44,7 +43,7 @@
                 <div id="question-card" class="bg-white rounded-3xl p-6 shadow-xl border border-slate-100 mb-8 transform transition-all duration-300 ease-out">
                     <div class="flex items-center space-x-3 mb-6">
                         <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
-                            <i data-feather="user" class="w (question icon will be set by JS) "></i>
+                            <i data-feather="user" class="w-5 h-5"></i>
                         </div>
                     <h2 id="question-title" class="text-xl font-semibold text-slate-800">Какой ваш пол?</h2>
 </div>
@@ -82,11 +81,11 @@
         <custom-footer></custom-footer>
     </custom-layout>
     
-    <script src="components/layout.js"></script>
-    <script src="components/navbar.js"></script>
-    <script src="components/footer.js"></script>
-    <script src="ui.js"></script>
-    <script src="questionnaire.js"></script>
+    <script src="/static/components/layout.js"></script>
+    <script src="/static/components/navbar.js"></script>
+    <script src="/static/components/footer.js"></script>
+    <script src="/static/js/ui.js"></script>
+    <script src="/static/js/questionnaire.js"></script>
     <script>
         feather.replace();
     </script>

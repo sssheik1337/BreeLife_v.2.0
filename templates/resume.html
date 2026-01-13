@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ваша Сводка - Health Bloom</title>
+    <title>BreeLife</title>
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
-    <script src="https://unpkg.com/feather-icons"></script>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/static/css/style.css">
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
       body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
@@ -72,11 +71,11 @@
                 
                 <!-- Action Buttons -->
                 <div class="space-y-4">
-                    <a href="profile.html" class="btn-primary w-full flex items-center justify-center space-x-3 group">
+                    <a href="/profile" class="btn-primary w-full flex items-center justify-center space-x-3 group">
                         <i data-feather="save" class="w-5 h-5"></i>
                         <span>Сохранить и перейти в панель</span>
 </a>
-                    <a href="questionnaire.html" class="btn-secondary w-full flex items-center justify-center space-x-3">
+                    <a href="/questionnaire" class="btn-secondary w-full flex items-center justify-center space-x-3">
                         <i data-feather="edit" class="w-5 h-5"></i>
                         <span>Редактировать информацию</span>
 </a>
@@ -93,11 +92,11 @@
         <custom-footer></custom-footer>
     </custom-layout>
     
-    <script src="components/layout.js"></script>
-    <script src="components/navbar.js"></script>
-    <script src="components/footer.js"></script>
-    <script src="ui.js"></script>
-    <script src="resume.js"></script>
+    <script src="/static/components/layout.js"></script>
+    <script src="/static/components/navbar.js"></script>
+    <script src="/static/components/footer.js"></script>
+    <script src="/static/js/ui.js"></script>
+    <script src="/static/js/resume.js"></script>
     <script>
         feather.replace();
         document.addEventListener('DOMContentLoaded', function() {
