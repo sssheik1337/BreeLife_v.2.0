@@ -1,4 +1,5 @@
 import logging
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
@@ -58,3 +59,14 @@ async def foods(request: Request):
 @app.get("/menu", response_class=HTMLResponse)
 async def menu(request: Request):
     return templates.TemplateResponse("menu.html", {"request": request})
+
+
+if __name__ == "__main__":
+    # Конфигурация хоста и порта берется из переменных окружения.
+    host = os.getenv("BREE_LIFE_HOST", "127.0.0.1")
+    port = int(os.getenv("BREE_LIFE_PORT", "8000"))
+
+    import uvicorn
+
+    # Автоперезагрузка для локальной разработки.
+    uvicorn.run("main:app", host=host, port=port, reload=True)
