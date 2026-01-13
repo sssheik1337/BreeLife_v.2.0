@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ваша Сводка - Health Bloom</title>
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <link rel="stylesheet" href="style.css">
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+      body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#f0f9ff] to-[#f0fdf4]">
+    <custom-layout>
+        <custom-navbar></custom-navbar>
+        
+        <main class="flex-1 px-4 py-8">
+            <div class="max-w-md mx-auto">
+                <!-- Header -->
+                <div class="text-center mb-10">
+                    <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r from-purple-400 to-pink-400 mb-4 shadow-lg">
+                        <i data-feather="check-circle" class="w-7 h-7 text-white"></i>
+                    </div>
+                    <h1 class="text-2xl font-bold text-slate-800">Ваш профиль здоровья</h1>
+                    <p class="text-slate-500 mt-2">Проверьте вашу информацию</p>
+</div>
+                
+                <!-- Success Badge -->
+                <div class="bg-gradient-to-r from-emerald-50 to-cyan-50 rounded-2xl p-4 mb-6 border border-emerald-100">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                            <i data-feather="check" class="w-5 h-5 text-emerald-600"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-semibold text-emerald-800">Оценка завершена</h3>
+                            <p class="text-sm text-emerald-600">Все вопросы успешно заполнены!</p>
+                        </div>
+</div>
+                </div>
+                
+                <!-- Data Cards -->
+                <div id="data-cards" class="space-y-4 mb-8">
+                    <!-- Cards will be populated by JavaScript -->
+                </div>
+                
+                <!-- BMI Calculator -->
+                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                            <i data-feather="activity" class="w-5 h-5 text-blue-600"></i>
+                        </div>
+                        <h3 class="font-semibold text-slate-800">Индекс массы тела (ИМТ)</h3>
+</div>
+                    <div class="text-center py-4">
+                        <div class="text-5xl font-bold text-slate-800 mb-2" id="bmi-value">--</div>
+                        <div class="text-slate-500" id="bmi-category">Вычисление...</div>
+</div>
+                    <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div id="bmi-progress" class="h-full rounded-full transition-all duration-1000"></div>
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-500 mt-2">
+                        <span>Недостаточный вес</span>
+                        <span>Нормальный</span>
+                        <span>Избыточный вес</span>
+                        <span>Ожирение</span>
+</div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="space-y-4">
+                    <a href="profile.html" class="btn-primary w-full flex items-center justify-center space-x-3 group">
+                        <i data-feather="save" class="w-5 h-5"></i>
+                        <span>Сохранить и перейти в панель</span>
+</a>
+                    <a href="questionnaire.html" class="btn-secondary w-full flex items-center justify-center space-x-3">
+                        <i data-feather="edit" class="w-5 h-5"></i>
+                        <span>Редактировать информацию</span>
+</a>
+                </div>
+                
+                <!-- Info -->
+                <p class="text-center text-sm text-slate-400 mt-8">
+                    <i data-feather="lock" class="w-4 h-4 inline mr-1"></i>
+                    Ваши данные обрабатываются локально на вашем устройстве
+                </p>
+</div>
+        </main>
+        
+        <custom-footer></custom-footer>
+    </custom-layout>
+    
+    <script src="components/layout.js"></script>
+    <script src="components/navbar.js"></script>
+    <script src="components/footer.js"></script>
+    <script src="ui.js"></script>
+    <script src="resume.js"></script>
+    <script>
+        feather.replace();
+        document.addEventListener('DOMContentLoaded', function() {
+            generateSummary();
+            calculateBMI();
+        });
+    </script>
+</body>
+</html>
