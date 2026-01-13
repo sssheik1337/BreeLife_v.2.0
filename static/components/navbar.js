@@ -85,13 +85,13 @@ class CustomNavbar extends HTMLElement {
       </style>
       
       <nav class="navbar">
-        <a href="index.html" class="logo">
+        <a href="/" class="logo">
           <div class="logo-icon">🌿</div>
           <div class="logo-text">Health Bloom</div>
 </a>
         
         <div class="nav-actions">
-          <a href="profile.html" class="nav-button">
+          <a href="/profile" class="nav-button">
             <i data-feather="user"></i>
           </a>
           <button class="nav-button" onclick="this.dispatchEvent(new CustomEvent('menu-toggle'))">
@@ -100,6 +100,14 @@ class CustomNavbar extends HTMLElement {
         </div>
       </nav>
     `;
+
+    // Заглушка обработчика для кнопки меню
+    const menuButton = this.shadowRoot.querySelector('button.nav-button');
+    if (menuButton) {
+      menuButton.addEventListener('click', () => {
+        console.log('Меню в разработке');
+      });
+    }
   }
 }
 

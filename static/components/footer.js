@@ -67,10 +67,10 @@ class CustomFooter extends HTMLElement {
             🌱 Посадите здоровье сегодня, расцветёте завтра. Делайте маленькие шаги каждый день к более здоровому себе.
           </p>
 <div class="footer-links">
-            <a href="index.html" class="footer-link">Главная</a>
-            <a href="questionnaire.html" class="footer-link">Опрос</a>
-            <a href="resume.html" class="footer-link">Сводка</a>
-            <a href="profile.html" class="footer-link">Профиль</a>
+            <a href="/" class="footer-link">Главная</a>
+            <a href="/questionnaire" class="footer-link">Опрос</a>
+            <a href="/resume" class="footer-link">Сводка</a>
+            <a href="/profile" class="footer-link">Профиль</a>
 </div>
           <div class="copyright">
             © ${new Date().getFullYear()} Health Bloom • Сделано с ❤️ для здоровой жизни

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Дневник питания - Health Bloom</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+      body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#f0f9ff] to-[#f0fdf4]">
+    <custom-layout>
+        <custom-navbar></custom-navbar>
+
+        <main class="flex-1 px-4 py-8">
+            <div class="max-w-md mx-auto space-y-8">
+                <div class="text-center">
+                    <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 mb-4 shadow-lg">
+                        <i data-feather="coffee" class="w-7 h-7 text-white"></i>
+                    </div>
+                    <h1 class="text-2xl font-bold text-slate-800">Список продуктов</h1>
+                    <p class="text-slate-500 mt-2">Подборка продуктов по группам и уровню полезности.</p>
+                </div>
+
+                <div id="foods-container" class="space-y-8">
+                    <p class="text-center text-slate-400">Загрузка...</p>
+                </div>
+            </div>
+        </main>
+
+        <custom-footer></custom-footer>
+    </custom-layout>
+
+    <script src="/static/components/layout.js"></script>
+    <script src="/static/components/navbar.js"></script>
+    <script src="/static/components/footer.js"></script>
+    <script src="/static/ui.js"></script>
+    <script src="/static/foods.js"></script>
+    <script>
+        feather.replace();
+    </script>
+</body>
+</html>
