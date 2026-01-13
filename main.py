@@ -1,8 +1,13 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="BreeLife")
 
@@ -12,7 +17,7 @@ templates = Jinja2Templates(directory="templates")
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
-        print(f"{request.method} {request.url.path} {response.status_code}")
+        logger.info("%s %s %s", request.method, request.url.path, response.status_code)
         return response
 
 
