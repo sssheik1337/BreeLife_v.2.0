@@ -6,7 +6,12 @@ const userData = {
     birthDate: null,
     height: null,
     currentWeight: null,
-    targetWeight: null
+    targetWeight: null,
+    activityLevel: null,
+    goalType: null,
+    deadline: null,
+    foodDiary: null,
+    registrationDate: null
 };
 
 // Format date to readable string
@@ -254,5 +259,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const savedData = storage.get('user_data');
     if (savedData) {
         Object.assign(userData, savedData);
+    }
+
+    const storedRegistrationDate = localStorage.getItem('health_bloom_registration_date');
+    if (storedRegistrationDate) {
+        userData.registrationDate = storedRegistrationDate;
+    } else {
+        const now = new Date().toISOString();
+        userData.registrationDate = now;
+        localStorage.setItem('health_bloom_registration_date', now);
     }
 });

@@ -50,10 +50,53 @@ unit: "kg",
         type: "number",
         icon: "target",
         placeholder: "Введите желаемый вес в килограммах",
-unit: "kg",
+        unit: "kg",
         min: 30,
         max: 200,
         step: 0.5
+    },
+    {
+        id: 6,
+        title: "Какой у вас уровень активности?",
+        type: "select",
+        icon: "activity",
+        options: [
+            { value: "1.2", label: "Минимальная активность (1.2)", emoji: "🛋️" },
+            { value: "1.375", label: "Лёгкая активность (1.375)", emoji: "🚶" },
+            { value: "1.55", label: "Средняя активность (1.55)", emoji: "🏃" },
+            { value: "1.725", label: "Высокая активность (1.725)", emoji: "🏋️" },
+            { value: "1.9", label: "Очень высокая активность (1.9)", emoji: "🔥" }
+        ]
+    },
+    {
+        id: 7,
+        title: "Какова ваша цель?",
+        type: "select",
+        icon: "flag",
+        options: [
+            { value: "loss", label: "Похудение", emoji: "📉" },
+            { value: "maintain", label: "Поддержание", emoji: "⚖️" },
+            { value: "gain", label: "Набор массы", emoji: "📈" }
+        ]
+    },
+    {
+        id: 8,
+        title: "Когда вы хотите достичь цели?",
+        type: "date",
+        icon: "calendar",
+        placeholder: "Выберите дату дедлайна",
+        min: new Date().toISOString().split('T')[0],
+        max: "2100-12-31"
+    },
+    {
+        id: 9,
+        title: "Планируете ли вести пищевой дневник?",
+        type: "select",
+        icon: "book",
+        options: [
+            { value: "yes", label: "Да", emoji: "✅" },
+            { value: "no", label: "Нет", emoji: "❌" }
+        ]
     }
 ];
 
@@ -279,6 +322,10 @@ function getDataKey(index) {
         case 3: return 'height';
         case 4: return 'currentWeight';
         case 5: return 'targetWeight';
+        case 6: return 'activityLevel';
+        case 7: return 'goalType';
+        case 8: return 'deadline';
+        case 9: return 'foodDiary';
         default: return `question_${question.id}`;
     }
 }

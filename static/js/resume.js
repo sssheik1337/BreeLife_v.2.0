@@ -192,6 +192,149 @@ function updateBMIProgress(bmi) {
     progressBar.style.transition = 'width 1s ease-out, background-color 1s ease-out';
 }
 
+// Рендер круговых индикаторов питания
+function renderNutritionRings() {
+    const mockData = {
+        calories: { percent: 72, value: '1540 / 2150 ккал', label: 'Калории', color: '#10b981' },
+        water: { percent: 55, value: '1.4 / 2.5 л', label: 'Вода', color: '#38bdf8' },
+        protein: { percent: 68, value: '82 / 120 г', label: 'Белки', color: '#a855f7' },
+        fat: { percent: 43, value: '38 / 90 г', label: 'Жиры', color: '#f59e0b' },
+        carbs: { percent: 61, value: '190 / 310 г', label: 'Углеводы', color: '#06b6d4' }
+    };
+
+    const rings = [
+        { id: 'calorie-ring', data: mockData.calories },
+        { id: 'water-ring', data: mockData.water },
+        { id: 'macro-protein-ring', data: mockData.protein },
+        { id: 'macro-fat-ring', data: mockData.fat },
+        { id: 'macro-carb-ring', data: mockData.carbs }
+    ];
+
+    rings.forEach(({ id, data }) => {
+        const container = document.getElementById(id);
+        if (!container) {
+            return;
+        }
+        container.innerHTML = '';
+        container.appendChild(createProgressRing(data));
+    });
+}
+
+// Создание SVG-круга с анимацией заполнения
+function createProgressRing({ percent, value, label, color }) {
+    const size = 140;
+    const strokeWidth = 10;
+    const radius = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const progress = Math.max(0, Math.min(percent, 100));
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'flex flex-col items-center text-center space-y-3';
+
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', size);
+    svg.setAttribute('height', size);
+    svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+
+    const backgroundCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    backgroundCircle.setAttribute('cx', size / 2);
+    backgroundCircle.setAttribute('cy', size / 2);
+    backgroundCircle.setAttribute('r', radius);
+    backgroundCircle.setAttribute('stroke', '#e2e8f0');
+    backgroundCircle.setAttribute('stroke-width', strokeWidth);
+    backgroundCircle.setAttribute('fill', 'none');
+
+    const progressCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    progressCircle.setAttribute('cx', size / 2);
+    progressCircle.setAttribute('cy', size / 2);
+    progressCircle.setAttribute('r', radius);
+    progressCircle.setAttribute('stroke', color);
+    progressCircle.setAttribute('stroke-width', strokeWidth);
+    progressCircle.setAttribute('fill', 'none');
+    progressCircle.setAttribute('stroke-linecap', 'round');
+    progressCircle.setAttribute('stroke-dasharray', circumference);
+    progressCircle.setAttribute('stroke-dashoffset', circumference);
+    progressCircle.style.filter = 'drop-shadow(0 6px 12px rgba(15, 23, 42, 0.12))';
+
+    const percentText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    percentText.setAttribute('x', '50%');
+    percentText.setAttribute('y', '50%');
+    percentText.setAttribute('text-anchor', 'middle');
+    percentText.setAttribute('dominant-baseline', 'middle');
+    percentText.setAttribute('font-size', '20');
+    percentText.setAttribute('font-weight', '700');
+    percentText.setAttribute('fill', '#0f172a');
+    percentText.textContent = `${Math.round(progress)}%`;
+
+    svg.appendChild(backgroundCircle);
+    svg.appendChild(progressCircle);
+    svg.appendChild(percentText);
+
+    const labelText = document.createElement('div');
+    labelText.className = 'text-sm font-semibold text-slate-700';
+    labelText.textContent = label;
+
+    const valueText = document.createElement('div');
+    valueText.className = 'text-xs text-slate-500';
+    valueText.textContent = value;
+
+    wrapper.appendChild(svg);
+    wrapper.appendChild(labelText);
+    wrapper.appendChild(valueText);
+
+    requestAnimationFrame(() => {
+        progressCircle.style.transition = 'stroke-dashoffset 1.2s ease-out';
+        progressCircle.setAttribute(
+            'stroke-dashoffset',
+            `${circumference - (progress / 100) * circumference}`
+        );
+    });
+
+    return wrapper;
+}
+
+// Рендер статуса пробного периода
+function renderTrialStatus() {
+    const statusElement = document.getElementById('trial-status');
+    const datesElement = document.getElementById('trial-dates');
+
+    if (!statusElement || !datesElement) {
+        return;
+    }
+
+    const storedDate = localStorage.getItem('health_bloom_registration_date') || window.userData?.registrationDate;
+    if (!storedDate) {
+        statusElement.textContent = 'Регистрация не найдена';
+        datesElement.textContent = 'Добавьте данные профиля, чтобы активировать пробный период.';
+        return;
+    }
+
+    const registrationDate = new Date(storedDate);
+    if (Number.isNaN(registrationDate.getTime())) {
+        statusElement.textContent = 'Некорректная дата регистрации';
+        datesElement.textContent = 'Проверьте данные профиля.';
+        return;
+    }
+
+    const trialEnd = new Date(registrationDate);
+    trialEnd.setDate(trialEnd.getDate() + 30);
+    const now = new Date();
+    const isTrial = now <= trialEnd;
+
+    statusElement.textContent = isTrial ? 'Пробный период активен' : 'Пробный период завершён';
+
+    const remainingMs = trialEnd.getTime() - now.getTime();
+    const remainingDays = Math.max(0, Math.ceil(remainingMs / (1000 * 60 * 60 * 24)));
+    const startDate = registrationDate.toLocaleDateString('ru-RU');
+    const endDate = trialEnd.toLocaleDateString('ru-RU');
+
+    if (isTrial) {
+        datesElement.textContent = `С ${startDate} до ${endDate}. Осталось дней: ${remainingDays}`;
+    } else {
+        datesElement.textContent = `Период длился с ${startDate} до ${endDate}.`;
+    }
+}
+
 // Save all data and redirect to profile
 function saveAndContinue() {
     // Save data to localStorage
@@ -212,6 +355,8 @@ function saveAndContinue() {
 document.addEventListener('DOMContentLoaded', function() {
     generateSummary();
     calculateBMI();
+    renderNutritionRings();
+    renderTrialStatus();
     
     // Добавляем обработчик для кнопки сохранения
     const saveButton = document.querySelector('a.btn-primary');
