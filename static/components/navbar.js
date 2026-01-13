@@ -87,7 +87,7 @@ class CustomNavbar extends HTMLElement {
       <nav class="navbar">
         <a href="/" class="logo">
           <div class="logo-icon">🌿</div>
-          <div class="logo-text">Health Bloom</div>
+          <div class="logo-text">BreeLife</div>
 </a>
         
         <div class="nav-actions">
