@@ -25,6 +25,11 @@ async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("/healthz")
+async def healthz():
+    return {"status": "ok"}
+
+
 @app.get("/questionnaire", response_class=HTMLResponse)
 async def questionnaire(request: Request):
     return templates.TemplateResponse("questionnaire.html", {"request": request})
