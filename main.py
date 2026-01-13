@@ -1,5 +1,4 @@
 import logging
-import os
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
@@ -7,10 +6,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from config import settings
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="BreeLife")
+app = FastAPI(title=settings.APP_NAME)
 
 templates = Jinja2Templates(directory="templates")
 
@@ -62,11 +63,12 @@ async def menu(request: Request):
 
 
 if __name__ == "__main__":
-    # Конфигурация хоста и порта берется из переменных окружения.
-    host = os.getenv("BREE_LIFE_HOST", "127.0.0.1")
-    port = int(os.getenv("BREE_LIFE_PORT", "8000"))
-
     import uvicorn
 
     # Автоперезагрузка для локальной разработки.
-    uvicorn.run("main:app", host=host, port=port, reload=True)
+    uvicorn.run(
+        "main:app",
+        host=settings.APP_HOST,
+        port=settings.APP_PORT,
+        reload=True,
+    )
