@@ -108,6 +108,72 @@ function animateCountUps(container) {
     });
 }
 
+function readFoodDiaryEntries() {
+    const raw = localStorage.getItem('food_diary_entries');
+    if (!raw) {
+        return [];
+    }
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function readManualDiaryEntries() {
+    const raw = localStorage.getItem('health_bloom_food_entries');
+    if (!raw) {
+        return [];
+    }
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function sumFoodDiaryCalories(entries) {
+    const totalsByDate = new Map();
+    entries.forEach((entry) => {
+        if (!entry?.date) {
+            return;
+        }
+        const calories = Array.isArray(entry.items)
+            ? entry.items.reduce((sum, item) => sum + (Number(item?.calories) || 0), 0)
+            : 0;
+        totalsByDate.set(entry.date, (totalsByDate.get(entry.date) || 0) + calories);
+    });
+    return Array.from(totalsByDate.values());
+}
+
+function sumManualDiaryCalories(entries) {
+    const totalsByDate = new Map();
+    entries.forEach((entry) => {
+        if (!entry?.date) {
+            return;
+        }
+        const calories = Number(entry.calories) || 0;
+        totalsByDate.set(entry.date, (totalsByDate.get(entry.date) || 0) + calories);
+    });
+    return Array.from(totalsByDate.values());
+}
+
+function getAverageCalories() {
+    const foodEntries = readFoodDiaryEntries();
+    const manualEntries = readManualDiaryEntries();
+    const totals = [
+        ...sumFoodDiaryCalories(foodEntries),
+        ...sumManualDiaryCalories(manualEntries)
+    ];
+    if (!totals.length) {
+        return null;
+    }
+    const sum = totals.reduce((acc, value) => acc + value, 0);
+    return sum / totals.length;
+}
+
 function renderProfileRings() {
     const caloriesContainer = document.getElementById('profile-calories-ring');
     const macrosContainer = document.getElementById('profile-macros-rings');
@@ -119,35 +185,43 @@ function renderProfileRings() {
 
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
     const tdee = Number(profile?.tdee_calories);
-    const caloriesBase = Number.isFinite(tdee) ? tdee : 2000;
-    const caloriesValue = Math.round(caloriesBase * 0.6);
+    const avgCalories = getAverageCalories();
+    const caloriesPercent = Number.isFinite(avgCalories) && Number.isFinite(tdee) && tdee > 0
+        ? (avgCalories / tdee) * 100
+        : 0;
+    const caloriesValue = Number.isFinite(avgCalories) && Number.isFinite(tdee)
+        ? `${Math.round(avgCalories)} / ${Math.round(tdee)} ккал`
+        : 'нет данных';
 
     caloriesContainer.innerHTML = '';
     caloriesContainer.appendChild(
         createProgressRing({
-            percent: 60,
+            percent: caloriesPercent,
             color: '#10b981',
             label: 'Калории',
-            value: `${caloriesValue} / ${Math.round(caloriesBase)} ккал`,
+            value: caloriesValue,
             emphasize: true
         })
     );
 
-    const macros = profile?.macros || { protein_pct: 0.3, fat_pct: 0.25, carbs_pct: 0.45 };
+    const macros = profile?.macros;
+    const hasMacros = Number.isFinite(macros?.protein_pct)
+        || Number.isFinite(macros?.fat_pct)
+        || Number.isFinite(macros?.carbs_pct);
     const macroItems = [
         {
             label: 'Белки',
-            percent: Math.round((macros.protein_pct || 0.3) * 100),
+            percent: Number.isFinite(macros?.protein_pct) ? Math.round(macros.protein_pct * 100) : 0,
             color: '#a855f7'
         },
         {
             label: 'Жиры',
-            percent: Math.round((macros.fat_pct || 0.25) * 100),
+            percent: Number.isFinite(macros?.fat_pct) ? Math.round(macros.fat_pct * 100) : 0,
             color: '#f59e0b'
         },
         {
             label: 'Углеводы',
-            percent: Math.round((macros.carbs_pct || 0.45) * 100),
+            percent: Number.isFinite(macros?.carbs_pct) ? Math.round(macros.carbs_pct * 100) : 0,
             color: '#06b6d4'
         }
     ];
@@ -159,14 +233,18 @@ function renderProfileRings() {
                 percent: item.percent,
                 color: item.color,
                 label: item.label,
-                value: `${item.percent}%`
+                value: hasMacros ? `${item.percent}%` : 'нет данных'
             })
         );
     });
 
-    const waterCurrent = 1.2;
-    const waterTarget = 2.0;
-    const waterPercent = Math.round((waterCurrent / waterTarget) * 100);
+    const waterAvg = profile?.weekly_stats?.water_avg_l;
+    const waterTarget = Number(window.adminConfig?.reminders?.water_min_l);
+    const hasWater = Number.isFinite(waterAvg);
+    const waterPercent = hasWater && Number.isFinite(waterTarget) && waterTarget > 0
+        ? Math.round((waterAvg / waterTarget) * 100)
+        : 0;
+    const waterValue = hasWater ? `${Number(waterAvg).toFixed(1)} л` : 'нет данных';
 
     waterContainer.innerHTML = '';
     waterContainer.appendChild(
@@ -174,7 +252,7 @@ function renderProfileRings() {
             percent: waterPercent,
             color: '#38bdf8',
             label: 'Вода',
-            value: `${waterCurrent} / ${waterTarget} л`
+            value: waterValue
         })
     );
 
@@ -190,14 +268,28 @@ function renderMonthGrid() {
     }
 
     container.innerHTML = '';
+    const diaryEntries = [
+        ...readFoodDiaryEntries(),
+        ...readManualDiaryEntries()
+    ];
+    const daysWithEntries = new Set(
+        diaryEntries
+            .map((entry) => entry?.date)
+            .filter(Boolean)
+    );
     const days = 30;
-    for (let i = 1; i <= days; i += 1) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let i = 0; i < days; i += 1) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - (days - 1 - i));
+        const dateKey = date.toISOString().split('T')[0];
         const day = document.createElement('div');
         day.className = 'month-day';
-        if (i % 3 === 0 || i % 5 === 0) {
+        if (daysWithEntries.has(dateKey)) {
             day.classList.add('month-day--active');
         }
-        day.textContent = i;
+        day.textContent = date.getDate().toString();
         container.appendChild(day);
     }
 }
