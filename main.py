@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from config import APP_ENV, APP_HOST, APP_NAME, APP_PORT, DEBUG
+from config import AI_ENABLED, APP_ENV, APP_HOST, APP_NAME, APP_PORT, DEBUG
 from services.nutrition import (
     calculate_bmr,
     calculate_daily_calories,
@@ -121,6 +121,27 @@ async def subscription_status(
         "subscription_status": status_result,
         "registered_at": registration_date.isoformat(),
         "trial_end": trial_end.isoformat(),
+    }
+
+
+@app.post("/api/ai/recommendation")
+async def ai_recommendation(request: Request):
+    try:
+        profile = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Некорректный JSON.") from exc
+
+    if not AI_ENABLED:
+        return {
+            "text": "Персональные рекомендации будут доступны после включения AI.",
+            "source": "stub",
+        }
+
+    goal = profile.get("goal") if isinstance(profile, dict) else None
+    goal_text = goal or "ваша цель"
+    return {
+        "text": f"AI-рекомендации для цели: {goal_text}.",
+        "source": "yandex",
     }
 
 

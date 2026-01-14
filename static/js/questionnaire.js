@@ -74,9 +74,10 @@ unit: "kg",
         type: "select",
         icon: "flag",
         options: [
-            { value: "loss", label: "Похудение", emoji: "📉" },
-            { value: "maintain", label: "Поддержание", emoji: "⚖️" },
-            { value: "gain", label: "Набор массы", emoji: "📈" }
+            { value: "lose", label: "Похудение", emoji: "📉" },
+            { value: "muscle", label: "Набор мышц", emoji: "💪" },
+            { value: "gain", label: "Набор веса", emoji: "📈" },
+            { value: "maintain", label: "Поддержание", emoji: "⚖️" }
         ]
     },
     {
@@ -86,7 +87,8 @@ unit: "kg",
         icon: "calendar",
         placeholder: "Выберите дату дедлайна",
         min: new Date().toISOString().split('T')[0],
-        max: "2100-12-31"
+        max: "2100-12-31",
+        optional: true
     },
     {
         id: 9,
@@ -94,8 +96,8 @@ unit: "kg",
         type: "select",
         icon: "book",
         options: [
-            { value: "yes", label: "Да", emoji: "✅" },
-            { value: "no", label: "Нет", emoji: "❌" }
+            { value: true, label: "Да", emoji: "✅" },
+            { value: false, label: "Нет", emoji: "❌" }
         ]
     }
 ];
@@ -142,6 +144,12 @@ function initQuestionnaire() {
 
 // Load saved answers from localStorage
 function loadSavedAnswers() {
+    if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
+        const profile = getUserProfile();
+        Object.assign(window.userData, mapUserProfileToUserData(profile));
+        return;
+    }
+
     const savedData = localStorage.getItem('health_bloom_user_data');
     if (savedData) {
         try {
@@ -333,7 +341,8 @@ function getDataKey(index) {
 // Update button states
 function updateButtonStates() {
     const currentValue = window.userData[getDataKey(currentQuestionIndex)];
-    const hasAnswer = currentValue !== null && currentValue !== '';
+    const isOptional = questions[currentQuestionIndex]?.optional;
+    const hasAnswer = isOptional ? true : currentValue !== null && currentValue !== '';
     
     // Enable/disable next button
     nextButton.disabled = !hasAnswer;
@@ -355,6 +364,9 @@ if (window.feather) {
 function saveUserData() {
     localStorage.setItem('health_bloom_user_data', JSON.stringify(window.userData));
     localStorage.setItem('health_bloom_question_index', currentQuestionIndex.toString());
+    if (typeof patchUserProfile === 'function' && typeof mapUserDataToUserProfile === 'function') {
+        patchUserProfile(mapUserDataToUserProfile(window.userData));
+    }
 }
 
 // Setup event listeners
@@ -365,6 +377,9 @@ function setupEventListeners() {
             currentQuestionIndex++;
             displayQuestion();
         } else {
+            if (typeof patchUserProfile === 'function' && typeof mapUserDataToUserProfile === 'function') {
+                patchUserProfile(mapUserDataToUserProfile(window.userData));
+            }
             // All questions answered, go to resume page
             window.location.href = 'resume.html';
         }

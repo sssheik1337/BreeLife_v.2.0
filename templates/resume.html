@@ -45,6 +45,95 @@
                 <div id="data-cards" class="space-y-4 mb-8">
                     <!-- Cards will be populated by JavaScript -->
                 </div>
+
+                <!-- Calculations -->
+                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                            <i data-feather="bar-chart-2" class="w-5 h-5 text-emerald-600"></i>
+                        </div>
+                        <h3 class="font-semibold text-slate-800">Расчётные показатели</h3>
+                    </div>
+                    <div class="space-y-3 text-slate-700">
+                        <div class="flex items-center justify-between">
+                            <span>Возраст</span>
+                            <span id="age-value" class="font-semibold">--</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>BMR</span>
+                            <span id="bmr-value" class="font-semibold">--</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>Суточная норма калорий</span>
+                            <span id="tdee-value" class="font-semibold">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Macros -->
+                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center">
+                            <i data-feather="sliders" class="w-5 h-5 text-cyan-600"></i>
+                        </div>
+                        <h3 class="font-semibold text-slate-800">Калории и БЖУ</h3>
+                    </div>
+                    <div class="space-y-3 text-slate-700">
+                        <div class="flex items-center justify-between">
+                            <span>Калории</span>
+                            <span id="calories-value" class="font-semibold">--</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>Белки</span>
+                            <span id="protein-value" class="font-semibold">--</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>Жиры</span>
+                            <span id="fat-value" class="font-semibold">--</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>Углеводы</span>
+                            <span id="carbs-value" class="font-semibold">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Weight Forecast -->
+                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
+                            <i data-feather="trending-up" class="w-5 h-5 text-purple-600"></i>
+                        </div>
+                        <h3 class="font-semibold text-slate-800">Прогноз изменения веса</h3>
+                    </div>
+                    <div class="space-y-3 text-slate-700">
+                        <div class="flex items-center justify-between">
+                            <span>Темп</span>
+                            <span id="weight-rate-value" class="font-semibold">--</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>Примерная дата достижения</span>
+                            <span id="weight-date-value" class="font-semibold">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Personal Recommendations -->
+                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                            <i data-feather="sparkles" class="w-5 h-5 text-emerald-600"></i>
+                        </div>
+                        <h3 class="font-semibold text-slate-800">Персональные рекомендации</h3>
+                    </div>
+                    <ul id="recommendations-list" class="space-y-2 text-slate-700"></ul>
+                    <div class="mt-4 space-y-2 text-sm text-slate-500">
+                        <p id="diary-explanation"></p>
+                        <p id="calories-explanation"></p>
+                        <p id="macros-explanation"></p>
+                        <p id="deadline-motivation" class="hidden"></p>
+                    </div>
+                </div>
                 
                 <!-- BMI Calculator -->
                 <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8">
@@ -130,7 +219,10 @@
     <script src="/static/components/layout.js"></script>
     <script src="/static/components/navbar.js"></script>
     <script src="/static/components/footer.js"></script>
+    <script src="/static/js/storage.js"></script>
     <script src="/static/js/ui.js"></script>
+    <script src="/static/js/ai_stub.js"></script>
+    <script src="/static/js/calculations.js"></script>
     <script src="/static/js/resume.js"></script>
     <script>
         feather.replace();
