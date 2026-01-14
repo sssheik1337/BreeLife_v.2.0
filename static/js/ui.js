@@ -14,6 +14,76 @@ const userData = {
     registrationDate: null
 };
 
+window.userData = userData;
+
+// Преобразование user_profile в данные анкеты
+function mapUserProfileToUserData(profile) {
+    if (!profile) {
+        return {};
+    }
+    const goalMap = {
+        lose: 'lose',
+        maintain: 'maintain',
+        gain: 'gain',
+        muscle: 'muscle'
+    };
+
+    return {
+        gender: profile.sex ?? null,
+        birthDate: profile.birth_date ?? null,
+        height: profile.height_cm ?? null,
+        currentWeight: profile.weight_kg ?? null,
+        targetWeight: profile.target_weight_kg ?? null,
+        activityLevel: profile.activity_factor ?? null,
+        goalType: goalMap[profile.goal] ?? null,
+        deadline: profile.goal_deadline ?? null,
+        foodDiary: profile.food_diary === null || profile.food_diary === undefined
+            ? null
+            : profile.food_diary
+    };
+}
+
+// Преобразование данных анкеты в user_profile
+function mapUserDataToUserProfile(data) {
+    if (!data) {
+        return {};
+    }
+    const goalMap = {
+        lose: 'lose',
+        maintain: 'maintain',
+        gain: 'gain',
+        muscle: 'muscle'
+    };
+    const parseNumber = (value) => {
+        if (value === null || value === undefined || value === '') {
+            return null;
+        }
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : null;
+    };
+    const birthDate = data.birthDate || null;
+    const age = calculateAge(birthDate);
+
+    return {
+        sex: data.gender === 'male' || data.gender === 'female' ? data.gender : null,
+        birth_date: birthDate,
+        age: age ?? null,
+        height_cm: parseNumber(data.height),
+        weight_kg: parseNumber(data.currentWeight),
+        target_weight_kg: parseNumber(data.targetWeight),
+        goal: goalMap[data.goalType] ?? null,
+        activity_factor: parseNumber(data.activityLevel),
+        goal_deadline: data.deadline || null,
+        food_diary: data.foodDiary === true || data.foodDiary === false
+            ? data.foodDiary
+            : data.foodDiary === 'yes'
+                ? true
+                : data.foodDiary === 'no'
+                    ? false
+                    : null
+    };
+}
+
 // Format date to readable string
 function formatDate(dateString) {
     if (!dateString) return 'Не указано';
@@ -256,9 +326,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Load saved data if available
-    const savedData = storage.get('user_data');
-    if (savedData) {
-        Object.assign(userData, savedData);
+    if (typeof getUserProfile === 'function') {
+        const profile = getUserProfile();
+        Object.assign(userData, mapUserProfileToUserData(profile));
+    } else {
+        const savedData = storage.get('user_data');
+        if (savedData) {
+            Object.assign(userData, savedData);
+        }
     }
 
     const storedRegistrationDate = localStorage.getItem('health_bloom_registration_date');

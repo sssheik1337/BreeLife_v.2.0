@@ -62,6 +62,164 @@ function generateSummary() {
     }
 }
 
+// Обновление расчётных показателей профиля
+function updateCalculatedMetrics() {
+    if (typeof getUserProfile !== 'function') {
+        return;
+    }
+
+    const profile = getUserProfile();
+    const age = typeof calculateAge === 'function' ? calculateAge(profile.birth_date) : null;
+    const bmr = typeof calculateBMR === 'function'
+        ? calculateBMR({
+            sex: profile.sex,
+            weight_kg: profile.weight_kg,
+            height_cm: profile.height_cm,
+            age
+        })
+        : null;
+    const tdee = typeof calculateTDEE === 'function'
+        ? calculateTDEE(bmr, profile.activity_factor)
+        : null;
+    const macros = typeof calculateMacros === 'function' ? calculateMacros(tdee) : null;
+    const weightForecast = typeof calculateWeightGoalForecast === 'function'
+        ? calculateWeightGoalForecast({
+            goal: profile.goal,
+            weight_kg: profile.weight_kg,
+            target_weight_kg: profile.target_weight_kg
+        })
+        : {
+            weight_rate_kg_per_week: null,
+            predicted_goal_date: null,
+            label: null
+        };
+
+    if (typeof patchUserProfile === 'function') {
+        patchUserProfile({
+            age,
+            bmr,
+            tdee_calories: tdee,
+            macros,
+            weight_rate_kg_per_week: weightForecast.weight_rate_kg_per_week,
+            predicted_goal_date: weightForecast.predicted_goal_date
+        });
+    }
+
+    const ageElement = document.getElementById('age-value');
+    const bmrElement = document.getElementById('bmr-value');
+    const tdeeElement = document.getElementById('tdee-value');
+    const caloriesElement = document.getElementById('calories-value');
+    const proteinElement = document.getElementById('protein-value');
+    const fatElement = document.getElementById('fat-value');
+    const carbsElement = document.getElementById('carbs-value');
+    const weightRateElement = document.getElementById('weight-rate-value');
+    const weightDateElement = document.getElementById('weight-date-value');
+
+    if (ageElement) {
+        ageElement.textContent = age === null ? '--' : `${age} лет`;
+    }
+    if (bmrElement) {
+        bmrElement.textContent = bmr === null ? '--' : `${Math.round(bmr)} ккал`;
+    }
+    if (tdeeElement) {
+        tdeeElement.textContent = tdee === null ? '--' : `${Math.round(tdee)} ккал`;
+    }
+    if (caloriesElement) {
+        caloriesElement.textContent = tdee === null ? '--' : `${Math.round(tdee)} ккал`;
+    }
+    if (proteinElement) {
+        proteinElement.textContent = macros === null
+            ? '--'
+            : `${Math.round(macros.protein_g)} г • ${Math.round(macros.protein_pct * 100)}%`;
+    }
+    if (fatElement) {
+        fatElement.textContent = macros === null
+            ? '--'
+            : `${Math.round(macros.fat_g)} г • ${Math.round(macros.fat_pct * 100)}%`;
+    }
+    if (carbsElement) {
+        carbsElement.textContent = macros === null
+            ? '--'
+            : `${Math.round(macros.carbs_g)} г • ${Math.round(macros.carbs_pct * 100)}%`;
+    }
+    if (weightRateElement) {
+        if (weightForecast.label) {
+            weightRateElement.textContent = weightForecast.label;
+        } else {
+            weightRateElement.textContent = weightForecast.weight_rate_kg_per_week === null
+                ? '--'
+                : `${weightForecast.weight_rate_kg_per_week} кг/нед`;
+        }
+    }
+    if (weightDateElement) {
+        weightDateElement.textContent = weightForecast.predicted_goal_date === null
+            ? '--'
+            : weightForecast.predicted_goal_date;
+    }
+}
+
+// Рендер персональных рекомендаций
+function renderPersonalRecommendations() {
+    if (typeof getUserProfile !== 'function') {
+        return;
+    }
+
+    const profile = getUserProfile();
+    const recommendations = typeof getRecommendations === 'function'
+        ? getRecommendations(profile)
+        : [];
+    const diaryExplanation = typeof getDiaryExplanation === 'function'
+        ? getDiaryExplanation(profile)
+        : '';
+    const caloriesExplanation = typeof getCaloriesExplanation === 'function'
+        ? getCaloriesExplanation(profile)
+        : '';
+    const macrosExplanation = typeof getMacrosExplanation === 'function'
+        ? getMacrosExplanation(profile)
+        : '';
+    const deadlineMotivation = typeof getDeadlineMotivation === 'function'
+        ? getDeadlineMotivation(profile)
+        : '';
+
+    const listElement = document.getElementById('recommendations-list');
+    const diaryElement = document.getElementById('diary-explanation');
+    const caloriesElement = document.getElementById('calories-explanation');
+    const macrosElement = document.getElementById('macros-explanation');
+    const deadlineElement = document.getElementById('deadline-motivation');
+
+    if (listElement) {
+        listElement.innerHTML = '';
+        recommendations.forEach((item) => {
+            const listItem = document.createElement('li');
+            listItem.className = 'flex items-start space-x-2';
+            listItem.innerHTML = '<span class=\"text-emerald-500\">•</span>';
+            const textNode = document.createElement('span');
+            textNode.textContent = item;
+            listItem.appendChild(textNode);
+            listElement.appendChild(listItem);
+        });
+    }
+
+    if (diaryElement) {
+        diaryElement.textContent = diaryExplanation;
+    }
+    if (caloriesElement) {
+        caloriesElement.textContent = caloriesExplanation;
+    }
+    if (macrosElement) {
+        macrosElement.textContent = macrosExplanation;
+    }
+    if (deadlineElement) {
+        if (deadlineMotivation) {
+            deadlineElement.textContent = deadlineMotivation;
+            deadlineElement.classList.remove('hidden');
+        } else {
+            deadlineElement.textContent = '';
+            deadlineElement.classList.add('hidden');
+        }
+    }
+}
+
 // Create a data card element
 function createDataCard(point, index) {
     const colorClasses = {
@@ -355,6 +513,8 @@ function saveAndContinue() {
 document.addEventListener('DOMContentLoaded', function() {
     generateSummary();
     calculateBMI();
+    updateCalculatedMetrics();
+    renderPersonalRecommendations();
     renderNutritionRings();
     renderTrialStatus();
     
