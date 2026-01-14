@@ -12,6 +12,8 @@ tags:
 # Welcome to your new DeepSite project!
 This project was created with [DeepSite](https://huggingface.co/deepsite).
 
+Пробный период начинается с момента первого использования сервиса пользователем (идентифицируемого через Telegram WebApp).
+
 ## Проверка после рефакторинга
 1. Запуск сервера:
    `uvicorn main:app --reload`

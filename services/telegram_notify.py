@@ -6,9 +6,6 @@ from typing import Any
 
 import requests
 
-# TODO: добавить планировщик для регулярных напоминаний.
-# TODO: интегрировать cron / celery для фоновых задач.
-
 
 def send_reminder(chat_id: str, text: str) -> dict[str, Any]:
     """Отправить напоминание в Telegram (заглушка)."""

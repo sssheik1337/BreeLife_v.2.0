@@ -56,9 +56,11 @@ function calculateMacros(tdee_calories) {
     if (!Number.isFinite(calories)) {
         return null;
     }
-    const protein_pct = 0.30;
-    const fat_pct = 0.25;
-    const carbs_pct = 0.45;
+    const adminConfig = window.adminConfig || {};
+    const macrosConfig = adminConfig.default_macros || {};
+    const protein_pct = Number.isFinite(macrosConfig.protein_pct) ? macrosConfig.protein_pct : 0.30;
+    const fat_pct = Number.isFinite(macrosConfig.fat_pct) ? macrosConfig.fat_pct : 0.25;
+    const carbs_pct = Number.isFinite(macrosConfig.carbs_pct) ? macrosConfig.carbs_pct : 0.45;
 
     return {
         protein_g: (calories * protein_pct) / 4,
@@ -89,7 +91,8 @@ function calculateWeightGoalForecast({ goal, weight_kg, target_weight_kg }) {
         };
     }
 
-    const rateMap = {
+    const adminConfig = window.adminConfig || {};
+    const rateMap = adminConfig.weight_rates || {
         lose: -0.5,
         gain: 0.3,
         muscle: 0.25,
