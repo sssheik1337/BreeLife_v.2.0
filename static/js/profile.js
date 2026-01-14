@@ -1,6 +1,6 @@
 // Скрипты визуальных блоков профиля
 
-function createProgressRing({ percent, size = 120, stroke = 10, color = '#10b981', label, value }) {
+function createProgressRing({ percent, size = 120, stroke = 10, color = '#10b981', label, value, emphasize = false }) {
     const radius = (size - stroke) / 2;
     const circumference = 2 * Math.PI * radius;
     const progress = Math.max(0, Math.min(percent, 100));
@@ -47,12 +47,16 @@ function createProgressRing({ percent, size = 120, stroke = 10, color = '#10b981
     svg.appendChild(percentText);
 
     const labelNode = document.createElement('div');
-    labelNode.className = 'text-sm font-semibold text-slate-700';
+    labelNode.className = emphasize
+        ? 'text-base font-semibold text-slate-800'
+        : 'text-sm font-semibold text-slate-700';
     labelNode.textContent = label;
 
     const valueNode = document.createElement('div');
-    valueNode.className = 'text-xs text-slate-500';
-    valueNode.textContent = value;
+    valueNode.className = emphasize
+        ? 'text-sm font-semibold text-slate-700'
+        : 'text-xs text-slate-500';
+    valueNode.innerHTML = formatCountUpValue(value);
 
     wrapper.appendChild(svg);
     wrapper.appendChild(labelNode);
@@ -66,6 +70,110 @@ function createProgressRing({ percent, size = 120, stroke = 10, color = '#10b981
     return wrapper;
 }
 
+function formatCountUpValue(value) {
+    if (!value) {
+        return '';
+    }
+    const parts = String(value).split(' ');
+    const numbers = parts.shift();
+    const suffix = parts.join(' ');
+    if (!numbers) {
+        return value;
+    }
+    const values = numbers.split('/');
+    if (values.length === 2) {
+        return `<span class="countup"><span data-count="${values[0].trim()}">0</span>/<span data-count="${values[1].trim()}">0</span></span>${suffix ? ` ${suffix}` : ''}`;
+    }
+    return `<span class="countup"><span data-count="${numbers.trim()}">0</span></span>${suffix ? ` ${suffix}` : ''}`;
+}
+
+function animateCountUps(container) {
+    const elements = container.querySelectorAll('[data-count]');
+    elements.forEach((element) => {
+        const target = Number(element.dataset.count);
+        if (!Number.isFinite(target)) {
+            return;
+        }
+        const duration = 900;
+        const start = performance.now();
+        const step = (now) => {
+            const progress = Math.min((now - start) / duration, 1);
+            const value = Math.round(target * progress);
+            element.textContent = value.toString();
+            if (progress < 1) {
+                requestAnimationFrame(step);
+            }
+        };
+        requestAnimationFrame(step);
+    });
+}
+
+function readFoodDiaryEntries() {
+    const raw = localStorage.getItem('food_diary_entries');
+    if (!raw) {
+        return [];
+    }
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function readManualDiaryEntries() {
+    const raw = localStorage.getItem('health_bloom_food_entries');
+    if (!raw) {
+        return [];
+    }
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function sumFoodDiaryCalories(entries) {
+    const totalsByDate = new Map();
+    entries.forEach((entry) => {
+        if (!entry?.date) {
+            return;
+        }
+        const calories = Array.isArray(entry.items)
+            ? entry.items.reduce((sum, item) => sum + (Number(item?.calories) || 0), 0)
+            : 0;
+        totalsByDate.set(entry.date, (totalsByDate.get(entry.date) || 0) + calories);
+    });
+    return Array.from(totalsByDate.values());
+}
+
+function sumManualDiaryCalories(entries) {
+    const totalsByDate = new Map();
+    entries.forEach((entry) => {
+        if (!entry?.date) {
+            return;
+        }
+        const calories = Number(entry.calories) || 0;
+        totalsByDate.set(entry.date, (totalsByDate.get(entry.date) || 0) + calories);
+    });
+    return Array.from(totalsByDate.values());
+}
+
+function getAverageCalories() {
+    const foodEntries = readFoodDiaryEntries();
+    const manualEntries = readManualDiaryEntries();
+    const totals = [
+        ...sumFoodDiaryCalories(foodEntries),
+        ...sumManualDiaryCalories(manualEntries)
+    ];
+    if (!totals.length) {
+        return null;
+    }
+    const sum = totals.reduce((acc, value) => acc + value, 0);
+    return sum / totals.length;
+}
+
 function renderProfileRings() {
     const caloriesContainer = document.getElementById('profile-calories-ring');
     const macrosContainer = document.getElementById('profile-macros-rings');
@@ -77,34 +185,43 @@ function renderProfileRings() {
 
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
     const tdee = Number(profile?.tdee_calories);
-    const caloriesBase = Number.isFinite(tdee) ? tdee : 2000;
-    const caloriesValue = Math.round(caloriesBase * 0.6);
+    const avgCalories = getAverageCalories();
+    const caloriesPercent = Number.isFinite(avgCalories) && Number.isFinite(tdee) && tdee > 0
+        ? (avgCalories / tdee) * 100
+        : 0;
+    const caloriesValue = Number.isFinite(avgCalories) && Number.isFinite(tdee)
+        ? `${Math.round(avgCalories)} / ${Math.round(tdee)} ккал`
+        : 'нет данных';
 
     caloriesContainer.innerHTML = '';
     caloriesContainer.appendChild(
         createProgressRing({
-            percent: 60,
+            percent: caloriesPercent,
             color: '#10b981',
             label: 'Калории',
-            value: `${caloriesValue} / ${Math.round(caloriesBase)} ккал`
+            value: caloriesValue,
+            emphasize: true
         })
     );
 
-    const macros = profile?.macros || { protein_pct: 0.3, fat_pct: 0.25, carbs_pct: 0.45 };
+    const macros = profile?.macros;
+    const hasMacros = Number.isFinite(macros?.protein_pct)
+        || Number.isFinite(macros?.fat_pct)
+        || Number.isFinite(macros?.carbs_pct);
     const macroItems = [
         {
             label: 'Белки',
-            percent: Math.round((macros.protein_pct || 0.3) * 100),
+            percent: Number.isFinite(macros?.protein_pct) ? Math.round(macros.protein_pct * 100) : 0,
             color: '#a855f7'
         },
         {
             label: 'Жиры',
-            percent: Math.round((macros.fat_pct || 0.25) * 100),
+            percent: Number.isFinite(macros?.fat_pct) ? Math.round(macros.fat_pct * 100) : 0,
             color: '#f59e0b'
         },
         {
             label: 'Углеводы',
-            percent: Math.round((macros.carbs_pct || 0.45) * 100),
+            percent: Number.isFinite(macros?.carbs_pct) ? Math.round(macros.carbs_pct * 100) : 0,
             color: '#06b6d4'
         }
     ];
@@ -116,14 +233,18 @@ function renderProfileRings() {
                 percent: item.percent,
                 color: item.color,
                 label: item.label,
-                value: `${item.percent}%`
+                value: hasMacros ? `${item.percent}%` : 'нет данных'
             })
         );
     });
 
-    const waterCurrent = 1.2;
-    const waterTarget = 2.0;
-    const waterPercent = Math.round((waterCurrent / waterTarget) * 100);
+    const waterAvg = profile?.weekly_stats?.water_avg_l;
+    const waterTarget = Number(window.adminConfig?.reminders?.water_min_l);
+    const hasWater = Number.isFinite(waterAvg);
+    const waterPercent = hasWater && Number.isFinite(waterTarget) && waterTarget > 0
+        ? Math.round((waterAvg / waterTarget) * 100)
+        : 0;
+    const waterValue = hasWater ? `${Number(waterAvg).toFixed(1)} л` : 'нет данных';
 
     waterContainer.innerHTML = '';
     waterContainer.appendChild(
@@ -131,9 +252,13 @@ function renderProfileRings() {
             percent: waterPercent,
             color: '#38bdf8',
             label: 'Вода',
-            value: `${waterCurrent} / ${waterTarget} л`
+            value: waterValue
         })
     );
+
+    animateCountUps(caloriesContainer);
+    animateCountUps(macrosContainer);
+    animateCountUps(waterContainer);
 }
 
 function renderMonthGrid() {
@@ -143,19 +268,289 @@ function renderMonthGrid() {
     }
 
     container.innerHTML = '';
+    const diaryEntries = [
+        ...readFoodDiaryEntries(),
+        ...readManualDiaryEntries()
+    ];
+    const daysWithEntries = new Set(
+        diaryEntries
+            .map((entry) => entry?.date)
+            .filter(Boolean)
+    );
     const days = 30;
-    for (let i = 1; i <= days; i += 1) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let i = 0; i < days; i += 1) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - (days - 1 - i));
+        const dateKey = date.toISOString().split('T')[0];
         const day = document.createElement('div');
         day.className = 'month-day';
-        if (i % 3 === 0 || i % 5 === 0) {
+        if (daysWithEntries.has(dateKey)) {
             day.classList.add('month-day--active');
         }
-        day.textContent = i;
+        day.textContent = date.getDate().toString();
         container.appendChild(day);
     }
 }
 
+function renderWeeklyAdjustments() {
+    const list = document.getElementById('profile-weekly-adjustments-list');
+    if (!list) {
+        return;
+    }
+    if (typeof getUserProfile !== 'function' || typeof analyzeWeeklyStats !== 'function') {
+        return;
+    }
+
+    const profile = getUserProfile();
+    const analysis = analyzeWeeklyStats(profile);
+    if (!analysis || !Array.isArray(analysis.adjustments)) {
+        return;
+    }
+
+    if (typeof patchUserProfile === 'function') {
+        patchUserProfile({ weekly_adjustments: analysis.text });
+    }
+
+    list.innerHTML = '';
+    analysis.adjustments.forEach((item) => {
+        const li = document.createElement('li');
+        li.className = 'flex items-start gap-2';
+        li.innerHTML = '<span class="text-amber-500">•</span>';
+        const span = document.createElement('span');
+        span.textContent = item;
+        li.appendChild(span);
+        list.appendChild(li);
+    });
+}
+
+async function applySubscriptionAccess() {
+    const paywallElement = document.getElementById('profile-paywall');
+    const payButton = document.getElementById('profile-pay-button');
+    const paymentMotivation = document.getElementById('profile-payment-motivation');
+    const weeklyProgress = document.getElementById('profile-weekly-progress');
+    const dailyRings = document.getElementById('profile-daily-rings');
+    const monthGrid = document.getElementById('profile-month-grid-section');
+
+    if (!paywallElement || !payButton) {
+        return;
+    }
+
+    if (typeof getUserProfile !== 'function') {
+        return;
+    }
+
+    const profile = getUserProfile();
+    const telegramUserId = profile.telegram_user_id;
+    if (!telegramUserId) {
+        paywallElement.classList.add('hidden');
+        if (weeklyProgress) {
+            weeklyProgress.classList.remove('hidden');
+        }
+        if (dailyRings) {
+            dailyRings.classList.remove('hidden');
+        }
+        if (monthGrid) {
+            monthGrid.classList.remove('hidden');
+        }
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/subscription/status?telegram_user_id=${telegramUserId}`);
+        if (!response.ok) {
+            throw new Error('Не удалось получить статус подписки.');
+        }
+        const subscription = await response.json();
+        const isExpired = subscription.subscription_status === 'expired';
+
+        paywallElement.classList.toggle('hidden', !isExpired);
+        if (isExpired && paymentMotivation && typeof getPaymentMotivation === 'function') {
+            const deviations = typeof getFoodDiaryDeviationStatus === 'function'
+                ? getFoodDiaryDeviationStatus(profile)
+                : null;
+            paymentMotivation.textContent = await getPaymentMotivation(profile, deviations);
+        }
+        if (weeklyProgress) {
+            weeklyProgress.classList.toggle('hidden', isExpired);
+        }
+        if (dailyRings) {
+            dailyRings.classList.toggle('hidden', isExpired);
+        }
+        if (monthGrid) {
+            monthGrid.classList.toggle('hidden', isExpired);
+        }
+    } catch (error) {
+        console.error(error);
+    }
+
+    payButton.onclick = async () => {
+        try {
+            const response = await fetch('/api/payments/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telegram_user_id: telegramUserId, days: 30 })
+            });
+            if (!response.ok) {
+                throw new Error('Не удалось выполнить оплату.');
+            }
+            const result = await response.json();
+            if (result?.status === 'success') {
+                if (typeof patchUserProfile === 'function') {
+                    patchUserProfile({
+                        subscription_status: result.subscription_status ?? 'active',
+                        subscription_until: result.subscription_until ?? null
+                    });
+                }
+                await applySubscriptionAccess();
+            }
+        } catch (error) {
+            console.error(error);
+        }
+    };
+}
+
+async function renderProfileRecommendations() {
+    const list = document.getElementById('profile-recommendations-list');
+    if (!list) {
+        return;
+    }
+    if (typeof getUserProfile !== 'function') {
+        return;
+    }
+
+    const profile = getUserProfile();
+    try {
+        const response = await fetch('/api/ai/recommendation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(profile)
+        });
+        if (!response.ok) {
+            return;
+        }
+        const data = await response.json();
+        const text = data?.text;
+        if (!text) {
+            return;
+        }
+        const items = text
+            .split(/(?<=[.!?])\s+/)
+            .map((part) => part.trim())
+            .filter(Boolean)
+            .slice(0, 4);
+        list.innerHTML = '';
+        items.forEach((item) => {
+            const li = document.createElement('li');
+            li.className = 'flex items-start gap-2';
+            li.innerHTML = '<span class="text-emerald-500">•</span>';
+            const span = document.createElement('span');
+            span.textContent = item;
+            li.appendChild(span);
+            list.appendChild(li);
+        });
+    } catch (error) {
+        return;
+    }
+}
+
+function shouldRefreshWeeklyReview(review) {
+    if (!review?.week_end) {
+        return true;
+    }
+    const today = new Date();
+    const endDate = new Date(`${review.week_end}T00:00:00`);
+    if (Number.isNaN(endDate.getTime())) {
+        return true;
+    }
+    const diffDays = Math.floor((today.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays >= 7;
+}
+
+function renderWeeklyReview() {
+    const indicator = document.getElementById('weekly-review-indicator');
+    const statusText = document.getElementById('weekly-review-status');
+    const messageText = document.getElementById('weekly-review-message');
+    if (!indicator || !statusText || !messageText) {
+        return;
+    }
+    if (typeof getUserProfile !== 'function' || typeof analyzeWeeklyNutrition !== 'function') {
+        return;
+    }
+
+    const profile = getUserProfile();
+    let review = profile.weekly_review;
+
+    if (shouldRefreshWeeklyReview(review)) {
+        const entries = (() => {
+            try {
+                const raw = localStorage.getItem('food_diary_entries');
+                return raw ? JSON.parse(raw) : [];
+            } catch (error) {
+                return [];
+            }
+        })();
+        review = analyzeWeeklyNutrition(profile, entries);
+        if (typeof patchUserProfile === 'function') {
+            patchUserProfile({ weekly_review: review });
+        }
+    }
+
+    const statusLabels = {
+        overeat: 'Калории выше ориентира',
+        undereat: 'Калории ниже ориентира',
+        low_protein: 'Нужно больше белка',
+        low_discipline: 'Низкая регулярность',
+        ok: 'Всё стабильно'
+    };
+    const statusColors = {
+        overeat: 'bg-rose-500',
+        undereat: 'bg-yellow-400',
+        low_protein: 'bg-amber-500',
+        low_discipline: 'bg-yellow-400',
+        ok: 'bg-emerald-400'
+    };
+
+    indicator.className = `inline-flex h-3 w-3 rounded-full ${statusColors[review.status] || 'bg-slate-300'}`;
+    statusText.textContent = statusLabels[review.status] || 'Статус недели';
+    messageText.textContent = review.message || '';
+}
+
+async function loadProfileFromServer() {
+    if (typeof getUserProfile !== 'function' || typeof setUserProfile !== 'function') {
+        return;
+    }
+    const profile = getUserProfile();
+    const telegramUserId = profile.telegram_user_id;
+    if (!telegramUserId) {
+        return;
+    }
+    try {
+        const response = await fetch(`/api/profile/get?telegram_user_id=${telegramUserId}`);
+        if (!response.ok) {
+            return;
+        }
+        const data = await response.json();
+        if (data?.status === 'not_found') {
+            return;
+        }
+        if (data && typeof data === 'object') {
+            setUserProfile(data);
+        }
+    } catch (error) {
+        console.error(error);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-    renderProfileRings();
-    renderMonthGrid();
+    (async () => {
+        await loadProfileFromServer();
+        renderProfileRings();
+        renderMonthGrid();
+        renderWeeklyAdjustments();
+        renderWeeklyReview();
+        applySubscriptionAccess();
+        renderProfileRecommendations();
+    })();
 });

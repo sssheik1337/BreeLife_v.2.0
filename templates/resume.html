@@ -119,7 +119,7 @@
                 </div>
 
                 <!-- Personal Recommendations -->
-                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8">
+                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8" id="recommendations-section">
                     <div class="flex items-center space-x-3 mb-4">
                         <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
                             <i data-feather="sparkles" class="w-5 h-5 text-emerald-600"></i>
@@ -132,6 +132,7 @@
                         <p id="calories-explanation"></p>
                         <p id="macros-explanation"></p>
                         <p id="deadline-motivation" class="hidden"></p>
+                        <p id="deadline-warning" class="text-rose-600 hidden"></p>
                     </div>
                 </div>
                 
@@ -159,7 +160,7 @@
                 </div>
 
                 <!-- Nutrition Rings -->
-                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8">
+                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8" id="nutrition-rings-section">
                     <div class="flex items-center space-x-3 mb-6">
                         <div class="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center">
                             <i data-feather="pie-chart" class="w-5 h-5 text-cyan-600"></i>
@@ -181,16 +182,46 @@
                         <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
                             <i data-feather="clock" class="w-5 h-5 text-emerald-600"></i>
                         </div>
-                        <h3 class="font-semibold text-slate-800">Пробный период</h3>
+                        <h3 class="font-semibold text-slate-800">Подписка и пробный период</h3>
                     </div>
                     <div class="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 shadow-sm">
                         <div class="text-slate-700 font-semibold" id="trial-status">Статус обновляется...</div>
                         <div class="text-sm text-slate-500 mt-1" id="trial-dates">Проверяем даты...</div>
                     </div>
-                    <button class="btn-primary w-full mt-4 flex items-center justify-center space-x-3">
-                        <i data-feather="credit-card" class="w-5 h-5"></i>
-                        <span>Оформить подписку</span>
-                    </button>
+                    <div class="mt-4">
+                        <span id="trial-badge" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700"></span>
+                    </div>
+                    <p id="trial-warning" class="text-sm text-amber-600 mt-3 hidden"></p>
+                    <div id="paywall" class="mt-4 hidden">
+                        <div class="bg-rose-50 rounded-2xl p-4 border border-rose-100 shadow-sm">
+                            <p class="text-sm text-rose-700">
+                                Пробный период завершён. Чтобы продолжить пользоваться сервисом, оформите подписку.
+                            </p>
+                            <div class="mt-4 border-t border-rose-100 pt-4">
+                                <p class="text-sm font-semibold text-rose-800">Почему платная версия полезна именно вам</p>
+                                <p id="payment-motivation" class="text-sm text-rose-700 mt-2"></p>
+                            </div>
+                        </div>
+                        <button id="pay-button" class="btn-primary w-full mt-4 flex items-center justify-center space-x-3">
+                            <i data-feather="credit-card" class="w-5 h-5"></i>
+                            <span>Оплатить</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Telegram Reminders -->
+                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8" id="reminders-section">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                            <i data-feather="bell" class="w-5 h-5 text-emerald-600"></i>
+                        </div>
+                        <h3 class="font-semibold text-slate-800">Напоминания в Telegram</h3>
+                    </div>
+                    <p class="text-sm text-slate-500 mb-4">
+                        Настройте напоминания после завершения опроса. Отправка пока не включена — это заглушки.
+                    </p>
+                    <div class="space-y-3" id="reminders-actions"></div>
+                    <p class="text-xs text-slate-400 mt-4" id="reminders-hint"></p>
                 </div>
                 
                 <!-- Action Buttons -->
@@ -221,6 +252,10 @@
     <script src="/static/components/footer.js"></script>
     <script src="/static/js/storage.js"></script>
     <script src="/static/js/ui.js"></script>
+    <script>
+        window.adminConfig = {{ admin_config | tojson }};
+        window.aiEnabled = {{ ai_enabled | tojson }};
+    </script>
     <script src="/static/js/ai_stub.js"></script>
     <script src="/static/js/calculations.js"></script>
     <script src="/static/js/resume.js"></script>

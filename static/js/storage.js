@@ -4,6 +4,7 @@
     const STORAGE_KEY = 'user_profile';
     const ALLOWED_SEX = new Set(['male', 'female']);
     const ALLOWED_GOALS = new Set(['lose', 'maintain', 'gain', 'muscle']);
+    const ALLOWED_RISKS = new Set(['low', 'medium', 'high']);
 
     function getTelegramUserId() {
         const rawId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
@@ -35,8 +36,24 @@
             macros: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
+            weekly_stats: {
+                calories_avg: null,
+                protein_avg_g: null,
+                fat_avg_g: null,
+                carbs_avg_g: null,
+                water_avg_l: null,
+                days_logged: null,
+                week_start: null,
+                week_end: null
+            },
+            weekly_adjustments: null,
+            weekly_review: null,
+            deviation_risk: null,
+            deviation_comment: null,
             subscription_until: null,
-            subscription_status: null
+            subscription_status: null,
+            subscription_started_at: null,
+            trial_started_at: null
         };
     }
 
@@ -75,6 +92,13 @@
         return null;
     }
 
+    function normalizeRisk(value) {
+        if (ALLOWED_RISKS.has(value)) {
+            return value;
+        }
+        return null;
+    }
+
     function normalizeMacros(macros) {
         if (!macros) {
             return null;
@@ -86,6 +110,39 @@
             protein_pct: parseNumber(macros.protein_pct),
             fat_pct: parseNumber(macros.fat_pct),
             carbs_pct: parseNumber(macros.carbs_pct)
+        };
+    }
+
+    function normalizeWeeklyStats(stats) {
+        if (!stats || typeof stats !== 'object') {
+            return null;
+        }
+        return {
+            calories_avg: parseNumber(stats.calories_avg),
+            protein_avg_g: parseNumber(stats.protein_avg_g),
+            fat_avg_g: parseNumber(stats.fat_avg_g),
+            carbs_avg_g: parseNumber(stats.carbs_avg_g),
+            water_avg_l: parseNumber(stats.water_avg_l),
+            days_logged: parseNumber(stats.days_logged),
+            week_start: stats.week_start || null,
+            week_end: stats.week_end || null
+        };
+    }
+
+    function normalizeWeeklyReview(review) {
+        if (!review || typeof review !== 'object') {
+            return null;
+        }
+        return {
+            week_start: review.week_start || null,
+            week_end: review.week_end || null,
+            avg_calories: parseNumber(review.avg_calories),
+            avg_protein_g: parseNumber(review.avg_protein_g),
+            avg_fat_g: parseNumber(review.avg_fat_g),
+            avg_carbs_g: parseNumber(review.avg_carbs_g),
+            days_logged: parseNumber(review.days_logged),
+            status: review.status || null,
+            message: review.message || null
         };
     }
 
@@ -134,8 +191,15 @@
         merged.macros = normalizeMacros(merged.macros);
         merged.weight_rate_kg_per_week = parseNumber(merged.weight_rate_kg_per_week);
         merged.predicted_goal_date = merged.predicted_goal_date || null;
+        merged.weekly_stats = normalizeWeeklyStats(merged.weekly_stats);
+        merged.weekly_adjustments = merged.weekly_adjustments || null;
+        merged.weekly_review = normalizeWeeklyReview(merged.weekly_review);
+        merged.deviation_risk = normalizeRisk(merged.deviation_risk);
+        merged.deviation_comment = merged.deviation_comment || null;
         merged.subscription_until = merged.subscription_until || null;
         merged.subscription_status = merged.subscription_status || null;
+        merged.subscription_started_at = merged.subscription_started_at || null;
+        merged.trial_started_at = merged.trial_started_at || null;
 
         return merged;
     }
@@ -168,8 +232,15 @@
             macros: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
+            weekly_stats: null,
+            weekly_adjustments: null,
+            weekly_review: null,
+            deviation_risk: null,
+            deviation_comment: null,
             subscription_until: null,
-            subscription_status: null
+            subscription_status: null,
+            subscription_started_at: null,
+            trial_started_at: null
         };
         return profile;
     }
@@ -210,12 +281,86 @@
         return normalized;
     }
 
+    function addTrialDays(startedAtIso, days) {
+        const date = new Date(startedAtIso);
+        if (Number.isNaN(date.getTime())) {
+            return null;
+        }
+        date.setDate(date.getDate() + days);
+        return date.toISOString();
+    }
+
+    function applyTrialStartIfNeeded(current, merged) {
+        const hasTelegramId = merged.telegram_user_id !== null && merged.telegram_user_id !== undefined;
+        const isFirstTelegramId = !current.telegram_user_id && hasTelegramId;
+        const hasSubscriptionStatus = merged.subscription_status !== null && merged.subscription_status !== undefined;
+        const hasSubscriptionUntil = merged.subscription_until !== null && merged.subscription_until !== undefined;
+        const hasSubscriptionStartedAt = merged.subscription_started_at !== null && merged.subscription_started_at !== undefined;
+        const hasTrialStartedAt = merged.trial_started_at !== null && merged.trial_started_at !== undefined;
+
+        if (
+            !isFirstTelegramId ||
+            hasSubscriptionStatus ||
+            hasSubscriptionUntil ||
+            hasSubscriptionStartedAt ||
+            hasTrialStartedAt
+        ) {
+            return { merged, shouldNotifyBackend: false };
+        }
+
+        const adminConfig = window.adminConfig || {};
+        const trialDays = Number.isFinite(adminConfig.trial_days) ? adminConfig.trial_days : 30;
+        const startedAt = new Date().toISOString();
+        const until = addTrialDays(startedAt, trialDays);
+        if (!until) {
+            return { merged, shouldNotifyBackend: false };
+        }
+
+        return {
+            merged: {
+                ...merged,
+                subscription_status: 'trial',
+                subscription_started_at: startedAt,
+                trial_started_at: startedAt,
+                subscription_until: until
+            },
+            shouldNotifyBackend: true
+        };
+    }
+
+    async function notifyTrialStart(telegramUserId, startedAt) {
+        try {
+            const response = await fetch('/api/subscription/start_trial', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    telegram_user_id: telegramUserId,
+                    trial_started_at: startedAt,
+                    subscription_started_at: startedAt
+                })
+            });
+            if (!response.ok) {
+                throw new Error('Не удалось синхронизировать старт пробного периода.');
+            }
+            return await response.json();
+        } catch (error) {
+            console.error(error);
+            return null;
+        }
+    }
+
     function setUserProfile(profile) {
-        const normalized = normalizeUserProfile(profile);
+        const current = getUserProfile();
+        const merged = { ...current, ...(profile || {}) };
+        const trialResult = applyTrialStartIfNeeded(current, merged);
+        const normalized = normalizeUserProfile(trialResult.merged);
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
         } catch (error) {
             console.warn('Не удалось сохранить профиль пользователя:', error);
+        }
+        if (trialResult.shouldNotifyBackend) {
+            void notifyTrialStart(normalized.telegram_user_id, normalized.subscription_started_at);
         }
         return normalized;
     }
@@ -226,11 +371,15 @@
         if (partial && Object.prototype.hasOwnProperty.call(partial, 'macros')) {
             merged.macros = partial.macros;
         }
-        const normalized = normalizeUserProfile(merged);
+        const trialResult = applyTrialStartIfNeeded(current, merged);
+        const normalized = normalizeUserProfile(trialResult.merged);
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
         } catch (error) {
             console.warn('Не удалось сохранить профиль пользователя:', error);
+        }
+        if (trialResult.shouldNotifyBackend) {
+            void notifyTrialStart(normalized.telegram_user_id, normalized.subscription_started_at);
         }
         return normalized;
     }

@@ -70,22 +70,28 @@ function updateCalculatedMetrics() {
 
     const profile = getUserProfile();
     const age = typeof calculateAge === 'function' ? calculateAge(profile.birth_date) : null;
-    const bmr = typeof calculateBMR === 'function'
+    const weight = Number(profile.weight_kg);
+    const height = Number(profile.height_cm);
+    const hasValidWeight = Number.isFinite(weight) && weight > 0;
+    const hasValidHeight = Number.isFinite(height) && height > 0;
+    const hasValidAge = age !== null && age > 0;
+    const hasValidMetrics = hasValidWeight && hasValidHeight && hasValidAge;
+    const bmr = hasValidMetrics && typeof calculateBMR === 'function'
         ? calculateBMR({
             sex: profile.sex,
-            weight_kg: profile.weight_kg,
-            height_cm: profile.height_cm,
+            weight_kg: weight,
+            height_cm: height,
             age
         })
         : null;
-    const tdee = typeof calculateTDEE === 'function'
+    const tdee = bmr !== null && typeof calculateTDEE === 'function'
         ? calculateTDEE(bmr, profile.activity_factor)
         : null;
-    const macros = typeof calculateMacros === 'function' ? calculateMacros(tdee) : null;
+    const macros = tdee !== null && typeof calculateMacros === 'function' ? calculateMacros(tdee) : null;
     const weightForecast = typeof calculateWeightGoalForecast === 'function'
         ? calculateWeightGoalForecast({
             goal: profile.goal,
-            weight_kg: profile.weight_kg,
+            weight_kg: hasValidWeight ? weight : null,
             target_weight_kg: profile.target_weight_kg
         })
         : {
@@ -94,7 +100,7 @@ function updateCalculatedMetrics() {
             label: null
         };
 
-    if (typeof patchUserProfile === 'function') {
+    if (hasValidMetrics && typeof patchUserProfile === 'function') {
         patchUserProfile({
             age,
             bmr,
@@ -116,7 +122,13 @@ function updateCalculatedMetrics() {
     const weightDateElement = document.getElementById('weight-date-value');
 
     if (ageElement) {
-        ageElement.textContent = age === null ? '--' : `${age} лет`;
+        if (age === null) {
+            ageElement.textContent = '--';
+        } else if (!hasValidAge) {
+            ageElement.textContent = 'Ошибка: возраст некорректен';
+        } else {
+            ageElement.textContent = `${age} лет`;
+        }
     }
     if (bmrElement) {
         bmrElement.textContent = bmr === null ? '--' : `${Math.round(bmr)} ккал`;
@@ -186,6 +198,7 @@ function renderPersonalRecommendations() {
     const caloriesElement = document.getElementById('calories-explanation');
     const macrosElement = document.getElementById('macros-explanation');
     const deadlineElement = document.getElementById('deadline-motivation');
+    const deadlineWarning = document.getElementById('deadline-warning');
 
     if (listElement) {
         listElement.innerHTML = '';
@@ -217,6 +230,81 @@ function renderPersonalRecommendations() {
             deadlineElement.textContent = '';
             deadlineElement.classList.add('hidden');
         }
+    }
+    if (deadlineWarning) {
+        const deadlineRaw = profile.goal_deadline;
+        if (deadlineRaw) {
+            const deadlineDate = new Date(deadlineRaw);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            deadlineDate.setHours(0, 0, 0, 0);
+            if (!Number.isNaN(deadlineDate.getTime()) && deadlineDate < today) {
+                deadlineWarning.textContent = 'Дедлайн уже прошёл. Можно выбрать новую дату, чтобы план был актуальным.';
+                deadlineWarning.classList.remove('hidden');
+            } else {
+                deadlineWarning.textContent = '';
+                deadlineWarning.classList.add('hidden');
+            }
+        } else {
+            deadlineWarning.textContent = '';
+            deadlineWarning.classList.add('hidden');
+        }
+    }
+}
+
+// Получить AI-рекомендацию и обновить текстовые блоки
+async function applyAiRecommendationToResume() {
+    if (typeof getUserProfile !== 'function') {
+        return;
+    }
+
+    const profile = getUserProfile();
+    const caloriesElement = document.getElementById('calories-explanation');
+    const macrosElement = document.getElementById('macros-explanation');
+    const deadlineElement = document.getElementById('deadline-motivation');
+
+    if (!caloriesElement && !macrosElement && !deadlineElement) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/ai/recommendation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(profile)
+        });
+        if (!response.ok) {
+            return;
+        }
+        const data = await response.json();
+        const text = data?.text;
+        if (!text) {
+            return;
+        }
+
+        const sentences = text
+            .split(/(?<=[.!?])\s+/)
+            .map((part) => part.trim())
+            .filter(Boolean);
+
+        const caloriesSentence = sentences.find((item) => item.toLowerCase().includes('ккал'));
+        const macrosSentence = sentences.find((item) => item.toLowerCase().includes('бжу'));
+        const deadlineSentence = sentences.find((item) =>
+            item.toLowerCase().includes('дата') || item.toLowerCase().includes('нед')
+        );
+
+        if (caloriesElement && caloriesSentence) {
+            caloriesElement.textContent = caloriesSentence;
+        }
+        if (macrosElement && macrosSentence) {
+            macrosElement.textContent = macrosSentence;
+        }
+        if (deadlineElement && deadlineSentence) {
+            deadlineElement.textContent = deadlineSentence;
+            deadlineElement.classList.remove('hidden');
+        }
+    } catch (error) {
+        return;
     }
 }
 
@@ -452,45 +540,336 @@ function createProgressRing({ percent, value, label, color }) {
 }
 
 // Рендер статуса пробного периода
-function renderTrialStatus() {
+async function renderTrialStatus() {
     const statusElement = document.getElementById('trial-status');
     const datesElement = document.getElementById('trial-dates');
+    const badgeElement = document.getElementById('trial-badge');
+    const warningElement = document.getElementById('trial-warning');
+    const paywallElement = document.getElementById('paywall');
+    const payButton = document.getElementById('pay-button');
+    const paymentMotivation = document.getElementById('payment-motivation');
+    const recommendationsSection = document.getElementById('recommendations-section');
+    const nutritionSection = document.getElementById('nutrition-rings-section');
 
-    if (!statusElement || !datesElement) {
+    if (!statusElement || !datesElement || !badgeElement || !paywallElement || !payButton) {
         return;
     }
 
-    const storedDate = localStorage.getItem('health_bloom_registration_date') || window.userData?.registrationDate;
-    if (!storedDate) {
-        statusElement.textContent = 'Регистрация не найдена';
-        datesElement.textContent = 'Добавьте данные профиля, чтобы активировать пробный период.';
+    if (typeof getUserProfile !== 'function') {
+        statusElement.textContent = 'Не удалось загрузить профиль';
+        datesElement.textContent = 'Повторите попытку позже.';
         return;
     }
 
-    const registrationDate = new Date(storedDate);
-    if (Number.isNaN(registrationDate.getTime())) {
-        statusElement.textContent = 'Некорректная дата регистрации';
-        datesElement.textContent = 'Проверьте данные профиля.';
+    const profile = getUserProfile();
+    const telegramUserId = profile.telegram_user_id;
+    if (!telegramUserId) {
+        statusElement.textContent = 'Telegram ID не найден';
+        datesElement.textContent = 'Откройте приложение в Telegram, чтобы активировать пробный период.';
+        badgeElement.textContent = 'Пробный период до --';
+        if (warningElement) {
+            warningElement.textContent = '';
+            warningElement.classList.add('hidden');
+        }
+        paywallElement.classList.add('hidden');
+        if (recommendationsSection) {
+            recommendationsSection.classList.remove('hidden');
+        }
+        if (nutritionSection) {
+            nutritionSection.classList.remove('hidden');
+        }
         return;
     }
 
-    const trialEnd = new Date(registrationDate);
-    trialEnd.setDate(trialEnd.getDate() + 30);
-    const now = new Date();
-    const isTrial = now <= trialEnd;
+    const formatDateRu = (iso) => {
+        if (!iso) {
+            return null;
+        }
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) {
+            return null;
+        }
+        return date.toLocaleDateString('ru-RU');
+    };
 
-    statusElement.textContent = isTrial ? 'Пробный период активен' : 'Пробный период завершён';
+    const fetchSubscriptionStatus = async () => {
+        const response = await fetch(`/api/subscription/status?telegram_user_id=${telegramUserId}`);
+        if (!response.ok) {
+            throw new Error('Не удалось получить статус подписки.');
+        }
+        return response.json();
+    };
 
-    const remainingMs = trialEnd.getTime() - now.getTime();
-    const remainingDays = Math.max(0, Math.ceil(remainingMs / (1000 * 60 * 60 * 24)));
-    const startDate = registrationDate.toLocaleDateString('ru-RU');
-    const endDate = trialEnd.toLocaleDateString('ru-RU');
+    const startTrial = async () => {
+        const response = await fetch('/api/subscription/start_trial', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegram_user_id: telegramUserId })
+        });
+        if (!response.ok) {
+            throw new Error('Не удалось запустить пробный период.');
+        }
+        return response.json();
+    };
 
-    if (isTrial) {
-        datesElement.textContent = `С ${startDate} до ${endDate}. Осталось дней: ${remainingDays}`;
+    const startPayment = async () => {
+        const response = await fetch('/api/payments/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telegram_user_id: telegramUserId, days: 30 })
+        });
+        if (!response.ok) {
+            throw new Error('Не удалось выполнить оплату.');
+        }
+        return response.json();
+    };
+
+    let subscription;
+    try {
+        subscription = await fetchSubscriptionStatus();
+    } catch (error) {
+        statusElement.textContent = 'Не удалось загрузить статус подписки';
+        datesElement.textContent = 'Попробуйте обновить страницу.';
+        badgeElement.textContent = 'Пробный период до --';
+        paywallElement.classList.add('hidden');
+        console.error(error);
+        return;
+    }
+
+    if (subscription.subscription_status === 'none') {
+        try {
+            subscription = await startTrial();
+        } catch (error) {
+            statusElement.textContent = 'Не удалось активировать пробный период';
+            datesElement.textContent = 'Попробуйте обновить страницу.';
+            badgeElement.textContent = 'Пробный период до --';
+            paywallElement.classList.add('hidden');
+            console.error(error);
+            return;
+        }
+    }
+
+    const untilDate = formatDateRu(subscription.subscription_until);
+    paywallElement.classList.add('hidden');
+    badgeElement.textContent = untilDate ? `Пробный период до ${untilDate}` : 'Пробный период до --';
+    if (warningElement) {
+        warningElement.textContent = '';
+        warningElement.classList.add('hidden');
+    }
+
+    const isExpired = subscription.subscription_status === 'expired';
+    if (recommendationsSection) {
+        recommendationsSection.classList.toggle('hidden', isExpired);
+    }
+    if (nutritionSection) {
+        nutritionSection.classList.toggle('hidden', isExpired);
+    }
+
+    if (subscription.subscription_status === 'trial') {
+        statusElement.textContent = 'Пробный период активен';
+        datesElement.textContent = untilDate
+            ? `Пробный период действует до ${untilDate}.`
+            : 'Даты пробного периода уточняются.';
+        if (warningElement && subscription.subscription_until) {
+            const endDate = new Date(subscription.subscription_until);
+            const now = new Date();
+            const diffMs = endDate.getTime() - now.getTime();
+            const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+            if (daysLeft <= 3 && daysLeft >= 0) {
+                warningElement.textContent = 'Пробный период скоро закончится. Можно заранее оформить подписку.';
+                warningElement.classList.remove('hidden');
+            }
+        }
+    } else if (subscription.subscription_status === 'active') {
+        statusElement.textContent = 'Подписка активна';
+        datesElement.textContent = untilDate
+            ? `Подписка действует до ${untilDate}.`
+            : 'Даты подписки уточняются.';
+        badgeElement.textContent = untilDate ? `Подписка до ${untilDate}` : 'Подписка активна';
+    } else if (subscription.subscription_status === 'expired') {
+        statusElement.textContent = 'Пробный период завершён';
+        datesElement.textContent = untilDate
+            ? `Пробный период закончился ${untilDate}.`
+            : 'Пробный период завершён.';
+        paywallElement.classList.remove('hidden');
+        badgeElement.textContent = 'Пробный период завершён';
+        if (paymentMotivation && typeof getPaymentMotivation === 'function') {
+            const deviations = typeof getFoodDiaryDeviationStatus === 'function'
+                ? getFoodDiaryDeviationStatus(profile)
+                : null;
+            paymentMotivation.textContent = await getPaymentMotivation(profile, deviations);
+        }
     } else {
-        datesElement.textContent = `Период длился с ${startDate} до ${endDate}.`;
+        statusElement.textContent = 'Статус подписки неизвестен';
+        datesElement.textContent = 'Попробуйте обновить страницу.';
+        badgeElement.textContent = 'Пробный период до --';
     }
+
+    payButton.onclick = async () => {
+        try {
+            const result = await startPayment();
+            if (result?.status === 'success') {
+                if (typeof showNotification === 'function') {
+                    showNotification('Оплата прошла успешно!', 'success');
+                }
+                if (typeof patchUserProfile === 'function') {
+                    patchUserProfile({
+                        subscription_status: result.subscription_status ?? 'active',
+                        subscription_until: result.subscription_until ?? subscription.subscription_until
+                    });
+                }
+                await renderTrialStatus();
+            }
+        } catch (error) {
+            if (typeof showNotification === 'function') {
+                showNotification('Не удалось выполнить оплату.', 'error');
+            }
+            console.error(error);
+        }
+    };
+}
+
+// Рендер кнопок напоминаний для Telegram
+function renderReminderActions() {
+    const section = document.getElementById('reminders-section');
+    const actionsContainer = document.getElementById('reminders-actions');
+    const hintElement = document.getElementById('reminders-hint');
+
+    if (!section || !actionsContainer || !hintElement) {
+        return;
+    }
+
+    if (typeof getUserProfile !== 'function') {
+        hintElement.textContent = 'Не удалось загрузить профиль для настройки напоминаний.';
+        return;
+    }
+
+    const profile = getUserProfile();
+    actionsContainer.innerHTML = '';
+    hintElement.textContent = '';
+
+    const telegramUserId = profile.telegram_user_id;
+    const isTelegramAvailable = telegramUserId !== null && telegramUserId !== undefined;
+
+    if (!isTelegramAvailable) {
+        hintElement.textContent = 'Telegram ID не найден. Откройте приложение в Telegram, чтобы включить напоминания.';
+    }
+
+    const scheduleReminder = async (payload) => {
+        try {
+            const response = await fetch('/api/reminders/schedule', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                throw new Error('Ошибка сервера при сохранении напоминания.');
+            }
+            const data = await response.json();
+            if (data?.status === 'scheduled') {
+                if (typeof showNotification === 'function') {
+                    showNotification('Напоминание сохранено!', 'success');
+                }
+            } else {
+                throw new Error('Ответ сервера не подтверждает сохранение.');
+            }
+        } catch (error) {
+            if (typeof showNotification === 'function') {
+                showNotification('Не удалось сохранить напоминание.', 'error');
+            }
+            console.error(error);
+        }
+    };
+
+    const typeLabels = {
+        food_diary: 'Дневник питания',
+        water: 'Вода',
+        weekly_summary: 'Еженедельный обзор',
+        goal_deadline: 'Дедлайн цели'
+    };
+
+    const renderPreview = (reminder) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'rounded-xl border border-slate-100 bg-slate-50 p-4';
+
+        const title = document.createElement('div');
+        title.className = 'text-sm font-semibold text-slate-700';
+        title.textContent = typeLabels[reminder.type] || 'Напоминание';
+
+        const text = document.createElement('p');
+        text.className = 'text-sm text-slate-600 mt-2';
+        text.textContent = reminder.text;
+
+        const actions = document.createElement('div');
+        actions.className = 'mt-3 grid grid-cols-2 gap-2';
+
+        const enableButton = document.createElement('button');
+        enableButton.type = 'button';
+        enableButton.className = `btn-primary ${isTelegramAvailable ? '' : 'opacity-60 cursor-not-allowed'}`;
+        enableButton.textContent = 'Включить';
+        enableButton.disabled = !isTelegramAvailable;
+
+        const skipButton = document.createElement('button');
+        skipButton.type = 'button';
+        skipButton.className = 'btn-secondary';
+        skipButton.textContent = 'Пропустить';
+
+        enableButton.addEventListener('click', async () => {
+            if (!isTelegramAvailable) {
+                return;
+            }
+            await scheduleReminder({
+                telegram_user_id: telegramUserId,
+                type: reminder.type,
+                when_iso: reminder.suggested_time_iso
+            });
+            wrapper.remove();
+        });
+
+        skipButton.addEventListener('click', () => {
+            wrapper.remove();
+        });
+
+        actions.appendChild(enableButton);
+        actions.appendChild(skipButton);
+        wrapper.appendChild(title);
+        wrapper.appendChild(text);
+        wrapper.appendChild(actions);
+        actionsContainer.appendChild(wrapper);
+    };
+
+    const fetchReminders = async () => {
+        try {
+            const response = await fetch('/api/reminders/auto-generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    telegram_user_id: telegramUserId ?? 0,
+                    user_profile: profile,
+                    weekly_review: profile.weekly_review || {}
+                })
+            });
+            if (!response.ok) {
+                throw new Error('Не удалось получить список напоминаний.');
+            }
+            const data = await response.json();
+            const reminders = Array.isArray(data?.reminders) ? data.reminders : [];
+            if (!reminders.length) {
+                hintElement.textContent = 'Пока нет рекомендаций по напоминаниям.';
+                return;
+            }
+            reminders.forEach((reminder) => {
+                if (!reminder?.type || !reminder?.text || !reminder?.suggested_time_iso) {
+                    return;
+                }
+                renderPreview(reminder);
+            });
+        } catch (error) {
+            hintElement.textContent = 'Не удалось загрузить превью напоминаний.';
+        }
+    };
+
+    fetchReminders();
 }
 
 // Save all data and redirect to profile
@@ -515,8 +894,10 @@ document.addEventListener('DOMContentLoaded', function() {
     calculateBMI();
     updateCalculatedMetrics();
     renderPersonalRecommendations();
+    applyAiRecommendationToResume();
     renderNutritionRings();
     renderTrialStatus();
+    renderReminderActions();
     
     // Добавляем обработчик для кнопки сохранения
     const saveButton = document.querySelector('a.btn-primary');

@@ -1,5 +1,24 @@
 // Questionnaire Logic for Health Bloom App
 
+function buildActivityOptions() {
+    const adminConfig = window.adminConfig || {};
+    const coefficients = adminConfig.activity_coefficients;
+    if (!Array.isArray(coefficients) || coefficients.length === 0) {
+        return [
+            { value: "1.2", label: "Минимальная активность (1.2)", emoji: "🛋️" },
+            { value: "1.375", label: "Лёгкая активность (1.375)", emoji: "🚶" },
+            { value: "1.55", label: "Средняя активность (1.55)", emoji: "🏃" },
+            { value: "1.725", label: "Высокая активность (1.725)", emoji: "🏋️" },
+            { value: "1.9", label: "Очень высокая активность (1.9)", emoji: "🔥" }
+        ];
+    }
+    return coefficients.map((item) => ({
+        value: String(item.value),
+        label: `${item.label} (${item.value})`,
+        emoji: item.emoji || "✨"
+    }));
+}
+
 // Question definitions
 const questions = [
     {
@@ -60,13 +79,7 @@ unit: "kg",
         title: "Какой у вас уровень активности?",
         type: "select",
         icon: "activity",
-        options: [
-            { value: "1.2", label: "Минимальная активность (1.2)", emoji: "🛋️" },
-            { value: "1.375", label: "Лёгкая активность (1.375)", emoji: "🚶" },
-            { value: "1.55", label: "Средняя активность (1.55)", emoji: "🏃" },
-            { value: "1.725", label: "Высокая активность (1.725)", emoji: "🏋️" },
-            { value: "1.9", label: "Очень высокая активность (1.9)", emoji: "🔥" }
-        ]
+        options: buildActivityOptions()
     },
     {
         id: 7,
@@ -125,6 +138,10 @@ function initQuestionnaire() {
     progressBar = document.getElementById('progress-bar');
     currentStep = document.getElementById('current-step');
     progressPercent = document.getElementById('progress-percent');
+    const totalSteps = document.getElementById('total-steps');
+    if (totalSteps) {
+        totalSteps.textContent = questions.length.toString();
+    }
     
     // Load saved progress
     const savedIndex = localStorage.getItem('health_bloom_question_index');
@@ -369,17 +386,41 @@ function saveUserData() {
     }
 }
 
+async function saveProfileToServer(profile) {
+    if (!profile || !profile.telegram_user_id) {
+        return;
+    }
+    try {
+        await fetch('/api/profile/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                telegram_user_id: profile.telegram_user_id,
+                user_profile: profile
+            })
+        });
+    } catch (error) {
+        console.error(error);
+    }
+}
+
 // Setup event listeners
 function setupEventListeners() {
     // Next button
-    nextButton.addEventListener('click', () => {
+    nextButton.addEventListener('click', async () => {
         if (currentQuestionIndex < questions.length - 1) {
             currentQuestionIndex++;
             displayQuestion();
         } else {
+            // Сохраняем профиль и отправляем на сервер (если доступен Telegram ID).
+            let profile = null;
             if (typeof patchUserProfile === 'function' && typeof mapUserDataToUserProfile === 'function') {
-                patchUserProfile(mapUserDataToUserProfile(window.userData));
+                profile = patchUserProfile(mapUserDataToUserProfile(window.userData));
             }
+            if (!profile && typeof getUserProfile === 'function') {
+                profile = getUserProfile();
+            }
+            await saveProfileToServer(profile);
             // All questions answered, go to resume page
             window.location.href = 'resume.html';
         }

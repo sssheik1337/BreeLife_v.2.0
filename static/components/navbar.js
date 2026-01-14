@@ -101,13 +101,6 @@ class CustomNavbar extends HTMLElement {
       </nav>
     `;
 
-    // Заглушка обработчика для кнопки меню
-    const menuButton = this.shadowRoot.querySelector('button.nav-button');
-    if (menuButton) {
-      menuButton.addEventListener('click', () => {
-        console.log('Меню в разработке');
-      });
-    }
   }
 }
 

@@ -7,7 +7,12 @@ class CustomLayout extends HTMLElement {
           min-height: 100vh;
           display: flex;
           flex-direction: column;
-          background: linear-gradient(135deg, #f8fafc 0%, #f0f9ff 50%, #f0fdf4 100%);
+          background: var(--tg-bg-color, #f8fafc);
+          color: var(--tg-text-color, #0f172a);
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+          padding-top: env(safe-area-inset-top);
+          padding-bottom: env(safe-area-inset-bottom);
         }
         
         .main-content {

@@ -11,6 +11,13 @@
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
       body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+      #question-card { min-height: 360px; }
+      #next-btn:disabled,
+      #prev-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
     </style>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#f0f9ff] to-[#f0fdf4]">
@@ -18,7 +25,7 @@
         <custom-navbar></custom-navbar>
         
         <main class="flex-1 px-4 py-8">
-            <div class="max-w-md mx-auto">
+            <div class="max-w-[420px] mx-auto">
                 <!-- Header -->
                 <div class="text-center mb-10">
                     <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 mb-4 shadow-lg">
@@ -30,9 +37,13 @@
                 
                 <!-- Progress Bar -->
                 <div class="mb-8">
-                    <div class="flex justify-between text-sm text-slate-500 mb-2">
-                        <span>Шаг <span id="current-step">1</span> из 9</span>
-<span id="progress-percent">11%</span>
+                    <div class="flex items-center justify-between text-sm text-slate-500 mb-2">
+                        <span class="inline-flex items-center gap-2">
+                            <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold">
+                                Шаг <span id="current-step">1</span> из <span id="total-steps">9</span>
+                            </span>
+                        </span>
+                        <span id="progress-percent">11%</span>
                     </div>
                     <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
                         <div id="progress-bar" class="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full transition-all duration-500 ease-out" style="width: 11%"></div>
@@ -86,6 +97,9 @@
     <script src="/static/components/footer.js"></script>
     <script src="/static/js/storage.js"></script>
     <script src="/static/js/ui.js"></script>
+    <script>
+        window.adminConfig = {{ admin_config | tojson }};
+    </script>
     <script src="/static/js/questionnaire.js"></script>
     <script>
         feather.replace();
