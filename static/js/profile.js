@@ -425,11 +425,40 @@ function renderWeeklyReview() {
     messageText.textContent = review.message || '';
 }
 
+async function loadProfileFromServer() {
+    if (typeof getUserProfile !== 'function' || typeof setUserProfile !== 'function') {
+        return;
+    }
+    const profile = getUserProfile();
+    const telegramUserId = profile.telegram_user_id;
+    if (!telegramUserId) {
+        return;
+    }
+    try {
+        const response = await fetch(`/api/profile/get?telegram_user_id=${telegramUserId}`);
+        if (!response.ok) {
+            return;
+        }
+        const data = await response.json();
+        if (data?.status === 'not_found') {
+            return;
+        }
+        if (data && typeof data === 'object') {
+            setUserProfile(data);
+        }
+    } catch (error) {
+        console.error(error);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-    renderProfileRings();
-    renderMonthGrid();
-    renderWeeklyAdjustments();
-    renderWeeklyReview();
-    applySubscriptionAccess();
-    renderProfileRecommendations();
+    (async () => {
+        await loadProfileFromServer();
+        renderProfileRings();
+        renderMonthGrid();
+        renderWeeklyAdjustments();
+        renderWeeklyReview();
+        applySubscriptionAccess();
+        renderProfileRecommendations();
+    })();
 });

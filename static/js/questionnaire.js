@@ -386,17 +386,41 @@ function saveUserData() {
     }
 }
 
+async function saveProfileToServer(profile) {
+    if (!profile || !profile.telegram_user_id) {
+        return;
+    }
+    try {
+        await fetch('/api/profile/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                telegram_user_id: profile.telegram_user_id,
+                user_profile: profile
+            })
+        });
+    } catch (error) {
+        console.error(error);
+    }
+}
+
 // Setup event listeners
 function setupEventListeners() {
     // Next button
-    nextButton.addEventListener('click', () => {
+    nextButton.addEventListener('click', async () => {
         if (currentQuestionIndex < questions.length - 1) {
             currentQuestionIndex++;
             displayQuestion();
         } else {
+            // Сохраняем профиль и отправляем на сервер (если доступен Telegram ID).
+            let profile = null;
             if (typeof patchUserProfile === 'function' && typeof mapUserDataToUserProfile === 'function') {
-                patchUserProfile(mapUserDataToUserProfile(window.userData));
+                profile = patchUserProfile(mapUserDataToUserProfile(window.userData));
             }
+            if (!profile && typeof getUserProfile === 'function') {
+                profile = getUserProfile();
+            }
+            await saveProfileToServer(profile);
             // All questions answered, go to resume page
             window.location.href = 'resume.html';
         }

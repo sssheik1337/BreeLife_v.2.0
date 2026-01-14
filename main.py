@@ -72,6 +72,8 @@ reminders_store: dict[int, list[dict[str, str]]] = {}
 food_diary_store: dict[int, list[dict[str, object]]] = {}
 # In-memory хранилище подписок по telegram_user_id.
 subscription_store: dict[int, dict[str, str]] = {}
+# In-memory хранилище профилей по telegram_user_id.
+profiles_store: dict[int, dict[str, object]] = {}
 reminder_scheduler = ReminderScheduler(REMINDERS_ENABLED, reminders_store)
 
 
@@ -101,6 +103,11 @@ class SubscriptionRequest(BaseModel):
 class PaymentRequest(BaseModel):
     telegram_user_id: int = Field(..., description="Telegram user id")
     days: int = Field(30, description="Срок продления подписки в днях")
+
+
+class ProfileSaveRequest(BaseModel):
+    telegram_user_id: int = Field(..., description="Telegram user id")
+    user_profile: dict[str, object] = Field(default_factory=dict)
 
 
 class FoodDiaryEntry(BaseModel):
@@ -514,6 +521,21 @@ async def start_payment(payload: PaymentRequest):
         "subscription_started_at": stored.get("subscription_started_at"),
         "trial_started_at": stored.get("trial_started_at"),
     }
+
+
+@app.post("/api/profile/save")
+async def save_profile(payload: ProfileSaveRequest):
+    profile = payload.user_profile if isinstance(payload.user_profile, dict) else {}
+    profiles_store[payload.telegram_user_id] = profile
+    return {"status": "ok"}
+
+
+@app.get("/api/profile/get")
+async def get_profile(telegram_user_id: int):
+    profile = profiles_store.get(telegram_user_id)
+    if not profile:
+        return {"status": "not_found"}
+    return profile
 
 
 @app.post("/api/ai/recommendation")
