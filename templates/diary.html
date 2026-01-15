@@ -24,7 +24,7 @@
                         <i data-feather="book-open" class="w-7 h-7 text-white"></i>
                     </div>
                     <h1 class="text-2xl font-bold text-slate-800">Дневник питания</h1>
-                    <p class="text-slate-500 mt-2">Введите калории и БЖУ вручную</p>
+                    <p class="text-slate-500 mt-2">Введите калории и баланс нутриентов вручную</p>
                 </div>
 
                 <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100">
@@ -60,7 +60,12 @@
                 </div>
 
                 <div id="diary-ai-section" class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100">
-                    <h3 class="font-semibold text-slate-800 mb-4">Комментарий от ИИ</h3>
+                    <div class="flex items-center gap-2 mb-4">
+                        <h3 class="font-semibold text-slate-800">Комментарий от ИИ</h3>
+                        <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 hidden" data-ai-badge>
+                            ИИ-рекомендации (beta)
+                        </span>
+                    </div>
                     <div id="diary-ai-comment" class="space-y-2 text-sm text-slate-600"></div>
                 </div>
 
@@ -88,6 +93,9 @@
                     <button id="diary-paywall-button" type="button" class="btn-primary w-full mt-5">
                         Оформить подписку
                     </button>
+                    <p class="text-xs text-slate-500 mt-2">
+                        Оплата будет доступна после подключения эквайринга
+                    </p>
                 </div>
             </div>
         </main>

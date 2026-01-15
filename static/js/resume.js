@@ -125,7 +125,7 @@ function updateCalculatedMetrics() {
         if (age === null) {
             ageElement.textContent = '--';
         } else if (!hasValidAge) {
-            ageElement.textContent = 'Ошибка: возраст некорректен';
+            ageElement.textContent = 'Проверьте дату рождения';
         } else {
             ageElement.textContent = `${age} лет`;
         }
@@ -160,13 +160,18 @@ function updateCalculatedMetrics() {
         } else {
             weightRateElement.textContent = weightForecast.weight_rate_kg_per_week === null
                 ? '--'
-                : `${weightForecast.weight_rate_kg_per_week} кг/нед`;
+                : `${weightForecast.weight_rate_kg_per_week} кг в неделю`;
         }
     }
     if (weightDateElement) {
-        weightDateElement.textContent = weightForecast.predicted_goal_date === null
-            ? '--'
-            : weightForecast.predicted_goal_date;
+        if (weightForecast.predicted_goal_date === null) {
+            weightDateElement.textContent = '--';
+        } else {
+            const date = new Date(weightForecast.predicted_goal_date);
+            weightDateElement.textContent = Number.isNaN(date.getTime())
+                ? weightForecast.predicted_goal_date
+                : date.toLocaleDateString('ru-RU');
+        }
     }
 }
 
@@ -547,6 +552,7 @@ async function renderTrialStatus() {
     const warningElement = document.getElementById('trial-warning');
     const paywallElement = document.getElementById('paywall');
     const payButton = document.getElementById('pay-button');
+    const trialCard = document.getElementById('trial-card');
     const paymentMotivation = document.getElementById('payment-motivation');
     const recommendationsSection = document.getElementById('recommendations-section');
     const nutritionSection = document.getElementById('nutrition-rings-section');
@@ -625,6 +631,9 @@ async function renderTrialStatus() {
     };
 
     let subscription;
+    if (trialCard) {
+        trialCard.classList.add('is-loading');
+    }
     try {
         subscription = await fetchSubscriptionStatus();
     } catch (error) {
@@ -632,7 +641,9 @@ async function renderTrialStatus() {
         datesElement.textContent = 'Попробуйте обновить страницу.';
         badgeElement.textContent = 'Пробный период до --';
         paywallElement.classList.add('hidden');
-        console.error(error);
+        if (trialCard) {
+            trialCard.classList.remove('is-loading');
+        }
         return;
     }
 
@@ -644,9 +655,14 @@ async function renderTrialStatus() {
             datesElement.textContent = 'Попробуйте обновить страницу.';
             badgeElement.textContent = 'Пробный период до --';
             paywallElement.classList.add('hidden');
-            console.error(error);
+            if (trialCard) {
+                trialCard.classList.remove('is-loading');
+            }
             return;
         }
+    }
+    if (trialCard) {
+        trialCard.classList.remove('is-loading');
     }
 
     const untilDate = formatDateRu(subscription.subscription_until);
@@ -712,6 +728,8 @@ async function renderTrialStatus() {
                 if (typeof showNotification === 'function') {
                     showNotification('Оплата прошла успешно!', 'success');
                 }
+                payButton.classList.add('btn-confirmed');
+                setTimeout(() => payButton.classList.remove('btn-confirmed'), 900);
                 if (typeof patchUserProfile === 'function') {
                     patchUserProfile({
                         subscription_status: result.subscription_status ?? 'active',
@@ -724,7 +742,6 @@ async function renderTrialStatus() {
             if (typeof showNotification === 'function') {
                 showNotification('Не удалось выполнить оплату.', 'error');
             }
-            console.error(error);
         }
     };
 }
@@ -777,7 +794,6 @@ function renderReminderActions() {
             if (typeof showNotification === 'function') {
                 showNotification('Не удалось сохранить напоминание.', 'error');
             }
-            console.error(error);
         }
     };
 

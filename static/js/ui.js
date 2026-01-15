@@ -242,7 +242,7 @@ const storage = {
         try {
             localStorage.setItem(`health_bloom_${key}`, JSON.stringify(value));
         } catch (e) {
-            console.warn('LocalStorage not available:', e);
+            return;
         }
     },
     
@@ -251,7 +251,6 @@ const storage = {
             const item = localStorage.getItem(`health_bloom_${key}`);
             return item ? JSON.parse(item) : null;
         } catch (e) {
-            console.warn('LocalStorage not available:', e);
             return null;
         }
     },
@@ -260,7 +259,7 @@ const storage = {
         try {
             localStorage.removeItem(`health_bloom_${key}`);
         } catch (e) {
-            console.warn('LocalStorage not available:', e);
+            return;
         }
     },
     
@@ -273,7 +272,7 @@ const storage = {
                 }
             });
         } catch (e) {
-            console.warn('LocalStorage not available:', e);
+            return;
         }
     }
 };
@@ -291,6 +290,7 @@ function animatePageTransition() {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
+    animatePageTransition();
     const tg = window.Telegram?.WebApp;
     if (tg) {
         tg.expand();
@@ -312,9 +312,6 @@ document.addEventListener('DOMContentLoaded', function() {
             root.style.setProperty('--tg-hint-color', theme.hint_color);
         }
     }
-    // Apply page transition
-    animatePageTransition();
-    
     // Add ripple effect to all primary buttons
     document.querySelectorAll('.btn-primary').forEach(button => {
         button.addEventListener('click', function(e) {

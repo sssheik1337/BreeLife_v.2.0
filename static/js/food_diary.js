@@ -257,7 +257,7 @@ function renderFoodDiaryList(entries) {
         item.innerHTML = `
             <div class="font-semibold text-slate-700">${entry.date} • ${formatMealLabel(entry.meal)}</div>
             <div class="text-slate-500">Калории: ${Math.round(summary.calories)} ккал</div>
-            <div class="text-slate-500">БЖУ: ${Math.round(summary.protein)} / ${Math.round(summary.fat)} / ${Math.round(summary.carbs)} г</div>
+            <div class="text-slate-500">Белки, жиры, углеводы: ${Math.round(summary.protein)} / ${Math.round(summary.fat)} / ${Math.round(summary.carbs)} г</div>
         `;
         list.appendChild(item);
     });

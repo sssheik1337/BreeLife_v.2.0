@@ -382,7 +382,7 @@ async function applySubscriptionAccess() {
             monthGrid.classList.toggle('hidden', isExpired);
         }
     } catch (error) {
-        console.error(error);
+        return;
     }
 
     payButton.onclick = async () => {
@@ -406,7 +406,7 @@ async function applySubscriptionAccess() {
                 await applySubscriptionAccess();
             }
         } catch (error) {
-            console.error(error);
+            return;
         }
     };
 }
@@ -421,6 +421,13 @@ async function renderProfileRecommendations() {
     }
 
     const profile = getUserProfile();
+    list.innerHTML = '';
+    const skeletonItems = Array.from({ length: 3 }).map(() => {
+        const item = document.createElement('li');
+        item.className = 'skeleton-line';
+        return item;
+    });
+    skeletonItems.forEach((item) => list.appendChild(item));
     try {
         const response = await fetch('/api/ai/recommendation', {
             method: 'POST',
@@ -428,12 +435,12 @@ async function renderProfileRecommendations() {
             body: JSON.stringify(profile)
         });
         if (!response.ok) {
-            return;
+            throw new Error('empty');
         }
         const data = await response.json();
         const text = data?.text;
         if (!text) {
-            return;
+            throw new Error('empty');
         }
         const items = text
             .split(/(?<=[.!?])\s+/)
@@ -451,7 +458,26 @@ async function renderProfileRecommendations() {
             list.appendChild(li);
         });
     } catch (error) {
-        return;
+        list.innerHTML = '';
+        const fallback = typeof getRecommendations === 'function'
+            ? getRecommendations(profile)
+            : [];
+        if (fallback.length) {
+            fallback.forEach((item) => {
+                const li = document.createElement('li');
+                li.className = 'flex items-start gap-2';
+                li.innerHTML = '<span class="text-emerald-500">•</span>';
+                const span = document.createElement('span');
+                span.textContent = item;
+                li.appendChild(span);
+                list.appendChild(li);
+            });
+            return;
+        }
+        const empty = document.createElement('li');
+        empty.className = 'text-sm text-slate-500';
+        empty.textContent = 'Здесь появятся персональные подсказки на основе вашего профиля.';
+        list.appendChild(empty);
     }
 }
 
@@ -539,7 +565,7 @@ async function loadProfileFromServer() {
             setUserProfile(data);
         }
     } catch (error) {
-        console.error(error);
+        return;
     }
 }
 

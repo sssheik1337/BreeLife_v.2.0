@@ -253,7 +253,6 @@
         try {
             return JSON.parse(raw);
         } catch (error) {
-            console.warn('Не удалось разобрать сохранённые данные пользователя:', error);
             return null;
         }
     }
@@ -264,7 +263,7 @@
             const raw = localStorage.getItem(STORAGE_KEY);
             storedProfile = raw ? JSON.parse(raw) : null;
         } catch (error) {
-            console.warn('Не удалось прочитать профиль пользователя:', error);
+            storedProfile = null;
         }
 
         if (!storedProfile) {
@@ -276,7 +275,7 @@
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
         } catch (error) {
-            console.warn('Не удалось сохранить профиль пользователя:', error);
+            // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
         return normalized;
     }
@@ -344,7 +343,6 @@
             }
             return await response.json();
         } catch (error) {
-            console.error(error);
             return null;
         }
     }
@@ -357,7 +355,7 @@
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
         } catch (error) {
-            console.warn('Не удалось сохранить профиль пользователя:', error);
+            // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
         if (trialResult.shouldNotifyBackend) {
             void notifyTrialStart(normalized.telegram_user_id, normalized.subscription_started_at);
@@ -376,7 +374,7 @@
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
         } catch (error) {
-            console.warn('Не удалось сохранить профиль пользователя:', error);
+            // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
         if (trialResult.shouldNotifyBackend) {
             void notifyTrialStart(normalized.telegram_user_id, normalized.subscription_started_at);

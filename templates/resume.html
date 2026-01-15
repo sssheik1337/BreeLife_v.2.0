@@ -60,7 +60,7 @@
                             <span id="age-value" class="font-semibold">--</span>
                         </div>
                         <div class="flex items-center justify-between">
-                            <span>BMR</span>
+                            <span>Базовый обмен</span>
                             <span id="bmr-value" class="font-semibold">--</span>
                         </div>
                         <div class="flex items-center justify-between">
@@ -76,7 +76,7 @@
                         <div class="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center">
                             <i data-feather="sliders" class="w-5 h-5 text-cyan-600"></i>
                         </div>
-                        <h3 class="font-semibold text-slate-800">Калории и БЖУ</h3>
+                        <h3 class="font-semibold text-slate-800">Калории и баланс</h3>
                     </div>
                     <div class="space-y-3 text-slate-700">
                         <div class="flex items-center justify-between">
@@ -124,7 +124,12 @@
                         <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
                             <i data-feather="sparkles" class="w-5 h-5 text-emerald-600"></i>
                         </div>
-                        <h3 class="font-semibold text-slate-800">Персональные рекомендации</h3>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-semibold text-slate-800">Персональные рекомендации</h3>
+                            <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 hidden" data-ai-badge>
+                                ИИ-рекомендации (beta)
+                            </span>
+                        </div>
                     </div>
                     <ul id="recommendations-list" class="space-y-2 text-slate-700"></ul>
                     <div class="mt-4 space-y-2 text-sm text-slate-500">
@@ -177,7 +182,7 @@
                 </div>
 
                 <!-- Trial Status -->
-                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8">
+                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8" id="trial-card">
                     <div class="flex items-center space-x-3 mb-4">
                         <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
                             <i data-feather="clock" class="w-5 h-5 text-emerald-600"></i>
@@ -206,6 +211,9 @@
                             <i data-feather="credit-card" class="w-5 h-5"></i>
                             <span>Оплатить</span>
                         </button>
+                        <p class="text-xs text-slate-500 mt-2">
+                            Оплата будет доступна после подключения эквайринга
+                        </p>
                     </div>
                 </div>
 
@@ -217,8 +225,11 @@
                         </div>
                         <h3 class="font-semibold text-slate-800">Напоминания в Telegram</h3>
                     </div>
-                    <p class="text-sm text-slate-500 mb-4">
+                    <p class="text-sm text-slate-500 mb-2">
                         Настройте напоминания после завершения опроса. Отправка пока не включена — это заглушки.
+                    </p>
+                    <p class="text-xs text-slate-400 mb-4">
+                        В разработке. Уведомления приходят через Telegram
                     </p>
                     <div class="space-y-3" id="reminders-actions"></div>
                     <p class="text-xs text-slate-400 mt-4" id="reminders-hint"></p>

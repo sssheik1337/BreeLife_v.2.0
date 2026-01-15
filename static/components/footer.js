@@ -8,6 +8,7 @@ class CustomFooter extends HTMLElement {
           padding: 2rem 1.5rem 1.5rem;
           background: white;
           border-top: 1px solid #f1f5f9;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
         
         .footer-content {
@@ -16,7 +17,6 @@ class CustomFooter extends HTMLElement {
           text-align: center;
         }
         .footer-text {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
           font-size: 0.875rem;
           color: #64748b;
           line-height: 1.5;

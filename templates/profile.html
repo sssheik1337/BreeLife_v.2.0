@@ -226,6 +226,9 @@
                         <i data-feather="credit-card" class="w-5 h-5"></i>
                         <span>Оплатить</span>
                     </button>
+                    <p class="text-xs text-slate-500 mt-2">
+                        Оплата будет доступна после подключения эквайринга
+                    </p>
                 </div>
 
                 <!-- Quick Actions -->
@@ -266,7 +269,12 @@
                         <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
                             <i data-feather="sparkles" class="w-5 h-5 text-emerald-600"></i>
                         </div>
-                        <h3 class="font-semibold text-slate-800">Персональные рекомендации</h3>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-semibold text-slate-800">Персональные рекомендации</h3>
+                            <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 hidden" data-ai-badge>
+                                ИИ-рекомендации (beta)
+                            </span>
+                        </div>
                     </div>
                     <ul id="profile-recommendations-list" class="space-y-2 text-sm text-slate-600"></ul>
                 </div>
