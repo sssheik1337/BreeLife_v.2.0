@@ -1,5 +1,16 @@
 // Заглушки для персонализированных текстов без внешних API
 
+function updateAiBadgesVisibility() {
+    const isAiDisabled = window.aiEnabled === false;
+    document.querySelectorAll('[data-ai-badge]').forEach((badge) => {
+        if (isAiDisabled) {
+            badge.classList.remove('hidden');
+        } else {
+            badge.classList.add('hidden');
+        }
+    });
+}
+
 function formatDateForUser(dateString) {
     if (!dateString) {
         return null;
@@ -50,9 +61,9 @@ function getCaloriesExplanation(profile) {
 function getMacrosExplanation(profile) {
     const macros = profile?.macros;
     if (!macros) {
-        return 'Баланс БЖУ помогает сохранять энергию и темп.';
+        return 'Баланс белков, жиров и углеводов помогает сохранять энергию и темп.';
     }
-    return `БЖУ: ${Math.round(macros.protein_pct * 100)}% белка, ${Math.round(macros.fat_pct * 100)}% жиров и ${Math.round(macros.carbs_pct * 100)}% углеводов.`;
+    return `Белки ${Math.round(macros.protein_pct * 100)}%, жиры ${Math.round(macros.fat_pct * 100)}%, углеводы ${Math.round(macros.carbs_pct * 100)}%.`;
 }
 
 function getRecommendations(profile) {
@@ -62,6 +73,8 @@ function getRecommendations(profile) {
     const activity = profile?.activity_factor;
     const tdee = profile?.tdee_calories;
     const predictedDate = formatDateForUser(profile?.predicted_goal_date);
+    const currentWeight = Number(profile?.weight_kg);
+    const targetWeight = Number(profile?.target_weight_kg);
 
     if (goalKey === 'lose') {
         recommendations.push('Цель — похудение. Двигайтесь спокойно и уверенно.');
@@ -75,6 +88,11 @@ function getRecommendations(profile) {
         recommendations.push(`Цель: ${goalLabel}.`);
     }
 
+    if (Number.isFinite(currentWeight) && Number.isFinite(targetWeight)) {
+        const delta = Math.abs(targetWeight - currentWeight);
+        recommendations.push(`До цели осталось около ${delta.toFixed(1)} кг.`);
+    }
+
     if (activity) {
         recommendations.push(`Уровень активности ${activity} — хороший ориентир для стабильного темпа.`);
     } else {
@@ -86,7 +104,7 @@ function getRecommendations(profile) {
     }
 
     if (predictedDate) {
-        recommendations.push(`Ожидаемая дата: ${predictedDate}.`);
+        recommendations.push(`Ориентировочная дата достижения цели: ${predictedDate}.`);
     }
 
     if (profile?.food_diary === true) {
@@ -114,7 +132,7 @@ function getDeadlineMotivation(profile) {
     if (!deadline || weeks === 0) {
         return '';
     }
-    return `У тебя есть около ${weeks} нед. до ${deadline} — отличный горизонт, чтобы двигаться спокойно.`;
+    return `У вас есть около ${weeks} нед. до ${deadline} — отличный горизонт, чтобы двигаться спокойно.`;
 }
 
 function getPaywallMotivation(profile, entriesCount = 0) {
@@ -205,6 +223,11 @@ function getFoodDiaryDeviationStatus(profile) {
     const tdee = typeof profile?.tdee_calories === 'number' ? profile.tdee_calories : null;
     return getDeviationStatusFromEntries(entries, tdee);
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Показываем бейджи только когда ИИ отключён.
+    updateAiBadgesVisibility();
+});
 
 async function getPaymentMotivation(profile, deviations) {
     const goalLabel = getGoalLabel(profile?.goal);

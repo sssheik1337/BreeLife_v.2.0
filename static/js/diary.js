@@ -37,10 +37,28 @@ function renderDiaryList(entries) {
         item.innerHTML = `
             <div class="font-semibold text-slate-700">${entry.date}</div>
             <div class="text-slate-500">Калории: ${entry.calories} ккал</div>
-            <div class="text-slate-500">БЖУ: ${entry.protein_g} / ${entry.fat_g} / ${entry.carbs_g} г</div>
+            <div class="text-slate-500">Белки, жиры, углеводы: ${entry.protein_g} / ${entry.fat_g} / ${entry.carbs_g} г</div>
         `;
         list.appendChild(item);
     });
+}
+
+function setDiaryLoadingState(isLoading) {
+    const list = document.getElementById('diary-list');
+    const aiSection = document.getElementById('diary-ai-section');
+    if (list) {
+        list.classList.toggle('is-loading', isLoading);
+        if (isLoading) {
+            list.innerHTML = `
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line mt-3"></div>
+                <div class="skeleton-line mt-3"></div>
+            `;
+        }
+    }
+    if (aiSection) {
+        aiSection.classList.toggle('is-loading', isLoading);
+    }
 }
 
 function setAiComment(insights, advice) {
@@ -176,6 +194,7 @@ async function requestAiAnalysis(entries) {
 }
 
 async function refreshDiary() {
+    setDiaryLoadingState(true);
     const localEntries = readDiaryEntries();
     const backendEntries = await loadEntriesFromBackend();
     const merged = sortEntries([...localEntries, ...backendEntries]);
@@ -194,6 +213,7 @@ async function refreshDiary() {
     const isExpired = profile?.subscription_status === 'expired';
     await toggleDiaryPaywall(isExpired, profile, unique.length);
     if (isExpired) {
+        setDiaryLoadingState(false);
         return;
     }
     const analysis = await requestAiAnalysis(unique.slice(0, 7));
@@ -201,11 +221,13 @@ async function refreshDiary() {
         setAiComment([analysis.text], '');
         renderDeviationRisk(analysis?.deviation_risk, analysis?.deviation_comment);
         updateProfileDeviation(analysis?.deviation_risk, analysis?.deviation_comment);
+        setDiaryLoadingState(false);
         return;
     }
     setAiComment(analysis?.insights || [], analysis?.advice || '');
     renderDeviationRisk(analysis?.deviation_risk, analysis?.deviation_comment);
     updateProfileDeviation(analysis?.deviation_risk, analysis?.deviation_comment);
+    setDiaryLoadingState(false);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -229,6 +251,9 @@ document.addEventListener('DOMContentLoaded', () => {
             saveDiaryEntries(entries);
             await syncEntryWithBackend(entry);
             await refreshDiary();
+            if (typeof showNotification === 'function') {
+                showNotification('Запись добавлена.', 'success');
+            }
             form.reset();
         });
     }

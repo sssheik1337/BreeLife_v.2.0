@@ -14,6 +14,7 @@ class CustomNavbar extends HTMLElement {
           z-index: 50;
           box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
           border-bottom: 1px solid #f1f5f9;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
         
         .logo {
@@ -36,7 +37,6 @@ class CustomNavbar extends HTMLElement {
           font-size: 18px;
         }
         .logo-text {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
           font-weight: 700;
           font-size: 1.25rem;
           background: linear-gradient(135deg, #34d399 0%, #3b82f6 100%);

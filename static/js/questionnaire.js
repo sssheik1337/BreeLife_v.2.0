@@ -173,7 +173,7 @@ function loadSavedAnswers() {
             const data = JSON.parse(savedData);
             Object.assign(window.userData, data);
         } catch (e) {
-            console.warn('Failed to parse saved data:', e);
+            return null;
         }
     }
 }
@@ -400,7 +400,7 @@ async function saveProfileToServer(profile) {
             })
         });
     } catch (error) {
-        console.error(error);
+        return null;
     }
 }
 
@@ -421,12 +421,12 @@ function setupEventListeners() {
                 profile = getUserProfile();
             }
             await saveProfileToServer(profile);
-            // All questions answered, go to resume page
-            window.location.href = 'resume.html';
+            // Все вопросы заполнены, переходим на страницу сводки.
+            window.location.href = '/resume';
         }
     });
     
-    // Previous button
+    // Кнопка назад
     prevButton.addEventListener('click', () => {
         if (currentQuestionIndex > 0) {
             currentQuestionIndex--;
