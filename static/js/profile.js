@@ -262,7 +262,9 @@ function renderProfileRings() {
 
     macrosContainer.innerHTML = '';
     macroItems.forEach((item) => {
-        macrosContainer.appendChild(
+        const card = document.createElement('div');
+        card.className = 'ring-compact shadow-sm border border-slate-100 flex justify-center';
+        card.appendChild(
             createProgressRing({
                 percent: item.percent,
                 color: item.color,
@@ -270,6 +272,7 @@ function renderProfileRings() {
                 value: todayTotals.hasEntries ? `${Math.round(item.consumed)} г` : 'нет данных'
             })
         );
+        macrosContainer.appendChild(card);
     });
 
     const waterAvg = profile?.weekly_stats?.water_avg_l;
