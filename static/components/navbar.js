@@ -101,6 +101,11 @@ class CustomNavbar extends HTMLElement {
       </nav>
     `;
 
+    if (window.feather) {
+      // Иконки внутри shadowRoot нужно активировать отдельно.
+      window.feather.replace({ root: this.shadowRoot });
+    }
+
   }
 }
 
