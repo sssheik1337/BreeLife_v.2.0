@@ -445,20 +445,136 @@ function updateBMIProgress(bmi) {
 
 // Рендер круговых индикаторов питания
 function renderNutritionRings() {
-    const mockData = {
-        calories: { percent: 72, value: '1540 / 2150 ккал', label: 'Калории', color: '#10b981' },
-        water: { percent: 55, value: '1.4 / 2.5 л', label: 'Вода', color: '#38bdf8' },
-        protein: { percent: 68, value: '82 / 120 г', label: 'Белки', color: '#a855f7' },
-        fat: { percent: 43, value: '38 / 90 г', label: 'Жиры', color: '#f59e0b' },
-        carbs: { percent: 61, value: '190 / 310 г', label: 'Углеводы', color: '#06b6d4' }
+    const readEntries = (storageKey) => {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) {
+            return [];
+        }
+        try {
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            return [];
+        }
+    };
+
+    const today = new Date().toISOString().split('T')[0];
+    const manualEntries = readEntries('health_bloom_food_entries');
+    const diaryEntries = readEntries('food_diary_entries');
+
+    const sumManual = manualEntries.reduce(
+        (acc, entry) => {
+            if (entry?.date !== today) {
+                return acc;
+            }
+            acc.calories += Number(entry.calories) || 0;
+            acc.protein += Number(entry.protein_g) || 0;
+            acc.fat += Number(entry.fat_g) || 0;
+            acc.carbs += Number(entry.carbs_g) || 0;
+            return acc;
+        },
+        { calories: 0, protein: 0, fat: 0, carbs: 0 }
+    );
+
+    const sumDiary = diaryEntries.reduce(
+        (acc, entry) => {
+            if (entry?.date !== today || !Array.isArray(entry.items)) {
+                return acc;
+            }
+            entry.items.forEach((item) => {
+                acc.calories += Number(item?.calories) || 0;
+                acc.protein += Number(item?.protein) || 0;
+                acc.fat += Number(item?.fat) || 0;
+                acc.carbs += Number(item?.carbs) || 0;
+            });
+            return acc;
+        },
+        { calories: 0, protein: 0, fat: 0, carbs: 0 }
+    );
+
+    const totals = {
+        calories: sumManual.calories + sumDiary.calories,
+        protein: sumManual.protein + sumDiary.protein,
+        fat: sumManual.fat + sumDiary.fat,
+        carbs: sumManual.carbs + sumDiary.carbs,
+    };
+
+    const hasEntriesToday = totals.calories > 0 || totals.protein > 0 || totals.fat > 0 || totals.carbs > 0;
+
+    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const recommended = {
+        calories: Number(profile?.tdee_calories) || null,
+        protein: Number(profile?.macros?.protein_g) || null,
+        fat: Number(profile?.macros?.fat_g) || null,
+        carbs: Number(profile?.macros?.carbs_g) || null,
+    };
+
+    const buildValue = (consumed, target, unit) => {
+        if (!hasEntriesToday) {
+            return 'Нет записей за сегодня';
+        }
+        if (Number.isFinite(target) && target > 0) {
+            return `${Math.round(consumed)} / ${Math.round(target)} ${unit} (съедено / рекомендовано)`;
+        }
+        return `${Math.round(consumed)} ${unit} (съедено)`;
+    };
+
+    const calcPercent = (consumed, target) => {
+        if (!hasEntriesToday) {
+            return 0;
+        }
+        if (!Number.isFinite(target) || target <= 0) {
+            return 0;
+        }
+        return (consumed / target) * 100;
     };
 
     const rings = [
-        { id: 'calorie-ring', data: mockData.calories },
-        { id: 'water-ring', data: mockData.water },
-        { id: 'macro-protein-ring', data: mockData.protein },
-        { id: 'macro-fat-ring', data: mockData.fat },
-        { id: 'macro-carb-ring', data: mockData.carbs }
+        {
+            id: 'calorie-ring',
+            data: {
+                percent: calcPercent(totals.calories, recommended.calories),
+                value: buildValue(totals.calories, recommended.calories, 'ккал'),
+                label: 'Калории',
+                color: '#10b981',
+            },
+        },
+        {
+            id: 'water-ring',
+            data: {
+                percent: 0,
+                value: 'Нет записей за сегодня',
+                label: 'Вода',
+                color: '#38bdf8',
+            },
+        },
+        {
+            id: 'macro-protein-ring',
+            data: {
+                percent: calcPercent(totals.protein, recommended.protein),
+                value: buildValue(totals.protein, recommended.protein, 'г'),
+                label: 'Белки',
+                color: '#a855f7',
+            },
+        },
+        {
+            id: 'macro-fat-ring',
+            data: {
+                percent: calcPercent(totals.fat, recommended.fat),
+                value: buildValue(totals.fat, recommended.fat, 'г'),
+                label: 'Жиры',
+                color: '#f59e0b',
+            },
+        },
+        {
+            id: 'macro-carb-ring',
+            data: {
+                percent: calcPercent(totals.carbs, recommended.carbs),
+                value: buildValue(totals.carbs, recommended.carbs, 'г'),
+                label: 'Углеводы',
+                color: '#06b6d4',
+            },
+        },
     ];
 
     rings.forEach(({ id, data }) => {
