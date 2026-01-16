@@ -900,7 +900,7 @@ function saveAndContinue() {
     
     // Redirect after a short delay
     setTimeout(() => {
-        window.location.href = 'profile.html';
+        window.location.href = '/profile';
     }, 1000);
 }
 
