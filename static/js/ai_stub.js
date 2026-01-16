@@ -402,6 +402,15 @@ function analyzeWeeklyStats(profile) {
     const daysLogged = Number(stats.days_logged);
 
     const adjustments = [];
+    const minDays = 4;
+
+    if (!Number.isFinite(daysLogged) || daysLogged < minDays) {
+        const message = 'Недостаточно данных для анализа недели.';
+        return {
+            adjustments: [message],
+            text: message
+        };
+    }
 
     if (Number.isFinite(tdee) && Number.isFinite(caloriesAvg)) {
         if (caloriesAvg > tdee * 1.1) {
