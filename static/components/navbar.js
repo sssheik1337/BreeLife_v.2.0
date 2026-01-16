@@ -143,6 +143,21 @@ class CustomNavbar extends HTMLElement {
           transform: scale(0.95);
           background: #e2e8f0;
         }
+
+        @media (max-width: 640px) {
+          .nav-actions {
+            gap: 0.5rem;
+          }
+
+          .nav-button {
+            width: 44px;
+            height: 44px;
+          }
+
+          .menu-panel {
+            width: min(240px, 90vw);
+          }
+        }
         
         @media (max-width: 640px) {
           .navbar {
