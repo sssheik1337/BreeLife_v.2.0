@@ -80,6 +80,10 @@ function formatCountUpValue(value) {
     if (!numbers) {
         return value;
     }
+    const numericPattern = /^(\d+(?:[.,]\d+)?)(\s*\/\s*(\d+(?:[.,]\d+)?))?$/;
+    if (!numericPattern.test(numbers.trim())) {
+        return value;
+    }
     const values = numbers.split('/');
     if (values.length === 2) {
         return `<span class="countup"><span data-count="${values[0].trim()}">0</span>/<span data-count="${values[1].trim()}">0</span></span>${suffix ? ` ${suffix}` : ''}`;
@@ -160,18 +164,39 @@ function sumManualDiaryCalories(entries) {
     return Array.from(totalsByDate.values());
 }
 
-function getAverageCalories() {
+function getTodayDiaryTotals() {
+    const today = new Date().toISOString().split('T')[0];
     const foodEntries = readFoodDiaryEntries();
     const manualEntries = readManualDiaryEntries();
-    const totals = [
-        ...sumFoodDiaryCalories(foodEntries),
-        ...sumManualDiaryCalories(manualEntries)
-    ];
-    if (!totals.length) {
-        return null;
-    }
-    const sum = totals.reduce((acc, value) => acc + value, 0);
-    return sum / totals.length;
+
+    const totals = foodEntries.reduce(
+        (acc, entry) => {
+            if (entry?.date !== today || !Array.isArray(entry.items)) {
+                return acc;
+            }
+            entry.items.forEach((item) => {
+                acc.calories += Number(item?.calories) || 0;
+                acc.protein += Number(item?.protein) || 0;
+                acc.fat += Number(item?.fat) || 0;
+                acc.carbs += Number(item?.carbs) || 0;
+            });
+            return acc;
+        },
+        { calories: 0, protein: 0, fat: 0, carbs: 0 }
+    );
+
+    manualEntries.forEach((entry) => {
+        if (entry?.date !== today) {
+            return;
+        }
+        totals.calories += Number(entry.calories) || 0;
+        totals.protein += Number(entry.protein_g) || 0;
+        totals.fat += Number(entry.fat_g) || 0;
+        totals.carbs += Number(entry.carbs_g) || 0;
+    });
+
+    const hasEntries = totals.calories > 0 || totals.protein > 0 || totals.fat > 0 || totals.carbs > 0;
+    return { ...totals, hasEntries };
 }
 
 function renderProfileRings() {
@@ -185,12 +210,12 @@ function renderProfileRings() {
 
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
     const tdee = Number(profile?.tdee_calories);
-    const avgCalories = getAverageCalories();
-    const caloriesPercent = Number.isFinite(avgCalories) && Number.isFinite(tdee) && tdee > 0
-        ? (avgCalories / tdee) * 100
+    const todayTotals = getTodayDiaryTotals();
+    const caloriesPercent = todayTotals.hasEntries && Number.isFinite(tdee) && tdee > 0
+        ? (todayTotals.calories / tdee) * 100
         : 0;
-    const caloriesValue = Number.isFinite(avgCalories) && Number.isFinite(tdee)
-        ? `${Math.round(avgCalories)} / ${Math.round(tdee)} ккал`
+    const caloriesValue = todayTotals.hasEntries && Number.isFinite(tdee)
+        ? `${Math.round(todayTotals.calories)} / ${Math.round(tdee)} ккал`
         : 'нет данных';
 
     caloriesContainer.innerHTML = '';
@@ -205,23 +230,32 @@ function renderProfileRings() {
     );
 
     const macros = profile?.macros;
-    const hasMacros = Number.isFinite(macros?.protein_pct)
-        || Number.isFinite(macros?.fat_pct)
-        || Number.isFinite(macros?.carbs_pct);
     const macroItems = [
         {
             label: 'Белки',
-            percent: Number.isFinite(macros?.protein_pct) ? Math.round(macros.protein_pct * 100) : 0,
+            key: 'protein',
+            consumed: todayTotals.protein,
+            percent: todayTotals.hasEntries && Number.isFinite(macros?.protein_g) && macros.protein_g > 0
+                ? Math.round((todayTotals.protein / macros.protein_g) * 100)
+                : 0,
             color: '#a855f7'
         },
         {
             label: 'Жиры',
-            percent: Number.isFinite(macros?.fat_pct) ? Math.round(macros.fat_pct * 100) : 0,
+            key: 'fat',
+            consumed: todayTotals.fat,
+            percent: todayTotals.hasEntries && Number.isFinite(macros?.fat_g) && macros.fat_g > 0
+                ? Math.round((todayTotals.fat / macros.fat_g) * 100)
+                : 0,
             color: '#f59e0b'
         },
         {
             label: 'Углеводы',
-            percent: Number.isFinite(macros?.carbs_pct) ? Math.round(macros.carbs_pct * 100) : 0,
+            key: 'carbs',
+            consumed: todayTotals.carbs,
+            percent: todayTotals.hasEntries && Number.isFinite(macros?.carbs_g) && macros.carbs_g > 0
+                ? Math.round((todayTotals.carbs / macros.carbs_g) * 100)
+                : 0,
             color: '#06b6d4'
         }
     ];
@@ -233,7 +267,7 @@ function renderProfileRings() {
                 percent: item.percent,
                 color: item.color,
                 label: item.label,
-                value: hasMacros ? `${item.percent}%` : 'нет данных'
+                value: todayTotals.hasEntries ? `${Math.round(item.consumed)} г` : 'нет данных'
             })
         );
     });
