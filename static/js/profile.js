@@ -263,7 +263,7 @@ function renderProfileRings() {
     macrosContainer.innerHTML = '';
     macroItems.forEach((item) => {
         const card = document.createElement('div');
-        card.className = 'ring-compact shadow-sm border border-slate-100 flex justify-center';
+        card.className = 'ring-compact flex justify-center';
         card.appendChild(
             createProgressRing({
                 percent: item.percent,
