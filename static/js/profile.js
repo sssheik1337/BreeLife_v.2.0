@@ -263,8 +263,10 @@ function renderProfileRings() {
     macrosContainer.innerHTML = '';
     macroItems.forEach((item) => {
         const card = document.createElement('div');
-        card.className = 'ring-compact flex justify-center';
-        card.appendChild(
+        card.className = 'stat-card flex justify-center';
+        const ringWrapper = document.createElement('div');
+        ringWrapper.className = 'ring-compact flex justify-center';
+        ringWrapper.appendChild(
             createProgressRing({
                 percent: item.percent,
                 color: item.color,
@@ -272,6 +274,7 @@ function renderProfileRings() {
                 value: todayTotals.hasEntries ? `${Math.round(item.consumed)} г` : 'нет данных'
             })
         );
+        card.appendChild(ringWrapper);
         macrosContainer.appendChild(card);
     });
 

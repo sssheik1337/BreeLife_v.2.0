@@ -71,12 +71,18 @@
         background: #f8fafc;
       }
 
-      .ring-compact {
+      .stat-card {
         padding: 0.5rem;
         border-radius: 1rem;
         background: #f8fafc;
         border: 1px solid #e2e8f0;
         box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+      }
+
+      .ring-compact {
+        padding: 0.5rem;
+        border-radius: 1rem;
+        background: #f8fafc;
       }
 
       .countup {
@@ -160,8 +166,12 @@
                         </div>
                     </div>
                     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                        <div id="profile-calories-ring" class="flex justify-center ring-compact"></div>
-                        <div id="profile-water-ring" class="flex justify-center ring-compact"></div>
+                        <div class="stat-card flex justify-center">
+                            <div id="profile-calories-ring" class="ring-compact flex justify-center"></div>
+                        </div>
+                        <div class="stat-card flex justify-center">
+                            <div id="profile-water-ring" class="ring-compact flex justify-center"></div>
+                        </div>
                     </div>
                     <div class="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-3" id="profile-macros-rings"></div>
                 </div>
