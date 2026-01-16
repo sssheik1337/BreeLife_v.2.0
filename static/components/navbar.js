@@ -3,6 +3,10 @@ class CustomNavbar extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this.shadowRoot.innerHTML = `
       <style>
+        :host {
+          display: block;
+        }
+
         .navbar {
           display: flex;
           justify-content: space-between;
@@ -52,14 +56,25 @@ class CustomNavbar extends HTMLElement {
           width: 40px;
           height: 40px;
           border-radius: 50%;
-          background: #f8fafc;
-          border: none;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
           display: flex;
           align-items: center;
           justify-content: center;
           color: #64748b;
           cursor: pointer;
           transition: all 0.2s ease;
+        }
+
+        .nav-button svg {
+          width: 20px;
+          height: 20px;
+          stroke: currentColor;
+        }
+
+        .nav-button:hover {
+          background: #f1f5f9;
+          color: #334155;
         }
         
         .nav-button:active {
@@ -91,10 +106,10 @@ class CustomNavbar extends HTMLElement {
 </a>
         
         <div class="nav-actions">
-          <a href="/profile" class="nav-button">
+          <a href="/profile" class="nav-button" aria-label="Профиль" title="Профиль">
             <i data-feather="user"></i>
           </a>
-          <button class="nav-button" onclick="this.dispatchEvent(new CustomEvent('menu-toggle'))">
+          <button class="nav-button" aria-label="Меню" title="Меню" onclick="this.dispatchEvent(new CustomEvent('menu-toggle'))">
             <i data-feather="menu"></i>
           </button>
         </div>
