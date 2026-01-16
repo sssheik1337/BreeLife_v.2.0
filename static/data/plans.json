@@ -1,8 +1,8 @@
 [
   {
     "id": 1,
-    "title": "Старт",
-    "duration_days": 7,
+    "title": "Пробный период 30 дней",
+    "duration_days": 30,
     "price": "0 ₽",
     "features": [
       "Базовые рекомендации",
