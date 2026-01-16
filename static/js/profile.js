@@ -214,7 +214,7 @@ function renderProfileRings() {
     const caloriesPercent = todayTotals.hasEntries && Number.isFinite(tdee) && tdee > 0
         ? (todayTotals.calories / tdee) * 100
         : 0;
-    const caloriesValue = todayTotals.hasEntries && Number.isFinite(tdee)
+    const caloriesValue = Number.isFinite(tdee)
         ? `${Math.round(todayTotals.calories)} / ${Math.round(tdee)} ккал`
         : 'нет данных';
 
