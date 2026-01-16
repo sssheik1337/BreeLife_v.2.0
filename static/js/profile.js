@@ -217,9 +217,9 @@ function renderProfileRings() {
         : null;
     const caloriesValue = todayTotals.hasEntries
         ? Number.isFinite(tdee)
-            ? `${Math.round(todayTotals.calories)} / ${Math.round(tdee)} ккал`
-            : `${Math.round(todayTotals.calories)} ккал`
-        : 'нет записей';
+            ? `Потреблено / рекомендовано: ${Math.round(todayTotals.calories)} / ${Math.round(tdee)} ккал`
+            : `Потреблено: ${Math.round(todayTotals.calories)} ккал`
+        : 'Нет данных';
 
     caloriesContainer.innerHTML = '';
     caloriesContainer.appendChild(
@@ -275,9 +275,9 @@ function renderProfileRings() {
         const hasTarget = Number.isFinite(item.target) && item.target > 0;
         const macroValue = todayTotals.hasEntries
             ? hasTarget
-                ? `${Math.round(item.consumed)} / ${Math.round(item.target)} г`
-                : `${Math.round(item.consumed)} г`
-            : 'нет записей';
+                ? `Потреблено / рекомендовано: ${Math.round(item.consumed)} / ${Math.round(item.target)} г`
+                : `Потреблено: ${Math.round(item.consumed)} г`
+            : 'Нет данных';
         ringWrapper.appendChild(
             createProgressRing({
                 size: 96,
@@ -301,9 +301,9 @@ function renderProfileRings() {
     const hasWaterTarget = Number.isFinite(waterTarget) && waterTarget > 0;
     const waterValue = hasWater
         ? hasWaterTarget
-            ? `${Number(waterAvg).toFixed(1)} / ${Number(waterTarget).toFixed(1)} л`
-            : `${Number(waterAvg).toFixed(1)} л`
-        : 'нет записей';
+            ? `Потреблено / рекомендовано: ${Number(waterAvg).toFixed(1)} / ${Number(waterTarget).toFixed(1)} л`
+            : `Потреблено: ${Number(waterAvg).toFixed(1)} л`
+        : 'Нет данных';
 
     waterContainer.innerHTML = '';
     waterContainer.appendChild(

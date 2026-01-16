@@ -511,12 +511,12 @@ function renderNutritionRings() {
 
     const buildValue = (consumed, target, unit) => {
         if (!hasEntriesToday) {
-            return 'нет записей';
+            return 'Нет данных';
         }
         if (Number.isFinite(target) && target > 0) {
-            return `${Math.round(consumed)} / ${Math.round(target)} ${unit}`;
+            return `Потреблено / рекомендовано: ${Math.round(consumed)} / ${Math.round(target)} ${unit}`;
         }
-        return `${Math.round(consumed)} ${unit}`;
+        return `Потреблено: ${Math.round(consumed)} ${unit}`;
     };
 
     const calcPercent = (consumed, target) => {
@@ -543,7 +543,7 @@ function renderNutritionRings() {
             id: 'water-ring',
             data: {
                 percent: null,
-                value: 'нет записей',
+                value: 'Нет данных',
                 label: 'Вода сегодня',
                 color: '#38bdf8',
             },
