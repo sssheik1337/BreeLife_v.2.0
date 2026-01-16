@@ -167,6 +167,15 @@ async def profile(request: Request):
     )
 
 
+@app.get("/profile.html", response_class=HTMLResponse)
+async def profile_legacy(request: Request):
+    # Поддержка старого пути, чтобы не ловить 404 при прямом заходе.
+    return templates.TemplateResponse(
+        "profile.html",
+        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+    )
+
+
 @app.get("/diary", response_class=HTMLResponse)
 async def diary(request: Request):
     return templates.TemplateResponse(
