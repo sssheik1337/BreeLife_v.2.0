@@ -66,6 +66,21 @@ class CustomNavbar extends HTMLElement {
           transition: all 0.2s ease;
         }
 
+        .nav-button--active {
+          background: #ecfdf3;
+          border-color: #34d399;
+          color: #047857;
+        }
+
+        .nav-button--disabled {
+          background: #f8fafc;
+          border-color: #e2e8f0;
+          color: #cbd5f5;
+          cursor: not-allowed;
+          opacity: 0.7;
+          pointer-events: none;
+        }
+
         .nav-emoji {
           font-size: 20px;
           line-height: 1;
@@ -105,19 +120,33 @@ class CustomNavbar extends HTMLElement {
 </a>
         
         <div class="nav-actions">
-          <a href="/profile" class="nav-button" aria-label="Профиль" title="Профиль">
+          <a href="/profile" class="nav-button" data-nav="profile" aria-label="Профиль" title="Профиль">
             <span class="nav-emoji" aria-hidden="true">👤</span>
           </a>
-          <a href="/menu" class="nav-button" aria-label="Меню" title="Меню">
+          <a href="/menu" class="nav-button" data-nav="menu" aria-label="Меню" title="Меню">
             <span class="nav-emoji" aria-hidden="true">📋</span>
           </a>
-          <a href="/profile#settings" class="nav-button" aria-label="Настройки" title="Настройки">
+          <button type="button" class="nav-button nav-button--disabled" aria-label="Настройки" title="В разработке" disabled>
             <span class="nav-emoji" aria-hidden="true">⚙️</span>
-          </a>
+          </button>
         </div>
       </nav>
     `;
 
+    const setActiveLink = () => {
+      const path = window.location.pathname || '/';
+      const profileLink = this.shadowRoot.querySelector('[data-nav="profile"]');
+      const menuLink = this.shadowRoot.querySelector('[data-nav="menu"]');
+
+      if (profileLink && path.startsWith('/profile')) {
+        profileLink.classList.add('nav-button--active');
+      }
+      if (menuLink && path.startsWith('/menu')) {
+        menuLink.classList.add('nav-button--active');
+      }
+    };
+
+    setActiveLink();
   }
 }
 
