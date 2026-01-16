@@ -109,7 +109,10 @@
     <script src="/static/js/storage.js"></script>
     <script src="/static/js/ui.js"></script>
     <script>
-        if (typeof getUserProfile === 'function') {
+        const hasCompletedQuiz = localStorage.getItem('hasCompletedQuiz') === 'true';
+        if (hasCompletedQuiz) {
+            window.location.replace('/profile');
+        } else if (typeof getUserProfile === 'function') {
             const profile = getUserProfile();
             if (profile?.completed === true) {
                 window.location.replace('/profile');

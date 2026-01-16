@@ -459,6 +459,7 @@ function setupEventListeners() {
                 mappedProfile.completed = true;
                 profile = patchUserProfile(mappedProfile);
             }
+            localStorage.setItem('hasCompletedQuiz', 'true');
             if (!profile && typeof getUserProfile === 'function') {
                 profile = getUserProfile();
             }
