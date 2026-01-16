@@ -362,12 +362,33 @@ function renderWeeklyProgress() {
         if (isFilled) {
             filledDays += 1;
         }
+
         const item = document.createElement('div');
         item.className = 'text-center';
-        item.innerHTML = `
-            <div class="h-10 rounded-lg ${isFilled ? 'bg-emerald-400' : 'bg-slate-200'}"></div>
-            <div class="text-xs text-slate-500 mt-1">${dayLabels[i]}</div>
-        `;
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'flex flex-col items-center gap-1';
+        button.setAttribute('aria-label', `${dayLabels[i]}: ${isFilled ? 'Есть запись' : 'Нет данных'}`);
+
+        if (isFilled) {
+            const dot = document.createElement('div');
+            dot.className = 'h-6 w-6 rounded-full bg-emerald-400';
+            button.appendChild(dot);
+        }
+
+        const label = document.createElement('div');
+        label.className = 'text-xs text-slate-500';
+        label.textContent = dayLabels[i];
+        button.appendChild(label);
+
+        button.addEventListener('click', () => {
+            if (typeof showNotification === 'function') {
+                showNotification(isFilled ? 'Есть запись' : 'Нет данных', isFilled ? 'success' : 'error');
+            }
+        });
+
+        item.appendChild(button);
         container.appendChild(item);
     }
 
