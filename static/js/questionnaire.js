@@ -5,17 +5,43 @@ function buildActivityOptions() {
     const coefficients = adminConfig.activity_coefficients;
     if (!Array.isArray(coefficients) || coefficients.length === 0) {
         return [
-            { value: "1.2", label: "Минимальная активность (1.2)", emoji: "🛋️" },
-            { value: "1.375", label: "Лёгкая активность (1.375)", emoji: "🚶" },
-            { value: "1.55", label: "Средняя активность (1.55)", emoji: "🏃" },
-            { value: "1.725", label: "Высокая активность (1.725)", emoji: "🏋️" },
-            { value: "1.9", label: "Очень высокая активность (1.9)", emoji: "🔥" }
+            {
+                value: "1.2",
+                label: "Минимальная активность (почти без тренировок)",
+                emoji: "🛋️",
+                tooltip: "Коэффициент: 1.2",
+            },
+            {
+                value: "1.375",
+                label: "Лёгкая активность (1–3 тренировки в неделю)",
+                emoji: "🚶",
+                tooltip: "Коэффициент: 1.375",
+            },
+            {
+                value: "1.55",
+                label: "Умеренная активность (3–5 тренировок в неделю)",
+                emoji: "🏃",
+                tooltip: "Коэффициент: 1.55",
+            },
+            {
+                value: "1.725",
+                label: "Высокая активность (6–7 тренировок в неделю)",
+                emoji: "🏋️",
+                tooltip: "Коэффициент: 1.725",
+            },
+            {
+                value: "1.9",
+                label: "Очень высокая активность (двойные тренировки)",
+                emoji: "🔥",
+                tooltip: "Коэффициент: 1.9",
+            }
         ];
     }
     return coefficients.map((item) => ({
         value: String(item.value),
-        label: `${item.label} (${item.value})`,
-        emoji: item.emoji || "✨"
+        label: item.label,
+        emoji: item.emoji || "✨",
+        tooltip: `Коэффициент: ${item.value}`,
     }));
 }
 
@@ -237,6 +263,9 @@ function displayOptions(options) {
         const optionElement = document.createElement('div');
         optionElement.className = 'option-card';
         optionElement.dataset.value = option.value;
+        if (option.tooltip) {
+            optionElement.title = option.tooltip;
+        }
         
         optionElement.innerHTML = `
             <div class="flex items-center space-x-3">
