@@ -1,4 +1,4 @@
-// Questionnaire Logic for Health Bloom App
+// Логика анкеты для Health Bloom App
 
 function buildActivityOptions() {
     const adminConfig = window.adminConfig || {};
@@ -9,31 +9,31 @@ function buildActivityOptions() {
                 value: "1.2",
                 label: "Минимальная активность (почти без тренировок)",
                 emoji: "🛋️",
-                tooltip: "Коэффициент: 1.2",
+                tooltip: "Низкая активность",
             },
             {
                 value: "1.375",
                 label: "Лёгкая активность (1–3 тренировки в неделю)",
                 emoji: "🚶",
-                tooltip: "Коэффициент: 1.375",
+                tooltip: "Низкая активность",
             },
             {
                 value: "1.55",
                 label: "Умеренная активность (3–5 тренировок в неделю)",
                 emoji: "🏃",
-                tooltip: "Коэффициент: 1.55",
+                tooltip: "Умеренная активность",
             },
             {
                 value: "1.725",
                 label: "Высокая активность (6–7 тренировок в неделю)",
                 emoji: "🏋️",
-                tooltip: "Коэффициент: 1.725",
+                tooltip: "Высокая активность",
             },
             {
                 value: "1.9",
                 label: "Очень высокая активность (двойные тренировки)",
                 emoji: "🔥",
-                tooltip: "Коэффициент: 1.9",
+                tooltip: "Высокая активность",
             }
         ];
     }
@@ -41,11 +41,11 @@ function buildActivityOptions() {
         value: String(item.value),
         label: item.label,
         emoji: item.emoji || "✨",
-        tooltip: `Коэффициент: ${item.value}`,
+        tooltip: item.label || "Уровень активности",
     }));
 }
 
-// Question definitions
+// Описание вопросов
 const questions = [
     {
         id: 1,
