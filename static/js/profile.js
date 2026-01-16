@@ -277,6 +277,8 @@ function renderProfileRings() {
                 : 'нет данных';
         ringWrapper.appendChild(
             createProgressRing({
+                size: 96,
+                stroke: 8,
                 percent: item.percent,
                 color: item.color,
                 label: item.label,
