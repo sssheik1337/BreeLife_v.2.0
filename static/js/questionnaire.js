@@ -142,6 +142,7 @@ unit: "kg",
 ];
 
 let currentQuestionIndex = 0;
+let isEditMode = false;
 
 // DOM Elements
 let questionTitle;
@@ -156,7 +157,7 @@ let progressPercent;
 // Initialize questionnaire
 function initQuestionnaire() {
     const urlParams = new URLSearchParams(window.location.search);
-    const isEditMode = urlParams.get('edit') === '1';
+    isEditMode = urlParams.get('edit') === '1';
 
     if (!isEditMode && typeof getUserProfile === 'function') {
         const profile = getUserProfile();
@@ -405,7 +406,7 @@ function updateButtonStates() {
     nextButton.disabled = !hasAnswer;
     
     // Enable/disable previous button
-    prevButton.disabled = currentQuestionIndex === 0;
+    prevButton.disabled = !isEditMode || currentQuestionIndex === 0;
     // Update next button text for last question
     if (currentQuestionIndex === questions.length - 1) {
         nextButton.innerHTML = `<span>Завершить</span><i data-feather="check" class="w-5 h-5"></i>`;
@@ -460,12 +461,13 @@ function setupEventListeners() {
                 profile = patchUserProfile(mappedProfile);
             }
             localStorage.setItem('hasCompletedQuiz', 'true');
+            localStorage.setItem('profile_completed', 'true');
             if (!profile && typeof getUserProfile === 'function') {
                 profile = getUserProfile();
             }
             await saveProfileToServer(profile);
             // Все вопросы заполнены, переходим на страницу сводки.
-            window.location.href = '/resume';
+            window.location.href = isEditMode ? '/profile' : '/resume';
         }
     });
     

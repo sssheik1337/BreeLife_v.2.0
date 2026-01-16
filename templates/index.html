@@ -109,8 +109,9 @@
     <script src="/static/js/storage.js"></script>
     <script src="/static/js/ui.js"></script>
     <script>
+        const profileCompleted = localStorage.getItem('profile_completed') === 'true';
         const hasCompletedQuiz = localStorage.getItem('hasCompletedQuiz') === 'true';
-        if (hasCompletedQuiz) {
+        if (profileCompleted || hasCompletedQuiz) {
             window.location.replace('/profile');
         } else if (typeof getUserProfile === 'function') {
             const profile = getUserProfile();
