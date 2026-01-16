@@ -294,6 +294,52 @@ function renderMonthGrid() {
     }
 }
 
+function renderWeeklyProgress() {
+    const container = document.getElementById('weekly-progress-grid');
+    const emptyState = document.getElementById('weekly-progress-empty');
+    if (!container || !emptyState) {
+        return;
+    }
+
+    container.innerHTML = '';
+    const diaryEntries = [
+        ...readFoodDiaryEntries(),
+        ...readManualDiaryEntries()
+    ];
+    const daysWithEntries = new Set(
+        diaryEntries
+            .map((entry) => entry?.date)
+            .filter(Boolean)
+    );
+
+    const dayLabels = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+    const today = new Date();
+    const dayIndex = (today.getDay() + 6) % 7;
+    const startDate = new Date(today);
+    startDate.setHours(0, 0, 0, 0);
+    startDate.setDate(today.getDate() - dayIndex);
+
+    let filledDays = 0;
+    for (let i = 0; i < 7; i += 1) {
+        const currentDate = new Date(startDate);
+        currentDate.setDate(startDate.getDate() + i);
+        const dateKey = currentDate.toISOString().split('T')[0];
+        const isFilled = daysWithEntries.has(dateKey);
+        if (isFilled) {
+            filledDays += 1;
+        }
+        const item = document.createElement('div');
+        item.className = 'text-center';
+        item.innerHTML = `
+            <div class="h-10 rounded-lg ${isFilled ? 'bg-emerald-400' : 'bg-slate-200'}"></div>
+            <div class="text-xs text-slate-500 mt-1">${dayLabels[i]}</div>
+        `;
+        container.appendChild(item);
+    }
+
+    emptyState.classList.toggle('hidden', filledDays > 0);
+}
+
 function renderWeeklyAdjustments() {
     const list = document.getElementById('profile-weekly-adjustments-list');
     if (!list) {
@@ -573,6 +619,7 @@ document.addEventListener('DOMContentLoaded', () => {
     (async () => {
         await loadProfileFromServer();
         renderProfileRings();
+        renderWeeklyProgress();
         renderMonthGrid();
         renderWeeklyAdjustments();
         renderWeeklyReview();
