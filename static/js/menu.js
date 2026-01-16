@@ -50,8 +50,8 @@ function createPlanCard(plan) {
     <ul class="space-y-2 text-sm text-slate-600">
       ${features.map((feature) => `<li class="flex items-start gap-2"><span class="text-emerald-500">•</span><span>${feature}</span></li>`).join('')}
     </ul>
-    <button class="btn-primary w-full" type="button" disabled title="Оплата подключается">
-      Оплата подключается
+    <button class="btn-primary w-full" type="button" disabled title="Скоро">
+      Скоро
     </button>
   `;
 
