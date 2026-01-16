@@ -139,6 +139,14 @@ async def index(request: Request):
     )
 
 
+@app.get("/index", response_class=HTMLResponse)
+async def index_alias(request: Request):
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+    )
+
+
 @app.get("/healthz")
 async def healthz():
     return {"status": "ok"}
