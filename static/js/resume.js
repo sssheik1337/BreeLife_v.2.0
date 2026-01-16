@@ -511,20 +511,20 @@ function renderNutritionRings() {
 
     const buildValue = (consumed, target, unit) => {
         if (!hasEntriesToday) {
-            return 'Нет записей за сегодня';
+            return 'нет записей';
         }
         if (Number.isFinite(target) && target > 0) {
-            return `${Math.round(consumed)} / ${Math.round(target)} ${unit} (съедено / рекомендовано)`;
+            return `${Math.round(consumed)} / ${Math.round(target)} ${unit}`;
         }
-        return `${Math.round(consumed)} ${unit} (съедено)`;
+        return `${Math.round(consumed)} ${unit}`;
     };
 
     const calcPercent = (consumed, target) => {
         if (!hasEntriesToday) {
-            return 0;
+            return null;
         }
         if (!Number.isFinite(target) || target <= 0) {
-            return 0;
+            return null;
         }
         return (consumed / target) * 100;
     };
@@ -535,16 +535,16 @@ function renderNutritionRings() {
             data: {
                 percent: calcPercent(totals.calories, recommended.calories),
                 value: buildValue(totals.calories, recommended.calories, 'ккал'),
-                label: 'Калории',
+                label: 'Калории сегодня',
                 color: '#10b981',
             },
         },
         {
             id: 'water-ring',
             data: {
-                percent: 0,
-                value: 'Нет записей за сегодня',
-                label: 'Вода',
+                percent: null,
+                value: 'нет записей',
+                label: 'Вода сегодня',
                 color: '#38bdf8',
             },
         },
@@ -553,7 +553,7 @@ function renderNutritionRings() {
             data: {
                 percent: calcPercent(totals.protein, recommended.protein),
                 value: buildValue(totals.protein, recommended.protein, 'г'),
-                label: 'Белки',
+                label: 'Белки сегодня',
                 color: '#a855f7',
             },
         },
@@ -562,7 +562,7 @@ function renderNutritionRings() {
             data: {
                 percent: calcPercent(totals.fat, recommended.fat),
                 value: buildValue(totals.fat, recommended.fat, 'г'),
-                label: 'Жиры',
+                label: 'Жиры сегодня',
                 color: '#f59e0b',
             },
         },
@@ -571,7 +571,7 @@ function renderNutritionRings() {
             data: {
                 percent: calcPercent(totals.carbs, recommended.carbs),
                 value: buildValue(totals.carbs, recommended.carbs, 'г'),
-                label: 'Углеводы',
+                label: 'Углеводы сегодня',
                 color: '#06b6d4',
             },
         },
@@ -593,7 +593,8 @@ function createProgressRing({ percent, value, label, color }) {
     const strokeWidth = 10;
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
-    const progress = Math.max(0, Math.min(percent, 100));
+    const safePercent = Number.isFinite(percent) ? percent : 0;
+    const progress = Math.max(0, Math.min(safePercent, 100));
 
     const wrapper = document.createElement('div');
     wrapper.className = 'flex flex-col items-center text-center gap-2';
@@ -629,7 +630,7 @@ function createProgressRing({ percent, value, label, color }) {
     percentText.setAttribute('font-size', '16');
     percentText.setAttribute('font-weight', '700');
     percentText.setAttribute('fill', '#0f172a');
-    percentText.textContent = `${Math.round(progress)}%`;
+    percentText.textContent = Number.isFinite(percent) ? `${Math.round(progress)}%` : '—';
 
     svg.appendChild(backgroundCircle);
     svg.appendChild(progressCircle);

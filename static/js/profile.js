@@ -3,7 +3,8 @@
 function createProgressRing({ percent, size = 120, stroke = 10, color = '#10b981', label, value, emphasize = false }) {
     const radius = (size - stroke) / 2;
     const circumference = 2 * Math.PI * radius;
-    const progress = Math.max(0, Math.min(percent, 100));
+    const safePercent = Number.isFinite(percent) ? percent : 0;
+    const progress = Math.max(0, Math.min(safePercent, 100));
 
     const wrapper = document.createElement('div');
     wrapper.className = 'profile-ring';
@@ -40,7 +41,7 @@ function createProgressRing({ percent, size = 120, stroke = 10, color = '#10b981
     percentText.setAttribute('font-size', '16');
     percentText.setAttribute('font-weight', '700');
     percentText.setAttribute('fill', '#0f172a');
-    percentText.textContent = `${Math.round(progress)}%`;
+    percentText.textContent = Number.isFinite(percent) ? `${Math.round(progress)}%` : '—';
 
     svg.appendChild(backgroundCircle);
     svg.appendChild(progressCircle);
@@ -213,10 +214,12 @@ function renderProfileRings() {
     const todayTotals = getTodayDiaryTotals();
     const caloriesPercent = todayTotals.hasEntries && Number.isFinite(tdee) && tdee > 0
         ? (todayTotals.calories / tdee) * 100
-        : 0;
-    const caloriesValue = Number.isFinite(tdee)
-        ? `${Math.round(todayTotals.calories)} / ${Math.round(tdee)} ккал`
-        : 'нет данных';
+        : null;
+    const caloriesValue = todayTotals.hasEntries
+        ? Number.isFinite(tdee)
+            ? `${Math.round(todayTotals.calories)} / ${Math.round(tdee)} ккал`
+            : `${Math.round(todayTotals.calories)} ккал`
+        : 'нет записей';
 
     caloriesContainer.innerHTML = '';
     caloriesContainer.appendChild(
@@ -238,7 +241,7 @@ function renderProfileRings() {
             target: Number(macros?.protein_g),
             percent: todayTotals.hasEntries && Number.isFinite(macros?.protein_g) && macros.protein_g > 0
                 ? Math.round((todayTotals.protein / macros.protein_g) * 100)
-                : 0,
+                : null,
             color: '#a855f7'
         },
         {
@@ -248,7 +251,7 @@ function renderProfileRings() {
             target: Number(macros?.fat_g),
             percent: todayTotals.hasEntries && Number.isFinite(macros?.fat_g) && macros.fat_g > 0
                 ? Math.round((todayTotals.fat / macros.fat_g) * 100)
-                : 0,
+                : null,
             color: '#f59e0b'
         },
         {
@@ -258,7 +261,7 @@ function renderProfileRings() {
             target: Number(macros?.carbs_g),
             percent: todayTotals.hasEntries && Number.isFinite(macros?.carbs_g) && macros.carbs_g > 0
                 ? Math.round((todayTotals.carbs / macros.carbs_g) * 100)
-                : 0,
+                : null,
             color: '#06b6d4'
         }
     ];
@@ -270,11 +273,11 @@ function renderProfileRings() {
         const ringWrapper = document.createElement('div');
         ringWrapper.className = 'ring-compact flex justify-center';
         const hasTarget = Number.isFinite(item.target) && item.target > 0;
-        const macroValue = hasTarget
-            ? `${Math.round(item.consumed)} / ${Math.round(item.target)} г`
-            : todayTotals.hasEntries
-                ? `${Math.round(item.consumed)} г`
-                : 'нет данных';
+        const macroValue = todayTotals.hasEntries
+            ? hasTarget
+                ? `${Math.round(item.consumed)} / ${Math.round(item.target)} г`
+                : `${Math.round(item.consumed)} г`
+            : 'нет записей';
         ringWrapper.appendChild(
             createProgressRing({
                 size: 96,
@@ -294,13 +297,13 @@ function renderProfileRings() {
     const hasWater = Number.isFinite(waterAvg);
     const waterPercent = hasWater && Number.isFinite(waterTarget) && waterTarget > 0
         ? Math.round((waterAvg / waterTarget) * 100)
-        : 0;
+        : null;
     const hasWaterTarget = Number.isFinite(waterTarget) && waterTarget > 0;
-    const waterValue = hasWaterTarget
-        ? `${Number.isFinite(waterAvg) ? Number(waterAvg).toFixed(1) : '0.0'} / ${Number(waterTarget).toFixed(1)} л`
-        : hasWater
-            ? `${Number(waterAvg).toFixed(1)} л`
-            : 'нет данных';
+    const waterValue = hasWater
+        ? hasWaterTarget
+            ? `${Number(waterAvg).toFixed(1)} / ${Number(waterTarget).toFixed(1)} л`
+            : `${Number(waterAvg).toFixed(1)} л`
+        : 'нет записей';
 
     waterContainer.innerHTML = '';
     waterContainer.appendChild(
