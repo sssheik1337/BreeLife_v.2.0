@@ -128,6 +128,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(RequestLoggingMiddleware)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+# HTTP 304 (Not Modified) для статики — это не ошибка, а корректный ответ кэша.
 
 
 @app.get("/", response_class=HTMLResponse)
