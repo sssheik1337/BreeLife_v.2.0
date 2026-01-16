@@ -67,7 +67,7 @@ class CustomFooter extends HTMLElement {
             🌱 Посадите здоровье сегодня, расцветёте завтра. Делайте маленькие шаги каждый день к более здоровому себе.
           </p>
 <div class="footer-links">
-            <a href="/" class="footer-link" data-link="home">Главная</a>
+            <a href="/profile" class="footer-link" data-link="home">Главная</a>
             <a href="/questionnaire" class="footer-link" data-link="questionnaire">Опрос</a>
             <a href="/resume" class="footer-link" data-link="resume">Сводка</a>
             <a href="/profile" class="footer-link" data-link="profile">Профиль</a>
@@ -105,7 +105,7 @@ class CustomFooter extends HTMLElement {
     const hasCompletedProfile = isProfileCompleted();
 
     if (links.home) {
-      links.home.href = hasCompletedProfile ? '/profile' : '/';
+      links.home.href = '/profile';
     }
     if (links.resume) {
       links.resume.href = '/resume';

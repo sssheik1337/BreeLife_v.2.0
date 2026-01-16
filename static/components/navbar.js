@@ -114,7 +114,7 @@ class CustomNavbar extends HTMLElement {
       </style>
       
       <nav class="navbar">
-        <a href="/" class="logo">
+        <a href="/profile" class="logo">
           <div class="logo-icon">🌿</div>
           <div class="logo-text">BreeLife</div>
 </a>
