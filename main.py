@@ -224,7 +224,11 @@ async def calculate(
 def normalize_iso_datetime(value: str) -> datetime:
     if value.endswith("Z"):
         value = value.replace("Z", "+00:00")
-    return datetime.fromisoformat(value)
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        # Если таймзона не указана, считаем дату в UTC, чтобы избежать смешения типов.
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
 
 
 def format_goal_label(goal: str | None) -> str:
@@ -350,6 +354,12 @@ def generate_auto_reminders_payload(
     days_logged = weekly_stats.get("days_logged") if isinstance(weekly_stats, dict) else None
     avg_water = weekly_stats.get("water_avg_l") if isinstance(weekly_stats, dict) else None
     deadline_raw = profile.get("goal_deadline") if isinstance(profile, dict) else None
+    if not deadline_raw:
+        return []
+    try:
+        deadline = normalize_iso_datetime(str(deadline_raw))
+    except ValueError:
+        return []
 
     if (
         profile.get("food_diary") is True
@@ -391,27 +401,21 @@ def generate_auto_reminders_payload(
             }
         )
 
-    if deadline_raw:
-        try:
-            deadline = normalize_iso_datetime(str(deadline_raw))
-        except ValueError:
-            deadline = None
-        if deadline:
-            days_left = (deadline - now).days
-            for days_before in deadline_days:
-                if days_left < days_before:
-                    date_label = deadline.strftime("%d.%m")
-                    reminders.append(
-                        {
-                            "type": "goal_deadline",
-                            "text": (
-                                f"До дедлайна ({date_label}) осталось {max(days_left, 0)} дн. "
-                                "Сверьте план на неделю, чтобы удержать цель."
-                            ),
-                            "suggested_time_iso": build_reminder_time(now, 9, days=0),
-                        }
-                    )
-                    break
+    days_left = (deadline - now).days
+    for days_before in deadline_days:
+        if days_left < days_before:
+            date_label = deadline.strftime("%d.%m")
+            reminders.append(
+                {
+                    "type": "goal_deadline",
+                    "text": (
+                        f"До дедлайна ({date_label}) осталось {max(days_left, 0)} дн. "
+                        "Сверьте план на неделю, чтобы удержать цель."
+                    ),
+                    "suggested_time_iso": build_reminder_time(now, 9, days=0),
+                }
+            )
+            break
 
     return reminders
 
@@ -596,7 +600,11 @@ async def generate_reminders(payload: ReminderGenerateRequest):
 async def auto_generate_reminders(payload: ReminderAutoGenerateRequest):
     profile = payload.user_profile if isinstance(payload.user_profile, dict) else {}
     weekly_review = payload.weekly_review if isinstance(payload.weekly_review, dict) else {}
-    reminders = generate_auto_reminders_payload(profile, weekly_review)
+    try:
+        reminders = generate_auto_reminders_payload(profile, weekly_review)
+    except Exception as exc:
+        logger.warning("Ошибка при генерации авто-напоминаний: %s", exc, exc_info=True)
+        return {"reminders": []}
     return {"reminders": reminders}
 
 
