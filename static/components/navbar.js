@@ -47,7 +47,7 @@ class CustomNavbar extends HTMLElement {
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
         }
-.nav-actions {
+        .nav-actions {
           display: flex;
           gap: 0.75rem;
         }
@@ -109,9 +109,12 @@ class CustomNavbar extends HTMLElement {
           <a href="/profile" class="nav-button" aria-label="Профиль" title="Профиль">
             <i data-feather="user"></i>
           </a>
-          <button class="nav-button" aria-label="Меню" title="Меню" onclick="this.dispatchEvent(new CustomEvent('menu-toggle'))">
+          <a href="/menu" class="nav-button" aria-label="Меню" title="Меню">
             <i data-feather="menu"></i>
-          </button>
+          </a>
+          <a href="/profile#settings" class="nav-button" aria-label="Настройки" title="Настройки">
+            <i data-feather="settings"></i>
+          </a>
         </div>
       </nav>
     `;
