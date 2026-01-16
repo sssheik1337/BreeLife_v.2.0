@@ -32,6 +32,20 @@ function getGoalLabel(goal) {
     return goalMap[goal] || 'здоровый баланс';
 }
 
+function getActivityLabel(activityFactor) {
+    const factor = Number(activityFactor);
+    if (!Number.isFinite(factor)) {
+        return null;
+    }
+    if (factor <= 1.3) {
+        return 'Низкая активность';
+    }
+    if (factor <= 1.6) {
+        return 'Умеренная активность';
+    }
+    return 'Высокая активность';
+}
+
 function getDiaryExplanation(profile) {
     if (!profile) {
         return 'Дневник питания помогает замечать привычки и держать курс.';
@@ -48,12 +62,13 @@ function getDiaryExplanation(profile) {
 function getCaloriesExplanation(profile) {
     const tdee = profile?.tdee_calories;
     const activity = profile?.activity_factor;
+    const activityLabel = getActivityLabel(activity);
     const goalLabel = getGoalLabel(profile?.goal);
     if (!tdee) {
         return `Мы учтём активность и цель (${goalLabel}), чтобы подсказать ориентир.`;
     }
-    if (activity) {
-        return `При активности ${activity} ориентир около ${Math.round(tdee)} ккал в день.`;
+    if (activityLabel) {
+        return `При уровне «${activityLabel}» ориентир около ${Math.round(tdee)} ккал в день.`;
     }
     return `Ориентир по калориям — около ${Math.round(tdee)} ккал в день.`;
 }
@@ -71,6 +86,7 @@ function getRecommendations(profile) {
     const goalLabel = getGoalLabel(profile?.goal);
     const goalKey = profile?.goal;
     const activity = profile?.activity_factor;
+    const activityLabel = getActivityLabel(activity);
     const tdee = profile?.tdee_calories;
     const predictedDate = formatDateForUser(profile?.predicted_goal_date);
     const currentWeight = Number(profile?.weight_kg);
@@ -93,8 +109,8 @@ function getRecommendations(profile) {
         recommendations.push(`До цели осталось около ${delta.toFixed(1)} кг.`);
     }
 
-    if (activity) {
-        recommendations.push(`Уровень активности ${activity} — хороший ориентир для стабильного темпа.`);
+    if (activityLabel) {
+        recommendations.push(`Уровень активности: ${activityLabel}. Это хороший ориентир для стабильного темпа.`);
     } else {
         recommendations.push('Добавьте немного движения — это поддержит настрой.');
     }

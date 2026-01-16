@@ -223,7 +223,7 @@ function renderProfileRings() {
         createProgressRing({
             percent: caloriesPercent,
             color: '#10b981',
-            label: 'Калории',
+            label: 'Калории сегодня',
             value: caloriesValue,
             emphasize: true
         })
