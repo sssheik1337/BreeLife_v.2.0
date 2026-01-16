@@ -589,14 +589,14 @@ function renderNutritionRings() {
 
 // Создание SVG-круга с анимацией заполнения
 function createProgressRing({ percent, value, label, color }) {
-    const size = 140;
+    const size = 120;
     const strokeWidth = 10;
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
     const progress = Math.max(0, Math.min(percent, 100));
 
     const wrapper = document.createElement('div');
-    wrapper.className = 'flex flex-col items-center text-center space-y-3';
+    wrapper.className = 'flex flex-col items-center text-center gap-2';
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', size);
@@ -621,14 +621,12 @@ function createProgressRing({ percent, value, label, color }) {
     progressCircle.setAttribute('stroke-linecap', 'round');
     progressCircle.setAttribute('stroke-dasharray', circumference);
     progressCircle.setAttribute('stroke-dashoffset', circumference);
-    progressCircle.style.filter = 'drop-shadow(0 6px 12px rgba(15, 23, 42, 0.12))';
-
     const percentText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     percentText.setAttribute('x', '50%');
     percentText.setAttribute('y', '50%');
     percentText.setAttribute('text-anchor', 'middle');
     percentText.setAttribute('dominant-baseline', 'middle');
-    percentText.setAttribute('font-size', '20');
+    percentText.setAttribute('font-size', '16');
     percentText.setAttribute('font-weight', '700');
     percentText.setAttribute('fill', '#0f172a');
     percentText.textContent = `${Math.round(progress)}%`;
