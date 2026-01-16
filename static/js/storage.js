@@ -53,7 +53,8 @@
             subscription_until: null,
             subscription_status: null,
             subscription_started_at: null,
-            trial_started_at: null
+            trial_started_at: null,
+            completed: false
         };
     }
 
@@ -200,6 +201,20 @@
         merged.subscription_status = merged.subscription_status || null;
         merged.subscription_started_at = merged.subscription_started_at || null;
         merged.trial_started_at = merged.trial_started_at || null;
+        merged.completed = parseBoolean(merged.completed);
+
+        if (merged.completed === null) {
+            const requiredFields = [
+                merged.sex,
+                merged.birth_date,
+                merged.height_cm,
+                merged.weight_kg,
+                merged.target_weight_kg,
+                merged.goal,
+                merged.activity_factor
+            ];
+            merged.completed = requiredFields.every((value) => value !== null && value !== undefined && value !== '');
+        }
 
         return merged;
     }

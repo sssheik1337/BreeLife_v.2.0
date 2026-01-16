@@ -155,6 +155,17 @@ let progressPercent;
 
 // Initialize questionnaire
 function initQuestionnaire() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const isEditMode = urlParams.get('edit') === '1';
+
+    if (!isEditMode && typeof getUserProfile === 'function') {
+        const profile = getUserProfile();
+        if (profile?.completed === true) {
+            window.location.replace('/profile');
+            return;
+        }
+    }
+
     // Get DOM elements
     questionTitle = document.getElementById('question-title');
     optionsContainer = document.getElementById('options-container');
@@ -444,7 +455,9 @@ function setupEventListeners() {
             // Сохраняем профиль и отправляем на сервер (если доступен Telegram ID).
             let profile = null;
             if (typeof patchUserProfile === 'function' && typeof mapUserDataToUserProfile === 'function') {
-                profile = patchUserProfile(mapUserDataToUserProfile(window.userData));
+                const mappedProfile = mapUserDataToUserProfile(window.userData);
+                mappedProfile.completed = true;
+                profile = patchUserProfile(mappedProfile);
             }
             if (!profile && typeof getUserProfile === 'function') {
                 profile = getUserProfile();

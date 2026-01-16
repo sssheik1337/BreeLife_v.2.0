@@ -96,16 +96,7 @@ class CustomFooter extends HTMLElement {
         if (!profile || typeof profile !== 'object') {
           return false;
         }
-        const requiredFields = [
-          'sex',
-          'birth_date',
-          'height_cm',
-          'weight_kg',
-          'target_weight_kg',
-          'goal',
-          'activity_factor',
-        ];
-        return requiredFields.every((field) => profile[field]);
+        return profile.completed === true;
       } catch (error) {
         return false;
       }
@@ -122,15 +113,15 @@ class CustomFooter extends HTMLElement {
     if (links.profile) {
       links.profile.href = '/profile';
     }
-    if (links.questionnaire) {
-      if (hasCompletedProfile) {
-        links.questionnaire.textContent = 'Редактировать данные';
-        links.questionnaire.href = '/questionnaire';
-      } else {
-        links.questionnaire.textContent = 'Опрос';
-        links.questionnaire.href = '/questionnaire';
+      if (links.questionnaire) {
+        if (hasCompletedProfile) {
+          links.questionnaire.textContent = 'Редактировать данные';
+          links.questionnaire.href = '/questionnaire?edit=1';
+        } else {
+          links.questionnaire.textContent = 'Опрос';
+          links.questionnaire.href = '/questionnaire';
+        }
       }
-    }
   }
 }
 
