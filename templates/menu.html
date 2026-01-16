@@ -68,12 +68,24 @@
                 </div>
 
                 <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-4">
-                    <h2 class="text-lg font-semibold text-slate-800">Подписка</h2>
-                    <p class="text-sm text-slate-500">Оплата подключается. Тарифы будут доступны позже.</p>
-                    <button type="button" class="btn-secondary w-full flex items-center justify-center space-x-2 text-slate-400 cursor-not-allowed" title="Скоро" disabled>
+                    <h2 class="text-lg font-semibold text-slate-800">Тарифы и пробный период</h2>
+                    <p class="text-sm text-slate-500">
+                        Пробный период 30 дней включается автоматически. Оплата пока недоступна, но можно изучить тарифы.
+                    </p>
+                    <a href="/menu#plans" class="btn-secondary w-full flex items-center justify-center space-x-2">
                         <i data-feather="credit-card" class="w-5 h-5"></i>
-                        <span>Тарифы скоро</span>
-                    </button>
+                        <span>Посмотреть тарифы</span>
+                    </a>
+                </div>
+
+                <div id="plans" class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-lg font-semibold text-slate-800">Тарифы</h2>
+                        <span class="text-xs text-slate-400">Без оплаты</span>
+                    </div>
+                    <div id="plans-container" class="space-y-4">
+                        <p class="text-center text-slate-400">Загрузка тарифов...</p>
+                    </div>
                 </div>
             </div>
         </main>

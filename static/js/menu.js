@@ -38,22 +38,48 @@ function createPlanCard(plan) {
   card.className = 'bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4';
 
   const features = Array.isArray(plan.features) ? plan.features : [];
+  const subtitle = plan.duration_days > 0 ? `Срок: ${plan.duration_days} дней` : 'Без ограничений по сроку';
+  const isTrial = plan.id === 'trial';
+  const isPremium = plan.id === 'premium';
+  const isFree = plan.id === 'free';
+  const statusText = isTrial
+    ? 'Пробный период активируется автоматически'
+    : isPremium
+      ? 'Оплата подключается, тариф готовится'
+      : 'Текущий бесплатный план';
 
   card.innerHTML = `
     <div class="flex items-center justify-between">
       <div>
         <h2 class="text-lg font-semibold text-slate-800">${plan.title}</h2>
-        <p class="text-sm text-slate-500">Срок: ${plan.duration_days} дней</p>
+        <p class="text-sm text-slate-500">${subtitle}</p>
       </div>
       <div class="text-xl font-bold text-emerald-600">${plan.price}</div>
     </div>
     <ul class="space-y-2 text-sm text-slate-600">
       ${features.map((feature) => `<li class="flex items-start gap-2"><span class="text-emerald-500">•</span><span>${feature}</span></li>`).join('')}
     </ul>
-    <button class="btn-primary w-full" type="button" disabled title="Скоро">
-      Скоро
+    <button class="btn-primary w-full" type="button" data-plan="${plan.id}">
+      Выбрать
     </button>
+    <p class="text-xs text-slate-500">${statusText}</p>
   `;
+
+  const button = card.querySelector('button[data-plan]');
+  if (button) {
+    button.addEventListener('click', () => {
+      const message = isPremium
+        ? 'Оплата подключается. Мы уведомим, когда можно будет оформить Premium.'
+        : isTrial
+          ? 'Пробный период 30 дней активируется автоматически после заполнения профиля.'
+          : 'Вы уже на бесплатном плане. Пробный период доступен при заполненном профиле.';
+      if (typeof showNotification === 'function') {
+        showNotification(message, 'success');
+      } else {
+        alert(message);
+      }
+    });
+  }
 
   return card;
 }
