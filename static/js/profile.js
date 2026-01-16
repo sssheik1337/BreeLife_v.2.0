@@ -235,6 +235,7 @@ function renderProfileRings() {
             label: 'Белки',
             key: 'protein',
             consumed: todayTotals.protein,
+            target: Number(macros?.protein_g),
             percent: todayTotals.hasEntries && Number.isFinite(macros?.protein_g) && macros.protein_g > 0
                 ? Math.round((todayTotals.protein / macros.protein_g) * 100)
                 : 0,
@@ -244,6 +245,7 @@ function renderProfileRings() {
             label: 'Жиры',
             key: 'fat',
             consumed: todayTotals.fat,
+            target: Number(macros?.fat_g),
             percent: todayTotals.hasEntries && Number.isFinite(macros?.fat_g) && macros.fat_g > 0
                 ? Math.round((todayTotals.fat / macros.fat_g) * 100)
                 : 0,
@@ -253,6 +255,7 @@ function renderProfileRings() {
             label: 'Углеводы',
             key: 'carbs',
             consumed: todayTotals.carbs,
+            target: Number(macros?.carbs_g),
             percent: todayTotals.hasEntries && Number.isFinite(macros?.carbs_g) && macros.carbs_g > 0
                 ? Math.round((todayTotals.carbs / macros.carbs_g) * 100)
                 : 0,
@@ -266,12 +269,18 @@ function renderProfileRings() {
         card.className = 'stat-card flex justify-center';
         const ringWrapper = document.createElement('div');
         ringWrapper.className = 'ring-compact flex justify-center';
+        const hasTarget = Number.isFinite(item.target) && item.target > 0;
+        const macroValue = hasTarget
+            ? `${Math.round(item.consumed)} / ${Math.round(item.target)} г`
+            : todayTotals.hasEntries
+                ? `${Math.round(item.consumed)} г`
+                : 'нет данных';
         ringWrapper.appendChild(
             createProgressRing({
                 percent: item.percent,
                 color: item.color,
                 label: item.label,
-                value: todayTotals.hasEntries ? `${Math.round(item.consumed)} г` : 'нет данных'
+                value: macroValue
             })
         );
         card.appendChild(ringWrapper);
@@ -284,7 +293,12 @@ function renderProfileRings() {
     const waterPercent = hasWater && Number.isFinite(waterTarget) && waterTarget > 0
         ? Math.round((waterAvg / waterTarget) * 100)
         : 0;
-    const waterValue = hasWater ? `${Number(waterAvg).toFixed(1)} л` : 'нет данных';
+    const hasWaterTarget = Number.isFinite(waterTarget) && waterTarget > 0;
+    const waterValue = hasWaterTarget
+        ? `${Number.isFinite(waterAvg) ? Number(waterAvg).toFixed(1) : '0.0'} / ${Number(waterTarget).toFixed(1)} л`
+        : hasWater
+            ? `${Number(waterAvg).toFixed(1)} л`
+            : 'нет данных';
 
     waterContainer.innerHTML = '';
     waterContainer.appendChild(
