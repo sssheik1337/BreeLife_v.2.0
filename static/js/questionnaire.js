@@ -144,6 +144,23 @@ unit: "kg",
 let currentQuestionIndex = 0;
 let isEditMode = false;
 
+// Проверка: есть ли уже заполненные данные профиля.
+function hasProfileData(profile) {
+    if (!profile || typeof profile !== 'object') {
+        return false;
+    }
+    const fields = [
+        profile.sex,
+        profile.birth_date,
+        profile.height_cm,
+        profile.weight_kg,
+        profile.target_weight_kg,
+        profile.goal,
+        profile.activity_factor
+    ];
+    return fields.some((value) => value !== null && value !== undefined && value !== '');
+}
+
 // DOM Elements
 let questionTitle;
 let optionsContainer;
@@ -161,7 +178,7 @@ function initQuestionnaire() {
 
     if (!isEditMode && typeof getUserProfile === 'function') {
         const profile = getUserProfile();
-        if (profile?.completed === true) {
+        if (profile?.completed === true || hasProfileData(profile)) {
             window.location.replace('/profile');
             return;
         }
