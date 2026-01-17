@@ -165,6 +165,50 @@ function normalizeDate(value) {
     return null;
 }
 
+function clamp01(x) {
+    return Math.max(0, Math.min(1, x));
+}
+
+function lerp(a, b, t) {
+    return a + (b - a) * t;
+}
+
+function lerpColor(c1, c2, t) {
+    const r = Math.round(lerp(c1[0], c2[0], t));
+    const g = Math.round(lerp(c1[1], c2[1], t));
+    const b = Math.round(lerp(c1[2], c2[2], t));
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
+/**
+ * Плавный градиент по проценту:
+ * 0.00 -> red
+ * 0.50 -> yellow
+ * 0.75 -> green
+ * 1.00 -> dark green
+ */
+function percentToGradientColor(p) {
+    const percent = clamp01(p);
+
+    // серый оставляем только для "нет данных", не для 0%
+    // 0% при наличии данных должен быть красным
+    const RED = [239, 68, 68];        // #ef4444
+    const YELLOW = [234, 179, 8];     // #eab308
+    const GREEN = [34, 197, 94];      // #22c55e
+    const DARK_GREEN = [4, 120, 87];  // #047857
+
+    if (percent <= 0.5) {
+        // 0..0.5: red -> yellow
+        return lerpColor(RED, YELLOW, percent / 0.5);
+    }
+    if (percent <= 0.75) {
+        // 0.5..0.75: yellow -> green
+        return lerpColor(YELLOW, GREEN, (percent - 0.5) / 0.25);
+    }
+    // 0.75..1.0: green -> dark green
+    return lerpColor(GREEN, DARK_GREEN, (percent - 0.75) / 0.25);
+}
+
 function getTodayDiaryTotals() {
     const today = new Date().toISOString().split('T')[0];
     const entries = readDiaryEntries();
@@ -386,26 +430,25 @@ function renderWeeklyProgress() {
         currentDate.setDate(startDate.getDate() + i);
         const dateKey = normalizeDate(currentDate);
         const dayCalories = dateKey ? (caloriesByDate.get(dateKey) || 0) : 0;
+        const hasData = dateKey ? caloriesByDate.has(dateKey) : false;
         const dayPercent = Number.isFinite(targetCalories) && targetCalories > 0
             ? Math.min(Math.max(dayCalories / targetCalories, 0), 1)
             : 0;
         totalPercent += dayPercent;
 
-        let barColor = '#e2e8f0';
-        if (dayPercent > 0.7) {
-            barColor = '#047857';
-        } else if (dayPercent >= 0.3) {
-            barColor = '#6ee7b7';
-        }
-
-        const heightPercent = Math.min(Math.max(dayPercent * 100, 20), 100);
-
         const item = document.createElement('div');
         item.className = 'flex flex-col items-center gap-2';
         const bar = document.createElement('div');
         bar.className = 'w-6 rounded-full';
-        bar.style.height = `${heightPercent}%`;
-        bar.style.background = barColor;
+        bar.style.transition = 'height 220ms ease, background-color 220ms ease';
+        const heightPercent = Math.min(Math.max(dayPercent * 100, 20), 100);
+        if (!hasData) {
+            bar.style.height = '20%';
+            bar.style.background = '#e2e8f0';
+        } else {
+            bar.style.height = `${heightPercent}%`;
+            bar.style.background = percentToGradientColor(dayPercent);
+        }
         const barWrapper = document.createElement('div');
         barWrapper.className = 'w-full flex items-end justify-center';
         barWrapper.style.height = '80px';
