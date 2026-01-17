@@ -157,6 +157,10 @@ function normalizeDate(value) {
         if (!trimmed) {
             return null;
         }
+        const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (isoMatch) {
+            return trimmed;
+        }
         const dotMatch = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
         if (dotMatch) {
             const [, day, month, year] = dotMatch;
@@ -437,7 +441,6 @@ function renderWeeklyProgress() {
         currentDate.setDate(startDate.getDate() + i);
         const dateKey = normalizeDate(currentDate);
         const dayCalories = dateKey ? (caloriesByDate.get(dateKey) || 0) : 0;
-        console.log('WEEK DAY', dateKey, caloriesByDate.get(dateKey));
         const dayPercent = Number.isFinite(targetCalories) && targetCalories > 0
             ? Math.min(Math.max(dayCalories / targetCalories, 0), 1)
             : 0;
