@@ -2,6 +2,8 @@
 
 (function() {
     const STORAGE_KEY = 'user_profile';
+    const DIARY_STORAGE_KEY = 'bree_diary_entries';
+    const LEGACY_DIARY_KEYS = ['health_bloom_food_entries', 'food_diary_entries'];
     const ALLOWED_SEX = new Set(['male', 'female']);
     const ALLOWED_GOALS = new Set(['lose', 'maintain', 'gain', 'muscle']);
     const ALLOWED_RISKS = new Set(['low', 'medium', 'high']);
@@ -53,7 +55,8 @@
             subscription_until: null,
             subscription_status: null,
             subscription_started_at: null,
-            trial_started_at: null
+            trial_started_at: null,
+            completed: false
         };
     }
 
@@ -200,6 +203,20 @@
         merged.subscription_status = merged.subscription_status || null;
         merged.subscription_started_at = merged.subscription_started_at || null;
         merged.trial_started_at = merged.trial_started_at || null;
+        merged.completed = parseBoolean(merged.completed);
+
+        if (merged.completed === null) {
+            const requiredFields = [
+                merged.sex,
+                merged.birth_date,
+                merged.height_cm,
+                merged.weight_kg,
+                merged.target_weight_kg,
+                merged.goal,
+                merged.activity_factor
+            ];
+            merged.completed = requiredFields.every((value) => value !== null && value !== undefined && value !== '');
+        }
 
         return merged;
     }
@@ -243,6 +260,172 @@
             trial_started_at: null
         };
         return profile;
+    }
+
+    function normalizeLocalDate(input) {
+        if (!input) {
+            return null;
+        }
+        if (input instanceof Date) {
+            if (Number.isNaN(input.getTime())) {
+                return null;
+            }
+            const year = input.getFullYear();
+            const month = String(input.getMonth() + 1).padStart(2, '0');
+            const day = String(input.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+        if (typeof input === 'string') {
+            const trimmed = input.trim();
+            if (!trimmed) {
+                return null;
+            }
+            const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (isoMatch) {
+                return trimmed;
+            }
+            const dotMatch = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+            if (dotMatch) {
+                const [, day, month, year] = dotMatch;
+                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+            const parsed = new Date(`${trimmed}T00:00:00`);
+            if (!Number.isNaN(parsed.getTime())) {
+                return normalizeLocalDate(parsed);
+            }
+            const fallback = new Date(trimmed);
+            if (!Number.isNaN(fallback.getTime())) {
+                return normalizeLocalDate(fallback);
+            }
+        }
+        return null;
+    }
+
+    function calculateDiaryTotals(items) {
+        return items.reduce(
+            (acc, item) => {
+                acc.calories += Number(item?.calories) || 0;
+                acc.protein_g += Number(item?.protein) || Number(item?.protein_g) || 0;
+                acc.fat_g += Number(item?.fat) || Number(item?.fat_g) || 0;
+                acc.carbs_g += Number(item?.carbs) || Number(item?.carbs_g) || 0;
+                return acc;
+            },
+            { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0 }
+        );
+    }
+
+    function normalizeDiaryEntry(entry) {
+        if (!entry) {
+            return null;
+        }
+        const dateKey = normalizeLocalDate(entry.date);
+        if (!dateKey) {
+            return null;
+        }
+        const isProducts = entry.mode === 'products' || Array.isArray(entry.items);
+        const items = Array.isArray(entry.items) ? entry.items : [];
+        const totals = isProducts
+            ? (entry.totals
+                ? {
+                    calories: Number(entry.totals.calories) || 0,
+                    protein_g: Number(entry.totals.protein_g) || 0,
+                    fat_g: Number(entry.totals.fat_g) || 0,
+                    carbs_g: Number(entry.totals.carbs_g) || 0
+                }
+                : calculateDiaryTotals(items))
+            : {
+                calories: Number(entry.calories ?? 0) || 0,
+                protein_g: Number(entry.protein_g ?? entry.protein ?? 0) || 0,
+                fat_g: Number(entry.fat_g ?? entry.fat ?? 0) || 0,
+                carbs_g: Number(entry.carbs_g ?? entry.carbs ?? 0) || 0
+            };
+        if (isProducts) {
+            return {
+                date: dateKey,
+                mode: 'products',
+                meal: entry.meal || null,
+                items,
+                totals
+            };
+        }
+        return {
+            date: dateKey,
+            mode: 'summary',
+            calories: totals.calories,
+            protein_g: totals.protein_g,
+            fat_g: totals.fat_g,
+            carbs_g: totals.carbs_g
+        };
+    }
+
+    function readRawDiaryEntries(key) {
+        const raw = localStorage.getItem(key);
+        if (!raw) {
+            return [];
+        }
+        try {
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            return [];
+        }
+    }
+
+    let diaryMigrationDone = false;
+
+    function migrateDiaryEntries() {
+        if (diaryMigrationDone) {
+            return readRawDiaryEntries(DIARY_STORAGE_KEY)
+                .map(normalizeDiaryEntry)
+                .filter(Boolean);
+        }
+        const unified = [];
+        const seen = new Set();
+
+        const collect = (entry) => {
+            const normalized = normalizeDiaryEntry(entry);
+            if (!normalized) {
+                return;
+            }
+            const totals = normalized.mode === 'products'
+                ? normalized.totals
+                : {
+                    calories: normalized.calories,
+                    protein_g: normalized.protein_g,
+                    fat_g: normalized.fat_g,
+                    carbs_g: normalized.carbs_g
+                };
+            const key = `${normalized.date}-${normalized.mode}-${normalized.meal || ''}-${totals.calories}-${totals.protein_g}-${totals.fat_g}-${totals.carbs_g}-${normalized.items?.length || 0}`;
+            if (seen.has(key)) {
+                return;
+            }
+            seen.add(key);
+            unified.push(normalized);
+        };
+
+        readRawDiaryEntries(DIARY_STORAGE_KEY).forEach(collect);
+        readRawDiaryEntries(LEGACY_DIARY_KEYS[0]).forEach((entry) => {
+            collect({
+                date: entry.date,
+                mode: 'summary',
+                calories: entry.calories,
+                protein: entry.protein_g,
+                fat: entry.fat_g,
+                carbs: entry.carbs_g
+            });
+        });
+        readRawDiaryEntries(LEGACY_DIARY_KEYS[1]).forEach((entry) => {
+            collect({
+                date: entry.date,
+                mode: 'products',
+                meal: entry.meal,
+                items: Array.isArray(entry.items) ? entry.items : []
+            });
+        });
+
+        localStorage.setItem(DIARY_STORAGE_KEY, JSON.stringify(unified));
+        diaryMigrationDone = true;
+        return unified;
     }
 
     function readLegacyUserData() {
@@ -385,4 +568,7 @@
     window.getUserProfile = getUserProfile;
     window.setUserProfile = setUserProfile;
     window.patchUserProfile = patchUserProfile;
+    window.normalizeLocalDate = normalizeLocalDate;
+    window.getDiaryEntries = migrateDiaryEntries;
+    window.DIARY_STORAGE_KEY = DIARY_STORAGE_KEY;
 })();
