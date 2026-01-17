@@ -432,7 +432,40 @@ async function refreshDiary() {
     setDiaryLoadingState(false);
 }
 
+let diaryInitialized = false;
+
+function bindDiaryEvents() {
+    if (document.body.dataset.diaryEventsBound) {
+        return;
+    }
+    document.body.dataset.diaryEventsBound = 'true';
+
+    document.addEventListener('click', (event) => {
+        const modeButton = event.target.closest('[data-mode]');
+        const toggle = document.getElementById('diary-mode-toggle');
+        if (modeButton && toggle && toggle.contains(modeButton)) {
+            setActiveMode(modeButton.dataset.mode);
+            const selectedDate = getSelectedDate();
+            renderDailySummary(readDiaryEntries(), selectedDate);
+            return;
+        }
+
+        const addItemButton = event.target.closest('#diary-add-item');
+        const productsItems = document.getElementById('diary-products-items');
+        if (addItemButton && productsItems) {
+            productsItems.appendChild(buildFoodItemRow());
+        }
+    });
+}
+
 function initDiary() {
+    if (diaryInitialized) {
+        return;
+    }
+    diaryInitialized = true;
+
+    bindDiaryEvents();
+
     const toggle = document.getElementById('diary-mode-toggle');
     const productsForm = document.getElementById('diary-products-form');
     const summaryForm = document.getElementById('diary-summary-form');
@@ -443,14 +476,6 @@ function initDiary() {
 
     if (toggle) {
         setActiveMode(getModeFromUrl());
-        const modeButtons = toggle.querySelectorAll('[data-mode]');
-        modeButtons.forEach((button) => {
-            button.addEventListener('click', () => {
-                setActiveMode(button.dataset.mode);
-                const selectedDate = getSelectedDate();
-                renderDailySummary(readDiaryEntries(), selectedDate);
-            });
-        });
     }
 
     if (productsItems && productsItems.children.length === 0) {
@@ -458,9 +483,7 @@ function initDiary() {
     }
 
     if (addItemButton && productsItems) {
-        addItemButton.addEventListener('click', () => {
-            productsItems.appendChild(buildFoodItemRow());
-        });
+        addItemButton.type = 'button';
     }
 
     if (productsForm && productsItems) {
