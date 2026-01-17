@@ -210,7 +210,7 @@ function percentToGradientColor(p) {
 }
 
 function getTodayDiaryTotals() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = formatLocalDate(new Date());
     const entries = readDiaryEntries();
     const totals = entries.reduce(
         (acc, entry) => {
@@ -369,7 +369,7 @@ function renderMonthGrid() {
     const diaryEntries = readDiaryEntries();
     const daysWithEntries = new Set(
         diaryEntries
-            .map((entry) => entry?.date)
+            .map((entry) => normalizeDate(entry?.date))
             .filter(Boolean)
     );
     const days = 30;
@@ -378,7 +378,7 @@ function renderMonthGrid() {
     for (let i = 0; i < days; i += 1) {
         const date = new Date(today);
         date.setDate(today.getDate() - (days - 1 - i));
-        const dateKey = date.toISOString().split('T')[0];
+        const dateKey = formatLocalDate(date);
         const day = document.createElement('div');
         day.className = 'month-day';
         if (daysWithEntries.has(dateKey)) {
