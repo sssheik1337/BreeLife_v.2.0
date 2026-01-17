@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+import logging
 
 import requests
 
@@ -11,6 +12,8 @@ SYSTEM_PROMPT = (
     "Не ставь диагнозы и не обещай результаты. "
     "Опирайся только на данные профиля пользователя."
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _format_goal(goal: str | None) -> str:
@@ -28,6 +31,25 @@ def _format_number(value: Any) -> str | None:
         return str(round(float(value)))
     except (TypeError, ValueError):
         return None
+
+
+def _format_activity_label(activity: Any) -> str | None:
+    """Преобразовать коэффициент активности в человекочитаемую фразу."""
+    try:
+        value = float(activity)
+    except (TypeError, ValueError):
+        return None
+    mapping = {
+        1.2: "Минимальная активность (почти без тренировок)",
+        1.375: "Лёгкая активность (1–3 тренировки в неделю)",
+        1.55: "Умеренная активность (3–5 тренировок в неделю)",
+        1.725: "Высокая активность (6–7 тренировок в неделю)",
+        1.9: "Очень высокая активность (двойные тренировки)",
+    }
+    for key, label in mapping.items():
+        if abs(value - key) < 0.001:
+            return label
+    return str(activity)
 
 
 def generate_profile_recommendation(profile: dict[str, Any]) -> str:
@@ -112,6 +134,7 @@ def generate_yandex_recommendation(
     """Сформировать рекомендацию через YandexGPT, используя только профиль."""
     system_prompt = SYSTEM_PROMPT
     user_prompt = build_ai_context(profile)
+    logger.debug("Контекст для YandexGPT: %s", user_prompt)
 
     payload = {
         "modelUri": f"gpt://{folder_id}/yandexgpt/latest",
@@ -144,6 +167,7 @@ def generate_yandex_recommendation(
     text = message.get("text")
     if not text:
         raise ValueError("YandexGPT не вернул текст рекомендации.")
+    logger.debug("Ответ YandexGPT (текст): %s", text)
     return text
 
 
@@ -196,7 +220,8 @@ def calculate_deviation_risk(
             weeks_shift = max(1, round(weeks_to_goal * deviation_abs))
     if weeks_shift is None:
         weeks_shift = max(1, round(deviation_abs * 6))
-    activity_note = f" Текущая активность: {activity_factor}." if activity_factor else ""
+    activity_label = _format_activity_label(activity_factor) if activity_factor else None
+    activity_note = f" Текущая активность: {activity_label}." if activity_label else ""
     return {
         "risk": risk,
         "comment": (
