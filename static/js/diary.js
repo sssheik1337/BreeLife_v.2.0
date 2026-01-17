@@ -1,5 +1,8 @@
 const DIARY_STORAGE_KEY = 'bree_diary_entries';
 
+let diaryInitialized = false;
+let diaryGlobalHandlersBound = false;
+
 const MODE_PRODUCTS = 'products';
 const MODE_SUMMARY = 'summary';
 
@@ -391,6 +394,31 @@ function setActiveMode(mode) {
     summaryBlock.classList.toggle('hidden', mode !== MODE_SUMMARY);
 }
 
+function bindGlobalDiaryHandlers() {
+    if (diaryGlobalHandlersBound) {
+        return;
+    }
+    diaryGlobalHandlersBound = true;
+
+    // Делаем обработчики устойчивыми, чтобы клики не терялись из-за состояния DOM.
+    document.addEventListener('click', (event) => {
+        const modeButton = event.target.closest('#diary-mode-toggle [data-mode]');
+        if (modeButton) {
+            setActiveMode(modeButton.dataset.mode);
+            renderDailySummary(readDiaryEntries(), getSelectedDate());
+            return;
+        }
+
+        const addButton = event.target.closest('#diary-add-item');
+        if (addButton) {
+            const productsItems = document.getElementById('diary-products-items');
+            if (productsItems) {
+                productsItems.appendChild(buildFoodItemRow());
+            }
+        }
+    });
+}
+
 function getSelectedDate() {
     const productsDate = document.getElementById('diary-products-date');
     const summaryDate = document.getElementById('diary-summary-date');
@@ -433,6 +461,12 @@ async function refreshDiary() {
 }
 
 function initDiary() {
+    if (diaryInitialized) {
+        return;
+    }
+    diaryInitialized = true;
+
+    bindGlobalDiaryHandlers();
     const toggle = document.getElementById('diary-mode-toggle');
     const productsForm = document.getElementById('diary-products-form');
     const summaryForm = document.getElementById('diary-summary-form');
@@ -443,14 +477,6 @@ function initDiary() {
 
     if (toggle) {
         setActiveMode(getModeFromUrl());
-        const modeButtons = toggle.querySelectorAll('[data-mode]');
-        modeButtons.forEach((button) => {
-            button.addEventListener('click', () => {
-                setActiveMode(button.dataset.mode);
-                const selectedDate = getSelectedDate();
-                renderDailySummary(readDiaryEntries(), selectedDate);
-            });
-        });
     }
 
     if (productsItems && productsItems.children.length === 0) {
@@ -458,9 +484,7 @@ function initDiary() {
     }
 
     if (addItemButton && productsItems) {
-        addItemButton.addEventListener('click', () => {
-            productsItems.appendChild(buildFoodItemRow());
-        });
+        addItemButton.setAttribute('type', 'button');
     }
 
     if (productsForm && productsItems) {
@@ -548,3 +572,5 @@ if (document.readyState === 'loading') {
 } else {
     initDiary();
 }
+
+window.addEventListener('load', initDiary);
