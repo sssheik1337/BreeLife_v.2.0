@@ -424,20 +424,36 @@ function renderWeeklyProgress() {
         caloriesByDate.set(normalizedDate, current + calories);
     });
 
-    let totalPercent = 0;
+    const weekDates = [];
     for (let i = 0; i < 7; i += 1) {
         const currentDate = new Date(startDate);
         currentDate.setDate(startDate.getDate() + i);
         const dateKey = typeof window.normalizeLocalDate === 'function'
             ? window.normalizeLocalDate(currentDate)
             : null;
+        weekDates.push({ dateKey, date: currentDate });
+    }
+    const maxWeekCalories = weekDates.reduce((maxValue, { dateKey }) => {
+        if (!dateKey) {
+            return maxValue;
+        }
+        return Math.max(maxValue, caloriesByDate.get(dateKey) || 0);
+    }, 0);
+    const fallbackTarget = maxWeekCalories > 0 ? maxWeekCalories : null;
+
+    let totalPercent = 0;
+    for (let i = 0; i < 7; i += 1) {
+        const { dateKey, date: currentDate } = weekDates[i];
         const dateLabel = dateKey
             ? `${String(currentDate.getDate()).padStart(2, '0')}.${String(currentDate.getMonth() + 1).padStart(2, '0')}`
             : '';
         const dayCalories = dateKey ? (caloriesByDate.get(dateKey) || 0) : 0;
         const hasData = dateKey ? caloriesByDate.has(dateKey) : false;
-        const dayPercent = Number.isFinite(targetCalories) && targetCalories > 0
-            ? Math.min(Math.max(dayCalories / targetCalories, 0), 1)
+        const target = Number.isFinite(targetCalories) && targetCalories > 0
+            ? targetCalories
+            : fallbackTarget;
+        const dayPercent = target
+            ? Math.min(Math.max(dayCalories / target, 0), 1)
             : 0;
         totalPercent += dayPercent;
 
