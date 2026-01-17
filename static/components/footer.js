@@ -67,10 +67,10 @@ class CustomFooter extends HTMLElement {
             🌱 Посадите здоровье сегодня, расцветёте завтра. Делайте маленькие шаги каждый день к более здоровому себе.
           </p>
 <div class="footer-links">
-            <a href="/" class="footer-link">Главная</a>
-            <a href="/questionnaire" class="footer-link">Опрос</a>
-            <a href="/resume" class="footer-link">Сводка</a>
-            <a href="/profile" class="footer-link">Профиль</a>
+            <a href="/profile" class="footer-link" data-link="home">Главная</a>
+            <a href="/questionnaire" class="footer-link" data-link="questionnaire">Опрос</a>
+            <a href="/resume" class="footer-link" data-link="resume">Сводка</a>
+            <a href="/profile" class="footer-link" data-link="profile">Профиль</a>
 </div>
           <div class="copyright">
             © ${new Date().getFullYear()} Health Bloom • Сделано с ❤️ для здоровой жизни
@@ -78,6 +78,50 @@ class CustomFooter extends HTMLElement {
 </div>
       </footer>
     `;
+
+    const links = {
+      home: this.shadowRoot.querySelector('[data-link="home"]'),
+      questionnaire: this.shadowRoot.querySelector('[data-link="questionnaire"]'),
+      resume: this.shadowRoot.querySelector('[data-link="resume"]'),
+      profile: this.shadowRoot.querySelector('[data-link="profile"]'),
+    };
+
+    const isProfileCompleted = () => {
+      try {
+        const raw = localStorage.getItem('user_profile');
+        if (!raw) {
+          return false;
+        }
+        const profile = JSON.parse(raw);
+        if (!profile || typeof profile !== 'object') {
+          return false;
+        }
+        return profile.completed === true;
+      } catch (error) {
+        return false;
+      }
+    };
+
+    const hasCompletedProfile = isProfileCompleted();
+
+    if (links.home) {
+      links.home.href = '/profile';
+    }
+    if (links.resume) {
+      links.resume.href = '/resume';
+    }
+    if (links.profile) {
+      links.profile.href = '/profile';
+    }
+      if (links.questionnaire) {
+        if (hasCompletedProfile) {
+          links.questionnaire.textContent = 'Редактировать данные';
+          links.questionnaire.href = '/questionnaire?edit=1';
+        } else {
+          links.questionnaire.textContent = 'Опрос';
+          links.questionnaire.href = '/questionnaire';
+        }
+      }
   }
 }
 

@@ -84,11 +84,14 @@ function mapUserDataToUserProfile(data) {
     };
 }
 
-// Format date to readable string
+// Форматировать дату для отображения на русском языке
 function formatDate(dateString) {
     if (!dateString) return 'Не указано';
-const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) {
+        return 'Не указано';
+    }
+    return date.toLocaleDateString('ru-RU', {
         year: 'numeric',
         month: 'long',
         day: 'numeric'
