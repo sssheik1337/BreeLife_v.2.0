@@ -1,6 +1,7 @@
 class CustomNavbar extends HTMLElement {
   connectedCallback() {
     this.attachShadow({ mode: 'open' });
+    const appName = document.documentElement?.dataset?.appName || 'BreeLife';
     this.shadowRoot.innerHTML = `
       <style>
         :host {
@@ -196,7 +197,7 @@ class CustomNavbar extends HTMLElement {
       <nav class="navbar">
         <a href="/profile" class="logo">
           <div class="logo-icon">🌿</div>
-          <div class="logo-text">BreeLife</div>
+          <div class="logo-text">${appName}</div>
 </a>
         
         <div class="nav-actions">

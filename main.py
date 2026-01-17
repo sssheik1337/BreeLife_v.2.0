@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title=APP_NAME)
 
 templates = Jinja2Templates(directory="templates")
+templates.env.globals["APP_NAME"] = APP_NAME
 
 ADMIN_CONFIG_PATH = Path("config/admin_config.json")
 ADMIN_CONFIG_CACHE: dict[str, object] | None = None
