@@ -442,6 +442,8 @@ function renderWeeklyProgress() {
     const fallbackTarget = maxWeekCalories > 0 ? maxWeekCalories : null;
 
     let totalPercent = 0;
+    let loggedDays = 0;
+    const shouldAverageLoggedDays = !(Number.isFinite(targetCalories) && targetCalories > 0);
     for (let i = 0; i < 7; i += 1) {
         const { dateKey, date: currentDate } = weekDates[i];
         const dateLabel = dateKey
@@ -456,6 +458,9 @@ function renderWeeklyProgress() {
             ? Math.min(Math.max(dayCalories / target, 0), 1)
             : 0;
         totalPercent += dayPercent;
+        if (hasData) {
+            loggedDays += 1;
+        }
 
         const item = document.createElement('a');
         item.className = 'weekly-day flex flex-col items-center gap-1 p-2';
@@ -494,7 +499,8 @@ function renderWeeklyProgress() {
         container.appendChild(item);
     }
 
-    const percent = Math.round((totalPercent / 7) * 100);
+    const denominator = shouldAverageLoggedDays ? loggedDays : 7;
+    const percent = denominator ? Math.round((totalPercent / denominator) * 100) : 0;
     percentElement.textContent = `${percent}%`;
     descElement.textContent = 'Учитываются записи дневника питания.';
 }
