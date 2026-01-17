@@ -197,9 +197,10 @@ function getDeviationStatusFromEntries(entries, tdee, today = new Date()) {
         }
         const diffDays = Math.floor((normalizedToday - entryDate) / (1000 * 60 * 60 * 24));
         if (diffDays >= 0 && diffDays < 7) {
-            const calories = Array.isArray(entry.items)
-                ? entry.items.reduce((sum, item) => sum + (Number(item?.calories) || 0), 0)
-                : 0;
+            let calories = Number(entry.calories) || 0;
+            if (entry?.mode === 'products' && Array.isArray(entry.items)) {
+                calories = entry.items.reduce((sum, item) => sum + (Number(item?.calories) || 0), 0);
+            }
             totalsByDate.set(entry.date, (totalsByDate.get(entry.date) || 0) + calories);
         }
     });
@@ -230,7 +231,7 @@ function getDeviationStatusFromEntries(entries, tdee, today = new Date()) {
 function getFoodDiaryDeviationStatus(profile) {
     const entries = (() => {
         try {
-            const raw = localStorage.getItem('food_diary_entries');
+            const raw = localStorage.getItem('bree_diary_entries');
             return raw ? JSON.parse(raw) : [];
         } catch (error) {
             return [];
@@ -308,18 +309,16 @@ function analyzeWeeklyNutrition(profile, foodDiary) {
         if (!entryDate || entryDate < weekStart || entryDate > weekEnd) {
             return;
         }
-        const calories = Array.isArray(entry.items)
-            ? entry.items.reduce((sum, item) => sum + (Number(item?.calories) || 0), 0)
-            : 0;
-        const protein = Array.isArray(entry.items)
-            ? entry.items.reduce((sum, item) => sum + (Number(item?.protein) || 0), 0)
-            : 0;
-        const fat = Array.isArray(entry.items)
-            ? entry.items.reduce((sum, item) => sum + (Number(item?.fat) || 0), 0)
-            : 0;
-        const carbs = Array.isArray(entry.items)
-            ? entry.items.reduce((sum, item) => sum + (Number(item?.carbs) || 0), 0)
-            : 0;
+        let calories = Number(entry.calories) || 0;
+        let protein = Number(entry.protein) || Number(entry.protein_g) || 0;
+        let fat = Number(entry.fat) || Number(entry.fat_g) || 0;
+        let carbs = Number(entry.carbs) || Number(entry.carbs_g) || 0;
+        if (entry?.mode === 'products' && Array.isArray(entry.items)) {
+            calories = entry.items.reduce((sum, item) => sum + (Number(item?.calories) || 0), 0);
+            protein = entry.items.reduce((sum, item) => sum + (Number(item?.protein) || 0), 0);
+            fat = entry.items.reduce((sum, item) => sum + (Number(item?.fat) || 0), 0);
+            carbs = entry.items.reduce((sum, item) => sum + (Number(item?.carbs) || 0), 0);
+        }
         const existing = totalsByDate.get(entryDate) || {
             calories: 0,
             protein: 0,

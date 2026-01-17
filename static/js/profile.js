@@ -109,21 +109,8 @@ function animateCountUps(container) {
     });
 }
 
-function readFoodDiaryEntries() {
-    const raw = localStorage.getItem('food_diary_entries');
-    if (!raw) {
-        return [];
-    }
-    try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch (error) {
-        return [];
-    }
-}
-
-function readManualDiaryEntries() {
-    const raw = localStorage.getItem('health_bloom_food_entries');
+function readDiaryEntries() {
+    const raw = localStorage.getItem('bree_diary_entries');
     if (!raw) {
         return [];
     }
@@ -178,62 +165,31 @@ function normalizeDate(value) {
     return null;
 }
 
-function sumFoodDiaryCalories(entries) {
-    const totalsByDate = new Map();
-    entries.forEach((entry) => {
-        if (!entry?.date) {
-            return;
-        }
-        const calories = Array.isArray(entry.items)
-            ? entry.items.reduce((sum, item) => sum + (Number(item?.calories) || 0), 0)
-            : 0;
-        totalsByDate.set(entry.date, (totalsByDate.get(entry.date) || 0) + calories);
-    });
-    return Array.from(totalsByDate.values());
-}
-
-function sumManualDiaryCalories(entries) {
-    const totalsByDate = new Map();
-    entries.forEach((entry) => {
-        if (!entry?.date) {
-            return;
-        }
-        const calories = Number(entry.calories) || 0;
-        totalsByDate.set(entry.date, (totalsByDate.get(entry.date) || 0) + calories);
-    });
-    return Array.from(totalsByDate.values());
-}
-
 function getTodayDiaryTotals() {
     const today = new Date().toISOString().split('T')[0];
-    const foodEntries = readFoodDiaryEntries();
-    const manualEntries = readManualDiaryEntries();
-
-    const totals = foodEntries.reduce(
+    const entries = readDiaryEntries();
+    const totals = entries.reduce(
         (acc, entry) => {
-            if (entry?.date !== today || !Array.isArray(entry.items)) {
+            if (entry?.date !== today) {
                 return acc;
             }
-            entry.items.forEach((item) => {
-                acc.calories += Number(item?.calories) || 0;
-                acc.protein += Number(item?.protein) || 0;
-                acc.fat += Number(item?.fat) || 0;
-                acc.carbs += Number(item?.carbs) || 0;
-            });
+            if (entry?.mode === 'products' && Array.isArray(entry.items)) {
+                entry.items.forEach((item) => {
+                    acc.calories += Number(item?.calories) || 0;
+                    acc.protein += Number(item?.protein) || 0;
+                    acc.fat += Number(item?.fat) || 0;
+                    acc.carbs += Number(item?.carbs) || 0;
+                });
+                return acc;
+            }
+            acc.calories += Number(entry.calories) || 0;
+            acc.protein += Number(entry.protein) || Number(entry.protein_g) || 0;
+            acc.fat += Number(entry.fat) || Number(entry.fat_g) || 0;
+            acc.carbs += Number(entry.carbs) || Number(entry.carbs_g) || 0;
             return acc;
         },
         { calories: 0, protein: 0, fat: 0, carbs: 0 }
     );
-
-    manualEntries.forEach((entry) => {
-        if (entry?.date !== today) {
-            return;
-        }
-        totals.calories += Number(entry.calories) || 0;
-        totals.protein += Number(entry.protein_g) || 0;
-        totals.fat += Number(entry.fat_g) || 0;
-        totals.carbs += Number(entry.carbs_g) || 0;
-    });
 
     const hasEntries = totals.calories > 0 || totals.protein > 0 || totals.fat > 0 || totals.carbs > 0;
     return { ...totals, hasEntries };
@@ -366,10 +322,7 @@ function renderMonthGrid() {
     }
 
     container.innerHTML = '';
-    const diaryEntries = [
-        ...readFoodDiaryEntries(),
-        ...readManualDiaryEntries()
-    ];
+    const diaryEntries = readDiaryEntries();
     const daysWithEntries = new Set(
         diaryEntries
             .map((entry) => entry?.date)
@@ -411,26 +364,18 @@ function renderWeeklyProgress() {
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
     const targetCalories = Number(profile?.tdee_calories);
 
-    const manualEntries = readManualDiaryEntries();
-    const foodEntries = readFoodDiaryEntries();
+    const entries = readDiaryEntries();
     const caloriesByDate = new Map();
 
-    manualEntries.forEach((entry) => {
+    entries.forEach((entry) => {
         const normalizedDate = normalizeDate(entry?.date);
         if (!normalizedDate) {
             return;
         }
-        const calories = Number(entry.calories) || 0;
-        const current = caloriesByDate.get(normalizedDate) || 0;
-        caloriesByDate.set(normalizedDate, current + calories);
-    });
-
-    foodEntries.forEach((entry) => {
-        const normalizedDate = normalizeDate(entry?.date);
-        if (!normalizedDate || !Array.isArray(entry.items)) {
-            return;
+        let calories = Number(entry.calories) || 0;
+        if (entry?.mode === 'products' && Array.isArray(entry.items)) {
+            calories = entry.items.reduce((sum, item) => sum + (Number(item?.calories) || 0), 0);
         }
-        const calories = entry.items.reduce((sum, item) => sum + (Number(item?.calories) || 0), 0);
         const current = caloriesByDate.get(normalizedDate) || 0;
         caloriesByDate.set(normalizedDate, current + calories);
     });
@@ -475,7 +420,7 @@ function renderWeeklyProgress() {
 
     const percent = Math.round((totalPercent / 7) * 100);
     percentElement.textContent = `${percent}%`;
-    descElement.textContent = 'Учитываются итоги дня и дневник по продуктам.';
+    descElement.textContent = 'Учитываются записи дневника питания.';
 }
 
 function renderWeeklyAdjustments() {
@@ -695,7 +640,7 @@ function renderWeeklyReview() {
     if (shouldRefreshWeeklyReview(review)) {
         const entries = (() => {
             try {
-                const raw = localStorage.getItem('food_diary_entries');
+                const raw = localStorage.getItem('bree_diary_entries');
                 return raw ? JSON.parse(raw) : [];
             } catch (error) {
                 return [];

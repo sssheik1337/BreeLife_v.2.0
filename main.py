@@ -6,7 +6,7 @@ from pathlib import Path
 
 import requests
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -193,12 +193,9 @@ async def diary(request: Request):
     )
 
 
-@app.get("/food-diary", response_class=HTMLResponse)
-async def food_diary(request: Request):
-    return templates.TemplateResponse(
-        "food_diary.html",
-        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
-    )
+@app.get("/food-diary")
+async def food_diary():
+    return RedirectResponse(url="/diary?mode=products")
 
 
 @app.get("/foods", response_class=HTMLResponse)

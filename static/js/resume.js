@@ -459,45 +459,30 @@ function renderNutritionRings() {
     };
 
     const today = new Date().toISOString().split('T')[0];
-    const manualEntries = readEntries('health_bloom_food_entries');
-    const diaryEntries = readEntries('food_diary_entries');
+    const diaryEntries = readEntries('bree_diary_entries');
 
-    const sumManual = manualEntries.reduce(
+    const totals = diaryEntries.reduce(
         (acc, entry) => {
             if (entry?.date !== today) {
                 return acc;
             }
-            acc.calories += Number(entry.calories) || 0;
-            acc.protein += Number(entry.protein_g) || 0;
-            acc.fat += Number(entry.fat_g) || 0;
-            acc.carbs += Number(entry.carbs_g) || 0;
-            return acc;
-        },
-        { calories: 0, protein: 0, fat: 0, carbs: 0 }
-    );
-
-    const sumDiary = diaryEntries.reduce(
-        (acc, entry) => {
-            if (entry?.date !== today || !Array.isArray(entry.items)) {
+            if (entry?.mode === 'products' && Array.isArray(entry.items)) {
+                entry.items.forEach((item) => {
+                    acc.calories += Number(item?.calories) || 0;
+                    acc.protein += Number(item?.protein) || 0;
+                    acc.fat += Number(item?.fat) || 0;
+                    acc.carbs += Number(item?.carbs) || 0;
+                });
                 return acc;
             }
-            entry.items.forEach((item) => {
-                acc.calories += Number(item?.calories) || 0;
-                acc.protein += Number(item?.protein) || 0;
-                acc.fat += Number(item?.fat) || 0;
-                acc.carbs += Number(item?.carbs) || 0;
-            });
+            acc.calories += Number(entry.calories) || 0;
+            acc.protein += Number(entry.protein) || Number(entry.protein_g) || 0;
+            acc.fat += Number(entry.fat) || Number(entry.fat_g) || 0;
+            acc.carbs += Number(entry.carbs) || Number(entry.carbs_g) || 0;
             return acc;
         },
         { calories: 0, protein: 0, fat: 0, carbs: 0 }
     );
-
-    const totals = {
-        calories: sumManual.calories + sumDiary.calories,
-        protein: sumManual.protein + sumDiary.protein,
-        fat: sumManual.fat + sumDiary.fat,
-        carbs: sumManual.carbs + sumDiary.carbs,
-    };
 
     const hasEntriesToday = totals.calories > 0 || totals.protein > 0 || totals.fat > 0 || totals.carbs > 0;
 

@@ -23,22 +23,62 @@
                     <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 mb-4 shadow-lg">
                         <i data-feather="book-open" class="w-7 h-7 text-white"></i>
                     </div>
-                    <h1 class="text-2xl font-bold text-slate-800">Быстрый дневник (итоги дня)</h1>
-                    <p class="text-slate-500 mt-2">Внесите суммарные значения за день (без продуктов).</p>
+                    <h1 class="text-2xl font-bold text-slate-800">Дневник питания</h1>
+                    <p class="text-slate-500 mt-2">Выберите удобный режим ввода: по продуктам или итоги дня.</p>
+                </div>
+
+                <div class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100">
+                    <div class="grid grid-cols-2 gap-3" id="diary-mode-toggle">
+                        <button type="button" class="btn-secondary w-full" data-mode="products">
+                            По продуктам
+                        </button>
+                        <button type="button" class="btn-secondary w-full" data-mode="summary">
+                            Итоги дня
+                        </button>
+                    </div>
                 </div>
 
                 <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100">
-                    <h3 class="font-semibold text-slate-800 mb-4">Итоги дня</h3>
-                    <form id="diary-form" class="space-y-3">
-                        <input type="date" id="entry-date" class="form-input" required>
-                        <input type="number" id="entry-calories" class="form-input" placeholder="Калории" min="0" step="1" required>
-                        <input type="number" id="entry-protein" class="form-input" placeholder="Белки, г" min="0" step="0.1" required>
-                        <input type="number" id="entry-fat" class="form-input" placeholder="Жиры, г" min="0" step="0.1" required>
-                        <input type="number" id="entry-carbs" class="form-input" placeholder="Углеводы, г" min="0" step="0.1" required>
-                        <button type="submit" class="btn-primary w-full">
-                            <span>Сохранить итоги дня</span>
-                        </button>
-                    </form>
+                    <div id="diary-mode-products">
+                        <h3 class="font-semibold text-slate-800 mb-4">Приём пищи</h3>
+                        <form id="diary-products-form" class="space-y-4">
+                            <input type="date" id="diary-products-date" class="form-input" required>
+                            <select id="diary-products-meal" class="form-input" required>
+                                <option value="breakfast">Завтрак</option>
+                                <option value="lunch">Обед</option>
+                                <option value="dinner">Ужин</option>
+                                <option value="snack">Перекус</option>
+                            </select>
+
+                            <div id="diary-products-items" class="space-y-3"></div>
+
+                            <button type="button" id="diary-add-item" class="btn-secondary w-full">
+                                Добавить продукт
+                            </button>
+                            <button type="submit" class="btn-primary w-full">
+                                Сохранить приём пищи
+                            </button>
+                        </form>
+                    </div>
+
+                    <div id="diary-mode-summary" class="hidden">
+                        <h3 class="font-semibold text-slate-800 mb-4">Итоги дня</h3>
+                        <form id="diary-summary-form" class="space-y-3">
+                            <input type="date" id="diary-summary-date" class="form-input" required>
+                            <input type="number" id="diary-summary-calories" class="form-input" placeholder="Калории" min="0" step="1" required>
+                            <input type="number" id="diary-summary-protein" class="form-input" placeholder="Белки, г" min="0" step="0.1" required>
+                            <input type="number" id="diary-summary-fat" class="form-input" placeholder="Жиры, г" min="0" step="0.1" required>
+                            <input type="number" id="diary-summary-carbs" class="form-input" placeholder="Углеводы, г" min="0" step="0.1" required>
+                            <button type="submit" class="btn-primary w-full">
+                                Сохранить итоги дня
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100">
+                    <h3 class="font-semibold text-slate-800 mb-4">Итоги за день</h3>
+                    <div id="daily-summary" class="text-sm text-slate-600 space-y-2"></div>
                 </div>
 
                 <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100">
