@@ -23,12 +23,65 @@
                     <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r from-purple-400 to-pink-400 mb-4 shadow-lg">
                         <i data-feather="layers" class="w-7 h-7 text-white"></i>
                     </div>
-                    <h1 class="text-2xl font-bold text-slate-800">Тарифы BreeLife</h1>
-                    <p class="text-slate-500 mt-2">Выберите подходящий план без оформления оплаты.</p>
+                    <h1 class="text-2xl font-bold text-slate-800">Меню BreeLife</h1>
+                    <p class="text-slate-500 mt-2">Быстрый доступ к дневникам и справочным разделам.</p>
                 </div>
 
-                <div id="plans-container" class="space-y-4">
-                    <p class="text-center text-slate-400">Загрузка...</p>
+                <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-4">
+                    <h2 class="text-lg font-semibold text-slate-800">Дневник питания</h2>
+                    <div class="space-y-3">
+                        <a href="/diary" class="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 hover:bg-slate-100 transition">
+                            <div>
+                                <p class="font-semibold text-slate-800">Дневник питания</p>
+                                <p class="text-sm text-slate-500">Записывайте приёмы пищи и итоги дня</p>
+                            </div>
+                            <i data-feather="chevron-right" class="w-5 h-5 text-slate-400"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-4">
+                    <h2 class="text-lg font-semibold text-slate-800">Справочники</h2>
+                    <div class="space-y-3">
+                        <a href="/foods" class="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 hover:bg-slate-100 transition">
+                            <div>
+                                <p class="font-semibold text-slate-800">Каталог продуктов</p>
+                                <p class="text-sm text-slate-500">Быстрый поиск по продуктам</p>
+                            </div>
+                            <i data-feather="chevron-right" class="w-5 h-5 text-slate-400"></i>
+                        </a>
+                        <button type="button" class="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-slate-400 cursor-not-allowed" title="Скоро" disabled>
+                            <div>
+                                <p class="font-semibold">Планы тренировок</p>
+                                <p class="text-sm">В разработке</p>
+                            </div>
+                            <span class="text-xs font-semibold">Скоро</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-4">
+                    <h2 class="text-lg font-semibold text-slate-800">Тарифы и пробный период</h2>
+                    <p class="text-sm text-slate-500">
+                        Пробный период: 30 дней. Оплата не подключена — сейчас можно выбрать и сравнить доступные режимы.
+                    </p>
+                    <a href="/menu#plans" class="btn-secondary w-full flex items-center justify-center space-x-2">
+                        <i data-feather="credit-card" class="w-5 h-5"></i>
+                        <span>Посмотреть тарифы</span>
+                    </a>
+                </div>
+
+                <div id="plans" class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-lg font-semibold text-slate-800">Тарифы</h2>
+                        <span class="text-xs text-slate-400">Без оплаты</span>
+                    </div>
+                    <p class="text-xs text-slate-500">
+                        Пробный период действует 30 дней и открывает функции Premium.
+                    </p>
+                    <div id="plans-container" class="space-y-4">
+                        <p class="text-center text-slate-400">Загрузка тарифов...</p>
+                    </div>
                 </div>
             </div>
         </main>

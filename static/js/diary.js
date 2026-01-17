@@ -1,4 +1,17 @@
-const DIARY_STORAGE_KEY = 'health_bloom_food_entries';
+const DIARY_STORAGE_KEY = 'bree_diary_entries';
+
+let diaryInitialized = false;
+let diaryGlobalHandlersBound = false;
+
+const MODE_PRODUCTS = 'products';
+const MODE_SUMMARY = 'summary';
+
+const mealLabels = {
+    breakfast: 'Завтрак',
+    lunch: 'Обед',
+    dinner: 'Ужин',
+    snack: 'Перекус'
+};
 
 function readDiaryEntries() {
     const raw = localStorage.getItem(DIARY_STORAGE_KEY);
@@ -7,7 +20,7 @@ function readDiaryEntries() {
     }
     try {
         const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
+        return Array.isArray(parsed) ? parsed.map(normalizeEntry).filter(Boolean) : [];
     } catch (error) {
         return [];
     }
@@ -17,8 +30,48 @@ function saveDiaryEntries(entries) {
     localStorage.setItem(DIARY_STORAGE_KEY, JSON.stringify(entries));
 }
 
+function normalizeEntry(entry) {
+    if (!entry || !entry.date) {
+        return null;
+    }
+    const mode = entry.mode === MODE_PRODUCTS || entry.mode === MODE_SUMMARY
+        ? entry.mode
+        : Array.isArray(entry.items)
+            ? MODE_PRODUCTS
+            : MODE_SUMMARY;
+    const items = Array.isArray(entry.items) ? entry.items : [];
+    const totals = mode === MODE_PRODUCTS ? calculateTotals(items) : null;
+    const calories = Number(entry.calories ?? totals?.calories ?? 0) || 0;
+    const protein = Number(entry.protein ?? entry.protein_g ?? totals?.protein ?? 0) || 0;
+    const fat = Number(entry.fat ?? entry.fat_g ?? totals?.fat ?? 0) || 0;
+    const carbs = Number(entry.carbs ?? entry.carbs_g ?? totals?.carbs ?? 0) || 0;
+    return {
+        date: entry.date,
+        mode,
+        meal: entry.meal || null,
+        calories,
+        protein,
+        fat,
+        carbs,
+        items: mode === MODE_PRODUCTS ? items : []
+    };
+}
+
 function sortEntries(entries) {
     return [...entries].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+}
+
+function calculateTotals(items) {
+    return items.reduce(
+        (acc, item) => {
+            acc.calories += Number(item?.calories) || 0;
+            acc.protein += Number(item?.protein) || 0;
+            acc.fat += Number(item?.fat) || 0;
+            acc.carbs += Number(item?.carbs) || 0;
+            return acc;
+        },
+        { calories: 0, protein: 0, fat: 0, carbs: 0 }
+    );
 }
 
 function renderDiaryList(entries) {
@@ -33,11 +86,17 @@ function renderDiaryList(entries) {
     }
     entries.forEach((entry) => {
         const item = document.createElement('div');
-        item.className = 'bg-slate-50 rounded-xl p-3 border border-slate-100';
+        item.className = 'bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-1';
+        const modeLabel = entry.mode === MODE_PRODUCTS ? 'По продуктам' : 'Итоги дня';
+        const mealLabel = entry.mode === MODE_PRODUCTS ? (mealLabels[entry.meal] || 'Приём пищи') : '';
         item.innerHTML = `
-            <div class="font-semibold text-slate-700">${entry.date}</div>
-            <div class="text-slate-500">Калории: ${entry.calories} ккал</div>
-            <div class="text-slate-500">Белки, жиры, углеводы: ${entry.protein_g} / ${entry.fat_g} / ${entry.carbs_g} г</div>
+            <div class="flex items-center justify-between">
+                <span class="font-semibold text-slate-700">${entry.date}</span>
+                <span class="text-xs text-slate-500">${modeLabel}</span>
+            </div>
+            ${mealLabel ? `<div class="text-xs text-slate-500">${mealLabel}</div>` : ''}
+            <div class="text-slate-500">Калории: ${Math.round(entry.calories)} ккал</div>
+            <div class="text-slate-500">Белки, жиры, углеводы: ${Math.round(entry.protein)} / ${Math.round(entry.fat)} / ${Math.round(entry.carbs)} г</div>
         `;
         list.appendChild(item);
     });
@@ -157,7 +216,14 @@ async function syncEntryWithBackend(entry) {
     await fetch('/api/food-diary/add', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...entry, telegram_user_id: profile.telegram_user_id })
+        body: JSON.stringify({
+            telegram_user_id: profile.telegram_user_id,
+            date: entry.date,
+            calories: entry.calories,
+            protein_g: entry.protein,
+            fat_g: entry.fat,
+            carbs_g: entry.carbs
+        })
     });
 }
 
@@ -171,7 +237,15 @@ async function loadEntriesFromBackend() {
         return [];
     }
     const data = await response.json();
-    return Array.isArray(data) ? data : [];
+    const entries = Array.isArray(data) ? data : [];
+    return entries.map((entry) => normalizeEntry({
+        date: entry.date,
+        mode: MODE_SUMMARY,
+        calories: entry.calories,
+        protein: entry.protein_g,
+        fat: entry.fat_g,
+        carbs: entry.carbs_g
+    })).filter(Boolean);
 }
 
 async function requestAiAnalysis(entries) {
@@ -193,79 +267,310 @@ async function requestAiAnalysis(entries) {
     return response.json();
 }
 
-async function refreshDiary() {
-    setDiaryLoadingState(true);
-    const localEntries = readDiaryEntries();
-    const backendEntries = await loadEntriesFromBackend();
+function mergeEntries(localEntries, backendEntries) {
     const merged = sortEntries([...localEntries, ...backendEntries]);
     const unique = [];
     const seen = new Set();
     merged.forEach((entry) => {
-        const key = `${entry.date}-${entry.calories}-${entry.protein_g}-${entry.fat_g}-${entry.carbs_g}`;
+        const key = `${entry.date}-${entry.mode}-${entry.meal || ''}-${entry.calories}-${entry.protein}-${entry.fat}-${entry.carbs}`;
         if (!seen.has(key)) {
             seen.add(key);
             unique.push(entry);
         }
     });
-    saveDiaryEntries(unique);
-    renderDiaryList(unique);
+    return unique;
+}
+
+function getEntriesByDate(entries, date) {
+    return entries.filter((entry) => entry.date === date);
+}
+
+function renderDailySummary(entries, date) {
+    const container = document.getElementById('daily-summary');
+    if (!container) {
+        return;
+    }
+    if (!date) {
+        container.innerHTML = '<p class="text-slate-400">Выберите дату, чтобы увидеть сводку.</p>';
+        return;
+    }
+    const dayEntries = getEntriesByDate(entries, date);
+    if (!dayEntries.length) {
+        container.innerHTML = '<p class="text-slate-400">Нет записей за выбранный день.</p>';
+        return;
+    }
+    const totals = dayEntries.reduce(
+        (acc, entry) => {
+            acc.calories += Number(entry.calories) || 0;
+            acc.protein += Number(entry.protein) || 0;
+            acc.fat += Number(entry.fat) || 0;
+            acc.carbs += Number(entry.carbs) || 0;
+            return acc;
+        },
+        { calories: 0, protein: 0, fat: 0, carbs: 0 }
+    );
+    container.innerHTML = `
+        <div>Калории: ${Math.round(totals.calories)} ккал</div>
+        <div>Белки: ${Math.round(totals.protein)} г</div>
+        <div>Жиры: ${Math.round(totals.fat)} г</div>
+        <div>Углеводы: ${Math.round(totals.carbs)} г</div>
+    `;
+}
+
+function buildFoodItemRow(values = {}) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'food-item-row grid grid-cols-1 gap-2 rounded-xl border border-slate-100 bg-slate-50 p-3';
+
+    wrapper.innerHTML = `
+        <input type="text" class="form-input" placeholder="Название продукта" value="${values.name || ''}" required>
+        <div class="grid grid-cols-2 gap-2">
+            <input type="number" class="form-input" placeholder="Ккал" min="0" step="1" value="${values.calories ?? ''}" required>
+            <input type="number" class="form-input" placeholder="Белки, г" min="0" step="0.1" value="${values.protein ?? ''}" required>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+            <input type="number" class="form-input" placeholder="Жиры, г" min="0" step="0.1" value="${values.fat ?? ''}" required>
+            <input type="number" class="form-input" placeholder="Углеводы, г" min="0" step="0.1" value="${values.carbs ?? ''}" required>
+        </div>
+        <button type="button" class="text-sm text-rose-500 font-semibold">Удалить продукт</button>
+    `;
+
+    const removeButton = wrapper.querySelector('button');
+    if (removeButton) {
+        removeButton.addEventListener('click', () => {
+            wrapper.remove();
+        });
+    }
+
+    return wrapper;
+}
+
+function collectFoodItems(container) {
+    const items = [];
+    const rows = container.querySelectorAll('.food-item-row');
+    rows.forEach((row) => {
+        const inputs = row.querySelectorAll('input');
+        if (inputs.length < 5) {
+            return;
+        }
+        const [nameInput, caloriesInput, proteinInput, fatInput, carbsInput] = inputs;
+        const name = nameInput.value.trim();
+        const calories = Number(caloriesInput.value);
+        const protein = Number(proteinInput.value);
+        const fat = Number(fatInput.value);
+        const carbs = Number(carbsInput.value);
+        if (!name) {
+            return;
+        }
+        items.push({
+            name,
+            calories: Number.isFinite(calories) ? calories : 0,
+            protein: Number.isFinite(protein) ? protein : 0,
+            fat: Number.isFinite(fat) ? fat : 0,
+            carbs: Number.isFinite(carbs) ? carbs : 0
+        });
+    });
+    return items;
+}
+
+function getModeFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('mode') === MODE_SUMMARY ? MODE_SUMMARY : MODE_PRODUCTS;
+}
+
+function setActiveMode(mode) {
+    const toggle = document.getElementById('diary-mode-toggle');
+    const productsBlock = document.getElementById('diary-mode-products');
+    const summaryBlock = document.getElementById('diary-mode-summary');
+    if (!toggle || !productsBlock || !summaryBlock) {
+        return;
+    }
+    const buttons = toggle.querySelectorAll('[data-mode]');
+    buttons.forEach((button) => {
+        const isActive = button.dataset.mode === mode;
+        button.classList.toggle('btn-primary', isActive);
+        button.classList.toggle('btn-secondary', !isActive);
+    });
+    productsBlock.classList.toggle('hidden', mode !== MODE_PRODUCTS);
+    summaryBlock.classList.toggle('hidden', mode !== MODE_SUMMARY);
+}
+
+function bindGlobalDiaryHandlers() {
+    if (diaryGlobalHandlersBound) {
+        return;
+    }
+    diaryGlobalHandlersBound = true;
+
+    // Делаем обработчики устойчивыми, чтобы клики не терялись из-за состояния DOM.
+    document.addEventListener('click', (event) => {
+        const modeButton = event.target.closest('#diary-mode-toggle [data-mode]');
+        if (modeButton) {
+            setActiveMode(modeButton.dataset.mode);
+            renderDailySummary(readDiaryEntries(), getSelectedDate());
+            return;
+        }
+
+        const addButton = event.target.closest('#diary-add-item');
+        if (addButton) {
+            const productsItems = document.getElementById('diary-products-items');
+            if (productsItems) {
+                productsItems.appendChild(buildFoodItemRow());
+            }
+        }
+    });
+}
+
+function getSelectedDate() {
+    const productsDate = document.getElementById('diary-products-date');
+    const summaryDate = document.getElementById('diary-summary-date');
+    if (productsDate && !productsDate.closest('.hidden')) {
+        return productsDate.value;
+    }
+    if (summaryDate && !summaryDate.closest('.hidden')) {
+        return summaryDate.value;
+    }
+    return '';
+}
+
+async function refreshDiary() {
+    setDiaryLoadingState(true);
+    const localEntries = readDiaryEntries();
+    const backendEntries = await loadEntriesFromBackend();
+    const merged = mergeEntries(localEntries, backendEntries);
+    saveDiaryEntries(merged);
+    renderDiaryList(merged);
+
+    const selectedDate = getSelectedDate();
+    renderDailySummary(merged, selectedDate);
+
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : null;
     const isExpired = profile?.subscription_status === 'expired';
-    await toggleDiaryPaywall(isExpired, profile, unique.length);
+    await toggleDiaryPaywall(isExpired, profile, merged.length);
     if (isExpired) {
         setDiaryLoadingState(false);
         return;
     }
-    const analysis = await requestAiAnalysis(unique.slice(0, 7));
+    const analysis = await requestAiAnalysis(merged.slice(0, 7));
     if (analysis?.text) {
-        setAiComment([analysis.text], '');
-        renderDeviationRisk(analysis?.deviation_risk, analysis?.deviation_comment);
-        updateProfileDeviation(analysis?.deviation_risk, analysis?.deviation_comment);
-        setDiaryLoadingState(false);
-        return;
+        setAiComment(analysis.text.insights, analysis.text.advice);
+        renderDeviationRisk(analysis.text.risk, analysis.text.comment);
+        updateProfileDeviation(analysis.text.risk, analysis.text.comment);
+    } else {
+        setAiComment(analysis.insights, analysis.advice);
     }
-    setAiComment(analysis?.insights || [], analysis?.advice || '');
-    renderDeviationRisk(analysis?.deviation_risk, analysis?.deviation_comment);
-    updateProfileDeviation(analysis?.deviation_risk, analysis?.deviation_comment);
     setDiaryLoadingState(false);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('diary-form');
-    const fixButton = document.getElementById('diary-fix-button');
-    if (form) {
-        form.addEventListener('submit', async (event) => {
+function initDiary() {
+    if (diaryInitialized) {
+        return;
+    }
+    diaryInitialized = true;
+
+    bindGlobalDiaryHandlers();
+    const toggle = document.getElementById('diary-mode-toggle');
+    const productsForm = document.getElementById('diary-products-form');
+    const summaryForm = document.getElementById('diary-summary-form');
+    const productsDate = document.getElementById('diary-products-date');
+    const summaryDate = document.getElementById('diary-summary-date');
+    const productsItems = document.getElementById('diary-products-items');
+    const addItemButton = document.getElementById('diary-add-item');
+
+    if (toggle) {
+        setActiveMode(getModeFromUrl());
+    }
+
+    if (productsItems && productsItems.children.length === 0) {
+        productsItems.appendChild(buildFoodItemRow());
+    }
+
+    if (addItemButton && productsItems) {
+        addItemButton.setAttribute('type', 'button');
+    }
+
+    if (productsForm && productsItems) {
+        productsForm.addEventListener('submit', async (event) => {
             event.preventDefault();
-            const entry = {
-                date: document.getElementById('entry-date')?.value || '',
-                calories: Number(document.getElementById('entry-calories')?.value || 0),
-                protein_g: Number(document.getElementById('entry-protein')?.value || 0),
-                fat_g: Number(document.getElementById('entry-fat')?.value || 0),
-                carbs_g: Number(document.getElementById('entry-carbs')?.value || 0),
-            };
-            if (!entry.date) {
+            const date = productsDate?.value;
+            const meal = document.getElementById('diary-products-meal')?.value || null;
+            if (!date) {
                 return;
             }
+            const items = collectFoodItems(productsItems);
+            if (!items.length) {
+                showNotification('Добавьте хотя бы один продукт.', 'error');
+                return;
+            }
+            const totals = calculateTotals(items);
+            const entry = normalizeEntry({
+                date,
+                mode: MODE_PRODUCTS,
+                meal,
+                calories: totals.calories,
+                protein: totals.protein,
+                fat: totals.fat,
+                carbs: totals.carbs,
+                items
+            });
             const entries = readDiaryEntries();
-            entries.unshift(entry);
-            saveDiaryEntries(entries);
+            entries.push(entry);
+            const merged = sortEntries(entries);
+            saveDiaryEntries(merged);
             await syncEntryWithBackend(entry);
-            await refreshDiary();
-            if (typeof showNotification === 'function') {
-                showNotification('Запись добавлена.', 'success');
-            }
-            form.reset();
+            renderDiaryList(merged);
+            renderDailySummary(merged, date);
+            productsItems.innerHTML = '';
+            productsItems.appendChild(buildFoodItemRow());
         });
     }
 
-    if (fixButton) {
-        fixButton.addEventListener('click', () => {
-            const commentBlock = document.getElementById('diary-ai-comment');
-            if (commentBlock) {
-                commentBlock.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (summaryForm) {
+        summaryForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const date = summaryDate?.value;
+            if (!date) {
+                return;
             }
+            const calories = Number(document.getElementById('diary-summary-calories')?.value);
+            const protein = Number(document.getElementById('diary-summary-protein')?.value);
+            const fat = Number(document.getElementById('diary-summary-fat')?.value);
+            const carbs = Number(document.getElementById('diary-summary-carbs')?.value);
+            const entry = normalizeEntry({
+                date,
+                mode: MODE_SUMMARY,
+                calories: Number.isFinite(calories) ? calories : 0,
+                protein: Number.isFinite(protein) ? protein : 0,
+                fat: Number.isFinite(fat) ? fat : 0,
+                carbs: Number.isFinite(carbs) ? carbs : 0
+            });
+            const entries = readDiaryEntries();
+            entries.push(entry);
+            const merged = sortEntries(entries);
+            saveDiaryEntries(merged);
+            await syncEntryWithBackend(entry);
+            renderDiaryList(merged);
+            renderDailySummary(merged, date);
         });
     }
 
-    refreshDiary();
-});
+    const handleDateChange = () => {
+        const entries = readDiaryEntries();
+        renderDailySummary(entries, getSelectedDate());
+    };
+
+    if (productsDate) {
+        productsDate.addEventListener('change', handleDateChange);
+    }
+    if (summaryDate) {
+        summaryDate.addEventListener('change', handleDateChange);
+    }
+
+    void refreshDiary();
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDiary);
+} else {
+    initDiary();
+}
+
+window.addEventListener('load', initDiary);
