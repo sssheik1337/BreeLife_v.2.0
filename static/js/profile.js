@@ -742,6 +742,15 @@ async function loadProfileFromServer() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    const quickDiaryLink = document.querySelector('[data-quick-action="diary"]');
+    if (quickDiaryLink) {
+        quickDiaryLink.addEventListener('click', (event) => {
+            event.preventDefault();
+            const target = quickDiaryLink.getAttribute('href') || '/diary';
+            window.location.href = target;
+        });
+    }
+
     (async () => {
         await loadProfileFromServer();
         renderProfileRings();
