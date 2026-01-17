@@ -6,7 +6,7 @@ from pathlib import Path
 
 import requests
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -36,7 +36,7 @@ from services.nutrition import (
 )
 from services.reminders import ReminderPayload, ReminderScheduler
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title=APP_NAME)
@@ -128,10 +128,19 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(RequestLoggingMiddleware)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+# HTTP 304 (Not Modified) для статики — это не ошибка, а корректный ответ кэша.
 
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+    )
+
+
+@app.get("/index", response_class=HTMLResponse)
+async def index_alias(request: Request):
     return templates.TemplateResponse(
         "index.html",
         {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
@@ -167,6 +176,15 @@ async def profile(request: Request):
     )
 
 
+@app.get("/profile.html", response_class=HTMLResponse)
+async def profile_legacy(request: Request):
+    # Поддержка старого пути, чтобы не ловить 404 при прямом заходе.
+    return templates.TemplateResponse(
+        "profile.html",
+        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+    )
+
+
 @app.get("/diary", response_class=HTMLResponse)
 async def diary(request: Request):
     return templates.TemplateResponse(
@@ -175,12 +193,9 @@ async def diary(request: Request):
     )
 
 
-@app.get("/food-diary", response_class=HTMLResponse)
-async def food_diary(request: Request):
-    return templates.TemplateResponse(
-        "food_diary.html",
-        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
-    )
+@app.get("/food-diary")
+async def food_diary():
+    return RedirectResponse(url="/diary?mode=products")
 
 
 @app.get("/foods", response_class=HTMLResponse)
@@ -633,6 +648,26 @@ async def analyze_food_diary(request: Request):
     if not isinstance(profile, dict) or not isinstance(entries, list):
         raise HTTPException(status_code=400, detail="Некорректные данные дневника.")
 
+    unique_days = {
+        entry.get("date")
+        for entry in entries
+        if isinstance(entry, dict) and entry.get("date")
+    }
+    logger.info(
+        "Запрос анализа дневника: записей=%s, дней=%s, AI_ENABLED=%s",
+        len(entries),
+        len(unique_days),
+        AI_ENABLED,
+    )
+    logger.debug(
+        "Профиль для анализа дневника: ключи=%s",
+        sorted(profile.keys()),
+    )
+    logger.debug(
+        "Записи дневника для анализа (первые 3): %s",
+        entries[:3],
+    )
+
     if not AI_ENABLED:
         result = generate_food_diary_recommendation(profile, entries)
         return {
@@ -650,6 +685,7 @@ async def analyze_food_diary(request: Request):
     deviation_info = calculate_deviation_risk(profile, entries)
 
     try:
+        logger.info("Отправка запроса в YandexGPT для анализа дневника.")
         text = generate_yandex_recommendation(
             {
                 "food_diary_entries": entries,
@@ -658,7 +694,9 @@ async def analyze_food_diary(request: Request):
             api_key=YANDEX_GPT_API_KEY,
             folder_id=YANDEX_GPT_FOLDER_ID,
         )
+        logger.info("Ответ YandexGPT для анализа дневника получен.")
     except (requests.RequestException, ValueError) as exc:
+        logger.warning("Ошибка запроса YandexGPT при анализе дневника: %s", exc, exc_info=True)
         raise HTTPException(status_code=502, detail="Не удалось получить ответ YandexGPT.") from exc
 
     return {

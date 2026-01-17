@@ -1,6 +1,8 @@
 // Отрисовка списка тарифов из JSON
 
 const PLANS_ENDPOINT = '/static/data/plans.json';
+const ACTIVE_PLAN_KEY = 'active_plan';
+let cachedPlans = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('plans-container');
@@ -18,7 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return response.json();
     })
     .then((plans) => {
-      renderPlans(container, plans);
+      cachedPlans = Array.isArray(plans) ? plans : [];
+      renderPlans(container, cachedPlans);
     })
     .catch(() => {
       container.textContent = 'Не удалось загрузить тарифы.';
@@ -36,22 +39,64 @@ function renderPlans(container, plans) {
 function createPlanCard(plan) {
   const card = document.createElement('div');
   card.className = 'bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4';
+  card.dataset.plan = plan.id;
 
   const features = Array.isArray(plan.features) ? plan.features : [];
+  const subtitle = plan.duration_days > 0 ? `Срок: ${plan.duration_days} дней` : 'Без ограничений по сроку';
+  const isTrial = plan.id === 'trial';
+  const isPremium = plan.id === 'premium';
+  const isFree = plan.id === 'free';
+  const statusText = isTrial
+    ? 'Пробный период активируется автоматически'
+    : isPremium
+      ? 'Оплата подключается, тариф готовится'
+      : 'Текущий бесплатный план';
+  const activePlan = localStorage.getItem(ACTIVE_PLAN_KEY) || 'free';
+  const isActive = activePlan === plan.id;
+  const buttonText = isPremium
+    ? 'Доступно в пробном периоде'
+    : isActive
+      ? 'Выбран'
+      : 'Выбрать';
 
   card.innerHTML = `
     <div class="flex items-center justify-between">
       <div>
         <h2 class="text-lg font-semibold text-slate-800">${plan.title}</h2>
-        <p class="text-sm text-slate-500">Срок: ${plan.duration_days} дней</p>
+        <p class="text-sm text-slate-500">${subtitle}</p>
       </div>
       <div class="text-xl font-bold text-emerald-600">${plan.price}</div>
     </div>
     <ul class="space-y-2 text-sm text-slate-600">
       ${features.map((feature) => `<li class="flex items-start gap-2"><span class="text-emerald-500">•</span><span>${feature}</span></li>`).join('')}
     </ul>
-    <button class="btn-primary w-full">Выбрать</button>
+    <button class="btn-primary w-full" type="button" data-plan="${plan.id}" ${isPremium ? 'disabled title="Оплата не подключена"' : ''}>
+      ${buttonText}
+    </button>
+    <p class="text-xs text-slate-500">${statusText}</p>
   `;
+
+  const button = card.querySelector('button[data-plan]');
+  if (button) {
+    button.addEventListener('click', () => {
+      if (isPremium) {
+        return;
+      }
+      localStorage.setItem(ACTIVE_PLAN_KEY, plan.id);
+      const message = isTrial
+        ? 'Пробный период 30 дней доступен. Оплата не требуется.'
+        : 'Бесплатный план выбран.';
+      if (typeof showNotification === 'function') {
+        showNotification(message, 'success');
+      } else {
+        alert(message);
+      }
+      const container = document.getElementById('plans-container');
+      if (container) {
+        renderPlans(container, cachedPlans);
+      }
+    });
+  }
 
   return card;
 }
