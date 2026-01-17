@@ -135,6 +135,33 @@ function readManualDiaryEntries() {
     }
 }
 
+function normalizeDate(value) {
+    if (!value) {
+        return null;
+    }
+    if (value instanceof Date) {
+        if (Number.isNaN(value.getTime())) {
+            return null;
+        }
+        return value.toISOString().split('T')[0];
+    }
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) {
+            return null;
+        }
+        const parsed = new Date(`${trimmed}T00:00:00`);
+        if (!Number.isNaN(parsed.getTime())) {
+            return parsed.toISOString().split('T')[0];
+        }
+        const fallback = new Date(trimmed);
+        if (!Number.isNaN(fallback.getTime())) {
+            return fallback.toISOString().split('T')[0];
+        }
+    }
+    return null;
+}
+
 function sumFoodDiaryCalories(entries) {
     const totalsByDate = new Map();
     entries.forEach((entry) => {
@@ -373,29 +400,31 @@ function renderWeeklyProgress() {
     const caloriesByDate = new Map();
 
     manualEntries.forEach((entry) => {
-        if (!entry?.date) {
+        const normalizedDate = normalizeDate(entry?.date);
+        if (!normalizedDate) {
             return;
         }
         const calories = Number(entry.calories) || 0;
-        const current = caloriesByDate.get(entry.date) || 0;
-        caloriesByDate.set(entry.date, current + calories);
+        const current = caloriesByDate.get(normalizedDate) || 0;
+        caloriesByDate.set(normalizedDate, current + calories);
     });
 
     foodEntries.forEach((entry) => {
-        if (!entry?.date || !Array.isArray(entry.items)) {
+        const normalizedDate = normalizeDate(entry?.date);
+        if (!normalizedDate || !Array.isArray(entry.items)) {
             return;
         }
         const calories = entry.items.reduce((sum, item) => sum + (Number(item?.calories) || 0), 0);
-        const current = caloriesByDate.get(entry.date) || 0;
-        caloriesByDate.set(entry.date, current + calories);
+        const current = caloriesByDate.get(normalizedDate) || 0;
+        caloriesByDate.set(normalizedDate, current + calories);
     });
 
     let totalPercent = 0;
     for (let i = 0; i < 7; i += 1) {
         const currentDate = new Date(startDate);
         currentDate.setDate(startDate.getDate() + i);
-        const dateKey = currentDate.toISOString().split('T')[0];
-        const dayCalories = caloriesByDate.get(dateKey) || 0;
+        const dateKey = normalizeDate(currentDate);
+        const dayCalories = dateKey ? (caloriesByDate.get(dateKey) || 0) : 0;
         const dayPercent = Number.isFinite(targetCalories) && targetCalories > 0
             ? Math.min(Math.max(dayCalories / targetCalories, 0), 1)
             : 0;
