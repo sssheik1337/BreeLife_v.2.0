@@ -392,6 +392,17 @@ function getModeFromUrl() {
     return params.get('mode') === MODE_SUMMARY ? MODE_SUMMARY : MODE_PRODUCTS;
 }
 
+function getDateFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const rawDate = params.get('date');
+    if (!rawDate) {
+        return '';
+    }
+    return typeof window.normalizeLocalDate === 'function'
+        ? window.normalizeLocalDate(rawDate) || ''
+        : rawDate;
+}
+
 function setActiveMode(mode) {
     const toggle = document.getElementById('diary-mode-toggle');
     const productsBlock = document.getElementById('diary-mode-products');
@@ -489,9 +500,19 @@ function initDiary() {
     const summaryDate = document.getElementById('diary-summary-date');
     const productsItems = document.getElementById('diary-products-items');
     const addItemButton = document.getElementById('diary-add-item');
+    const initialDate = getDateFromUrl();
 
     if (toggle) {
         setActiveMode(getModeFromUrl());
+    }
+
+    if (initialDate) {
+        if (productsDate) {
+            productsDate.value = initialDate;
+        }
+        if (summaryDate) {
+            summaryDate.value = initialDate;
+        }
     }
 
     if (productsItems && productsItems.children.length === 0) {
@@ -577,6 +598,10 @@ function initDiary() {
     }
     if (summaryDate) {
         summaryDate.addEventListener('change', handleDateChange);
+    }
+
+    if (initialDate) {
+        renderDailySummary(readDiaryEntries(), initialDate);
     }
 
     void refreshDiary();

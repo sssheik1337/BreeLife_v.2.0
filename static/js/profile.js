@@ -367,6 +367,9 @@ function renderWeeklyProgress() {
 
     const dayLabels = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
     const today = new Date();
+    const todayKey = typeof window.normalizeLocalDate === 'function'
+        ? window.normalizeLocalDate(today)
+        : null;
     const dayIndex = (today.getDay() + 6) % 7;
     const startDate = new Date(today);
     startDate.setHours(0, 0, 0, 0);
@@ -399,6 +402,9 @@ function renderWeeklyProgress() {
         const dateKey = typeof window.normalizeLocalDate === 'function'
             ? window.normalizeLocalDate(currentDate)
             : null;
+        const dateLabel = dateKey
+            ? `${String(currentDate.getDate()).padStart(2, '0')}.${String(currentDate.getMonth() + 1).padStart(2, '0')}`
+            : '';
         const dayCalories = dateKey ? (caloriesByDate.get(dateKey) || 0) : 0;
         const hasData = dateKey ? caloriesByDate.has(dateKey) : false;
         const dayPercent = Number.isFinite(targetCalories) && targetCalories > 0
@@ -406,8 +412,16 @@ function renderWeeklyProgress() {
             : 0;
         totalPercent += dayPercent;
 
-        const item = document.createElement('div');
-        item.className = 'flex flex-col items-center gap-2';
+        const item = document.createElement('a');
+        item.className = 'weekly-day flex flex-col items-center gap-1 p-2';
+        if (dateKey) {
+            item.href = `/diary?date=${dateKey}`;
+        } else {
+            item.href = '/diary';
+        }
+        if (todayKey && dateKey === todayKey) {
+            item.classList.add('is-today');
+        }
         const bar = document.createElement('div');
         bar.className = 'w-6 rounded-full';
         bar.style.transition = 'height 220ms ease, background-color 220ms ease';
@@ -426,8 +440,12 @@ function renderWeeklyProgress() {
         const label = document.createElement('div');
         label.className = 'text-xs text-slate-500';
         label.textContent = dayLabels[i];
+        const dateText = document.createElement('div');
+        dateText.className = 'text-[10px] text-slate-400';
+        dateText.textContent = dateLabel;
         item.appendChild(barWrapper);
         item.appendChild(label);
+        item.appendChild(dateText);
         container.appendChild(item);
     }
 
