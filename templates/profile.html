@@ -90,6 +90,15 @@
         gap: 0.25rem;
         align-items: baseline;
       }
+
+      .quick-actions {
+        position: relative;
+        z-index: 1;
+      }
+
+      .quick-actions a {
+        pointer-events: auto;
+      }
     </style>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#f0f9ff] to-[#f0fdf4]">
@@ -208,7 +217,7 @@
                 </div>
 
                 <!-- Quick Actions -->
-                <div class="profile-card profile-card--secondary p-5 mb-8">
+                <div class="profile-card profile-card--secondary p-5 mb-8 quick-actions">
                     <h3 class="font-semibold text-slate-800 mb-4">Быстрые действия</h3>
                     <div class="grid grid-cols-2 gap-3">
                         <a href="/diary" class="flex flex-col items-center justify-center p-3 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-95 transition-all" title="Быстрый дневник (итоги дня)">
