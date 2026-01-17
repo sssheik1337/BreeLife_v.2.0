@@ -63,10 +63,16 @@
                             <span>Базовый обмен</span>
                             <span id="bmr-value" class="font-semibold">--</span>
                         </div>
+                        <p class="text-xs text-slate-500">
+                            Базовый обмен — расход в покое.
+                        </p>
                         <div class="flex items-center justify-between">
                             <span>Суточная норма калорий</span>
                             <span id="tdee-value" class="font-semibold">--</span>
                         </div>
+                        <p class="text-xs text-slate-500">
+                            Рекомендуемое потребление калорий в день для достижения цели.
+                        </p>
                     </div>
                 </div>
 
@@ -95,6 +101,9 @@
                             <span>Углеводы</span>
                             <span id="carbs-value" class="font-semibold">--</span>
                         </div>
+                        <p class="text-xs text-slate-500">
+                            Эти значения показывают, сколько стоит потреблять калорий и нутриентов каждый день.
+                        </p>
                     </div>
                 </div>
 
@@ -172,6 +181,7 @@
                         </div>
                         <h3 class="font-semibold text-slate-800">Суточные показатели</h3>
                     </div>
+                    <p class="text-xs text-slate-500 mb-4">Факт / цель</p>
                     <div class="grid grid-cols-2 gap-4">
                         <div id="calorie-ring" class="bg-slate-50 rounded-2xl p-4 shadow-md border border-slate-100"></div>
                         <div id="water-ring" class="bg-slate-50 rounded-2xl p-4 shadow-md border border-slate-100"></div>
@@ -241,7 +251,7 @@
                         <i data-feather="save" class="w-5 h-5"></i>
                         <span>Сохранить и перейти в панель</span>
 </a>
-                    <a href="/questionnaire" class="btn-secondary w-full flex items-center justify-center space-x-3">
+                    <a href="/questionnaire?edit=1" class="btn-secondary w-full flex items-center justify-center space-x-3">
                         <i data-feather="edit" class="w-5 h-5"></i>
                         <span>Редактировать информацию</span>
 </a>

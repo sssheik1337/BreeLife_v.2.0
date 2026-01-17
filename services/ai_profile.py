@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
+import logging
 
 import requests
 
@@ -11,6 +12,8 @@ SYSTEM_PROMPT = (
     "Не ставь диагнозы и не обещай результаты. "
     "Опирайся только на данные профиля пользователя."
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _format_goal(goal: str | None) -> str:
@@ -112,6 +115,7 @@ def generate_yandex_recommendation(
     """Сформировать рекомендацию через YandexGPT, используя только профиль."""
     system_prompt = SYSTEM_PROMPT
     user_prompt = build_ai_context(profile)
+    logger.debug("Контекст для YandexGPT: %s", user_prompt)
 
     payload = {
         "modelUri": f"gpt://{folder_id}/yandexgpt/latest",
@@ -144,6 +148,7 @@ def generate_yandex_recommendation(
     text = message.get("text")
     if not text:
         raise ValueError("YandexGPT не вернул текст рекомендации.")
+    logger.debug("Ответ YandexGPT (текст): %s", text)
     return text
 
 
