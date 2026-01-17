@@ -109,6 +109,20 @@
     <script src="/static/js/storage.js"></script>
     <script src="/static/js/ui.js"></script>
     <script>
+        const profileCompleted = localStorage.getItem('profile_completed') === 'true';
+        const hasCompletedQuiz = localStorage.getItem('hasCompletedQuiz') === 'true';
+        if (profileCompleted || hasCompletedQuiz) {
+            window.location.replace('/profile');
+        } else if (typeof getUserProfile === 'function') {
+            const profile = getUserProfile();
+            if (profile?.completed === true) {
+                window.location.replace('/profile');
+            } else {
+                window.location.replace('/questionnaire');
+            }
+        } else {
+            window.location.replace('/questionnaire');
+        }
         feather.replace();
     </script>
 </body>

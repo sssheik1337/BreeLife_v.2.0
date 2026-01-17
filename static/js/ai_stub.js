@@ -32,6 +32,20 @@ function getGoalLabel(goal) {
     return goalMap[goal] || 'здоровый баланс';
 }
 
+function getActivityLabel(activityFactor) {
+    const factor = Number(activityFactor);
+    if (!Number.isFinite(factor)) {
+        return null;
+    }
+    if (factor <= 1.3) {
+        return 'Низкая активность';
+    }
+    if (factor <= 1.6) {
+        return 'Умеренная активность';
+    }
+    return 'Высокая активность';
+}
+
 function getDiaryExplanation(profile) {
     if (!profile) {
         return 'Дневник питания помогает замечать привычки и держать курс.';
@@ -48,12 +62,13 @@ function getDiaryExplanation(profile) {
 function getCaloriesExplanation(profile) {
     const tdee = profile?.tdee_calories;
     const activity = profile?.activity_factor;
+    const activityLabel = getActivityLabel(activity);
     const goalLabel = getGoalLabel(profile?.goal);
     if (!tdee) {
         return `Мы учтём активность и цель (${goalLabel}), чтобы подсказать ориентир.`;
     }
-    if (activity) {
-        return `При активности ${activity} ориентир около ${Math.round(tdee)} ккал в день.`;
+    if (activityLabel) {
+        return `При уровне «${activityLabel}» ориентир около ${Math.round(tdee)} ккал в день.`;
     }
     return `Ориентир по калориям — около ${Math.round(tdee)} ккал в день.`;
 }
@@ -71,6 +86,7 @@ function getRecommendations(profile) {
     const goalLabel = getGoalLabel(profile?.goal);
     const goalKey = profile?.goal;
     const activity = profile?.activity_factor;
+    const activityLabel = getActivityLabel(activity);
     const tdee = profile?.tdee_calories;
     const predictedDate = formatDateForUser(profile?.predicted_goal_date);
     const currentWeight = Number(profile?.weight_kg);
@@ -93,8 +109,8 @@ function getRecommendations(profile) {
         recommendations.push(`До цели осталось около ${delta.toFixed(1)} кг.`);
     }
 
-    if (activity) {
-        recommendations.push(`Уровень активности ${activity} — хороший ориентир для стабильного темпа.`);
+    if (activityLabel) {
+        recommendations.push(`Уровень активности: ${activityLabel}. Это хороший ориентир для стабильного темпа.`);
     } else {
         recommendations.push('Добавьте немного движения — это поддержит настрой.');
     }
@@ -181,9 +197,16 @@ function getDeviationStatusFromEntries(entries, tdee, today = new Date()) {
         }
         const diffDays = Math.floor((normalizedToday - entryDate) / (1000 * 60 * 60 * 24));
         if (diffDays >= 0 && diffDays < 7) {
-            const calories = Array.isArray(entry.items)
-                ? entry.items.reduce((sum, item) => sum + (Number(item?.calories) || 0), 0)
-                : 0;
+            let calories = 0;
+            if (entry?.mode === 'products') {
+                if (entry.totals) {
+                    calories = Number(entry.totals.calories) || 0;
+                } else if (Array.isArray(entry.items)) {
+                    calories = entry.items.reduce((sum, item) => sum + (Number(item?.calories) || 0), 0);
+                }
+            } else {
+                calories = Number(entry.calories) || 0;
+            }
             totalsByDate.set(entry.date, (totalsByDate.get(entry.date) || 0) + calories);
         }
     });
@@ -212,14 +235,9 @@ function getDeviationStatusFromEntries(entries, tdee, today = new Date()) {
 }
 
 function getFoodDiaryDeviationStatus(profile) {
-    const entries = (() => {
-        try {
-            const raw = localStorage.getItem('food_diary_entries');
-            return raw ? JSON.parse(raw) : [];
-        } catch (error) {
-            return [];
-        }
-    })();
+    const entries = typeof window.getDiaryEntries === 'function'
+        ? window.getDiaryEntries()
+        : [];
     const tdee = typeof profile?.tdee_calories === 'number' ? profile.tdee_calories : null;
     return getDeviationStatusFromEntries(entries, tdee);
 }
@@ -283,8 +301,12 @@ function analyzeWeeklyNutrition(profile, foodDiary) {
     const weekStartDate = new Date(weekEndDate);
     weekStartDate.setDate(weekStartDate.getDate() - 6);
 
-    const weekStart = weekStartDate.toISOString().split('T')[0];
-    const weekEnd = weekEndDate.toISOString().split('T')[0];
+    const weekStart = typeof window.normalizeLocalDate === 'function'
+        ? window.normalizeLocalDate(weekStartDate)
+        : weekStartDate.toISOString().split('T')[0];
+    const weekEnd = typeof window.normalizeLocalDate === 'function'
+        ? window.normalizeLocalDate(weekEndDate)
+        : weekEndDate.toISOString().split('T')[0];
 
     const totalsByDate = new Map();
     entries.forEach((entry) => {
@@ -292,18 +314,28 @@ function analyzeWeeklyNutrition(profile, foodDiary) {
         if (!entryDate || entryDate < weekStart || entryDate > weekEnd) {
             return;
         }
-        const calories = Array.isArray(entry.items)
-            ? entry.items.reduce((sum, item) => sum + (Number(item?.calories) || 0), 0)
-            : 0;
-        const protein = Array.isArray(entry.items)
-            ? entry.items.reduce((sum, item) => sum + (Number(item?.protein) || 0), 0)
-            : 0;
-        const fat = Array.isArray(entry.items)
-            ? entry.items.reduce((sum, item) => sum + (Number(item?.fat) || 0), 0)
-            : 0;
-        const carbs = Array.isArray(entry.items)
-            ? entry.items.reduce((sum, item) => sum + (Number(item?.carbs) || 0), 0)
-            : 0;
+        let calories = 0;
+        let protein = 0;
+        let fat = 0;
+        let carbs = 0;
+        if (entry?.mode === 'products') {
+            if (entry.totals) {
+                calories = Number(entry.totals.calories) || 0;
+                protein = Number(entry.totals.protein_g) || 0;
+                fat = Number(entry.totals.fat_g) || 0;
+                carbs = Number(entry.totals.carbs_g) || 0;
+            } else if (Array.isArray(entry.items)) {
+                calories = entry.items.reduce((sum, item) => sum + (Number(item?.calories) || 0), 0);
+                protein = entry.items.reduce((sum, item) => sum + (Number(item?.protein) || Number(item?.protein_g) || 0), 0);
+                fat = entry.items.reduce((sum, item) => sum + (Number(item?.fat) || Number(item?.fat_g) || 0), 0);
+                carbs = entry.items.reduce((sum, item) => sum + (Number(item?.carbs) || Number(item?.carbs_g) || 0), 0);
+            }
+        } else {
+            calories = Number(entry.calories) || 0;
+            protein = Number(entry.protein_g) || 0;
+            fat = Number(entry.fat_g) || 0;
+            carbs = Number(entry.carbs_g) || 0;
+        }
         const existing = totalsByDate.get(entryDate) || {
             calories: 0,
             protein: 0,
@@ -377,15 +409,104 @@ function analyzeWeeklyNutrition(profile, foodDiary) {
     };
 }
 
-function analyzeWeeklyStats(profile) {
+function normalizeDiaryDate(value) {
+    if (typeof window.normalizeLocalDate === 'function') {
+        return window.normalizeLocalDate(value);
+    }
+    if (!value) {
+        return null;
+    }
+    if (value instanceof Date) {
+        const year = value.getFullYear();
+        const month = String(value.getMonth() + 1).padStart(2, '0');
+        const day = String(value.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+    return String(value);
+}
+
+function calculateEntryTotals(entry) {
+    if (!entry) {
+        return { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0 };
+    }
+    if (entry.mode === 'products' && Array.isArray(entry.items)) {
+        return entry.items.reduce(
+            (acc, item) => {
+                acc.calories += Number(item?.calories) || 0;
+                acc.protein_g += Number(item?.protein) || Number(item?.protein_g) || 0;
+                acc.fat_g += Number(item?.fat) || Number(item?.fat_g) || 0;
+                acc.carbs_g += Number(item?.carbs) || Number(item?.carbs_g) || 0;
+                return acc;
+            },
+            { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0 }
+        );
+    }
+    return {
+        calories: Number(entry?.calories) || 0,
+        protein_g: Number(entry?.protein_g) || 0,
+        fat_g: Number(entry?.fat_g) || 0,
+        carbs_g: Number(entry?.carbs_g) || 0
+    };
+}
+
+function analyzeWeeklyStats(profile, entries = []) {
     const stats = profile?.weekly_stats || {};
     const tdee = Number(profile?.tdee_calories);
     const proteinTarget = Number(profile?.macros?.protein_g);
-    const caloriesAvg = Number(stats.calories_avg);
-    const proteinAvg = Number(stats.protein_avg_g);
-    const daysLogged = Number(stats.days_logged);
+
+    let caloriesAvg = Number(stats.calories_avg);
+    let proteinAvg = Number(stats.protein_avg_g);
+    let daysLogged = Number(stats.days_logged);
+
+    if (Array.isArray(entries) && entries.length > 0) {
+        const totalsByDate = new Map();
+        entries.forEach((entry) => {
+            const dateKey = normalizeDiaryDate(entry?.date);
+            if (!dateKey) {
+                return;
+            }
+            const totals = calculateEntryTotals(entry);
+            const hasData = totals.calories > 0 || totals.protein_g > 0 || totals.fat_g > 0 || totals.carbs_g > 0;
+            if (!hasData) {
+                return;
+            }
+            const current = totalsByDate.get(dateKey) || { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0 };
+            totalsByDate.set(dateKey, {
+                calories: current.calories + totals.calories,
+                protein_g: current.protein_g + totals.protein_g,
+                fat_g: current.fat_g + totals.fat_g,
+                carbs_g: current.carbs_g + totals.carbs_g
+            });
+        });
+
+        const dailyTotals = Array.from(totalsByDate.values());
+        daysLogged = dailyTotals.length;
+        if (daysLogged > 0) {
+            const sum = dailyTotals.reduce(
+                (acc, day) => {
+                    acc.calories += day.calories;
+                    acc.protein_g += day.protein_g;
+                    acc.fat_g += day.fat_g;
+                    acc.carbs_g += day.carbs_g;
+                    return acc;
+                },
+                { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0 }
+            );
+            caloriesAvg = sum.calories / daysLogged;
+            proteinAvg = sum.protein_g / daysLogged;
+        }
+    }
 
     const adjustments = [];
+    const minDays = 4;
+
+    if (!Number.isFinite(daysLogged) || daysLogged < minDays) {
+        const message = 'Недостаточно данных для анализа недели.';
+        return {
+            adjustments: [message],
+            text: message
+        };
+    }
 
     if (Number.isFinite(tdee) && Number.isFinite(caloriesAvg)) {
         if (caloriesAvg > tdee * 1.1) {
