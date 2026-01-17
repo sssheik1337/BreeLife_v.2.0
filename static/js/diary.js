@@ -432,7 +432,7 @@ async function refreshDiary() {
     setDiaryLoadingState(false);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initDiary() {
     const toggle = document.getElementById('diary-mode-toggle');
     const productsForm = document.getElementById('diary-products-form');
     const summaryForm = document.getElementById('diary-summary-form');
@@ -541,4 +541,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     void refreshDiary();
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDiary);
+} else {
+    initDiary();
+}
