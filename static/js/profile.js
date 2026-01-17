@@ -459,7 +459,7 @@ function renderWeeklyProgress() {
 
     const percent = Math.round((totalPercent / 7) * 100);
     percentElement.textContent = `${percent}%`;
-    descElement.textContent = 'Отмечены дни, когда велся учёт питания.';
+    descElement.textContent = 'Учитываются итоги дня и дневник по продуктам.';
 }
 
 function renderWeeklyAdjustments() {

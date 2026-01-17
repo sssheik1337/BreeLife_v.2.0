@@ -23,12 +23,12 @@
                     <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 mb-4 shadow-lg">
                         <i data-feather="book-open" class="w-7 h-7 text-white"></i>
                     </div>
-                    <h1 class="text-2xl font-bold text-slate-800">Дневник питания</h1>
-                    <p class="text-slate-500 mt-2">Введите калории и баланс нутриентов вручную</p>
+                    <h1 class="text-2xl font-bold text-slate-800">Быстрый дневник (итоги дня)</h1>
+                    <p class="text-slate-500 mt-2">Внесите суммарные значения за день (без продуктов).</p>
                 </div>
 
                 <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100">
-                    <h3 class="font-semibold text-slate-800 mb-4">Добавить день</h3>
+                    <h3 class="font-semibold text-slate-800 mb-4">Итоги дня</h3>
                     <form id="diary-form" class="space-y-3">
                         <input type="date" id="entry-date" class="form-input" required>
                         <input type="number" id="entry-calories" class="form-input" placeholder="Калории" min="0" step="1" required>
@@ -36,7 +36,7 @@
                         <input type="number" id="entry-fat" class="form-input" placeholder="Жиры, г" min="0" step="0.1" required>
                         <input type="number" id="entry-carbs" class="form-input" placeholder="Углеводы, г" min="0" step="0.1" required>
                         <button type="submit" class="btn-primary w-full">
-                            <span>Добавить день</span>
+                            <span>Сохранить итоги дня</span>
                         </button>
                     </form>
                 </div>

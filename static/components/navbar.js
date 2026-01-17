@@ -100,6 +100,14 @@ class CustomNavbar extends HTMLElement {
           z-index: 20;
         }
 
+        .menu-section {
+          padding: 0.5rem 0.75rem 0.25rem;
+          color: #94a3b8;
+          font-size: 0.7rem;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+        }
+
         .menu-panel.is-open {
           display: block;
         }
@@ -192,8 +200,9 @@ class CustomNavbar extends HTMLElement {
             </button>
             <div class="menu-panel" id="menu-panel">
               <a href="/profile" class="menu-link">Профиль</a>
-              <a href="/diary" class="menu-link">Дневник питания</a>
-              <a href="/food-diary" class="menu-link">Дневник продуктов</a>
+              <div class="menu-section">Дневник</div>
+              <a href="/diary" class="menu-link">Итоги дня</a>
+              <a href="/food-diary" class="menu-link">По продуктам</a>
               <a href="/foods" class="menu-link">Список продуктов</a>
               <a href="/menu#plans" class="menu-link">Тарифы</a>
               <span class="menu-link menu-link--disabled" title="Скоро">Настройки <span>Скоро</span></span>
