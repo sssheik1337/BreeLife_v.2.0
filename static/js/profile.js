@@ -362,24 +362,6 @@ function renderWeeklyProgress() {
     }
 
     container.innerHTML = '';
-    const diaryEntries = [
-        ...readFoodDiaryEntries(),
-        ...readManualDiaryEntries()
-    ];
-    const daysWithEntries = new Set(
-        diaryEntries
-            .filter((entry) => {
-                if (!entry) {
-                    return false;
-                }
-                if (Array.isArray(entry.items)) {
-                    return entry.items.length > 0;
-                }
-                return true;
-            })
-            .map((entry) => entry?.date)
-            .filter(Boolean)
-    );
 
     const dayLabels = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
     const today = new Date();
@@ -387,29 +369,71 @@ function renderWeeklyProgress() {
     const startDate = new Date(today);
     startDate.setHours(0, 0, 0, 0);
     startDate.setDate(today.getDate() - dayIndex);
+    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const targetCalories = Number(profile?.tdee_calories);
 
-    let filledDays = 0;
+    const manualEntries = readManualDiaryEntries();
+    const foodEntries = readFoodDiaryEntries();
+    const caloriesByDate = new Map();
+
+    manualEntries.forEach((entry) => {
+        if (!entry?.date) {
+            return;
+        }
+        const calories = Number(entry.calories) || 0;
+        const current = caloriesByDate.get(entry.date) || 0;
+        caloriesByDate.set(entry.date, current + calories);
+    });
+
+    foodEntries.forEach((entry) => {
+        if (!entry?.date || !Array.isArray(entry.items)) {
+            return;
+        }
+        const calories = entry.items.reduce((sum, item) => sum + (Number(item?.calories) || 0), 0);
+        const current = caloriesByDate.get(entry.date) || 0;
+        caloriesByDate.set(entry.date, current + calories);
+    });
+
+    let totalPercent = 0;
     for (let i = 0; i < 7; i += 1) {
         const currentDate = new Date(startDate);
         currentDate.setDate(startDate.getDate() + i);
         const dateKey = currentDate.toISOString().split('T')[0];
-        const isFilled = daysWithEntries.has(dateKey);
-        if (isFilled) {
-            filledDays += 1;
+        const dayCalories = caloriesByDate.get(dateKey) || 0;
+        const dayPercent = Number.isFinite(targetCalories) && targetCalories > 0
+            ? Math.min(Math.max((dayCalories / targetCalories) * 100, 0), 100)
+            : 0;
+        totalPercent += dayPercent;
+
+        let barColor = '#e2e8f0';
+        if (dayPercent > 80) {
+            barColor = '#047857';
+        } else if (dayPercent > 50) {
+            barColor = '#10b981';
+        } else if (dayPercent > 20) {
+            barColor = '#6ee7b7';
         }
+
+        const heightPercent = Math.max(dayPercent, 20);
+
         const item = document.createElement('div');
-        item.className = 'text-center';
-        const tile = document.createElement('div');
-        tile.className = `h-10 rounded-lg ${isFilled ? 'bg-emerald-400' : 'bg-slate-200'}`;
+        item.className = 'flex flex-col items-center gap-2';
+        const bar = document.createElement('div');
+        bar.className = 'w-6 rounded-full';
+        bar.style.height = `${heightPercent}%`;
+        bar.style.background = barColor;
+        const barWrapper = document.createElement('div');
+        barWrapper.className = 'h-20 w-full flex items-end justify-center';
+        barWrapper.appendChild(bar);
         const label = document.createElement('div');
-        label.className = 'text-xs text-slate-500 mt-1';
+        label.className = 'text-xs text-slate-500';
         label.textContent = dayLabels[i];
-        item.appendChild(tile);
+        item.appendChild(barWrapper);
         item.appendChild(label);
         container.appendChild(item);
     }
 
-    const percent = Math.round((filledDays / 7) * 100);
+    const percent = Math.round(totalPercent / 7);
     percentElement.textContent = `${percent}%`;
     descElement.textContent = 'Отмечены дни, когда велся учёт питания.';
 }
