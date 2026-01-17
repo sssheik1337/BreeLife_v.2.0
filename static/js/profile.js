@@ -397,20 +397,18 @@ function renderWeeklyProgress() {
         const dateKey = currentDate.toISOString().split('T')[0];
         const dayCalories = caloriesByDate.get(dateKey) || 0;
         const dayPercent = Number.isFinite(targetCalories) && targetCalories > 0
-            ? Math.min(Math.max((dayCalories / targetCalories) * 100, 0), 100)
+            ? Math.min(Math.max(dayCalories / targetCalories, 0), 1)
             : 0;
         totalPercent += dayPercent;
 
         let barColor = '#e2e8f0';
-        if (dayPercent > 80) {
+        if (dayPercent > 0.7) {
             barColor = '#047857';
-        } else if (dayPercent > 50) {
-            barColor = '#10b981';
-        } else if (dayPercent > 20) {
+        } else if (dayPercent >= 0.3) {
             barColor = '#6ee7b7';
         }
 
-        const heightPercent = Math.max(dayPercent, 20);
+        const heightPercent = Math.min(Math.max(dayPercent * 100, 20), 100);
 
         const item = document.createElement('div');
         item.className = 'flex flex-col items-center gap-2';
@@ -419,7 +417,8 @@ function renderWeeklyProgress() {
         bar.style.height = `${heightPercent}%`;
         bar.style.background = barColor;
         const barWrapper = document.createElement('div');
-        barWrapper.className = 'h-20 w-full flex items-end justify-center';
+        barWrapper.className = 'w-full flex items-end justify-center';
+        barWrapper.style.height = '80px';
         barWrapper.appendChild(bar);
         const label = document.createElement('div');
         label.className = 'text-xs text-slate-500';
@@ -429,7 +428,7 @@ function renderWeeklyProgress() {
         container.appendChild(item);
     }
 
-    const percent = Math.round(totalPercent / 7);
+    const percent = Math.round((totalPercent / 7) * 100);
     percentElement.textContent = `${percent}%`;
     descElement.textContent = 'Отмечены дни, когда велся учёт питания.';
 }
