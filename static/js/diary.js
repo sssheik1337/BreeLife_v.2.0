@@ -443,14 +443,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (toggle) {
         setActiveMode(getModeFromUrl());
-        toggle.addEventListener('click', (event) => {
-            const button = event.target.closest('[data-mode]');
-            if (!button) {
-                return;
-            }
-            setActiveMode(button.dataset.mode);
-            const selectedDate = getSelectedDate();
-            renderDailySummary(readDiaryEntries(), selectedDate);
+        const modeButtons = toggle.querySelectorAll('[data-mode]');
+        modeButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                setActiveMode(button.dataset.mode);
+                const selectedDate = getSelectedDate();
+                renderDailySummary(readDiaryEntries(), selectedDate);
+            });
         });
     }
 
