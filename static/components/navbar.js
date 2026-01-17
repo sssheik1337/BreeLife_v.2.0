@@ -97,6 +97,11 @@ class CustomNavbar extends HTMLElement {
           box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
           padding: 0.5rem;
           display: none;
+          visibility: hidden;
+          opacity: 0;
+          pointer-events: none;
+          transform: translateY(-4px);
+          transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
           z-index: 20;
         }
 
@@ -110,6 +115,10 @@ class CustomNavbar extends HTMLElement {
 
         .menu-panel.is-open {
           display: block;
+          visibility: visible;
+          opacity: 1;
+          pointer-events: auto;
+          transform: translateY(0);
         }
 
         .menu-link {
@@ -229,7 +238,8 @@ class CustomNavbar extends HTMLElement {
           menuPanel.classList.toggle('is-open');
         });
         document.addEventListener('click', (event) => {
-          if (!this.shadowRoot.contains(event.target)) {
+          const clickInside = event.composedPath().includes(this);
+          if (!clickInside) {
             menuPanel.classList.remove('is-open');
           }
         });
