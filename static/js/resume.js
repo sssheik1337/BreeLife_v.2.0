@@ -445,25 +445,16 @@ function updateBMIProgress(bmi) {
 
 // Рендер круговых индикаторов питания
 function renderNutritionRings() {
-    const readEntries = (storageKey) => {
-        const raw = localStorage.getItem(storageKey);
-        if (!raw) {
-            return [];
-        }
-        try {
-            const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (error) {
-            return [];
-        }
-    };
-
-    const today = new Date().toISOString().split('T')[0];
-    const diaryEntries = readEntries('bree_diary_entries');
+    const today = typeof window.normalizeLocalDate === 'function'
+        ? window.normalizeLocalDate(new Date())
+        : null;
+    const diaryEntries = typeof window.getDiaryEntries === 'function'
+        ? window.getDiaryEntries()
+        : [];
 
     const totals = diaryEntries.reduce(
         (acc, entry) => {
-            if (entry?.date !== today) {
+            if (!today || entry?.date !== today) {
                 return acc;
             }
             if (entry?.mode === 'products' && Array.isArray(entry.items)) {

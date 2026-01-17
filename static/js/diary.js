@@ -1,4 +1,4 @@
-const DIARY_STORAGE_KEY = 'bree_diary_entries';
+const DIARY_STORAGE_KEY = window.DIARY_STORAGE_KEY || 'bree_diary_entries';
 
 let diaryInitialized = false;
 let diaryGlobalHandlersBound = false;
@@ -14,6 +14,9 @@ const mealLabels = {
 };
 
 function readDiaryEntries() {
+    if (typeof window.getDiaryEntries === 'function') {
+        return window.getDiaryEntries();
+    }
     const raw = localStorage.getItem(DIARY_STORAGE_KEY);
     if (!raw) {
         return [];
@@ -45,8 +48,14 @@ function normalizeEntry(entry) {
     const protein = Number(entry.protein ?? entry.protein_g ?? totals?.protein ?? 0) || 0;
     const fat = Number(entry.fat ?? entry.fat_g ?? totals?.fat ?? 0) || 0;
     const carbs = Number(entry.carbs ?? entry.carbs_g ?? totals?.carbs ?? 0) || 0;
+    const dateKey = typeof window.normalizeLocalDate === 'function'
+        ? window.normalizeLocalDate(entry.date)
+        : entry.date;
+    if (!dateKey) {
+        return null;
+    }
     return {
-        date: entry.date,
+        date: dateKey,
         mode,
         meal: entry.meal || null,
         calories,
@@ -282,7 +291,13 @@ function mergeEntries(localEntries, backendEntries) {
 }
 
 function getEntriesByDate(entries, date) {
-    return entries.filter((entry) => entry.date === date);
+    const dateKey = typeof window.normalizeLocalDate === 'function'
+        ? window.normalizeLocalDate(date)
+        : date;
+    if (!dateKey) {
+        return [];
+    }
+    return entries.filter((entry) => entry.date === dateKey);
 }
 
 function renderDailySummary(entries, date) {

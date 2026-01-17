@@ -229,14 +229,9 @@ function getDeviationStatusFromEntries(entries, tdee, today = new Date()) {
 }
 
 function getFoodDiaryDeviationStatus(profile) {
-    const entries = (() => {
-        try {
-            const raw = localStorage.getItem('bree_diary_entries');
-            return raw ? JSON.parse(raw) : [];
-        } catch (error) {
-            return [];
-        }
-    })();
+    const entries = typeof window.getDiaryEntries === 'function'
+        ? window.getDiaryEntries()
+        : [];
     const tdee = typeof profile?.tdee_calories === 'number' ? profile.tdee_calories : null;
     return getDeviationStatusFromEntries(entries, tdee);
 }

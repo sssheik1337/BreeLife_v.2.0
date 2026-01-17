@@ -110,6 +110,9 @@ function animateCountUps(container) {
 }
 
 function readDiaryEntries() {
+    if (typeof window.getDiaryEntries === 'function') {
+        return window.getDiaryEntries();
+    }
     const raw = localStorage.getItem('bree_diary_entries');
     if (!raw) {
         return [];
@@ -120,49 +123,6 @@ function readDiaryEntries() {
     } catch (error) {
         return [];
     }
-}
-
-function formatLocalDate(date) {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-function normalizeDate(value) {
-    if (!value) {
-        return null;
-    }
-    if (value instanceof Date) {
-        if (Number.isNaN(value.getTime())) {
-            return null;
-        }
-        return formatLocalDate(value);
-    }
-    if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (!trimmed) {
-            return null;
-        }
-        const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (isoMatch) {
-            return trimmed;
-        }
-        const dotMatch = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-        if (dotMatch) {
-            const [, day, month, year] = dotMatch;
-            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-        }
-        const parsed = new Date(`${trimmed}T00:00:00`);
-        if (!Number.isNaN(parsed.getTime())) {
-            return formatLocalDate(parsed);
-        }
-        const fallback = new Date(trimmed);
-        if (!Number.isNaN(fallback.getTime())) {
-            return formatLocalDate(fallback);
-        }
-    }
-    return null;
 }
 
 function clamp01(x) {
@@ -210,11 +170,13 @@ function percentToGradientColor(p) {
 }
 
 function getTodayDiaryTotals() {
-    const today = formatLocalDate(new Date());
+    const today = typeof window.normalizeLocalDate === 'function'
+        ? window.normalizeLocalDate(new Date())
+        : null;
     const entries = readDiaryEntries();
     const totals = entries.reduce(
         (acc, entry) => {
-            if (entry?.date !== today) {
+            if (!today || entry?.date !== today) {
                 return acc;
             }
             if (entry?.mode === 'products' && Array.isArray(entry.items)) {
@@ -369,7 +331,9 @@ function renderMonthGrid() {
     const diaryEntries = readDiaryEntries();
     const daysWithEntries = new Set(
         diaryEntries
-            .map((entry) => normalizeDate(entry?.date))
+            .map((entry) => (typeof window.normalizeLocalDate === 'function'
+                ? window.normalizeLocalDate(entry?.date)
+                : entry?.date))
             .filter(Boolean)
     );
     const days = 30;
@@ -378,10 +342,12 @@ function renderMonthGrid() {
     for (let i = 0; i < days; i += 1) {
         const date = new Date(today);
         date.setDate(today.getDate() - (days - 1 - i));
-        const dateKey = formatLocalDate(date);
+        const dateKey = typeof window.normalizeLocalDate === 'function'
+            ? window.normalizeLocalDate(date)
+            : null;
         const day = document.createElement('div');
         day.className = 'month-day';
-        if (daysWithEntries.has(dateKey)) {
+        if (dateKey && daysWithEntries.has(dateKey)) {
             day.classList.add('month-day--active');
         }
         day.textContent = date.getDate().toString();
@@ -412,7 +378,9 @@ function renderWeeklyProgress() {
     const caloriesByDate = new Map();
 
     entries.forEach((entry) => {
-        const normalizedDate = normalizeDate(entry?.date);
+        const normalizedDate = typeof window.normalizeLocalDate === 'function'
+            ? window.normalizeLocalDate(entry?.date)
+            : entry?.date;
         if (!normalizedDate) {
             return;
         }
@@ -428,7 +396,9 @@ function renderWeeklyProgress() {
     for (let i = 0; i < 7; i += 1) {
         const currentDate = new Date(startDate);
         currentDate.setDate(startDate.getDate() + i);
-        const dateKey = normalizeDate(currentDate);
+        const dateKey = typeof window.normalizeLocalDate === 'function'
+            ? window.normalizeLocalDate(currentDate)
+            : null;
         const dayCalories = dateKey ? (caloriesByDate.get(dateKey) || 0) : 0;
         const hasData = dateKey ? caloriesByDate.has(dateKey) : false;
         const dayPercent = Number.isFinite(targetCalories) && targetCalories > 0
@@ -681,14 +651,7 @@ function renderWeeklyReview() {
     let review = profile.weekly_review;
 
     if (shouldRefreshWeeklyReview(review)) {
-        const entries = (() => {
-            try {
-                const raw = localStorage.getItem('bree_diary_entries');
-                return raw ? JSON.parse(raw) : [];
-            } catch (error) {
-                return [];
-            }
-        })();
+        const entries = readDiaryEntries();
         review = analyzeWeeklyNutrition(profile, entries);
         if (typeof patchUserProfile === 'function') {
             patchUserProfile({ weekly_review: review });
