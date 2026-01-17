@@ -209,9 +209,7 @@ class CustomNavbar extends HTMLElement {
             </button>
             <div class="menu-panel" id="menu-panel">
               <a href="/profile" class="menu-link">Профиль</a>
-              <div class="menu-section">Дневник</div>
-              <a href="/diary?mode=summary" class="menu-link">Итоги дня</a>
-              <a href="/diary?mode=products" class="menu-link">По продуктам</a>
+              <a href="/diary" class="menu-link">Дневник питания</a>
               <a href="/foods" class="menu-link">Список продуктов</a>
               <a href="/menu#plans" class="menu-link">Тарифы</a>
               <span class="menu-link menu-link--disabled" title="Скоро">Настройки <span>Скоро</span></span>
