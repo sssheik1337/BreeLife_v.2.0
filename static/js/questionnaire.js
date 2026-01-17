@@ -1,25 +1,51 @@
-// Questionnaire Logic for Health Bloom App
+// Логика анкеты для Health Bloom App
 
 function buildActivityOptions() {
     const adminConfig = window.adminConfig || {};
     const coefficients = adminConfig.activity_coefficients;
     if (!Array.isArray(coefficients) || coefficients.length === 0) {
         return [
-            { value: "1.2", label: "Минимальная активность (1.2)", emoji: "🛋️" },
-            { value: "1.375", label: "Лёгкая активность (1.375)", emoji: "🚶" },
-            { value: "1.55", label: "Средняя активность (1.55)", emoji: "🏃" },
-            { value: "1.725", label: "Высокая активность (1.725)", emoji: "🏋️" },
-            { value: "1.9", label: "Очень высокая активность (1.9)", emoji: "🔥" }
+            {
+                value: "1.2",
+                label: "Минимальная активность (почти без тренировок)",
+                emoji: "🛋️",
+                tooltip: "Низкая активность",
+            },
+            {
+                value: "1.375",
+                label: "Лёгкая активность (1–3 тренировки в неделю)",
+                emoji: "🚶",
+                tooltip: "Низкая активность",
+            },
+            {
+                value: "1.55",
+                label: "Умеренная активность (3–5 тренировок в неделю)",
+                emoji: "🏃",
+                tooltip: "Умеренная активность",
+            },
+            {
+                value: "1.725",
+                label: "Высокая активность (6–7 тренировок в неделю)",
+                emoji: "🏋️",
+                tooltip: "Высокая активность",
+            },
+            {
+                value: "1.9",
+                label: "Очень высокая активность (двойные тренировки)",
+                emoji: "🔥",
+                tooltip: "Высокая активность",
+            }
         ];
     }
     return coefficients.map((item) => ({
         value: String(item.value),
-        label: `${item.label} (${item.value})`,
-        emoji: item.emoji || "✨"
+        label: item.label,
+        emoji: item.emoji || "✨",
+        tooltip: item.label || "Уровень активности",
     }));
 }
 
-// Question definitions
+// Описание вопросов
 const questions = [
     {
         id: 1,
@@ -116,6 +142,24 @@ unit: "kg",
 ];
 
 let currentQuestionIndex = 0;
+let isEditMode = false;
+
+// Проверка: есть ли уже заполненные данные профиля.
+function hasProfileData(profile) {
+    if (!profile || typeof profile !== 'object') {
+        return false;
+    }
+    const fields = [
+        profile.sex,
+        profile.birth_date,
+        profile.height_cm,
+        profile.weight_kg,
+        profile.target_weight_kg,
+        profile.goal,
+        profile.activity_factor
+    ];
+    return fields.some((value) => value !== null && value !== undefined && value !== '');
+}
 
 // DOM Elements
 let questionTitle;
@@ -129,6 +173,17 @@ let progressPercent;
 
 // Initialize questionnaire
 function initQuestionnaire() {
+    const urlParams = new URLSearchParams(window.location.search);
+    isEditMode = urlParams.get('edit') === '1';
+
+    if (!isEditMode && typeof getUserProfile === 'function') {
+        const profile = getUserProfile();
+        if (profile?.completed === true || hasProfileData(profile)) {
+            window.location.replace('/profile');
+            return;
+        }
+    }
+
     // Get DOM elements
     questionTitle = document.getElementById('question-title');
     optionsContainer = document.getElementById('options-container');
@@ -237,6 +292,9 @@ function displayOptions(options) {
         const optionElement = document.createElement('div');
         optionElement.className = 'option-card';
         optionElement.dataset.value = option.value;
+        if (option.tooltip) {
+            optionElement.title = option.tooltip;
+        }
         
         optionElement.innerHTML = `
             <div class="flex items-center space-x-3">
@@ -365,7 +423,7 @@ function updateButtonStates() {
     nextButton.disabled = !hasAnswer;
     
     // Enable/disable previous button
-    prevButton.disabled = currentQuestionIndex === 0;
+    prevButton.disabled = !isEditMode || currentQuestionIndex === 0;
     // Update next button text for last question
     if (currentQuestionIndex === questions.length - 1) {
         nextButton.innerHTML = `<span>Завершить</span><i data-feather="check" class="w-5 h-5"></i>`;
@@ -415,14 +473,18 @@ function setupEventListeners() {
             // Сохраняем профиль и отправляем на сервер (если доступен Telegram ID).
             let profile = null;
             if (typeof patchUserProfile === 'function' && typeof mapUserDataToUserProfile === 'function') {
-                profile = patchUserProfile(mapUserDataToUserProfile(window.userData));
+                const mappedProfile = mapUserDataToUserProfile(window.userData);
+                mappedProfile.completed = true;
+                profile = patchUserProfile(mappedProfile);
             }
+            localStorage.setItem('hasCompletedQuiz', 'true');
+            localStorage.setItem('profile_completed', 'true');
             if (!profile && typeof getUserProfile === 'function') {
                 profile = getUserProfile();
             }
             await saveProfileToServer(profile);
             // Все вопросы заполнены, переходим на страницу сводки.
-            window.location.href = '/resume';
+            window.location.href = isEditMode ? '/profile' : '/resume';
         }
     });
     
