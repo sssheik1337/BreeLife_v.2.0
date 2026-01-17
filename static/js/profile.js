@@ -48,15 +48,11 @@ function createProgressRing({ percent, size = 120, stroke = 10, color = '#10b981
     svg.appendChild(percentText);
 
     const labelNode = document.createElement('div');
-    labelNode.className = emphasize
-        ? 'text-base font-semibold text-slate-800'
-        : 'text-sm font-semibold text-slate-700';
+    labelNode.className = 'text-sm font-semibold text-slate-700';
     labelNode.textContent = label;
 
     const valueNode = document.createElement('div');
-    valueNode.className = emphasize
-        ? 'text-sm font-semibold text-slate-700'
-        : 'text-xs text-slate-500';
+    valueNode.className = 'text-xs text-slate-500';
     valueNode.innerHTML = formatCountUpValue(value);
 
     wrapper.appendChild(svg);
@@ -217,8 +213,8 @@ function renderProfileRings() {
         : null;
     const caloriesValue = todayTotals.hasEntries
         ? Number.isFinite(tdee)
-            ? `Потреблено / рекомендовано: ${Math.round(todayTotals.calories)} / ${Math.round(tdee)} ккал`
-            : `Потреблено: ${Math.round(todayTotals.calories)} ккал`
+            ? `Факт / цель: ${Math.round(todayTotals.calories)} / ${Math.round(tdee)} ккал`
+            : `Факт: ${Math.round(todayTotals.calories)} ккал`
         : 'Нет данных';
 
     caloriesContainer.innerHTML = '';
@@ -275,8 +271,8 @@ function renderProfileRings() {
         const hasTarget = Number.isFinite(item.target) && item.target > 0;
         const macroValue = todayTotals.hasEntries
             ? hasTarget
-                ? `Потреблено / рекомендовано: ${Math.round(item.consumed)} / ${Math.round(item.target)} г`
-                : `Потреблено: ${Math.round(item.consumed)} г`
+                ? `Факт / цель: ${Math.round(item.consumed)} / ${Math.round(item.target)} г`
+                : `Факт: ${Math.round(item.consumed)} г`
             : 'Нет данных';
         ringWrapper.appendChild(
             createProgressRing({
@@ -301,8 +297,8 @@ function renderProfileRings() {
     const hasWaterTarget = Number.isFinite(waterTarget) && waterTarget > 0;
     const waterValue = hasWater
         ? hasWaterTarget
-            ? `Потреблено / рекомендовано: ${Number(waterAvg).toFixed(1)} / ${Number(waterTarget).toFixed(1)} л`
-            : `Потреблено: ${Number(waterAvg).toFixed(1)} л`
+            ? `Факт / цель: ${Number(waterAvg).toFixed(1)} / ${Number(waterTarget).toFixed(1)} л`
+            : `Факт: ${Number(waterAvg).toFixed(1)} л`
         : 'Нет данных';
 
     waterContainer.innerHTML = '';

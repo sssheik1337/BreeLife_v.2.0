@@ -514,9 +514,9 @@ function renderNutritionRings() {
             return 'Нет данных';
         }
         if (Number.isFinite(target) && target > 0) {
-            return `Потреблено / рекомендовано: ${Math.round(consumed)} / ${Math.round(target)} ${unit}`;
+            return `Факт / цель: ${Math.round(consumed)} / ${Math.round(target)} ${unit}`;
         }
-        return `Потреблено: ${Math.round(consumed)} ${unit}`;
+        return `Факт: ${Math.round(consumed)} ${unit}`;
     };
 
     const calcPercent = (consumed, target) => {
