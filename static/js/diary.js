@@ -60,7 +60,8 @@ function normalizeEntry(entry) {
                 calories: Number(entry.totals.calories) || 0,
                 protein_g: Number(entry.totals.protein_g) || 0,
                 fat_g: Number(entry.totals.fat_g) || 0,
-                carbs_g: Number(entry.totals.carbs_g) || 0
+                carbs_g: Number(entry.totals.carbs_g) || 0,
+                fiber_g: Number(entry.totals.fiber_g) || 0
             }
             : calculateTotals(items))
         : {
@@ -68,6 +69,7 @@ function normalizeEntry(entry) {
             protein_g: Number(entry.protein_g ?? entry.protein ?? 0) || 0,
             fat_g: Number(entry.fat_g ?? entry.fat ?? 0) || 0,
             carbs_g: Number(entry.carbs_g ?? entry.carbs ?? 0) || 0,
+            fiber_g: Number(entry.fiber_g ?? entry.fiber ?? 0) || 0,
             water_l: Number(entry.water_l ?? entry.water ?? 0) || 0
         };
     if (mode === MODE_PRODUCTS) {
@@ -77,7 +79,8 @@ function normalizeEntry(entry) {
             meal: entry.meal || null,
             items,
             totals,
-            water_l: Number(entry.water_l ?? entry.water ?? 0) || 0
+            water_l: Number(entry.water_l ?? entry.water ?? 0) || 0,
+            sleep_time: entry.sleep_time || null
         };
     }
     return {
@@ -87,7 +90,9 @@ function normalizeEntry(entry) {
         protein_g: totals.protein_g,
         fat_g: totals.fat_g,
         carbs_g: totals.carbs_g,
-        water_l: totals.water_l
+        fiber_g: totals.fiber_g,
+        water_l: totals.water_l,
+        sleep_time: entry.sleep_time || null
     };
 }
 
@@ -102,13 +107,15 @@ function calculateTotals(items) {
             acc.protein_g += Number(item?.protein) || Number(item?.protein_g) || 0;
             acc.fat_g += Number(item?.fat) || Number(item?.fat_g) || 0;
             acc.carbs_g += Number(item?.carbs) || Number(item?.carbs_g) || 0;
+            acc.fiber_g += Number(item?.fiber) || Number(item?.fiber_g) || 0;
             return acc;
         },
         {
             calories: 0,
             protein_g: 0,
             fat_g: 0,
-            carbs_g: 0
+            carbs_g: 0,
+            fiber_g: 0
         }
     );
 }
@@ -124,6 +131,40 @@ function getMaxWaterForDate(entries, dateKey) {
         const water = Number(entry?.water_l) || 0;
         return Math.max(maxValue, water);
     }, 0);
+}
+
+function parseSleepMinutes(value) {
+    if (!value || typeof value !== 'string') {
+        return null;
+    }
+    const [hours, minutes] = value.split(':').map((part) => Number(part));
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+        return null;
+    }
+    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+        return null;
+    }
+    return hours * 60 + minutes;
+}
+
+function getMinSleepForDate(entries, dateKey) {
+    if (!dateKey) {
+        return null;
+    }
+    let best = null;
+    entries.forEach((entry) => {
+        if (entry?.date !== dateKey) {
+            return;
+        }
+        const minutes = parseSleepMinutes(entry.sleep_time);
+        if (minutes === null) {
+            return;
+        }
+        if (best === null || minutes < best) {
+            best = minutes;
+        }
+    });
+    return best;
 }
 
 function renderDiaryList(entries) {
@@ -151,7 +192,8 @@ function renderDiaryList(entries) {
                 calories: Number(entry.calories) || 0,
                 protein_g: Number(entry.protein_g) || 0,
                 fat_g: Number(entry.fat_g) || 0,
-                carbs_g: Number(entry.carbs_g) || 0
+                carbs_g: Number(entry.carbs_g) || 0,
+                fiber_g: Number(entry.fiber_g) || 0
             };
         const existing = groupedByDate.get(entry.date) || {
             date: entry.date,
@@ -159,14 +201,23 @@ function renderDiaryList(entries) {
             protein_g: 0,
             fat_g: 0,
             carbs_g: 0,
+            fiber_g: 0,
             water_l: 0,
+            sleep_time: null,
             entriesCount: 0
         };
         existing.calories += Number(totals.calories) || 0;
         existing.protein_g += Number(totals.protein_g) || 0;
         existing.fat_g += Number(totals.fat_g) || 0;
         existing.carbs_g += Number(totals.carbs_g) || 0;
+        existing.fiber_g += Number(totals.fiber_g) || 0;
         existing.water_l = Math.max(existing.water_l, Number(entry?.water_l) || 0);
+        const sleepMinutes = parseSleepMinutes(entry?.sleep_time);
+        if (sleepMinutes !== null) {
+            if (existing.sleep_time === null || sleepMinutes < existing.sleep_time) {
+                existing.sleep_time = sleepMinutes;
+            }
+        }
         existing.entriesCount += 1;
         groupedByDate.set(entry.date, existing);
     });
@@ -181,6 +232,9 @@ function renderDiaryList(entries) {
         const waterLine = summary.water_l > 0
             ? `<div class="text-slate-500">Вода: ${summary.water_l.toFixed(1)} л</div>`
             : '';
+        const sleepLine = summary.sleep_time !== null
+            ? `<div class="text-slate-500">Сон: ${String(Math.floor(summary.sleep_time / 60)).padStart(2, '0')}:${String(summary.sleep_time % 60).padStart(2, '0')}</div>`
+            : '';
         const entriesMarkup = dayEntries.map((entry) => {
             const modeLabel = entry.mode === MODE_PRODUCTS ? 'По продуктам' : 'Итоги дня';
             const mealLabel = entry.mode === MODE_PRODUCTS ? (mealLabels[entry.meal] || 'Приём пищи') : '';
@@ -190,7 +244,8 @@ function renderDiaryList(entries) {
                     calories: Number(entry.calories) || 0,
                     protein_g: Number(entry.protein_g) || 0,
                     fat_g: Number(entry.fat_g) || 0,
-                    carbs_g: Number(entry.carbs_g) || 0
+                    carbs_g: Number(entry.carbs_g) || 0,
+                    fiber_g: Number(entry.fiber_g) || 0
                 };
             const editUrl = `/diary?date=${entry.date}&mode=${entry.mode}`;
             return `
@@ -204,8 +259,8 @@ function renderDiaryList(entries) {
                             </button>
                         </div>
                     </div>
-                    <div class="text-slate-500">Калории: ${Math.round(totals.calories)} ккал</div>
-                    <div class="text-slate-500">Белки, жиры, углеводы: ${Math.round(totals.protein_g)} / ${Math.round(totals.fat_g)} / ${Math.round(totals.carbs_g)} г</div>
+                    <div class="text-slate-500">Всего за день: ${Math.round(totals.calories)} ккал</div>
+                    <div class="text-slate-500">Белки / жиры / углеводы / клетчатка: ${Math.round(totals.protein_g)} / ${Math.round(totals.fat_g)} / ${Math.round(totals.carbs_g)} / ${Math.round(totals.fiber_g || 0)} г</div>
                 </div>
             `;
         }).join('');
@@ -214,8 +269,9 @@ function renderDiaryList(entries) {
                 <span class="font-semibold text-slate-700">${summary.date}</span>
                 <span class="text-xs text-slate-500">Записей: ${summary.entriesCount}</span>
             </button>
-            <div class="text-slate-500">Калории: ${Math.round(summary.calories)} ккал</div>
-            <div class="text-slate-500">Белки, жиры, углеводы: ${Math.round(summary.protein_g)} / ${Math.round(summary.fat_g)} / ${Math.round(summary.carbs_g)} г</div>
+            <div class="text-slate-500">Всего за день: ${Math.round(summary.calories)} ккал</div>
+            <div class="text-slate-500">Белки / жиры / углеводы / клетчатка: ${Math.round(summary.protein_g)} / ${Math.round(summary.fat_g)} / ${Math.round(summary.carbs_g)} / ${Math.round(summary.fiber_g || 0)} г</div>
+            ${sleepLine}
             ${waterLine}
             <div class="hidden" data-role="day-details">
                 <div class="mt-2 space-y-2">
@@ -478,9 +534,10 @@ function mergeEntries(localEntries, backendEntries) {
                 calories: Number(entry?.calories) || 0,
                 protein_g: Number(entry?.protein_g) || 0,
                 fat_g: Number(entry?.fat_g) || 0,
-                carbs_g: Number(entry?.carbs_g) || 0
+                carbs_g: Number(entry?.carbs_g) || 0,
+                fiber_g: Number(entry?.fiber_g) || 0
             };
-        const key = `${entry.date}-${entry.mode}-${entry.meal || ''}-${totals.calories}-${totals.protein_g}-${totals.fat_g}-${totals.carbs_g}-${entry?.items?.length || 0}`;
+        const key = `${entry.date}-${entry.mode}-${entry.meal || ''}-${totals.calories}-${totals.protein_g}-${totals.fat_g}-${totals.carbs_g}-${totals.fiber_g}-${entry?.items?.length || 0}-${entry?.sleep_time || ''}`;
         if (!seen.has(key)) {
             seen.add(key);
             unique.push(entry);
@@ -578,6 +635,10 @@ function renderDailySummary(entries, date) {
         return;
     }
     const waterMax = getMaxWaterForDate(entries, fallbackDate);
+    const sleepMinutes = getMinSleepForDate(entries, fallbackDate);
+    const sleepText = sleepMinutes !== null
+        ? `${String(Math.floor(sleepMinutes / 60)).padStart(2, '0')}:${String(sleepMinutes % 60).padStart(2, '0')}`
+        : '—';
     const totals = dayEntries.reduce(
         (acc, entry) => {
             if (entry.mode === MODE_PRODUCTS) {
@@ -586,21 +647,25 @@ function renderDailySummary(entries, date) {
                 acc.protein_g += Number(resolvedTotals.protein_g) || 0;
                 acc.fat_g += Number(resolvedTotals.fat_g) || 0;
                 acc.carbs_g += Number(resolvedTotals.carbs_g) || 0;
+                acc.fiber_g += Number(resolvedTotals.fiber_g) || 0;
                 return acc;
             }
             acc.calories += Number(entry.calories) || 0;
             acc.protein_g += Number(entry.protein_g) || 0;
             acc.fat_g += Number(entry.fat_g) || 0;
             acc.carbs_g += Number(entry.carbs_g) || 0;
+            acc.fiber_g += Number(entry.fiber_g) || 0;
             return acc;
         },
-        { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0 }
+        { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0 }
     );
     container.innerHTML = `
-        <div>Калории: ${Math.round(totals.calories)} ккал</div>
+        <div>Всего энергии: ${Math.round(totals.calories)} ккал</div>
         <div>Белки: ${Math.round(totals.protein_g)} г</div>
         <div>Жиры: ${Math.round(totals.fat_g)} г</div>
         <div>Углеводы: ${Math.round(totals.carbs_g)} г</div>
+        <div>Клетчатка: ${Math.round(totals.fiber_g)} г</div>
+        <div>Сон: ${sleepText}</div>
         <div>Вода: ${waterMax.toFixed(1)} л</div>
     `;
 }
@@ -618,6 +683,10 @@ function buildFoodItemRow(values = {}) {
         <div class="grid grid-cols-2 gap-2">
             <input type="number" class="form-input" placeholder="Жиры, г" min="0" step="0.1" value="${values.fat ?? ''}" required>
             <input type="number" class="form-input" placeholder="Углеводы, г" min="0" step="0.1" value="${values.carbs ?? ''}" required>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+            <input type="number" class="form-input" placeholder="Клетчатка, г" min="0" step="0.1" value="${values.fiber ?? ''}">
+            <div class="hidden sm:block"></div>
         </div>
         <button type="button" class="text-sm text-rose-500 font-semibold">Удалить продукт</button>
     `;
@@ -637,15 +706,16 @@ function collectFoodItems(container) {
     const rows = container.querySelectorAll('.food-item-row');
     rows.forEach((row) => {
         const inputs = row.querySelectorAll('input');
-        if (inputs.length < 5) {
+        if (inputs.length < 6) {
             return;
         }
-        const [nameInput, caloriesInput, proteinInput, fatInput, carbsInput] = inputs;
+        const [nameInput, caloriesInput, proteinInput, fatInput, carbsInput, fiberInput] = inputs;
         const name = nameInput.value.trim();
         const calories = Number(caloriesInput.value);
         const protein = Number(proteinInput.value);
         const fat = Number(fatInput.value);
         const carbs = Number(carbsInput.value);
+        const fiber = Number(fiberInput?.value);
         if (!name) {
             return;
         }
@@ -654,7 +724,8 @@ function collectFoodItems(container) {
             calories: Number.isFinite(calories) ? calories : 0,
             protein: Number.isFinite(protein) ? protein : 0,
             fat: Number.isFinite(fat) ? fat : 0,
-            carbs: Number.isFinite(carbs) ? carbs : 0
+            carbs: Number.isFinite(carbs) ? carbs : 0,
+            fiber: Number.isFinite(fiber) ? fiber : 0
         });
     });
     return items;
@@ -725,10 +796,12 @@ function updateSummaryForm(entries, dateKey) {
     const proteinInput = document.getElementById('diary-summary-protein');
     const fatInput = document.getElementById('diary-summary-fat');
     const carbsInput = document.getElementById('diary-summary-carbs');
+    const fiberInput = document.getElementById('diary-summary-fiber');
+    const sleepInput = document.getElementById('diary-summary-sleep');
     const waterInput = document.getElementById('diary-summary-water');
     const deleteButton = document.getElementById('diary-summary-delete');
 
-    if (!caloriesInput || !proteinInput || !fatInput || !carbsInput || !waterInput || !deleteButton) {
+    if (!caloriesInput || !proteinInput || !fatInput || !carbsInput || !fiberInput || !sleepInput || !waterInput || !deleteButton) {
         return;
     }
 
@@ -738,6 +811,8 @@ function updateSummaryForm(entries, dateKey) {
         proteinInput.value = entry.protein_g ?? '';
         fatInput.value = entry.fat_g ?? '';
         carbsInput.value = entry.carbs_g ?? '';
+        fiberInput.value = entry.fiber_g ?? '';
+        sleepInput.value = entry.sleep_time ?? '';
         waterInput.value = entry.water_l ?? '';
         deleteButton.classList.remove('hidden');
     } else {
@@ -745,6 +820,8 @@ function updateSummaryForm(entries, dateKey) {
         proteinInput.value = '';
         fatInput.value = '';
         carbsInput.value = '';
+        fiberInput.value = '';
+        sleepInput.value = '';
         waterInput.value = '';
         deleteButton.classList.add('hidden');
     }
@@ -754,8 +831,9 @@ function updateProductsForm(entries, dateKey, meal) {
     const itemsContainer = document.getElementById('diary-products-items');
     const deleteButton = document.getElementById('diary-products-delete');
     const waterInput = document.getElementById('diary-products-water');
+    const sleepInput = document.getElementById('diary-products-sleep');
 
-    if (!itemsContainer || !deleteButton || !waterInput) {
+    if (!itemsContainer || !deleteButton || !waterInput || !sleepInput) {
         return;
     }
 
@@ -777,8 +855,13 @@ function updateProductsForm(entries, dateKey, meal) {
 
     if (dateKey) {
         waterInput.value = getMaxWaterForDate(entries, dateKey).toFixed(1);
+        const sleepMinutes = getMinSleepForDate(entries, dateKey);
+        sleepInput.value = sleepMinutes !== null
+            ? `${String(Math.floor(sleepMinutes / 60)).padStart(2, '0')}:${String(sleepMinutes % 60).padStart(2, '0')}`
+            : '';
     } else {
         waterInput.value = '';
+        sleepInput.value = '';
     }
 }
 
@@ -976,13 +1059,15 @@ function initDiary() {
             }
             const totals = calculateTotals(items);
             const water = Number(document.getElementById('diary-products-water')?.value);
+            const sleepTime = document.getElementById('diary-products-sleep')?.value || null;
             const entry = normalizeEntry({
                 date,
                 mode: MODE_PRODUCTS,
                 meal,
                 items,
                 totals,
-                water_l: Number.isFinite(water) ? water : 0
+                water_l: Number.isFinite(water) ? water : 0,
+                sleep_time: sleepTime
             });
             const entries = readDiaryEntries();
             const dateKey = entry?.date;
@@ -1015,6 +1100,8 @@ function initDiary() {
             const protein = Number(document.getElementById('diary-summary-protein')?.value);
             const fat = Number(document.getElementById('diary-summary-fat')?.value);
             const carbs = Number(document.getElementById('diary-summary-carbs')?.value);
+            const fiber = Number(document.getElementById('diary-summary-fiber')?.value);
+            const sleepTime = document.getElementById('diary-summary-sleep')?.value || null;
             const water = Number(document.getElementById('diary-summary-water')?.value);
             const entry = normalizeEntry({
                 date,
@@ -1023,7 +1110,9 @@ function initDiary() {
                 protein_g: Number.isFinite(protein) ? protein : 0,
                 fat_g: Number.isFinite(fat) ? fat : 0,
                 carbs_g: Number.isFinite(carbs) ? carbs : 0,
-                water_l: Number.isFinite(water) ? water : 0
+                fiber_g: Number.isFinite(fiber) ? fiber : 0,
+                water_l: Number.isFinite(water) ? water : 0,
+                sleep_time: sleepTime
             });
             const entries = readDiaryEntries();
             const dateKey = entry?.date;

@@ -118,6 +118,7 @@ function updateCalculatedMetrics() {
     const proteinElement = document.getElementById('protein-value');
     const fatElement = document.getElementById('fat-value');
     const carbsElement = document.getElementById('carbs-value');
+    const fiberElement = document.getElementById('fiber-value');
     const weightRateElement = document.getElementById('weight-rate-value');
     const weightDateElement = document.getElementById('weight-date-value');
 
@@ -153,6 +154,12 @@ function updateCalculatedMetrics() {
         carbsElement.textContent = macros === null
             ? '--'
             : `${Math.round(macros.carbs_g)} г • ${Math.round(macros.carbs_pct * 100)}%`;
+    }
+    if (fiberElement) {
+        const fiberTarget = Number(window.adminConfig?.reminders?.fiber_target_g);
+        fiberElement.textContent = Number.isFinite(fiberTarget) && fiberTarget > 0
+            ? `${Math.round(fiberTarget)} г`
+            : '--';
     }
     if (weightRateElement) {
         if (weightForecast.label) {
@@ -447,7 +454,7 @@ function updateBMIProgress(bmi) {
 function renderNutritionRings() {
     const resolveEntryTotals = (entry) => {
         if (!entry) {
-            return { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, water_l: 0 };
+            return { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0, water_l: 0 };
         }
         if (entry.mode === 'products') {
             if (entry.totals) {
@@ -460,9 +467,10 @@ function renderNutritionRings() {
                         acc.protein_g += Number(item?.protein) || Number(item?.protein_g) || 0;
                         acc.fat_g += Number(item?.fat) || Number(item?.fat_g) || 0;
                         acc.carbs_g += Number(item?.carbs) || Number(item?.carbs_g) || 0;
+                        acc.fiber_g += Number(item?.fiber) || Number(item?.fiber_g) || 0;
                         return acc;
                     },
-                    { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, water_l: 0 }
+                    { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0, water_l: 0 }
                 );
             }
         }
@@ -471,6 +479,7 @@ function renderNutritionRings() {
             protein_g: Number(entry.protein_g) || 0,
             fat_g: Number(entry.fat_g) || 0,
             carbs_g: Number(entry.carbs_g) || 0,
+            fiber_g: Number(entry.fiber_g) || 0,
             water_l: Number(entry.water_l) || 0
         };
     };
@@ -492,14 +501,15 @@ function renderNutritionRings() {
             acc.protein += totals.protein_g;
             acc.fat += totals.fat_g;
             acc.carbs += totals.carbs_g;
+            acc.fiber += totals.fiber_g;
             waterMax = Math.max(waterMax, Number(entry?.water_l) || 0);
             return acc;
         },
-        { calories: 0, protein: 0, fat: 0, carbs: 0, water: 0 }
+        { calories: 0, protein: 0, fat: 0, carbs: 0, fiber: 0, water: 0 }
     );
     totals.water = waterMax;
 
-    const hasEntriesToday = totals.calories > 0 || totals.protein > 0 || totals.fat > 0 || totals.carbs > 0 || totals.water > 0;
+    const hasEntriesToday = totals.calories > 0 || totals.protein > 0 || totals.fat > 0 || totals.carbs > 0 || totals.fiber > 0 || totals.water > 0;
 
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
     const recommended = {
@@ -507,6 +517,7 @@ function renderNutritionRings() {
         protein: Number(profile?.macros?.protein_g) || null,
         fat: Number(profile?.macros?.fat_g) || null,
         carbs: Number(profile?.macros?.carbs_g) || null,
+        fiber: Number(window.adminConfig?.reminders?.fiber_target_g) || null,
         water: Number(window.adminConfig?.reminders?.water_min_l) || null,
     };
 
@@ -574,6 +585,15 @@ function renderNutritionRings() {
                 value: buildValue(totals.carbs, recommended.carbs, 'г'),
                 label: 'Углеводы сегодня',
                 color: '#06b6d4',
+            },
+        },
+        {
+            id: 'macro-fiber-ring',
+            data: {
+                percent: calcPercent(totals.fiber, recommended.fiber),
+                value: buildValue(totals.fiber, recommended.fiber, 'г'),
+                label: 'Клетчатка сегодня',
+                color: '#84cc16',
             },
         },
     ];

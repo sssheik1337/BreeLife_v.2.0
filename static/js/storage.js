@@ -56,7 +56,9 @@
             subscription_status: null,
             subscription_started_at: null,
             trial_started_at: null,
-            completed: false
+            completed: false,
+            favorite_product_ids: [],
+            excluded_product_ids: []
         };
     }
 
@@ -100,6 +102,16 @@
             return value;
         }
         return null;
+    }
+
+    function normalizeIdList(value) {
+        if (!Array.isArray(value)) {
+            return [];
+        }
+        const normalized = value
+            .map((item) => parseNumber(item))
+            .filter((item) => Number.isFinite(item));
+        return Array.from(new Set(normalized));
     }
 
     function normalizeMacros(macros) {
@@ -204,6 +216,8 @@
         merged.subscription_started_at = merged.subscription_started_at || null;
         merged.trial_started_at = merged.trial_started_at || null;
         merged.completed = parseBoolean(merged.completed);
+        merged.favorite_product_ids = normalizeIdList(merged.favorite_product_ids);
+        merged.excluded_product_ids = normalizeIdList(merged.excluded_product_ids);
 
         if (merged.completed === null) {
             const requiredFields = [
@@ -308,9 +322,10 @@
                 acc.protein_g += Number(item?.protein) || Number(item?.protein_g) || 0;
                 acc.fat_g += Number(item?.fat) || Number(item?.fat_g) || 0;
                 acc.carbs_g += Number(item?.carbs) || Number(item?.carbs_g) || 0;
+                acc.fiber_g += Number(item?.fiber) || Number(item?.fiber_g) || 0;
                 return acc;
             },
-            { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0 }
+            { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0 }
         );
     }
 
@@ -330,7 +345,8 @@
                     calories: Number(entry.totals.calories) || 0,
                     protein_g: Number(entry.totals.protein_g) || 0,
                     fat_g: Number(entry.totals.fat_g) || 0,
-                    carbs_g: Number(entry.totals.carbs_g) || 0
+                    carbs_g: Number(entry.totals.carbs_g) || 0,
+                    fiber_g: Number(entry.totals.fiber_g) || 0
                 }
                 : calculateDiaryTotals(items))
             : {
@@ -338,6 +354,7 @@
                 protein_g: Number(entry.protein_g ?? entry.protein ?? 0) || 0,
                 fat_g: Number(entry.fat_g ?? entry.fat ?? 0) || 0,
                 carbs_g: Number(entry.carbs_g ?? entry.carbs ?? 0) || 0,
+                fiber_g: Number(entry.fiber_g ?? entry.fiber ?? 0) || 0,
                 water_l: Number(entry.water_l ?? entry.water ?? 0) || 0
             };
         if (isProducts) {
@@ -347,7 +364,8 @@
                 meal: entry.meal || null,
                 items,
                 totals,
-                water_l: Number(entry.water_l ?? entry.water ?? 0) || 0
+                water_l: Number(entry.water_l ?? entry.water ?? 0) || 0,
+                sleep_time: entry.sleep_time || null
             };
         }
         return {
@@ -357,7 +375,9 @@
             protein_g: totals.protein_g,
             fat_g: totals.fat_g,
             carbs_g: totals.carbs_g,
-            water_l: totals.water_l
+            fiber_g: totals.fiber_g,
+            water_l: totals.water_l,
+            sleep_time: entry.sleep_time || null
         };
     }
 

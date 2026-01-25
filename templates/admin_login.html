@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Админка</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f8fafc;
+        margin: 0;
+        padding: 32px;
+        color: #0f172a;
+      }
+      .card {
+        max-width: 420px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+      }
+      label {
+        display: block;
+        font-size: 14px;
+        margin-bottom: 6px;
+      }
+      input {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid #cbd5f5;
+        margin-bottom: 16px;
+        box-sizing: border-box;
+      }
+      button {
+        width: 100%;
+        padding: 10px 12px;
+        background: #2563eb;
+        color: #ffffff;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .error {
+        margin-bottom: 12px;
+        color: #b91c1c;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Вход в админку</h1>
+      {% if error %}
+        <div class="error">{{ error }}</div>
+      {% endif %}
+      <form method="post" action="/admin/login">
+        <label for="login">Логин</label>
+        <input id="login" name="login" type="text" required />
+        <label for="password">Пароль</label>
+        <input id="password" name="password" type="password" required />
+        <button type="submit">Войти</button>
+      </form>
+    </div>
+  </body>
+</html>

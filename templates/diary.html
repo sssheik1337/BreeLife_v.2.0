@@ -43,6 +43,7 @@
                         <h3 class="font-semibold text-slate-800 mb-4">Приём пищи</h3>
                         <form id="diary-products-form" class="space-y-4">
                             <input type="date" id="diary-products-date" class="form-input" required>
+                            <input type="time" id="diary-products-sleep" class="form-input" placeholder="Сон, время отхода">
                             <input type="number" id="diary-products-water" class="form-input" placeholder="Вода, л" min="0" step="0.1">
                             <select id="diary-products-meal" class="form-input" required>
                                 <option value="breakfast">Завтрак</option>
@@ -69,10 +70,12 @@
                         <h3 class="font-semibold text-slate-800 mb-4">Итоги дня</h3>
                         <form id="diary-summary-form" class="space-y-3">
                             <input type="date" id="diary-summary-date" class="form-input" required>
+                            <input type="time" id="diary-summary-sleep" class="form-input" placeholder="Сон, время отхода">
                             <input type="number" id="diary-summary-calories" class="form-input" placeholder="Калории" min="0" step="1" required>
                             <input type="number" id="diary-summary-protein" class="form-input" placeholder="Белки, г" min="0" step="0.1" required>
                             <input type="number" id="diary-summary-fat" class="form-input" placeholder="Жиры, г" min="0" step="0.1" required>
                             <input type="number" id="diary-summary-carbs" class="form-input" placeholder="Углеводы, г" min="0" step="0.1" required>
+                            <input type="number" id="diary-summary-fiber" class="form-input" placeholder="Клетчатка, г" min="0" step="0.1">
                             <input type="number" id="diary-summary-water" class="form-input" placeholder="Вода, л" min="0" step="0.1">
                             <button type="submit" class="btn-primary w-full">
                                 Сохранить итоги дня

@@ -24,4 +24,8 @@ PAYMENT_SECRET_KEY = os.getenv("PAYMENT_SECRET_KEY", "")
 YANDEX_GPT_API_KEY = os.getenv("YANDEX_GPT_API_KEY", "")
 YANDEX_GPT_FOLDER_ID = os.getenv("YANDEX_GPT_FOLDER_ID", "")
 
+# Данные доступа в админку.
+ADMIN_LOGIN = os.getenv("ADMIN_LOGIN", "")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+
 # reserved for future use

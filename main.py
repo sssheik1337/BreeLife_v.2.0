@@ -1,11 +1,12 @@
 import json
 import logging
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 from pathlib import Path
 
 import requests
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -22,6 +23,8 @@ from config import (
     REMINDERS_ENABLED,
     YANDEX_GPT_API_KEY,
     YANDEX_GPT_FOLDER_ID,
+    ADMIN_LOGIN,
+    ADMIN_PASSWORD,
 )
 from services.ai_profile import (
     calculate_deviation_risk,
@@ -45,8 +48,12 @@ templates = Jinja2Templates(directory="templates")
 templates.env.globals["APP_NAME"] = APP_NAME
 
 ADMIN_CONFIG_PATH = Path("config/admin_config.json")
+ADMIN_PRODUCTS_PATH = Path("static/data/products.json")
 ADMIN_CONFIG_CACHE: dict[str, object] | None = None
 ADMIN_CONFIG_MTIME: float | None = None
+ADMIN_SESSION_COOKIE = "admin_session"
+ADMIN_SESSION_TTL = timedelta(hours=12)
+ADMIN_SESSIONS: dict[str, datetime] = {}
 
 
 def loadAdminConfig() -> dict[str, object]:
@@ -67,6 +74,128 @@ def loadAdminConfig() -> dict[str, object]:
         except json.JSONDecodeError:
             ADMIN_CONFIG_CACHE = {}
     return ADMIN_CONFIG_CACHE or {}
+
+
+def loadAdminProducts() -> list[dict[str, object]]:
+    """Загрузить список продуктов из файла, если он доступен."""
+    if not ADMIN_PRODUCTS_PATH.exists():
+        return []
+    try:
+        data = json.loads(ADMIN_PRODUCTS_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, list):
+        return []
+    return [item for item in data if isinstance(item, dict)]
+
+
+def saveAdminProducts(products: list[dict[str, object]]) -> None:
+    """Сохранить список продуктов в файл."""
+    ADMIN_PRODUCTS_PATH.write_text(
+        json.dumps(products, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def updateAdminConfig(data: dict[str, object]) -> None:
+    """Сохранить админ-конфиг в файл."""
+    ADMIN_CONFIG_PATH.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def isAdminAuthenticated(request: Request) -> bool:
+    """Проверить, что текущая сессия имеет доступ в админку."""
+    token = request.cookies.get(ADMIN_SESSION_COOKIE)
+    if not token:
+        return False
+    expires_at = ADMIN_SESSIONS.get(token)
+    if not expires_at:
+        return False
+    if datetime.now(timezone.utc) >= expires_at:
+        ADMIN_SESSIONS.pop(token, None)
+        return False
+    return True
+
+
+def verifyAdminCredentials(login: str, password: str) -> bool:
+    """Проверить логин и пароль админки."""
+    if not ADMIN_LOGIN or not ADMIN_PASSWORD:
+        return False
+    login_ok = secrets.compare_digest(login, ADMIN_LOGIN)
+    password_ok = secrets.compare_digest(password, ADMIN_PASSWORD)
+    return login_ok and password_ok
+
+
+def renderAdminPage(
+    request: Request,
+    error: str | None = None,
+    success: str | None = None,
+) -> HTMLResponse:
+    """Отрисовать админ-страницу с данными."""
+    products = loadAdminProducts()
+    config = loadAdminConfig()
+    norms = config.get("norms") if isinstance(config, dict) else {}
+    if not isinstance(norms, dict):
+        norms = {}
+    return templates.TemplateResponse(
+        "admin.html",
+        {
+            "request": request,
+            "products": products,
+            "norms": {
+                "water_l": norms.get("water_l", 2),
+                "sleep_hours": norms.get("sleep_hours", 8),
+                "fiber_g": norms.get("fiber_g", 25),
+            },
+            "error": error,
+            "success": success,
+        },
+    )
+
+
+def buildFoodDiaryAggregates(
+    entries: list[dict[str, object]],
+    profile: dict[str, object],
+) -> dict[str, object]:
+    """Сформировать агрегаты дневника без сырых записей."""
+    recent = sorted(entries, key=lambda item: item.get("date", ""))[-7:]
+    calories = [
+        item.get("calories")
+        for item in recent
+        if isinstance(item, dict) and isinstance(item.get("calories"), (int, float))
+    ]
+    avg_calories = sum(calories) / len(calories) if calories else None
+    tdee = profile.get("tdee_calories") if isinstance(profile, dict) else None
+    deviation_kcal = None
+    deviation_ratio = None
+    if isinstance(avg_calories, (int, float)) and isinstance(tdee, (int, float)) and tdee:
+        deviation_kcal = avg_calories - tdee
+        deviation_ratio = deviation_kcal / tdee
+
+    trend = "нет данных"
+    if len(calories) >= 4:
+        midpoint = len(calories) // 2
+        first_avg = sum(calories[:midpoint]) / midpoint
+        second_avg = sum(calories[midpoint:]) / (len(calories) - midpoint)
+        diff = second_avg - first_avg
+        if abs(diff) < 50:
+            trend = "стабильно"
+        elif diff > 0:
+            trend = "рост"
+        else:
+            trend = "снижение"
+
+    return {
+        "days_count": len({item.get("date") for item in recent if isinstance(item, dict)}),
+        "avg_calories": avg_calories,
+        "deviation": {
+            "kcal": deviation_kcal,
+            "ratio": deviation_ratio,
+        },
+        "trend": trend,
+    }
 
 # In-memory хранилище напоминаний по telegram_user_id.
 reminders_store: dict[int, list[dict[str, str]]] = {}
@@ -207,12 +336,166 @@ async def foods(request: Request):
     )
 
 
+@app.get("/my-products", response_class=HTMLResponse)
+async def my_products(request: Request):
+    return templates.TemplateResponse(
+        "my_products.html",
+        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+    )
+
+@app.get("/meal-plan", response_class=HTMLResponse)
+async def meal_plan(request: Request):
+    return templates.TemplateResponse(
+        "meal_plan.html",
+        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+    )
+
+
 @app.get("/menu", response_class=HTMLResponse)
 async def menu(request: Request):
     return templates.TemplateResponse(
         "menu.html",
         {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
     )
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin(request: Request):
+    if not isAdminAuthenticated(request):
+        return templates.TemplateResponse(
+            "admin_login.html",
+            {"request": request, "error": None},
+        )
+    return renderAdminPage(request)
+
+
+@app.post("/admin/login", response_class=HTMLResponse)
+async def admin_login(request: Request, login: str = Form(...), password: str = Form(...)):
+    if not verifyAdminCredentials(login, password):
+        return templates.TemplateResponse(
+            "admin_login.html",
+            {"request": request, "error": "Неверный логин или пароль."},
+        )
+    token = secrets.token_urlsafe(32)
+    ADMIN_SESSIONS[token] = datetime.now(timezone.utc) + ADMIN_SESSION_TTL
+    response = RedirectResponse(url="/admin", status_code=303)
+    response.set_cookie(
+        ADMIN_SESSION_COOKIE,
+        token,
+        httponly=True,
+        max_age=int(ADMIN_SESSION_TTL.total_seconds()),
+        samesite="lax",
+    )
+    return response
+
+
+@app.post("/admin/logout")
+async def admin_logout(request: Request):
+    token = request.cookies.get(ADMIN_SESSION_COOKIE)
+    if token:
+        ADMIN_SESSIONS.pop(token, None)
+    response = RedirectResponse(url="/admin", status_code=303)
+    response.delete_cookie(ADMIN_SESSION_COOKIE)
+    return response
+
+
+@app.post("/admin/products/add", response_class=HTMLResponse)
+async def admin_products_add(
+    request: Request,
+    name: str = Form(...),
+    group: str = Form(...),
+    kcal: float = Form(...),
+    protein_g: float = Form(...),
+    fat_g: float = Form(...),
+    carbs_g: float = Form(...),
+    fiber_g: float = Form(...),
+):
+    if not isAdminAuthenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    products = loadAdminProducts()
+    next_id = max((item.get("id", 0) for item in products if isinstance(item.get("id"), int)), default=0) + 1
+    products.append(
+        {
+            "id": next_id,
+            "name": name.strip(),
+            "group": group.strip(),
+            "kcal": kcal,
+            "protein_g": protein_g,
+            "fat_g": fat_g,
+            "carbs_g": carbs_g,
+            "fiber_g": fiber_g,
+            "tags": [],
+            "health_level": "neutral",
+        }
+    )
+    saveAdminProducts(products)
+    return renderAdminPage(request, success="Продукт добавлен.")
+
+
+@app.post("/admin/products/update", response_class=HTMLResponse)
+async def admin_products_update(
+    request: Request,
+    product_id: int = Form(...),
+    name: str = Form(...),
+    group: str = Form(...),
+    kcal: float = Form(...),
+    protein_g: float = Form(...),
+    fat_g: float = Form(...),
+    carbs_g: float = Form(...),
+    fiber_g: float = Form(...),
+):
+    if not isAdminAuthenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    products = loadAdminProducts()
+    updated = False
+    for item in products:
+        if item.get("id") == product_id:
+            item["name"] = name.strip()
+            item["group"] = group.strip()
+            item["kcal"] = kcal
+            item["protein_g"] = protein_g
+            item["fat_g"] = fat_g
+            item["carbs_g"] = carbs_g
+            item["fiber_g"] = fiber_g
+            updated = True
+            break
+    if not updated:
+        return renderAdminPage(request, error="Продукт не найден.")
+    saveAdminProducts(products)
+    return renderAdminPage(request, success="Продукт обновлён.")
+
+
+@app.post("/admin/products/delete", response_class=HTMLResponse)
+async def admin_products_delete(request: Request, product_id: int = Form(...)):
+    if not isAdminAuthenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    products = loadAdminProducts()
+    filtered = [item for item in products if item.get("id") != product_id]
+    if len(filtered) == len(products):
+        return renderAdminPage(request, error="Продукт не найден.")
+    saveAdminProducts(filtered)
+    return renderAdminPage(request, success="Продукт удалён.")
+
+
+@app.post("/admin/norms", response_class=HTMLResponse)
+async def admin_norms_update(
+    request: Request,
+    water_l: float = Form(...),
+    sleep_hours: float = Form(...),
+    fiber_g: float = Form(...),
+):
+    if not isAdminAuthenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    config = loadAdminConfig()
+    if not isinstance(config, dict):
+        config = {}
+    config["norms"] = {
+        "water_l": water_l,
+        "sleep_hours": sleep_hours,
+        "fiber_g": fiber_g,
+    }
+    updateAdminConfig(config)
+    return renderAdminPage(request, success="Нормы обновлены.")
 
 
 @app.get("/api/calculate")
@@ -654,6 +937,7 @@ async def analyze_food_diary(request: Request):
         for entry in entries
         if isinstance(entry, dict) and entry.get("date")
     }
+    aggregates = buildFoodDiaryAggregates(entries, profile)
     logger.info(
         "Запрос анализа дневника: записей=%s, дней=%s, AI_ENABLED=%s",
         len(entries),
@@ -664,10 +948,7 @@ async def analyze_food_diary(request: Request):
         "Профиль для анализа дневника: ключи=%s",
         sorted(profile.keys()),
     )
-    logger.debug(
-        "Записи дневника для анализа (первые 3): %s",
-        entries[:3],
-    )
+    logger.debug("Агрегаты дневника для анализа: %s", aggregates)
 
     if not AI_ENABLED:
         result = generate_food_diary_recommendation(profile, entries)
@@ -689,7 +970,7 @@ async def analyze_food_diary(request: Request):
         logger.info("Отправка запроса в YandexGPT для анализа дневника.")
         text = generate_yandex_recommendation(
             {
-                "food_diary_entries": entries,
+                "food_diary_aggregates": aggregates,
                 **profile,
             },
             api_key=YANDEX_GPT_API_KEY,

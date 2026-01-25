@@ -125,9 +125,416 @@ function readDiaryEntries() {
     }
 }
 
+function normalizeDateKey(value) {
+    if (typeof window.normalizeLocalDate === 'function') {
+        return window.normalizeLocalDate(value);
+    }
+    if (!value) {
+        return null;
+    }
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+        return null;
+    }
+    return parsed.toISOString().split('T')[0];
+}
+
+function parseSleepMinutes(value) {
+    if (!value || typeof value !== 'string') {
+        return null;
+    }
+    const [hours, minutes] = value.split(':').map((part) => Number(part));
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+        return null;
+    }
+    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+        return null;
+    }
+    return hours * 60 + minutes;
+}
+
+function formatSleepMinutes(minutes) {
+    if (!Number.isFinite(minutes)) {
+        return '—';
+    }
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+}
+
+function buildDateRange(days) {
+    const range = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let i = days - 1; i >= 0; i -= 1) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        const dateKey = normalizeDateKey(date);
+        range.push({ date, dateKey });
+    }
+    return range;
+}
+
+function resolveCalorieTone(dayCalories, targetCalories) {
+    if (!Number.isFinite(targetCalories) || targetCalories <= 0) {
+        return { color: '#e2e8f0', label: 'ориентир не рассчитан' };
+    }
+    if (dayCalories < targetCalories * 0.9) {
+        return { color: '#facc15', label: 'меньше нужного' };
+    }
+    if (dayCalories > targetCalories * 1.1) {
+        return { color: '#f43f5e', label: 'больше нужного' };
+    }
+    return { color: '#10b981', label: 'в нужном диапазоне' };
+}
+
+function updateRangeButtonState(buttons, activeValue) {
+    buttons.forEach((button) => {
+        const isActive = button.dataset.calorieRange === activeValue;
+        button.classList.toggle('bg-emerald-100', isActive);
+        button.classList.toggle('text-emerald-700', isActive);
+        button.classList.toggle('bg-slate-100', !isActive);
+        button.classList.toggle('text-slate-500', !isActive);
+    });
+}
+
+function updateMacroRangeButtonState(buttons, activeValue) {
+    buttons.forEach((button) => {
+        const isActive = button.dataset.macroRange === activeValue;
+        button.classList.toggle('bg-emerald-100', isActive);
+        button.classList.toggle('text-emerald-700', isActive);
+        button.classList.toggle('bg-slate-100', !isActive);
+        button.classList.toggle('text-slate-500', !isActive);
+    });
+}
+
+function updateWaterRangeButtonState(buttons, activeValue) {
+    buttons.forEach((button) => {
+        const isActive = button.dataset.waterRange === activeValue;
+        button.classList.toggle('bg-emerald-100', isActive);
+        button.classList.toggle('text-emerald-700', isActive);
+        button.classList.toggle('bg-slate-100', !isActive);
+        button.classList.toggle('text-slate-500', !isActive);
+    });
+}
+
+function summarizeMacrosByDate(entries, range) {
+    const totals = new Map();
+    range.forEach(({ dateKey }) => {
+        if (dateKey) {
+            totals.set(dateKey, { protein_g: 0, fat_g: 0, carbs_g: 0 });
+        }
+    });
+    entries.forEach((entry) => {
+        const dateKey = normalizeDateKey(entry?.date);
+        if (!dateKey || !totals.has(dateKey)) {
+            return;
+        }
+        const resolved = resolveEntryTotals(entry);
+        const current = totals.get(dateKey);
+        current.protein_g += resolved.protein_g;
+        current.fat_g += resolved.fat_g;
+        current.carbs_g += resolved.carbs_g;
+    });
+    return totals;
+}
+
+function renderWaterHistory(rangeDays = 7) {
+    const grid = document.getElementById('water-history-grid');
+    const desc = document.getElementById('water-history-desc');
+    const insight = document.getElementById('water-history-insight');
+    if (!grid || !desc || !insight) {
+        return;
+    }
+
+    const entries = readDiaryEntries();
+    const waterByDate = new Map();
+    const range = buildDateRange(rangeDays);
+    range.forEach(({ dateKey }) => {
+        if (dateKey) {
+            waterByDate.set(dateKey, 0);
+        }
+    });
+
+    entries.forEach((entry) => {
+        const dateKey = normalizeDateKey(entry?.date);
+        if (!dateKey || !waterByDate.has(dateKey)) {
+            return;
+        }
+        const waterValue = Number(entry?.water_l) || 0;
+        const current = waterByDate.get(dateKey) || 0;
+        waterByDate.set(dateKey, Math.max(current, waterValue));
+    });
+
+    const target = Number(window.adminConfig?.reminders?.water_min_l);
+    let totalWater = 0;
+    let daysWithData = 0;
+    const maxWater = range.reduce((maxValue, { dateKey }) => {
+        const value = dateKey ? (waterByDate.get(dateKey) || 0) : 0;
+        if (dateKey && waterByDate.has(dateKey)) {
+            totalWater += value;
+            daysWithData += 1;
+        }
+        return Math.max(maxValue, value);
+    }, 0);
+    const scale = Math.max(maxWater, Number.isFinite(target) ? target : 0, 0.5);
+
+    grid.innerHTML = '';
+    grid.classList.remove('grid-cols-7');
+    grid.classList.remove('grid-cols-10');
+    grid.classList.add(rangeDays === 30 ? 'grid-cols-10' : 'grid-cols-7');
+
+    range.forEach(({ date, dateKey }) => {
+        const dayWater = dateKey ? (waterByDate.get(dateKey) || 0) : 0;
+        const height = Math.round((dayWater / scale) * 100);
+        const dayLabel = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const meetsTarget = Number.isFinite(target) && target > 0 && dayWater >= target;
+        const barColor = meetsTarget ? '#10b981' : '#7dd3fc';
+
+        const item = document.createElement('div');
+        item.className = 'flex flex-col items-center gap-1';
+
+        const barWrapper = document.createElement('div');
+        barWrapper.className = 'w-full flex items-end justify-center';
+        barWrapper.style.height = rangeDays === 30 ? '56px' : '72px';
+
+        const bar = document.createElement('div');
+        bar.className = 'w-full rounded-lg';
+        bar.style.height = `${Math.max(height, 4)}%`;
+        bar.style.background = barColor;
+        bar.title = `${dayLabel}: ${dayWater.toFixed(1)} л`;
+
+        const value = document.createElement('div');
+        value.className = 'text-[10px] text-slate-400';
+        value.textContent = `${dayWater.toFixed(1)}`;
+
+        const label = document.createElement('div');
+        label.className = 'text-[10px] text-slate-500';
+        label.textContent = dayLabel;
+
+        barWrapper.appendChild(bar);
+        item.appendChild(barWrapper);
+        if (rangeDays === 7) {
+            item.appendChild(value);
+        }
+        item.appendChild(label);
+        grid.appendChild(item);
+    });
+
+    if (!Number.isFinite(target) || target <= 0) {
+        desc.textContent = 'Цель по воде не задана, показываем фактические значения.';
+        insight.textContent = daysWithData
+            ? 'Есть записи по воде, но цель не задана. Попробуйте отмечать воду регулярно.'
+            : 'Пока нет записей по воде. Начните с одного дня — так проще войти в ритм.';
+    } else {
+        desc.textContent = `Цель: ${target.toFixed(1)} л в день.`;
+        if (!daysWithData) {
+            insight.textContent = 'Пока нет записей по воде. Заполните пару дней — и появится понятная картина.';
+        } else {
+            const average = totalWater / daysWithData;
+            if (average >= target) {
+                insight.textContent = 'Хорошо: в среднем вода на уровне цели. Продолжайте в том же духе.';
+            } else {
+                insight.textContent = 'Воды в среднем меньше цели. Попробуйте добавить стакан воды в первой половине дня.';
+            }
+        }
+    }
+}
+
+function renderMacroBalance(rangeKey = 'day') {
+    const chart = document.getElementById('macro-balance-chart');
+    const desc = document.getElementById('macro-balance-desc');
+    const insight = document.getElementById('macro-balance-insight');
+    const proteinLabel = document.getElementById('macro-balance-protein');
+    const fatLabel = document.getElementById('macro-balance-fat');
+    const carbsLabel = document.getElementById('macro-balance-carbs');
+    if (!chart || !desc || !insight || !proteinLabel || !fatLabel || !carbsLabel) {
+        return;
+    }
+
+    const entries = readDiaryEntries();
+    let protein = 0;
+    let fat = 0;
+    let carbs = 0;
+    let label = 'Фактический состав рациона.';
+
+    if (rangeKey === 'week') {
+        const range = buildDateRange(7);
+        const totals = summarizeMacrosByDate(entries, range);
+        let daysWithData = 0;
+        totals.forEach((dayTotals) => {
+            if (dayTotals.protein_g || dayTotals.fat_g || dayTotals.carbs_g) {
+                daysWithData += 1;
+                protein += dayTotals.protein_g;
+                fat += dayTotals.fat_g;
+                carbs += dayTotals.carbs_g;
+            }
+        });
+        if (daysWithData > 0) {
+            protein /= daysWithData;
+            fat /= daysWithData;
+            carbs /= daysWithData;
+        }
+        label = 'Средние значения за неделю.';
+    } else {
+        const today = normalizeDateKey(new Date());
+        entries.forEach((entry) => {
+            const dateKey = normalizeDateKey(entry?.date);
+            if (!today || dateKey !== today) {
+                return;
+            }
+            const resolved = resolveEntryTotals(entry);
+            protein += resolved.protein_g;
+            fat += resolved.fat_g;
+            carbs += resolved.carbs_g;
+        });
+        label = 'Фактические значения за сегодня.';
+    }
+
+    const total = protein + fat + carbs;
+    const safeTotal = total > 0 ? total : 1;
+    const proteinPercent = Math.round((protein / safeTotal) * 100);
+    const fatPercent = Math.round((fat / safeTotal) * 100);
+    const carbsPercent = Math.max(0, 100 - proteinPercent - fatPercent);
+
+    if (total <= 0) {
+        chart.style.background = '#e2e8f0';
+        desc.textContent = 'Нет данных для расчёта.';
+        insight.textContent = 'Пока нет записей, поэтому распределение не видно.';
+        proteinLabel.textContent = 'Белки — 0%';
+        fatLabel.textContent = 'Жиры — 0%';
+        carbsLabel.textContent = 'Углеводы — 0%';
+        return;
+    }
+
+    chart.style.background = `conic-gradient(#10b981 0 ${proteinPercent}%, #f59e0b ${proteinPercent}% ${proteinPercent + fatPercent}%, #38bdf8 ${proteinPercent + fatPercent}% 100%)`;
+    desc.textContent = label;
+    proteinLabel.textContent = `Белки — ${proteinPercent}%`;
+    fatLabel.textContent = `Жиры — ${fatPercent}%`;
+    carbsLabel.textContent = `Углеводы — ${carbsPercent}%`;
+    const maxPercent = Math.max(proteinPercent, fatPercent, carbsPercent);
+    if (maxPercent >= 55) {
+        const dominant = maxPercent === proteinPercent
+            ? 'белков'
+            : maxPercent === fatPercent
+                ? 'жиров'
+                : 'углеводов';
+        insight.textContent = `Сейчас заметный упор на долю ${dominant}. Чтобы выровнять баланс, добавьте продукты других групп.`;
+    } else if (maxPercent <= 45) {
+        insight.textContent = 'Баланс выглядит ровно — хорошо для стабильной энергии.';
+    } else {
+        const dominant = maxPercent === proteinPercent
+            ? 'белкам'
+            : maxPercent === fatPercent
+                ? 'жирам'
+                : 'углеводам';
+        insight.textContent = `Баланс слегка смещён к ${dominant}. Можно добавить продукты других групп для ровного распределения.`;
+    }
+}
+
+function renderCalorieTrend(rangeDays = 7) {
+    const grid = document.getElementById('calorie-trend-grid');
+    const desc = document.getElementById('calorie-trend-desc');
+    const insight = document.getElementById('calorie-trend-insight');
+    if (!grid || !desc || !insight) {
+        return;
+    }
+
+    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const targetCalories = Number(profile?.tdee_calories);
+    const entries = readDiaryEntries();
+    const caloriesByDate = new Map();
+
+    entries.forEach((entry) => {
+        const dateKey = normalizeDateKey(entry?.date);
+        if (!dateKey) {
+            return;
+        }
+        const totals = resolveEntryTotals(entry);
+        const calories = Number(totals.calories) || 0;
+        const current = caloriesByDate.get(dateKey) || 0;
+        caloriesByDate.set(dateKey, current + calories);
+    });
+
+    const range = buildDateRange(rangeDays);
+    let totalCalories = 0;
+    let daysWithData = 0;
+    const maxCalories = range.reduce((maxValue, { dateKey }) => {
+        const value = dateKey ? (caloriesByDate.get(dateKey) || 0) : 0;
+        if (dateKey && caloriesByDate.has(dateKey)) {
+            totalCalories += value;
+            daysWithData += 1;
+        }
+        return Math.max(maxValue, value);
+    }, 0);
+    const scale = Math.max(maxCalories, Number.isFinite(targetCalories) ? targetCalories : 0, 1);
+
+    grid.innerHTML = '';
+    grid.classList.remove('grid-cols-7');
+    grid.classList.remove('grid-cols-10');
+    grid.classList.add(rangeDays === 30 ? 'grid-cols-10' : 'grid-cols-7');
+
+    range.forEach(({ date, dateKey }) => {
+        const dayCalories = dateKey ? (caloriesByDate.get(dateKey) || 0) : 0;
+        const height = Math.round((dayCalories / scale) * 100);
+        const tone = resolveCalorieTone(dayCalories, targetCalories);
+        const dayLabel = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+        const item = document.createElement('div');
+        item.className = 'flex flex-col items-center gap-1';
+
+        const barWrapper = document.createElement('div');
+        barWrapper.className = 'w-full flex items-end justify-center';
+        barWrapper.style.height = rangeDays === 30 ? '56px' : '72px';
+
+        const bar = document.createElement('div');
+        bar.className = 'w-full rounded-lg';
+        bar.style.height = `${Math.max(height, 4)}%`;
+        bar.style.background = tone.color;
+        bar.title = `${dayLabel}: ${Math.round(dayCalories)} ккал за день`;
+
+        const value = document.createElement('div');
+        value.className = 'text-[10px] text-slate-400';
+        value.textContent = `${Math.round(dayCalories)}`;
+
+        const label = document.createElement('div');
+        label.className = 'text-[10px] text-slate-500';
+        label.textContent = dayLabel;
+
+        barWrapper.appendChild(bar);
+        item.appendChild(barWrapper);
+        if (rangeDays === 7) {
+            item.appendChild(value);
+        }
+        item.appendChild(label);
+        grid.appendChild(item);
+    });
+
+    if (!Number.isFinite(targetCalories) || targetCalories <= 0) {
+        desc.textContent = 'Ориентир по калориям ещё не рассчитан, поэтому показываем факт.';
+        insight.textContent = daysWithData
+            ? 'Есть записи по калориям, но ориентир не задан. Постарайтесь держать дни примерно на одном уровне.'
+            : 'Пока нет записей по калориям. Заполните пару дней, чтобы увидеть тенденции.';
+    } else {
+        desc.textContent = `Ориентир на день: ${Math.round(targetCalories)} ккал.`;
+        if (!daysWithData) {
+            insight.textContent = 'Пока нет записей. Как только появятся данные, здесь будет понятный вывод.';
+        } else {
+            const average = totalCalories / daysWithData;
+            if (average >= targetCalories * 1.1) {
+                insight.textContent = 'В среднем калорий больше нужного. Если хотите ближе к цели, уменьшите порции или выберите более лёгкие блюда.';
+            } else if (average <= targetCalories * 0.9) {
+                insight.textContent = 'В среднем калорий меньше нужного. Можно добавить небольшой перекус, чтобы поддерживать энергию.';
+            } else {
+                insight.textContent = 'В среднем всё близко к ориентиру — это хороший знак стабильности.';
+            }
+        }
+    }
+}
+
 function resolveEntryTotals(entry) {
     if (!entry) {
-        return { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, water_l: 0 };
+        return { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0, water_l: 0 };
     }
     if (entry.mode === 'products') {
         if (entry.totals) {
@@ -140,9 +547,10 @@ function resolveEntryTotals(entry) {
                     acc.protein_g += Number(item?.protein) || Number(item?.protein_g) || 0;
                     acc.fat_g += Number(item?.fat) || Number(item?.fat_g) || 0;
                     acc.carbs_g += Number(item?.carbs) || Number(item?.carbs_g) || 0;
+                    acc.fiber_g += Number(item?.fiber) || Number(item?.fiber_g) || 0;
                     return acc;
                 },
-                { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, water_l: 0 }
+                { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0, water_l: 0 }
             );
         }
     }
@@ -151,6 +559,7 @@ function resolveEntryTotals(entry) {
         protein_g: Number(entry.protein_g) || 0,
         fat_g: Number(entry.fat_g) || 0,
         carbs_g: Number(entry.carbs_g) || 0,
+        fiber_g: Number(entry.fiber_g) || 0,
         water_l: Number(entry.water_l) || 0
     };
 }
@@ -215,43 +624,72 @@ function getTodayDiaryTotals() {
             acc.protein_g += resolved.protein_g;
             acc.fat_g += resolved.fat_g;
             acc.carbs_g += resolved.carbs_g;
+            acc.fiber_g += resolved.fiber_g;
             waterMax = Math.max(waterMax, Number(entry?.water_l) || 0);
             return acc;
         },
-        { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, water_l: 0 }
+        { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0, water_l: 0 }
     );
 
-    const hasEntries = totals.calories > 0 || totals.protein_g > 0 || totals.fat_g > 0 || totals.carbs_g > 0 || waterMax > 0;
+    const hasEntries = totals.calories > 0 || totals.protein_g > 0 || totals.fat_g > 0 || totals.carbs_g > 0 || totals.fiber_g > 0 || waterMax > 0;
     return { ...totals, water_l: waterMax, hasEntries };
+}
+
+function getSleepMinutesForDate(entries, dateKey) {
+    if (!dateKey) {
+        return null;
+    }
+    let best = null;
+    entries.forEach((entry) => {
+        if (entry?.date !== dateKey) {
+            return;
+        }
+        const minutes = parseSleepMinutes(entry.sleep_time);
+        if (minutes === null) {
+            return;
+        }
+        if (best === null || minutes < best) {
+            best = minutes;
+        }
+    });
+    return best;
 }
 
 function renderProfileRings() {
     const caloriesContainer = document.getElementById('profile-calories-ring');
     const macrosContainer = document.getElementById('profile-macros-rings');
     const waterContainer = document.getElementById('profile-water-ring');
+    const sleepContainer = document.getElementById('profile-sleep-ring');
 
-    if (!caloriesContainer || !macrosContainer || !waterContainer) {
+    if (!caloriesContainer || !macrosContainer || !waterContainer || !sleepContainer) {
         return;
     }
 
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
     const tdee = Number(profile?.tdee_calories);
+    const entries = readDiaryEntries();
     const todayTotals = getTodayDiaryTotals();
+    const todayKey = typeof window.normalizeLocalDate === 'function'
+        ? window.normalizeLocalDate(new Date())
+        : null;
+    const sleepMinutes = getSleepMinutesForDate(entries, todayKey);
+    const sleepTargetRaw = window.adminConfig?.reminders?.sleep_target;
+    const sleepTargetMinutes = parseSleepMinutes(sleepTargetRaw);
     const caloriesPercent = todayTotals.hasEntries && Number.isFinite(tdee) && tdee > 0
         ? (todayTotals.calories / tdee) * 100
         : null;
     const caloriesValue = todayTotals.hasEntries
         ? Number.isFinite(tdee)
-            ? `Факт / цель: ${Math.round(todayTotals.calories)} / ${Math.round(tdee)} ккал`
-            : `Факт: ${Math.round(todayTotals.calories)} ккал`
-        : 'Нет данных';
+            ? `Сегодня: ${Math.round(todayTotals.calories)} из ${Math.round(tdee)} ккал`
+            : `Сегодня: ${Math.round(todayTotals.calories)} ккал`
+        : 'Пока нет данных';
 
     caloriesContainer.innerHTML = '';
     caloriesContainer.appendChild(
         createProgressRing({
             percent: caloriesPercent,
             color: '#10b981',
-            label: 'Калории сегодня',
+            label: 'Съедено сегодня',
             value: caloriesValue,
             emphasize: true
         })
@@ -317,6 +755,33 @@ function renderProfileRings() {
         macrosContainer.appendChild(card);
     });
 
+    const fiberTarget = Number(window.adminConfig?.reminders?.fiber_target_g);
+    const hasFiberTarget = Number.isFinite(fiberTarget) && fiberTarget > 0;
+    const fiberPercent = todayTotals.hasEntries && hasFiberTarget
+        ? Math.round((todayTotals.fiber_g / fiberTarget) * 100)
+        : null;
+    const fiberValue = todayTotals.hasEntries
+        ? hasFiberTarget
+            ? `Факт / цель: ${Math.round(todayTotals.fiber_g)} / ${Math.round(fiberTarget)} г`
+            : `Факт: ${Math.round(todayTotals.fiber_g)} г`
+        : 'Нет данных';
+    const fiberCard = document.createElement('div');
+    fiberCard.className = 'stat-card flex justify-center';
+    const fiberWrapper = document.createElement('div');
+    fiberWrapper.className = 'ring-compact flex justify-center';
+    fiberWrapper.appendChild(
+        createProgressRing({
+            size: 96,
+            stroke: 8,
+            percent: fiberPercent,
+            color: '#84cc16',
+            label: 'Клетчатка',
+            value: fiberValue
+        })
+    );
+    fiberCard.appendChild(fiberWrapper);
+    macrosContainer.appendChild(fiberCard);
+
     const waterTarget = Number(window.adminConfig?.reminders?.water_min_l);
     const waterTotal = Number(todayTotals.water_l) || 0;
     const hasWater = todayTotals.hasEntries && Number.isFinite(waterTotal);
@@ -340,49 +805,121 @@ function renderProfileRings() {
         })
     );
 
+    const hasSleepTarget = sleepTargetMinutes !== null;
+    const sleepPercent = sleepMinutes !== null && hasSleepTarget
+        ? Math.max(0, Math.min((sleepTargetMinutes / sleepMinutes) * 100, 120))
+        : null;
+    const sleepValue = sleepMinutes !== null
+        ? hasSleepTarget
+            ? `Факт / цель: ${formatSleepMinutes(sleepMinutes)} / ${formatSleepMinutes(sleepTargetMinutes)}`
+            : `Факт: ${formatSleepMinutes(sleepMinutes)}`
+        : 'Нет данных';
+    sleepContainer.innerHTML = '';
+    sleepContainer.appendChild(
+        createProgressRing({
+            percent: sleepPercent,
+            color: '#8b5cf6',
+            label: 'Сон сегодня',
+            value: sleepValue
+        })
+    );
+
     animateCountUps(caloriesContainer);
     animateCountUps(macrosContainer);
     animateCountUps(waterContainer);
+    animateCountUps(sleepContainer);
 }
 
 function renderMonthGrid() {
     const container = document.getElementById('profile-month-grid');
-    if (!container) {
+    const insight = document.getElementById('profile-month-grid-insight');
+    if (!container || !insight) {
         return;
     }
 
     container.innerHTML = '';
     const diaryEntries = readDiaryEntries();
-    const daysWithEntries = new Set(
-        diaryEntries
-            .map((entry) => (typeof window.normalizeLocalDate === 'function'
-                ? window.normalizeLocalDate(entry?.date)
-                : entry?.date))
-            .filter(Boolean)
-    );
+    const caloriesByDate = new Map();
+    const waterByDate = new Map();
+    const sleepByDate = new Map();
+    diaryEntries.forEach((entry) => {
+        const dateKey = normalizeDateKey(entry?.date);
+        if (!dateKey) {
+            return;
+        }
+        const totals = resolveEntryTotals(entry);
+        const currentCalories = caloriesByDate.get(dateKey) || 0;
+        caloriesByDate.set(dateKey, currentCalories + (Number(totals.calories) || 0));
+        const waterValue = Number(entry?.water_l) || 0;
+        const currentWater = waterByDate.get(dateKey) || 0;
+        waterByDate.set(dateKey, Math.max(currentWater, waterValue));
+        const sleepMinutes = parseSleepMinutes(entry?.sleep_time);
+        if (sleepMinutes !== null) {
+            const currentSleep = sleepByDate.get(dateKey);
+            if (currentSleep === undefined || sleepMinutes < currentSleep) {
+                sleepByDate.set(dateKey, sleepMinutes);
+            }
+        }
+    });
     const days = 30;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const todayDate = typeof window.normalizeLocalDate === 'function'
-        ? window.normalizeLocalDate(today)
-        : null;
+    const todayDate = normalizeDateKey(today);
+    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const targetCalories = Number(profile?.tdee_calories);
+    const waterTarget = Number(window.adminConfig?.reminders?.water_min_l);
+    const sleepTargetMinutes = parseSleepMinutes(window.adminConfig?.reminders?.sleep_target);
+    let daysWithData = 0;
+    let daysOnTrack = 0;
+    let daysOffTrack = 0;
     for (let i = 0; i < days; i += 1) {
         const date = new Date(today);
         date.setDate(today.getDate() - (days - 1 - i));
-        const dateKey = typeof window.normalizeLocalDate === 'function'
-            ? window.normalizeLocalDate(date)
-            : null;
+        const dateKey = normalizeDateKey(date);
         const day = document.createElement('a');
         day.className = 'month-day';
         day.href = dateKey ? `/diary?date=${dateKey}&mode=summary` : '/diary?mode=summary';
         if (todayDate && dateKey === todayDate) {
             day.classList.add('month-day--today');
         }
-        if (dateKey && daysWithEntries.has(dateKey)) {
-            day.classList.add('month-day--active');
+        const dayCalories = dateKey ? (caloriesByDate.get(dateKey) || 0) : 0;
+        const dayWater = dateKey ? (waterByDate.get(dateKey) || 0) : 0;
+        const daySleep = dateKey ? sleepByDate.get(dateKey) : undefined;
+        const hasData = dateKey
+            ? (caloriesByDate.has(dateKey) || waterByDate.has(dateKey) || sleepByDate.has(dateKey))
+            : false;
+        if (hasData) {
+            daysWithData += 1;
+        }
+        if (hasData && Number.isFinite(targetCalories) && targetCalories > 0
+            && Number.isFinite(waterTarget) && waterTarget > 0
+            && sleepTargetMinutes !== null) {
+            const caloriesOk = dayCalories >= targetCalories * 0.9 && dayCalories <= targetCalories * 1.1;
+            const waterOk = dayWater >= waterTarget;
+            const sleepOk = daySleep !== undefined && daySleep <= sleepTargetMinutes;
+            if (caloriesOk && waterOk && sleepOk) {
+                day.classList.add('month-day--good');
+                daysOnTrack += 1;
+            } else {
+                day.classList.add('month-day--bad');
+                daysOffTrack += 1;
+            }
+        } else if (hasData) {
+            day.classList.add('month-day--empty');
+        } else {
+            day.classList.add('month-day--empty');
         }
         day.textContent = date.getDate().toString();
         container.appendChild(day);
+    }
+    if (!daysWithData) {
+        insight.textContent = 'Пока нет отметок за месяц. Начните с пары дней, и появится понятная картина.';
+    } else if (daysOnTrack > daysOffTrack) {
+        insight.textContent = 'Большинство дней выглядят ровно — хороший ритм.';
+    } else if (daysOffTrack > daysOnTrack) {
+        insight.textContent = 'Есть несколько дней вне ритма. Попробуйте сделать график более регулярным.';
+    } else {
+        insight.textContent = 'Ритм пока смешанный. Если отметить больше дней, вывод будет точнее.';
     }
 }
 
@@ -390,7 +927,8 @@ function renderWeeklyProgress() {
     const container = document.getElementById('weekly-progress-grid');
     const percentElement = document.getElementById('weekly-progress-percent');
     const descElement = document.getElementById('weekly-progress-desc');
-    if (!container || !percentElement || !descElement) {
+    const insight = document.getElementById('weekly-progress-insight');
+    if (!container || !percentElement || !descElement || !insight) {
         return;
     }
 
@@ -442,6 +980,9 @@ function renderWeeklyProgress() {
     const fallbackTarget = maxWeekCalories > 0 ? maxWeekCalories : null;
 
     let totalPercent = 0;
+    let loggedDays = 0;
+    let totalCalories = 0;
+    const shouldAverageLoggedDays = !(Number.isFinite(targetCalories) && targetCalories > 0);
     for (let i = 0; i < 7; i += 1) {
         const { dateKey, date: currentDate } = weekDates[i];
         const dateLabel = dateKey
@@ -456,6 +997,10 @@ function renderWeeklyProgress() {
             ? Math.min(Math.max(dayCalories / target, 0), 1)
             : 0;
         totalPercent += dayPercent;
+        if (hasData) {
+            loggedDays += 1;
+            totalCalories += dayCalories;
+        }
 
         const item = document.createElement('a');
         item.className = 'weekly-day flex flex-col items-center gap-1 p-2';
@@ -494,9 +1039,30 @@ function renderWeeklyProgress() {
         container.appendChild(item);
     }
 
-    const percent = Math.round((totalPercent / 7) * 100);
+    const denominator = shouldAverageLoggedDays ? loggedDays : 7;
+    const percent = denominator ? Math.round((totalPercent / denominator) * 100) : 0;
     percentElement.textContent = `${percent}%`;
     descElement.textContent = 'Учитываются записи дневника питания.';
+    if (!loggedDays) {
+        insight.textContent = 'Пока нет записей за неделю. Добавьте несколько дней — и появится понятный вывод.';
+        return;
+    }
+    if (loggedDays < 3) {
+        insight.textContent = 'Записей пока мало, вывод приблизительный. Попробуйте отмечать питание чаще.';
+        return;
+    }
+    if (!Number.isFinite(targetCalories) || targetCalories <= 0) {
+        insight.textContent = 'Есть записи за неделю, но ориентир не задан. Старайтесь держать дни более ровными.';
+        return;
+    }
+    const avgCalories = totalCalories / loggedDays;
+    if (avgCalories >= targetCalories * 1.1) {
+        insight.textContent = 'В среднем за неделю калорий было больше нужного. Если хотите ближе к цели, уменьшайте порции постепенно.';
+    } else if (avgCalories <= targetCalories * 0.9) {
+        insight.textContent = 'В среднем за неделю калорий было меньше нужного. Можно добавить небольшой перекус, чтобы поддерживать энергию.';
+    } else {
+        insight.textContent = 'Неделя выглядит ровно — вы держите хороший ритм.';
+    }
 }
 
 function renderWeeklyAdjustments() {
@@ -723,11 +1289,11 @@ function renderWeeklyReview() {
     }
 
     const statusLabels = {
-        overeat: 'Калории выше ориентира',
-        undereat: 'Калории ниже ориентира',
-        low_protein: 'Нужно больше белка',
-        low_discipline: 'Низкая регулярность',
-        ok: 'Всё стабильно'
+        overeat: 'Еды было больше, чем нужно',
+        undereat: 'Еды было меньше, чем нужно',
+        low_protein: 'Белка не хватает',
+        low_discipline: 'Записей мало',
+        ok: 'Ритм стабильный'
     };
     const statusColors = {
         overeat: 'bg-rose-500',
@@ -794,10 +1360,52 @@ document.addEventListener('DOMContentLoaded', () => {
         link.addEventListener('click', (event) => navigateToDiary(event, link));
     });
 
+    const rangeButtons = Array.from(document.querySelectorAll('[data-calorie-range]'));
+    let activeRange = '7';
+    if (rangeButtons.length) {
+        updateRangeButtonState(rangeButtons, activeRange);
+        rangeButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                activeRange = button.dataset.calorieRange || '7';
+                updateRangeButtonState(rangeButtons, activeRange);
+                renderCalorieTrend(Number(activeRange));
+            });
+        });
+    }
+
+    const waterRangeButtons = Array.from(document.querySelectorAll('[data-water-range]'));
+    let activeWaterRange = '7';
+    if (waterRangeButtons.length) {
+        updateWaterRangeButtonState(waterRangeButtons, activeWaterRange);
+        waterRangeButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                activeWaterRange = button.dataset.waterRange || '7';
+                updateWaterRangeButtonState(waterRangeButtons, activeWaterRange);
+                renderWaterHistory(Number(activeWaterRange));
+            });
+        });
+    }
+
+    const macroRangeButtons = Array.from(document.querySelectorAll('[data-macro-range]'));
+    let activeMacroRange = 'day';
+    if (macroRangeButtons.length) {
+        updateMacroRangeButtonState(macroRangeButtons, activeMacroRange);
+        macroRangeButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                activeMacroRange = button.dataset.macroRange || 'day';
+                updateMacroRangeButtonState(macroRangeButtons, activeMacroRange);
+                renderMacroBalance(activeMacroRange);
+            });
+        });
+    }
+
     (async () => {
         await loadProfileFromServer();
         renderProfileRings();
         renderWeeklyProgress();
+        renderCalorieTrend(Number(activeRange));
+        renderWaterHistory(Number(activeWaterRange));
+        renderMacroBalance(activeMacroRange);
         renderMonthGrid();
         renderWeeklyAdjustments();
         renderWeeklyReview();

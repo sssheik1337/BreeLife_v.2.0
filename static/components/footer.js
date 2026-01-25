@@ -3,6 +3,10 @@ class CustomFooter extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this.shadowRoot.innerHTML = `
       <style>
+        :host {
+          display: block;
+        }
+
         .footer {
           margin-top: auto;
           padding: 2rem 1.5rem 1.5rem;
@@ -59,7 +63,66 @@ class CustomFooter extends HTMLElement {
             gap: 1rem 1.5rem;
           }
         }
+
+        .bottom-spacer {
+          height: 76px;
+        }
+
+        .bottom-nav {
+          position: fixed;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(255, 255, 255, 0.98);
+          border-top: 1px solid #e2e8f0;
+          box-shadow: 0 -6px 20px rgba(15, 23, 42, 0.08);
+          padding: 0.5rem 1rem 0.75rem;
+          z-index: 40;
+        }
+
+        .bottom-nav__inner {
+          max-width: 420px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 0.5rem;
+        }
+
+        .bottom-link {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 0.35rem;
+          padding: 0.4rem 0.25rem;
+          border-radius: 0.75rem;
+          color: #64748b;
+          font-size: 0.7rem;
+          font-weight: 600;
+          text-decoration: none;
+        }
+
+        .bottom-link__icon {
+          font-size: 1.15rem;
+          line-height: 1;
+        }
+
+        .bottom-link--active {
+          color: #047857;
+          background: #ecfdf3;
+        }
+
+        @media (min-width: 768px) {
+          .bottom-nav {
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(420px, 100%);
+            border-radius: 1rem 1rem 0 0;
+          }
+        }
       </style>
+
+      <div class="bottom-spacer" aria-hidden="true"></div>
       
       <footer class="footer">
         <div class="footer-content">
@@ -77,6 +140,27 @@ class CustomFooter extends HTMLElement {
           </div>
 </div>
       </footer>
+
+      <nav class="bottom-nav" aria-label="Основная навигация">
+        <div class="bottom-nav__inner">
+          <a href="/profile" class="bottom-link" data-bottom-link="profile">
+            <span class="bottom-link__icon" aria-hidden="true">👤</span>
+            <span>Профиль</span>
+          </a>
+          <a href="/diary?mode=summary" class="bottom-link" data-bottom-link="diary">
+            <span class="bottom-link__icon" aria-hidden="true">🍽️</span>
+            <span>Дневник</span>
+          </a>
+          <a href="/meal-plan" class="bottom-link" data-bottom-link="meal-plan">
+            <span class="bottom-link__icon" aria-hidden="true">📋</span>
+            <span>Рацион</span>
+          </a>
+          <a href="/profile#profile-month-grid-section" class="bottom-link" data-bottom-link="progress">
+            <span class="bottom-link__icon" aria-hidden="true">📊</span>
+            <span>Прогресс</span>
+          </a>
+        </div>
+      </nav>
     `;
 
     const links = {
@@ -120,8 +204,35 @@ class CustomFooter extends HTMLElement {
         } else {
           links.questionnaire.textContent = 'Опрос';
           links.questionnaire.href = '/questionnaire';
-        }
       }
+    }
+
+    const bottomLinks = {
+      profile: this.shadowRoot.querySelector('[data-bottom-link="profile"]'),
+      diary: this.shadowRoot.querySelector('[data-bottom-link="diary"]'),
+      mealPlan: this.shadowRoot.querySelector('[data-bottom-link="meal-plan"]'),
+      progress: this.shadowRoot.querySelector('[data-bottom-link="progress"]'),
+    };
+
+    const currentPath = window.location.pathname || '/';
+    const currentHash = window.location.hash || '';
+    let activeKey = 'profile';
+    if (currentPath.startsWith('/diary')) {
+      activeKey = 'diary';
+    } else if (currentPath.startsWith('/meal-plan')) {
+      activeKey = 'meal-plan';
+    } else if (currentHash.includes('progress') || currentHash.includes('month')) {
+      activeKey = 'progress';
+    } else if (currentPath.startsWith('/profile')) {
+      activeKey = 'profile';
+    }
+
+    Object.entries(bottomLinks).forEach(([key, link]) => {
+      if (!link) {
+        return;
+      }
+      link.classList.toggle('bottom-link--active', key === activeKey);
+    });
   }
 }
 

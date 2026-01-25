@@ -65,20 +65,20 @@ function getCaloriesExplanation(profile) {
     const activityLabel = getActivityLabel(activity);
     const goalLabel = getGoalLabel(profile?.goal);
     if (!tdee) {
-        return `Мы учтём активность и цель (${goalLabel}), чтобы подсказать ориентир.`;
+        return `Мы учтём активность и цель (${goalLabel}), чтобы подсказать, сколько энергии нужно в день.`;
     }
     if (activityLabel) {
-        return `При уровне «${activityLabel}» ориентир около ${Math.round(tdee)} ккал в день.`;
+        return `При уровне «${activityLabel}» около ${Math.round(tdee)} ккал в день помогают держать стабильный вес.`;
     }
-    return `Ориентир по калориям — около ${Math.round(tdee)} ккал в день.`;
+    return `Примерно ${Math.round(tdee)} ккал в день помогают держать стабильный вес.`;
 }
 
 function getMacrosExplanation(profile) {
     const macros = profile?.macros;
     if (!macros) {
-        return 'Баланс белков, жиров и углеводов помогает сохранять энергию и темп.';
+        return 'Баланс белков, жиров и углеводов помогает держать сытость и энергию.';
     }
-    return `Белки ${Math.round(macros.protein_pct * 100)}%, жиры ${Math.round(macros.fat_pct * 100)}%, углеводы ${Math.round(macros.carbs_pct * 100)}%.`;
+    return `Примерное распределение: белки ${Math.round(macros.protein_pct * 100)}%, жиры ${Math.round(macros.fat_pct * 100)}%, углеводы ${Math.round(macros.carbs_pct * 100)}%.`;
 }
 
 function getRecommendations(profile) {
@@ -110,13 +110,13 @@ function getRecommendations(profile) {
     }
 
     if (activityLabel) {
-        recommendations.push(`Уровень активности: ${activityLabel}. Это хороший ориентир для стабильного темпа.`);
+        recommendations.push(`Уровень активности: ${activityLabel}. Это помогает держать стабильный темп.`);
     } else {
         recommendations.push('Добавьте немного движения — это поддержит настрой.');
     }
 
     if (tdee) {
-        recommendations.push(`Ориентир по калориям: около ${Math.round(tdee)} ккал в день.`);
+        recommendations.push(`В день примерно ${Math.round(tdee)} ккал — это подсказка по объёму еды.`);
     }
 
     if (predictedDate) {
@@ -216,7 +216,7 @@ function getDeviationStatusFromEntries(entries, tdee, today = new Date()) {
     }
 
     if (typeof tdee !== 'number') {
-        return { status: 'ok', message: 'Ориентир по калориям пока не рассчитан.' };
+        return { status: 'ok', message: 'Мы ещё не рассчитали ваш ориентир по калориям.' };
     }
 
     const total = Array.from(totalsByDate.values()).reduce((sum, value) => sum + value, 0);
@@ -389,10 +389,10 @@ function analyzeWeeklyNutrition(profile, foodDiary) {
     }
 
     const messages = {
-        overeat: 'Средняя калорийность недели выше ориентира. Попробуйте чуть снизить калории.',
-        undereat: 'Средняя калорийность недели ниже ориентира. Добавьте немного энергии.',
-        low_protein: 'Белка в среднем меньше ориентира. Добавьте белковый продукт в приём пищи.',
-        low_discipline: 'Недостаточно дней учёта. Записывайте хотя бы 4 дня для точной оценки.',
+        overeat: 'На этой неделе еды было больше, чем нужно для цели. Попробуйте чуть уменьшить порции.',
+        undereat: 'На этой неделе еды было меньше, чем нужно для цели. Добавьте немного энергии.',
+        low_protein: 'Белка в среднем не хватает. Добавьте белковый продукт в один из приёмов пищи.',
+        low_discipline: 'Записей пока мало. Если отметить хотя бы 4 дня, оценка будет точнее.',
         ok: 'Недельный ритм выглядит стабильно. Сохраняйте текущий курс.'
     };
 
@@ -510,18 +510,18 @@ function analyzeWeeklyStats(profile, entries = []) {
 
     if (Number.isFinite(tdee) && Number.isFinite(caloriesAvg)) {
         if (caloriesAvg > tdee * 1.1) {
-            adjustments.push('Калории выше ориентира. Попробуйте снизить суточную норму на ближайшие дни.');
+            adjustments.push('Еды в среднем было больше, чем нужно для цели. Попробуйте чуть уменьшить порции.');
         } else if (caloriesAvg < tdee * 0.9) {
-            adjustments.push('Калории ниже ориентира. Добавьте немного энергии, чтобы поддержать темп.');
+            adjustments.push('Еды в среднем было меньше, чем нужно для цели. Добавьте немного энергии.');
         }
     }
 
     if (Number.isFinite(proteinTarget) && Number.isFinite(proteinAvg) && proteinAvg < proteinTarget) {
-        adjustments.push('Белка меньше нормы. Добавьте белковый продукт в один из приёмов пищи.');
+        adjustments.push('Белка в среднем не хватает. Добавьте белковый продукт в один из приёмов пищи.');
     }
 
     if (Number.isFinite(daysLogged) && daysLogged < 4) {
-        adjustments.push('Недостаточно дней учёта. Зафиксируйте хотя бы 4 дня для точной коррекции.');
+        adjustments.push('Записей пока мало. Зафиксируйте хотя бы 4 дня для более точных подсказок.');
     }
 
     if (!adjustments.length) {
