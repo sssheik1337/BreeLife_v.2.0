@@ -981,6 +981,7 @@ function renderWeeklyProgress() {
 
     let totalPercent = 0;
     let loggedDays = 0;
+
     let totalCalories = 0;
     const shouldAverageLoggedDays = !(Number.isFinite(targetCalories) && targetCalories > 0);
     for (let i = 0; i < 7; i += 1) {
@@ -1000,6 +1001,7 @@ function renderWeeklyProgress() {
         if (hasData) {
             loggedDays += 1;
             totalCalories += dayCalories;
+
         }
 
         const item = document.createElement('a');
