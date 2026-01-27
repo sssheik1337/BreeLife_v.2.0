@@ -40,6 +40,7 @@ from services.nutrition import (
 )
 from services.reminders import ReminderPayload, ReminderScheduler
 from services.storage_db import init_db, read_payload, write_payload
+from telegram_bot import run_bot, stop_bot
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -50,6 +51,8 @@ templates = Jinja2Templates(directory="templates")
 templates.env.globals["APP_NAME"] = APP_NAME
 
 init_db()
+
+bot_app = None
 
 ADMIN_CONFIG_PATH = Path("config/admin_config.json")
 ADMIN_PRODUCTS_PATH = Path("static/data/products.json")
@@ -387,6 +390,23 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestLoggingMiddleware)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 # HTTP 304 (Not Modified) для статики — это не ошибка, а корректный ответ кэша.
+
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("🚀 FastAPI started")
+    try:
+        app_instance = await run_bot()
+    except RuntimeError as exc:
+        logger.error("Не удалось запустить Telegram-бота: %s", exc)
+        return
+    global bot_app
+    bot_app = app_instance
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await stop_bot(bot_app)
 
 
 @app.get("/", response_class=HTMLResponse)
