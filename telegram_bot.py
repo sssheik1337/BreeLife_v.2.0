@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Final
 
@@ -6,6 +7,9 @@ from telegram import KeyboardButton, ReplyKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 TOKEN: Final[str] = os.getenv("TELEGRAM_BOT_TOKEN", "")
 MINIAPP_URL: Final[str] = os.getenv("TELEGRAM_MINIAPP_URL", "")
@@ -36,6 +40,7 @@ def main() -> None:
     _ensure_env()
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
+    logger.info("Телеграм-бот запущен. Команда /start доступна.")
     app.run_polling()
 
 
