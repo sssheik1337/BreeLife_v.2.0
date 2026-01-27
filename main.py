@@ -1,5 +1,6 @@
 import json
 import logging
+from contextlib import asynccontextmanager
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -45,14 +46,30 @@ from telegram_bot import run_bot, stop_bot
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title=APP_NAME)
+bot_state = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("🚀 FastAPI started")
+    try:
+        app_instance = await run_bot()
+    except RuntimeError as exc:
+        logger.error("Не удалось запустить Telegram-бота: %s", exc)
+        yield
+        return
+    global bot_state
+    bot_state = app_instance
+    yield
+    await stop_bot(bot_state)
+
+
+app = FastAPI(title=APP_NAME, lifespan=lifespan)
 
 templates = Jinja2Templates(directory="templates")
 templates.env.globals["APP_NAME"] = APP_NAME
 
 init_db()
-
-bot_state = None
 
 ADMIN_CONFIG_PATH = Path("config/admin_config.json")
 ADMIN_PRODUCTS_PATH = Path("static/data/products.json")
@@ -390,23 +407,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 app.add_middleware(RequestLoggingMiddleware)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 # HTTP 304 (Not Modified) для статики — это не ошибка, а корректный ответ кэша.
-
-
-@app.on_event("startup")
-async def startup_event():
-    logger.info("🚀 FastAPI started")
-    try:
-        app_instance = await run_bot()
-    except RuntimeError as exc:
-        logger.error("Не удалось запустить Telegram-бота: %s", exc)
-        return
-    global bot_state
-    bot_state = app_instance
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    await stop_bot(bot_state)
 
 
 @app.get("/", response_class=HTMLResponse)
