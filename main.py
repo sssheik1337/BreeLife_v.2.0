@@ -1,11 +1,13 @@
 import json
 import logging
+import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 from pathlib import Path
 
 import requests
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -22,6 +24,8 @@ from config import (
     REMINDERS_ENABLED,
     YANDEX_GPT_API_KEY,
     YANDEX_GPT_FOLDER_ID,
+    ADMIN_LOGIN,
+    ADMIN_PASSWORD,
 )
 from services.ai_profile import (
     calculate_deviation_risk,
@@ -35,6 +39,7 @@ from services.nutrition import (
     calculate_goal_calories,
 )
 from services.reminders import ReminderPayload, ReminderScheduler
+from services.storage_db import init_db, read_payload, write_payload
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -44,9 +49,15 @@ app = FastAPI(title=APP_NAME)
 templates = Jinja2Templates(directory="templates")
 templates.env.globals["APP_NAME"] = APP_NAME
 
+init_db()
+
 ADMIN_CONFIG_PATH = Path("config/admin_config.json")
+ADMIN_PRODUCTS_PATH = Path("static/data/products.json")
 ADMIN_CONFIG_CACHE: dict[str, object] | None = None
 ADMIN_CONFIG_MTIME: float | None = None
+ADMIN_SESSION_COOKIE = "admin_session"
+ADMIN_SESSION_TTL = timedelta(hours=12)
+ADMIN_SESSIONS: dict[str, datetime] = {}
 
 
 def loadAdminConfig() -> dict[str, object]:
@@ -68,19 +79,243 @@ def loadAdminConfig() -> dict[str, object]:
             ADMIN_CONFIG_CACHE = {}
     return ADMIN_CONFIG_CACHE or {}
 
+
+def loadAdminProducts() -> list[dict[str, object]]:
+    """Загрузить список продуктов из файла, если он доступен."""
+    if not ADMIN_PRODUCTS_PATH.exists():
+        return []
+    try:
+        data = json.loads(ADMIN_PRODUCTS_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(data, list):
+        return []
+    return [item for item in data if isinstance(item, dict)]
+
+
+def normalizeProductName(value: str) -> str:
+    return value.strip().lower()
+
+
+def search_products(query: str) -> dict[str, list[dict[str, object]]]:
+    normalized_query = normalizeProductName(query)
+    if not normalized_query:
+        return {"exact": [], "similar": []}
+    products = loadAdminProducts()
+    exact = []
+    similar = []
+    for item in products:
+        name = item.get("name")
+        if not isinstance(name, str):
+            continue
+        normalized_name = normalizeProductName(name)
+        if normalized_name == normalized_query:
+            exact.append(item)
+        elif normalized_query in normalized_name:
+            similar.append(item)
+    return {"exact": exact, "similar": similar}
+
+
+def saveAdminProducts(products: list[dict[str, object]]) -> None:
+    """Сохранить список продуктов в файл."""
+    ADMIN_PRODUCTS_PATH.write_text(
+        json.dumps(products, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def updateAdminConfig(data: dict[str, object]) -> None:
+    """Сохранить админ-конфиг в файл."""
+    ADMIN_CONFIG_PATH.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def isAdminAuthenticated(request: Request) -> bool:
+    """Проверить, что текущая сессия имеет доступ в админку."""
+    token = request.cookies.get(ADMIN_SESSION_COOKIE)
+    if not token:
+        return False
+    expires_at = ADMIN_SESSIONS.get(token)
+    if not expires_at:
+        return False
+    if datetime.now(timezone.utc) >= expires_at:
+        ADMIN_SESSIONS.pop(token, None)
+        return False
+    return True
+
+
+def verifyAdminCredentials(login: str, password: str) -> bool:
+    """Проверить логин и пароль админки."""
+    if not ADMIN_LOGIN or not ADMIN_PASSWORD:
+        return False
+    login_ok = secrets.compare_digest(login, ADMIN_LOGIN)
+    password_ok = secrets.compare_digest(password, ADMIN_PASSWORD)
+    return login_ok and password_ok
+
+
+def normalize_group_list(values: object) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    groups = []
+    for item in values:
+        if isinstance(item, str):
+            normalized = item.strip()
+            if normalized and normalized not in groups:
+                groups.append(normalized)
+    return groups
+
+
+def collect_product_groups(
+    products: list[dict[str, object]],
+    config: dict[str, object],
+) -> list[str]:
+    groups = normalize_group_list(config.get("product_groups"))
+    for item in products:
+        group = item.get("group")
+        if isinstance(group, str):
+            normalized = group.strip()
+            if normalized and normalized not in groups:
+                groups.append(normalized)
+    return sorted(groups)
+
+
+def renderAdminIndex(
+    request: Request,
+    error: str | None = None,
+    success: str | None = None,
+) -> HTMLResponse:
+    return templates.TemplateResponse(
+        "admin_index.html",
+        {
+            "request": request,
+            "error": error,
+            "success": success,
+        },
+    )
+
+
+def renderAdminProducts(
+    request: Request,
+    error: str | None = None,
+    success: str | None = None,
+) -> HTMLResponse:
+    products = loadAdminProducts()
+    config = loadAdminConfig()
+    groups = collect_product_groups(products, config if isinstance(config, dict) else {})
+    return templates.TemplateResponse(
+        "admin_products.html",
+        {
+            "request": request,
+            "products": products,
+            "groups": groups,
+            "error": error,
+            "success": success,
+        },
+    )
+
+
+def renderAdminGroups(
+    request: Request,
+    error: str | None = None,
+    success: str | None = None,
+) -> HTMLResponse:
+    config = loadAdminConfig()
+    groups = normalize_group_list(config.get("product_groups") if isinstance(config, dict) else [])
+    return templates.TemplateResponse(
+        "admin_groups.html",
+        {
+            "request": request,
+            "groups": sorted(groups),
+            "error": error,
+            "success": success,
+        },
+    )
+
+
+def renderAdminNorms(
+    request: Request,
+    error: str | None = None,
+    success: str | None = None,
+) -> HTMLResponse:
+    config = loadAdminConfig()
+    norms = config.get("norms") if isinstance(config, dict) else {}
+    if not isinstance(norms, dict):
+        norms = {}
+    return templates.TemplateResponse(
+        "admin_norms.html",
+        {
+            "request": request,
+            "norms": {
+                "water_l": norms.get("water_l", 2),
+                "sleep_hours": norms.get("sleep_hours", 8),
+                "fiber_g": norms.get("fiber_g", 25),
+            },
+            "error": error,
+            "success": success,
+        },
+    )
+
+
+def buildFoodDiaryAggregates(
+    entries: list[dict[str, object]],
+    profile: dict[str, object],
+) -> dict[str, object]:
+    """Сформировать агрегаты дневника без сырых записей."""
+    recent = sorted(entries, key=lambda item: item.get("date", ""))[-7:]
+    calories = [
+        item.get("calories")
+        for item in recent
+        if isinstance(item, dict) and isinstance(item.get("calories"), (int, float))
+    ]
+    avg_calories = sum(calories) / len(calories) if calories else None
+    tdee = profile.get("tdee_calories") if isinstance(profile, dict) else None
+    deviation_kcal = None
+    deviation_ratio = None
+    if isinstance(avg_calories, (int, float)) and isinstance(tdee, (int, float)) and tdee:
+        deviation_kcal = avg_calories - tdee
+        deviation_ratio = deviation_kcal / tdee
+
+    trend = "нет данных"
+    if len(calories) >= 4:
+        midpoint = len(calories) // 2
+        first_avg = sum(calories[:midpoint]) / midpoint
+        second_avg = sum(calories[midpoint:]) / (len(calories) - midpoint)
+        diff = second_avg - first_avg
+        if abs(diff) < 50:
+            trend = "стабильно"
+        elif diff > 0:
+            trend = "рост"
+        else:
+            trend = "снижение"
+
+    return {
+        "days_count": len({item.get("date") for item in recent if isinstance(item, dict)}),
+        "avg_calories": avg_calories,
+        "deviation": {
+            "kcal": deviation_kcal,
+            "ratio": deviation_ratio,
+        },
+        "trend": trend,
+    }
+
 # In-memory хранилище напоминаний по telegram_user_id.
 reminders_store: dict[int, list[dict[str, str]]] = {}
-food_diary_store: dict[int, list[dict[str, object]]] = {}
-# In-memory хранилище подписок по telegram_user_id.
-subscription_store: dict[int, dict[str, str]] = {}
-# In-memory хранилище профилей по telegram_user_id.
-profiles_store: dict[int, dict[str, object]] = {}
 reminder_scheduler = ReminderScheduler(REMINDERS_ENABLED, reminders_store)
 
 
 class ReminderScheduleRequest(BaseModel):
     telegram_user_id: int = Field(..., description="Telegram user id")
-    type: Literal["food_diary", "water", "weekly_summary", "goal_deadline"]
+    type: Literal[
+        "food_diary",
+        "water",
+        "weekly_summary",
+        "goal_deadline",
+        "sleep",
+        "sleep_reminder",
+        "activity",
+    ]
     when_iso: str
 
 
@@ -111,6 +346,26 @@ class ProfileSaveRequest(BaseModel):
     user_profile: dict[str, object] = Field(default_factory=dict)
 
 
+class DiaryEntriesPayload(BaseModel):
+    telegram_user_id: int = Field(..., description="Telegram user id")
+    entries: list[dict[str, object]] = Field(default_factory=list)
+
+
+class WaterEntriesPayload(BaseModel):
+    telegram_user_id: int = Field(..., description="Telegram user id")
+    entries: list[dict[str, object]] = Field(default_factory=list)
+
+
+class SleepEntriesPayload(BaseModel):
+    telegram_user_id: int = Field(..., description="Telegram user id")
+    entries: list[dict[str, object]] = Field(default_factory=list)
+
+
+class HabitEntriesPayload(BaseModel):
+    telegram_user_id: int = Field(..., description="Telegram user id")
+    habits: dict[str, object] = Field(default_factory=dict)
+
+
 class FoodDiaryEntry(BaseModel):
     telegram_user_id: int = Field(..., description="Telegram user id")
     date: str
@@ -118,6 +373,8 @@ class FoodDiaryEntry(BaseModel):
     protein_g: float
     fat_g: float
     carbs_g: float
+    carbs_simple_g: float = 0
+    carbs_complex_g: float = 0
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -207,12 +464,251 @@ async def foods(request: Request):
     )
 
 
+@app.get("/my-products", response_class=HTMLResponse)
+async def my_products(request: Request):
+    return templates.TemplateResponse(
+        "my_products.html",
+        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+    )
+
+@app.get("/meal-plan", response_class=HTMLResponse)
+async def meal_plan(request: Request):
+    return templates.TemplateResponse(
+        "meal_plan.html",
+        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+    )
+
+
+@app.get("/shopping-list", response_class=HTMLResponse)
+async def shopping_list(request: Request):
+    return templates.TemplateResponse(
+        "shopping_list.html",
+        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+    )
+
+
 @app.get("/menu", response_class=HTMLResponse)
 async def menu(request: Request):
     return templates.TemplateResponse(
         "menu.html",
         {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
     )
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin(request: Request):
+    if not isAdminAuthenticated(request):
+        return templates.TemplateResponse(
+            "admin_login.html",
+            {"request": request, "error": None},
+        )
+    return renderAdminIndex(request)
+
+
+@app.get("/admin/products", response_class=HTMLResponse)
+async def admin_products(request: Request):
+    if not isAdminAuthenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    return renderAdminProducts(request)
+
+
+@app.get("/admin/groups", response_class=HTMLResponse)
+async def admin_groups(request: Request):
+    if not isAdminAuthenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    return renderAdminGroups(request)
+
+
+@app.get("/admin/norms", response_class=HTMLResponse)
+async def admin_norms(request: Request):
+    if not isAdminAuthenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    return renderAdminNorms(request)
+
+
+@app.post("/admin/login", response_class=HTMLResponse)
+async def admin_login(request: Request, login: str = Form(...), password: str = Form(...)):
+    if not verifyAdminCredentials(login, password):
+        return templates.TemplateResponse(
+            "admin_login.html",
+            {"request": request, "error": "Неверный логин или пароль."},
+        )
+    token = secrets.token_urlsafe(32)
+    ADMIN_SESSIONS[token] = datetime.now(timezone.utc) + ADMIN_SESSION_TTL
+    response = RedirectResponse(url="/admin", status_code=303)
+    response.set_cookie(
+        ADMIN_SESSION_COOKIE,
+        token,
+        httponly=True,
+        max_age=int(ADMIN_SESSION_TTL.total_seconds()),
+        samesite="lax",
+    )
+    return response
+
+
+@app.post("/admin/logout")
+async def admin_logout(request: Request):
+    token = request.cookies.get(ADMIN_SESSION_COOKIE)
+    if token:
+        ADMIN_SESSIONS.pop(token, None)
+    response = RedirectResponse(url="/admin", status_code=303)
+    response.delete_cookie(ADMIN_SESSION_COOKIE)
+    return response
+
+
+@app.post("/admin/products/add", response_class=HTMLResponse)
+async def admin_products_add(
+    request: Request,
+    name: str = Form(...),
+    group: str = Form(...),
+    kcal: float = Form(...),
+    protein_g: float = Form(...),
+    fat_g: float = Form(...),
+    carbs_simple_g: float = Form(...),
+    carbs_complex_g: float = Form(...),
+    fiber_g: float = Form(...),
+):
+    if not isAdminAuthenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    carbs_g = max(0, carbs_simple_g + carbs_complex_g)
+    products = loadAdminProducts()
+    next_id = max((item.get("id", 0) for item in products if isinstance(item.get("id"), int)), default=0) + 1
+    products.append(
+        {
+            "id": next_id,
+            "name": name.strip(),
+            "group": group.strip(),
+            "kcal": kcal,
+            "protein_g": protein_g,
+            "fat_g": fat_g,
+            "carbs_g": carbs_g,
+            "carbs_simple_g": carbs_simple_g,
+            "carbs_complex_g": carbs_complex_g,
+            "fiber_g": fiber_g,
+            "tags": [],
+            "health_level": "neutral",
+        }
+    )
+    saveAdminProducts(products)
+    config = loadAdminConfig()
+    if isinstance(config, dict):
+        groups = normalize_group_list(config.get("product_groups"))
+        if group.strip() and group.strip() not in groups:
+            config["product_groups"] = sorted(groups + [group.strip()])
+            updateAdminConfig(config)
+    return renderAdminProducts(request, success="Продукт добавлен.")
+
+
+@app.post("/admin/products/update", response_class=HTMLResponse)
+async def admin_products_update(
+    request: Request,
+    product_id: int = Form(...),
+    name: str = Form(...),
+    group: str = Form(...),
+    kcal: float = Form(...),
+    protein_g: float = Form(...),
+    fat_g: float = Form(...),
+    carbs_simple_g: float = Form(...),
+    carbs_complex_g: float = Form(...),
+    fiber_g: float = Form(...),
+):
+    if not isAdminAuthenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    carbs_g = max(0, carbs_simple_g + carbs_complex_g)
+    products = loadAdminProducts()
+    updated = False
+    for item in products:
+        if item.get("id") == product_id:
+            item["name"] = name.strip()
+            item["group"] = group.strip()
+            item["kcal"] = kcal
+            item["protein_g"] = protein_g
+            item["fat_g"] = fat_g
+            item["carbs_g"] = carbs_g
+            item["carbs_simple_g"] = carbs_simple_g
+            item["carbs_complex_g"] = carbs_complex_g
+            item["fiber_g"] = fiber_g
+            updated = True
+            break
+    if not updated:
+        return renderAdminProducts(request, error="Продукт не найден.")
+    saveAdminProducts(products)
+    config = loadAdminConfig()
+    if isinstance(config, dict):
+        groups = normalize_group_list(config.get("product_groups"))
+        if group.strip() and group.strip() not in groups:
+            config["product_groups"] = sorted(groups + [group.strip()])
+            updateAdminConfig(config)
+    return renderAdminProducts(request, success="Продукт обновлён.")
+
+
+@app.post("/admin/products/delete", response_class=HTMLResponse)
+async def admin_products_delete(request: Request, product_id: int = Form(...)):
+    if not isAdminAuthenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    products = loadAdminProducts()
+    filtered = [item for item in products if item.get("id") != product_id]
+    if len(filtered) == len(products):
+        return renderAdminProducts(request, error="Продукт не найден.")
+    saveAdminProducts(filtered)
+    return renderAdminProducts(request, success="Продукт удалён.")
+
+
+@app.post("/admin/norms", response_class=HTMLResponse)
+async def admin_norms_update(
+    request: Request,
+    water_l: float = Form(...),
+    sleep_hours: float = Form(...),
+    fiber_g: float = Form(...),
+):
+    if not isAdminAuthenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    config = loadAdminConfig()
+    if not isinstance(config, dict):
+        config = {}
+    config["norms"] = {
+        "water_l": water_l,
+        "sleep_hours": sleep_hours,
+        "fiber_g": fiber_g,
+    }
+    updateAdminConfig(config)
+    return renderAdminNorms(request, success="Нормы обновлены.")
+
+
+@app.post("/admin/groups/add", response_class=HTMLResponse)
+async def admin_groups_add(request: Request, name: str = Form(...)):
+    if not isAdminAuthenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    normalized = name.strip()
+    if not normalized:
+        return renderAdminGroups(request, error="Название группы не может быть пустым.")
+    config = loadAdminConfig()
+    if not isinstance(config, dict):
+        config = {}
+    groups = normalize_group_list(config.get("product_groups"))
+    if normalized in groups:
+        return renderAdminGroups(request, error="Такая группа уже существует.")
+    groups.append(normalized)
+    config["product_groups"] = sorted(groups)
+    updateAdminConfig(config)
+    return renderAdminGroups(request, success="Группа добавлена.")
+
+
+@app.post("/admin/groups/delete", response_class=HTMLResponse)
+async def admin_groups_delete(request: Request, name: str = Form(...)):
+    if not isAdminAuthenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    normalized = name.strip()
+    config = loadAdminConfig()
+    if not isinstance(config, dict):
+        config = {}
+    groups = normalize_group_list(config.get("product_groups"))
+    updated = [group for group in groups if group != normalized]
+    if len(updated) == len(groups):
+        return renderAdminGroups(request, error="Группа не найдена.")
+    config["product_groups"] = sorted(updated)
+    updateAdminConfig(config)
+    return renderAdminGroups(request, success="Группа удалена.")
 
 
 @app.get("/api/calculate")
@@ -270,7 +766,87 @@ def next_weekday(base: datetime, weekday: int) -> datetime:
     return base + timedelta(days=days_ahead)
 
 
-def generate_reminders_payload(profile: dict[str, object]) -> list[dict[str, str]]:
+def parse_sleep_target(target: object) -> tuple[int, int] | None:
+    if not isinstance(target, str):
+        return None
+    parts = target.split(":")
+    if len(parts) != 2:
+        return None
+    try:
+        hours = int(parts[0])
+        minutes = int(parts[1])
+    except ValueError:
+        return None
+    if hours < 0 or hours > 23 or minutes < 0 or minutes > 59:
+        return None
+    return hours, minutes
+
+
+def has_sleep_logged_today(telegram_user_id: int, today_key: str) -> bool:
+    entries = load_sleep_entries(telegram_user_id)
+    return any(
+        isinstance(entry, dict)
+        and entry.get("date") == today_key
+        and entry.get("sleep_time")
+        for entry in entries
+    )
+
+
+def has_reminder_today(entries: list[dict[str, str]], reminder_type: str, today_key: str) -> bool:
+    for entry in entries:
+        if entry.get("type") != reminder_type:
+            continue
+        when_iso = entry.get("when_iso")
+        if not when_iso:
+            continue
+        try:
+            when_dt = normalize_iso_datetime(str(when_iso))
+        except ValueError:
+            continue
+        if when_dt.date().isoformat() == today_key:
+            return True
+    return False
+
+
+def build_sleep_reminder(
+    profile: dict[str, object],
+    telegram_user_id: int,
+    now: datetime,
+) -> dict[str, str] | None:
+    reminder_settings = profile.get("reminder_settings") if isinstance(profile, dict) else None
+    sleep_settings = (
+        reminder_settings.get("sleep") if isinstance(reminder_settings, dict) else None
+    )
+    if not isinstance(sleep_settings, dict) or not sleep_settings.get("enabled"):
+        return None
+    admin_config = loadAdminConfig()
+    reminder_config = admin_config.get("reminders", {}) if isinstance(admin_config, dict) else {}
+    sleep_target_raw = reminder_config.get("sleep_target", "23:30")
+    target_time = parse_sleep_target(sleep_target_raw)
+    if not target_time:
+        return None
+    target_hours, target_minutes = target_time
+    target_dt = now.replace(hour=target_hours, minute=target_minutes, second=0, microsecond=0)
+    threshold = target_dt - timedelta(minutes=30)
+    if now < threshold:
+        return None
+    today_key = now.date().isoformat()
+    if has_sleep_logged_today(telegram_user_id, today_key):
+        return None
+    stored = load_reminder_entries(telegram_user_id)
+    if has_reminder_today(stored, "sleep_reminder", today_key):
+        return None
+    return {
+        "type": "sleep_reminder",
+        "text": "Пора готовиться ко сну 🌙 Завтра будет легче, если лечь вовремя",
+        "suggested_time_iso": now.isoformat(),
+    }
+
+
+def generate_reminders_payload(
+    profile: dict[str, object],
+    telegram_user_id: int | None = None,
+) -> list[dict[str, str]]:
     now = datetime.now(timezone.utc)
     reminders: list[dict[str, str]] = []
     admin_config = loadAdminConfig()
@@ -316,6 +892,11 @@ def generate_reminders_payload(profile: dict[str, object]) -> list[dict[str, str
             }
         )
 
+    if telegram_user_id is not None:
+        sleep_reminder = build_sleep_reminder(profile, telegram_user_id, now)
+        if sleep_reminder:
+            reminders.append(sleep_reminder)
+
     if deadline_raw:
         try:
             deadline = normalize_iso_datetime(str(deadline_raw))
@@ -353,6 +934,7 @@ def generate_reminders_payload(profile: dict[str, object]) -> list[dict[str, str
 def generate_auto_reminders_payload(
     profile: dict[str, object],
     weekly_review: dict[str, object],
+    telegram_user_id: int | None = None,
 ) -> list[dict[str, str]]:
     now = datetime.now(timezone.utc)
     reminders: list[dict[str, str]] = []
@@ -404,6 +986,11 @@ def generate_auto_reminders_payload(
                 "suggested_time_iso": build_reminder_time(now, 12, days=0),
             }
         )
+
+    if telegram_user_id is not None:
+        sleep_reminder = build_sleep_reminder(profile, telegram_user_id, now)
+        if sleep_reminder:
+            reminders.append(sleep_reminder)
 
     weekly_status = weekly_review.get("status") if isinstance(weekly_review, dict) else None
     weekly_message = weekly_review.get("message") if isinstance(weekly_review, dict) else None
@@ -463,9 +1050,92 @@ def compute_subscription_status(payload: dict[str, str]) -> dict[str, str | None
     }
 
 
+def load_subscription(telegram_user_id: int) -> dict[str, str]:
+    data = read_payload("subscriptions", telegram_user_id)
+    return data if isinstance(data, dict) else {}
+
+
+def save_subscription(telegram_user_id: int, payload: dict[str, str]) -> None:
+    write_payload("subscriptions", telegram_user_id, payload)
+
+
+def load_profile(telegram_user_id: int) -> dict[str, object] | None:
+    data = read_payload("profiles", telegram_user_id)
+    return data if isinstance(data, dict) else None
+
+
+def save_profile_data(telegram_user_id: int, profile: dict[str, object]) -> None:
+    write_payload("profiles", telegram_user_id, profile)
+
+
+def load_food_diary_entries(telegram_user_id: int) -> list[dict[str, object]]:
+    data = read_payload("food_diary_entries", telegram_user_id)
+    return data if isinstance(data, list) else []
+
+
+def save_food_diary_entries(telegram_user_id: int, entries: list[dict[str, object]]) -> None:
+    write_payload("food_diary_entries", telegram_user_id, entries)
+
+
+def load_diary_entries(telegram_user_id: int) -> list[dict[str, object]]:
+    data = read_payload("diary_entries", telegram_user_id)
+    return data if isinstance(data, list) else []
+
+
+def save_diary_entries(telegram_user_id: int, entries: list[dict[str, object]]) -> None:
+    write_payload("diary_entries", telegram_user_id, entries)
+
+
+def load_water_entries(telegram_user_id: int) -> list[dict[str, object]]:
+    data = read_payload("water_entries", telegram_user_id)
+    return data if isinstance(data, list) else []
+
+
+def save_water_entries(telegram_user_id: int, entries: list[dict[str, object]]) -> None:
+    write_payload("water_entries", telegram_user_id, entries)
+
+
+def load_sleep_entries(telegram_user_id: int) -> list[dict[str, object]]:
+    data = read_payload("sleep_entries", telegram_user_id)
+    return data if isinstance(data, list) else []
+
+
+def save_sleep_entries(telegram_user_id: int, entries: list[dict[str, object]]) -> None:
+    write_payload("sleep_entries", telegram_user_id, entries)
+
+
+def load_habit_entries(telegram_user_id: int) -> dict[str, object]:
+    data = read_payload("habit_entries", telegram_user_id)
+    return data if isinstance(data, dict) else {}
+
+
+def save_habit_entries(telegram_user_id: int, entries: dict[str, object]) -> None:
+    write_payload("habit_entries", telegram_user_id, entries)
+
+
+def load_reminder_entries(telegram_user_id: int) -> list[dict[str, str]]:
+    data = read_payload("reminder_entries", telegram_user_id)
+    return data if isinstance(data, list) else []
+
+
+def save_reminder_entries(telegram_user_id: int, entries: list[dict[str, str]]) -> None:
+    write_payload("reminder_entries", telegram_user_id, entries)
+
+
+def ensure_entry_ids(entries: list[dict[str, object]]) -> list[dict[str, object]]:
+    normalized: list[dict[str, object]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        if not entry.get("id"):
+            entry = {**entry, "id": uuid.uuid4().hex}
+        normalized.append(entry)
+    return normalized
+
+
 @app.get("/api/subscription/status")
 async def subscription_status(telegram_user_id: int):
-    stored = subscription_store.get(telegram_user_id, {})
+    stored = load_subscription(telegram_user_id)
     return compute_subscription_status(stored)
 
 
@@ -476,9 +1146,31 @@ async def admin_config():
     return loadAdminConfig()
 
 
+@app.get("/api/products/search")
+async def products_search(q: str):
+    query = q.strip()
+    if len(query) < 2:
+        return {"exact": [], "similar": []}
+    results = search_products(query)
+    def normalize_item(item: dict[str, object]) -> dict[str, object]:
+        return {
+            "id": item.get("id"),
+            "name": item.get("name"),
+            "kcal": item.get("kcal") or 0,
+            "protein_g": item.get("protein_g") or 0,
+            "fat_g": item.get("fat_g") or 0,
+            "carbs_g": item.get("carbs_g") or 0,
+            "fiber_g": item.get("fiber_g") or 0,
+        }
+    return {
+        "exact": [normalize_item(item) for item in results["exact"]],
+        "similar": [normalize_item(item) for item in results["similar"]],
+    }
+
+
 @app.post("/api/subscription/start_trial")
 async def start_trial(payload: SubscriptionRequest):
-    stored = subscription_store.get(payload.telegram_user_id)
+    stored = load_subscription(payload.telegram_user_id)
     if stored and stored.get("subscription_until"):
         return compute_subscription_status(stored)
 
@@ -498,14 +1190,15 @@ async def start_trial(payload: SubscriptionRequest):
     else:
         started_at = now
     trial_until = started_at + timedelta(days=trial_days)
-    subscription_store[payload.telegram_user_id] = {
+    subscription_payload = {
         "subscription_status": "trial",
         "subscription_until": trial_until.isoformat(),
         "subscription_started_at": started_at.isoformat(),
         "trial_started_at": started_at.isoformat(),
         "started_at": now.isoformat(),
     }
-    return compute_subscription_status(subscription_store[payload.telegram_user_id])
+    save_subscription(payload.telegram_user_id, subscription_payload)
+    return compute_subscription_status(subscription_payload)
 
 
 @app.post("/api/payments/start")
@@ -514,7 +1207,7 @@ async def start_payment(payload: PaymentRequest):
         raise HTTPException(status_code=400, detail="Срок продления должен быть больше нуля.")
 
     now = datetime.now(timezone.utc)
-    stored = subscription_store.get(payload.telegram_user_id, {})
+    stored = load_subscription(payload.telegram_user_id)
     current_until_raw = stored.get("subscription_until")
     if current_until_raw:
         try:
@@ -526,36 +1219,154 @@ async def start_payment(payload: PaymentRequest):
 
     base_date = current_until if current_until > now else now
     new_until = base_date + timedelta(days=payload.days)
-    subscription_store[payload.telegram_user_id] = {
+    subscription_payload = {
         "subscription_status": "active",
         "subscription_until": new_until.isoformat(),
         "subscription_started_at": stored.get("subscription_started_at"),
         "trial_started_at": stored.get("trial_started_at"),
         "started_at": stored.get("started_at") or now.isoformat(),
     }
+    save_subscription(payload.telegram_user_id, subscription_payload)
 
     return {
         "status": "success",
         "subscription_status": "active",
         "subscription_until": new_until.isoformat(),
-        "subscription_started_at": stored.get("subscription_started_at"),
-        "trial_started_at": stored.get("trial_started_at"),
+        "subscription_started_at": subscription_payload.get("subscription_started_at"),
+        "trial_started_at": subscription_payload.get("trial_started_at"),
     }
 
 
-@app.post("/api/profile/save")
+@app.post("/api/profile")
 async def save_profile(payload: ProfileSaveRequest):
     profile = payload.user_profile if isinstance(payload.user_profile, dict) else {}
-    profiles_store[payload.telegram_user_id] = profile
+    save_profile_data(payload.telegram_user_id, profile)
     return {"status": "ok"}
 
 
-@app.get("/api/profile/get")
+@app.get("/api/profile")
 async def get_profile(telegram_user_id: int):
-    profile = profiles_store.get(telegram_user_id)
+    profile = load_profile(telegram_user_id)
     if not profile:
         return {"status": "not_found"}
     return profile
+
+
+@app.post("/api/profile/save")
+async def save_profile_legacy(payload: ProfileSaveRequest):
+    return await save_profile(payload)
+
+
+@app.get("/api/profile/get")
+async def get_profile_legacy(telegram_user_id: int):
+    return await get_profile(telegram_user_id)
+
+
+@app.get("/api/diary")
+async def get_diary(telegram_user_id: int):
+    entries = load_diary_entries(telegram_user_id)
+    if not entries:
+        return {"status": "not_found", "entries": []}
+    return {"entries": entries}
+
+
+@app.post("/api/diary")
+async def save_diary(payload: DiaryEntriesPayload):
+    entries = payload.entries if isinstance(payload.entries, list) else []
+    normalized = ensure_entry_ids(entries)
+    save_diary_entries(payload.telegram_user_id, normalized)
+    return {"status": "ok", "entries": normalized}
+
+
+@app.delete("/api/diary/{entry_id}")
+async def delete_diary_entry(entry_id: str, telegram_user_id: int):
+    entries = load_diary_entries(telegram_user_id)
+    updated = [entry for entry in entries if entry.get("id") != entry_id]
+    save_diary_entries(telegram_user_id, updated)
+    return {"status": "ok"}
+
+
+@app.get("/api/water")
+async def get_water_entries(telegram_user_id: int):
+    entries = load_water_entries(telegram_user_id)
+    if not entries:
+        return {"status": "not_found", "entries": []}
+    return {"entries": entries}
+
+
+@app.post("/api/water")
+async def save_water_entries_endpoint(payload: WaterEntriesPayload):
+    entries = payload.entries if isinstance(payload.entries, list) else []
+    normalized = ensure_entry_ids(entries)
+    save_water_entries(payload.telegram_user_id, normalized)
+    return {"status": "ok", "entries": normalized}
+
+
+@app.delete("/api/water/{entry_id}")
+async def delete_water_entry(entry_id: str, telegram_user_id: int):
+    entries = load_water_entries(telegram_user_id)
+    updated = [entry for entry in entries if entry.get("id") != entry_id]
+    save_water_entries(telegram_user_id, updated)
+    return {"status": "ok"}
+
+
+@app.get("/api/sleep")
+async def get_sleep_entries(telegram_user_id: int):
+    entries = load_sleep_entries(telegram_user_id)
+    if not entries:
+        return {"status": "not_found", "entries": []}
+    return {"entries": entries}
+
+
+@app.post("/api/sleep")
+async def save_sleep_entries_endpoint(payload: SleepEntriesPayload):
+    entries = payload.entries if isinstance(payload.entries, list) else []
+    normalized = ensure_entry_ids(entries)
+    save_sleep_entries(payload.telegram_user_id, normalized)
+    return {"status": "ok", "entries": normalized}
+
+
+@app.delete("/api/sleep/{entry_id}")
+async def delete_sleep_entry(entry_id: str, telegram_user_id: int):
+    entries = load_sleep_entries(telegram_user_id)
+    updated = [entry for entry in entries if entry.get("id") != entry_id]
+    save_sleep_entries(telegram_user_id, updated)
+    return {"status": "ok"}
+
+
+@app.get("/api/habits")
+async def get_habits(telegram_user_id: int):
+    habits = load_habit_entries(telegram_user_id)
+    if not habits:
+        return {"status": "not_found", "habits": {}}
+    return {"habits": habits}
+
+
+@app.post("/api/habits")
+async def save_habits(payload: HabitEntriesPayload):
+    habits = payload.habits if isinstance(payload.habits, dict) else {}
+    save_habit_entries(payload.telegram_user_id, habits)
+    return {"status": "ok"}
+
+
+@app.get("/api/diary/get")
+async def get_diary_legacy(telegram_user_id: int):
+    return await get_diary(telegram_user_id)
+
+
+@app.post("/api/diary/save")
+async def save_diary_legacy(payload: DiaryEntriesPayload):
+    return await save_diary(payload)
+
+
+@app.get("/api/habits/get")
+async def get_habits_legacy(telegram_user_id: int):
+    return await get_habits(telegram_user_id)
+
+
+@app.post("/api/habits/save")
+async def save_habits_legacy(payload: HabitEntriesPayload):
+    return await save_habits(payload)
 
 
 @app.post("/api/ai/recommendation")
@@ -591,6 +1402,9 @@ async def ai_recommendation(request: Request):
 
 @app.post("/api/reminders/schedule")
 async def schedule_reminder(payload: ReminderScheduleRequest):
+    stored = load_reminder_entries(payload.telegram_user_id)
+    stored.append({"type": payload.type, "when_iso": payload.when_iso})
+    save_reminder_entries(payload.telegram_user_id, stored)
     return reminder_scheduler.schedule(
         ReminderPayload(
             telegram_user_id=payload.telegram_user_id,
@@ -602,13 +1416,16 @@ async def schedule_reminder(payload: ReminderScheduleRequest):
 
 @app.get("/api/reminders/list")
 async def list_reminders(telegram_user_id: int):
+    stored = load_reminder_entries(telegram_user_id)
+    if stored:
+        return stored
     return reminder_scheduler.list_for_user(telegram_user_id)
 
 
 @app.post("/api/reminders/generate")
 async def generate_reminders(payload: ReminderGenerateRequest):
     profile = payload.user_profile if isinstance(payload.user_profile, dict) else {}
-    reminders = generate_reminders_payload(profile)
+    reminders = generate_reminders_payload(profile, payload.telegram_user_id)
     return {"reminders": reminders}
 
 
@@ -617,7 +1434,11 @@ async def auto_generate_reminders(payload: ReminderAutoGenerateRequest):
     profile = payload.user_profile if isinstance(payload.user_profile, dict) else {}
     weekly_review = payload.weekly_review if isinstance(payload.weekly_review, dict) else {}
     try:
-        reminders = generate_auto_reminders_payload(profile, weekly_review)
+        reminders = generate_auto_reminders_payload(
+            profile,
+            weekly_review,
+            payload.telegram_user_id,
+        )
     except Exception as exc:
         logger.warning("Ошибка при генерации авто-напоминаний: %s", exc, exc_info=True)
         return {"reminders": []}
@@ -626,14 +1447,15 @@ async def auto_generate_reminders(payload: ReminderAutoGenerateRequest):
 
 @app.post("/api/food-diary/add")
 async def add_food_diary_entry(entry: FoodDiaryEntry):
-    entries = food_diary_store.setdefault(entry.telegram_user_id, [])
+    entries = load_food_diary_entries(entry.telegram_user_id)
     entries.append(entry.model_dump())
+    save_food_diary_entries(entry.telegram_user_id, entries)
     return {"status": "saved"}
 
 
 @app.get("/api/food-diary/list")
 async def list_food_diary_entries(telegram_user_id: int):
-    return food_diary_store.get(telegram_user_id, [])
+    return load_food_diary_entries(telegram_user_id)
 
 
 @app.post("/api/food-diary/analyze")
@@ -654,6 +1476,7 @@ async def analyze_food_diary(request: Request):
         for entry in entries
         if isinstance(entry, dict) and entry.get("date")
     }
+    aggregates = buildFoodDiaryAggregates(entries, profile)
     logger.info(
         "Запрос анализа дневника: записей=%s, дней=%s, AI_ENABLED=%s",
         len(entries),
@@ -664,10 +1487,7 @@ async def analyze_food_diary(request: Request):
         "Профиль для анализа дневника: ключи=%s",
         sorted(profile.keys()),
     )
-    logger.debug(
-        "Записи дневника для анализа (первые 3): %s",
-        entries[:3],
-    )
+    logger.debug("Агрегаты дневника для анализа: %s", aggregates)
 
     if not AI_ENABLED:
         result = generate_food_diary_recommendation(profile, entries)
@@ -689,7 +1509,7 @@ async def analyze_food_diary(request: Request):
         logger.info("Отправка запроса в YandexGPT для анализа дневника.")
         text = generate_yandex_recommendation(
             {
-                "food_diary_entries": entries,
+                "food_diary_aggregates": aggregates,
                 **profile,
             },
             api_key=YANDEX_GPT_API_KEY,

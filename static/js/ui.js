@@ -25,7 +25,7 @@ function mapUserProfileToUserData(profile) {
         lose: 'lose',
         maintain: 'maintain',
         gain: 'gain',
-        muscle: 'muscle'
+        muscle: 'gain'
     };
 
     return {
@@ -52,7 +52,7 @@ function mapUserDataToUserProfile(data) {
         lose: 'lose',
         maintain: 'maintain',
         gain: 'gain',
-        muscle: 'muscle'
+        muscle: 'gain'
     };
     const parseNumber = (value) => {
         if (value === null || value === undefined || value === '') {

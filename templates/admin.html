@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Админка</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f8fafc;
+        margin: 0;
+        padding: 24px;
+        color: #0f172a;
+      }
+      h1 {
+        margin-bottom: 8px;
+      }
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+      }
+      .card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+      }
+      input[type="text"],
+      input[type="number"] {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid #cbd5f5;
+        border-radius: 6px;
+        box-sizing: border-box;
+      }
+      button {
+        padding: 6px 12px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .btn-primary {
+        background: #2563eb;
+        color: #ffffff;
+      }
+      .btn-danger {
+        background: #dc2626;
+        color: #ffffff;
+      }
+      .message {
+        margin-bottom: 12px;
+        padding: 10px 12px;
+        border-radius: 6px;
+      }
+      .message.error {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+      .message.success {
+        background: #dcfce7;
+        color: #166534;
+      }
+      .logout button {
+        background: #0f172a;
+        color: #ffffff;
+      }
+      .form-row {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .form-actions {
+        margin-top: 12px;
+      }
+      .product-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .product-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 12px;
+      }
+      .product-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .product-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="toolbar">
+      <div>
+        <h1>Админка</h1>
+        <div>Управление продуктами и нормами</div>
+      </div>
+      <form class="logout" method="post" action="/admin/logout">
+        <button type="submit">Выйти</button>
+      </form>
+    </div>
+
+    {% if error %}
+      <div class="message error">{{ error }}</div>
+    {% endif %}
+    {% if success %}
+      <div class="message success">{{ success }}</div>
+    {% endif %}
+
+    <div class="card">
+      <h2>Нормы</h2>
+      <form method="post" action="/admin/norms">
+        <div class="form-row">
+          <label>
+            Вода, л
+            <input type="number" name="water_l" step="0.1" min="0" value="{{ norms.water_l }}" required />
+          </label>
+          <label>
+            Сон, часов
+            <input type="number" name="sleep_hours" step="0.1" min="0" value="{{ norms.sleep_hours }}" required />
+          </label>
+          <label>
+            Клетчатка, г
+            <input type="number" name="fiber_g" step="0.1" min="0" value="{{ norms.fiber_g }}" required />
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary" type="submit">Сохранить нормы</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Добавить продукт</h2>
+      <form method="post" action="/admin/products/add">
+        <div class="form-row">
+          <label>
+            Название
+            <input type="text" name="name" required />
+          </label>
+          <label>
+            Группа
+            <input type="text" name="group" required />
+          </label>
+          <label>
+            Ккал на 100 г
+            <input type="number" name="kcal" step="0.1" min="0" required />
+          </label>
+          <label>
+            Белки, г
+            <input type="number" name="protein_g" step="0.1" min="0" required />
+          </label>
+          <label>
+            Жиры, г
+            <input type="number" name="fat_g" step="0.1" min="0" required />
+          </label>
+          <label>
+            Углеводы простые, г
+            <input type="number" name="carbs_simple_g" step="0.1" min="0" required />
+          </label>
+          <label>
+            Углеводы сложные, г
+            <input type="number" name="carbs_complex_g" step="0.1" min="0" required />
+          </label>
+          <label>
+            Углеводы всего, г
+            <input type="number" step="0.1" min="0" value="0" readonly />
+          </label>
+          <label>
+            Клетчатка, г
+            <input type="number" name="fiber_g" step="0.1" min="0" required />
+          </label>
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary" type="submit">Добавить продукт</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Список продуктов</h2>
+      <div class="product-list">
+        {% for product in products %}
+          <div class="product-card">
+            <form method="post" action="/admin/products/update">
+              <div class="product-grid">
+                <label>
+                  Название
+                  <input type="text" name="name" value="{{ product.name }}" required />
+                </label>
+                <label>
+                  Группа
+                  <input type="text" name="group" value="{{ product.group }}" required />
+                </label>
+                <label>
+                  Ккал
+                  <input type="number" name="kcal" step="0.1" min="0" value="{{ product.kcal or 0 }}" required />
+                </label>
+                <label>
+                  Белки, г
+                  <input type="number" name="protein_g" step="0.1" min="0" value="{{ product.protein_g or 0 }}" required />
+                </label>
+                <label>
+                  Жиры, г
+                  <input type="number" name="fat_g" step="0.1" min="0" value="{{ product.fat_g or 0 }}" required />
+                </label>
+                <label>
+                  Углеводы простые, г
+                  <input type="number" name="carbs_simple_g" step="0.1" min="0" value="{{ product.carbs_simple_g or 0 }}" required />
+                </label>
+                <label>
+                  Углеводы сложные, г
+                  <input type="number" name="carbs_complex_g" step="0.1" min="0" value="{{ product.carbs_complex_g or product.carbs_g or 0 }}" required />
+                </label>
+                <label>
+                  Углеводы всего, г
+                  <input type="number" step="0.1" min="0" value="{{ (product.carbs_simple_g or 0) + (product.carbs_complex_g or product.carbs_g or 0) }}" readonly />
+                </label>
+                <label>
+                  Клетчатка, г
+                  <input type="number" name="fiber_g" step="0.1" min="0" value="{{ product.fiber_g or 0 }}" required />
+                </label>
+              </div>
+              <div class="product-actions">
+                <input type="hidden" name="product_id" value="{{ product.id }}" />
+                <button class="btn-primary" type="submit">Сохранить</button>
+              </div>
+            </form>
+            <form method="post" action="/admin/products/delete">
+              <input type="hidden" name="product_id" value="{{ product.id }}" />
+              <button class="btn-danger" type="submit">Удалить</button>
+            </form>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </body>
+</html>

@@ -24,8 +24,8 @@
                     <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r from-purple-400 to-pink-400 mb-4 shadow-lg">
                         <i data-feather="check-circle" class="w-7 h-7 text-white"></i>
                     </div>
-                    <h1 class="text-2xl font-bold text-slate-800">Ваш профиль здоровья</h1>
-                    <p class="text-slate-500 mt-2">Проверьте вашу информацию</p>
+                    <h1 class="text-2xl font-bold text-slate-800">План готов — можно начинать</h1>
+                    <p class="text-slate-500 mt-2">Собрали основу, чтобы держать курс к цели</p>
 </div>
                 
                 <!-- Success Badge -->
@@ -35,8 +35,8 @@
                             <i data-feather="check" class="w-5 h-5 text-emerald-600"></i>
                         </div>
                         <div>
-                            <h3 class="font-semibold text-emerald-800">Оценка завершена</h3>
-                            <p class="text-sm text-emerald-600">Все вопросы успешно заполнены!</p>
+                            <h3 class="font-semibold text-emerald-800">Данные собраны</h3>
+                            <p class="text-sm text-emerald-600">Вы уже на шаг ближе к своей цели.</p>
                         </div>
 </div>
                 </div>
@@ -52,7 +52,7 @@
                         <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
                             <i data-feather="bar-chart-2" class="w-5 h-5 text-emerald-600"></i>
                         </div>
-                        <h3 class="font-semibold text-slate-800">Расчётные показатели</h3>
+                        <h3 class="font-semibold text-slate-800">Ключевые ориентиры</h3>
                     </div>
                     <div class="space-y-3 text-slate-700">
                         <div class="flex items-center justify-between">
@@ -60,18 +60,18 @@
                             <span id="age-value" class="font-semibold">--</span>
                         </div>
                         <div class="flex items-center justify-between">
-                            <span>Базовый обмен</span>
+                            <span>Энергия в покое</span>
                             <span id="bmr-value" class="font-semibold">--</span>
                         </div>
                         <p class="text-xs text-slate-500">
-                            Базовый обмен — расход в покое.
+                            Это то, сколько энергии тратит тело, когда вы отдыхаете.
                         </p>
                         <div class="flex items-center justify-between">
-                            <span>Суточная норма калорий</span>
+                            <span>Ежедневный ориентир по калориям</span>
                             <span id="tdee-value" class="font-semibold">--</span>
                         </div>
                         <p class="text-xs text-slate-500">
-                            Рекомендуемое потребление калорий в день для достижения цели.
+                            Это количество калорий, при котором вес будет идти к цели.
                         </p>
                     </div>
                 </div>
@@ -82,11 +82,11 @@
                         <div class="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center">
                             <i data-feather="sliders" class="w-5 h-5 text-cyan-600"></i>
                         </div>
-                        <h3 class="font-semibold text-slate-800">Калории и баланс</h3>
+                        <h3 class="font-semibold text-slate-800">Ориентир по питанию</h3>
                     </div>
                     <div class="space-y-3 text-slate-700">
                         <div class="flex items-center justify-between">
-                            <span>Калории</span>
+                            <span>Сколько энергии в день</span>
                             <span id="calories-value" class="font-semibold">--</span>
                         </div>
                         <div class="flex items-center justify-between">
@@ -101,8 +101,12 @@
                             <span>Углеводы</span>
                             <span id="carbs-value" class="font-semibold">--</span>
                         </div>
+                        <div class="flex items-center justify-between">
+                            <span>Клетчатка</span>
+                            <span id="fiber-value" class="font-semibold">--</span>
+                        </div>
                         <p class="text-xs text-slate-500">
-                            Эти значения показывают, сколько стоит потреблять калорий и нутриентов каждый день.
+                            Это подсказка, сколько энергии и питательных веществ нужно в день, чтобы держать нужный ритм.
                         </p>
                     </div>
                 </div>
@@ -188,6 +192,7 @@
                         <div id="macro-protein-ring" class="bg-slate-50 rounded-2xl p-4 shadow-md border border-slate-100"></div>
                         <div id="macro-fat-ring" class="bg-slate-50 rounded-2xl p-4 shadow-md border border-slate-100"></div>
                         <div id="macro-carb-ring" class="bg-slate-50 rounded-2xl p-4 shadow-md border border-slate-100 col-span-2"></div>
+                        <div id="macro-fiber-ring" class="bg-slate-50 rounded-2xl p-4 shadow-md border border-slate-100 col-span-2"></div>
                     </div>
                 </div>
 

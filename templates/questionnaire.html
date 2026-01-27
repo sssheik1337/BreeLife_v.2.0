@@ -18,6 +18,60 @@
         cursor: not-allowed;
         box-shadow: none;
       }
+      .wheel-picker {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        padding: 12px;
+        border-radius: 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+      }
+      .wheel-column {
+        position: relative;
+      }
+      .wheel-column::before,
+      .wheel-column::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 36px;
+        pointer-events: none;
+        z-index: 2;
+      }
+      .wheel-column::before {
+        top: 0;
+        background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(248, 250, 252, 0));
+      }
+      .wheel-column::after {
+        bottom: 0;
+        background: linear-gradient(0deg, rgba(248, 250, 252, 0.95), rgba(248, 250, 252, 0));
+      }
+      .wheel-select {
+        width: 100%;
+        height: 200px;
+        border: none;
+        background: transparent;
+        font-size: 15px;
+        font-weight: 500;
+        color: #0f172a;
+        scroll-snap-type: y mandatory;
+        overflow-y: auto;
+        text-align: center;
+        appearance: none;
+        -webkit-appearance: none;
+        padding: 8px 0;
+      }
+      .wheel-select:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+        border-radius: 12px;
+      }
+      .wheel-select option {
+        padding: 8px 0;
+        scroll-snap-align: center;
+      }
     </style>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#f0f9ff] to-[#f0fdf4]">
@@ -31,8 +85,8 @@
                     <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 mb-4 shadow-lg">
                         <i data-feather="edit-3" class="w-7 h-7 text-white"></i>
                     </div>
-                    <h1 class="text-2xl font-bold text-slate-800">Оценка здоровья</h1>
-                    <p class="text-slate-500 mt-2">Персонализируем ваше путешествие к здоровью</p>
+                    <h1 class="text-2xl font-bold text-slate-800">Заполните личные данные</h1>
+                    <p class="text-slate-500 mt-2">Для расчёта суточной нормы калорий и рациона</p>
 </div>
                 
                 <!-- Progress Bar -->
@@ -40,7 +94,7 @@
                     <div class="flex items-center justify-between text-sm text-slate-500 mb-2">
                         <span class="inline-flex items-center gap-2">
                             <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold">
-                                Шаг <span id="current-step">1</span> из <span id="total-steps">9</span>
+                                Шаг <span id="current-step">1</span> из <span id="total-steps">8</span>
                             </span>
                         </span>
                         <span id="progress-percent">11%</span>

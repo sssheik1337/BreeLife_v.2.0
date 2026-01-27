@@ -27,7 +27,72 @@
                     <p class="text-slate-500 mt-2">Выберите удобный режим ввода: по продуктам или итоги дня.</p>
                 </div>
 
-                <div class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100">
+                <div class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100 hidden" id="diary-mode-day">
+                    <div class="flex items-start justify-between gap-3 mb-4">
+                        <div>
+                            <h3 class="font-semibold text-slate-800">День питания</h3>
+                            <p class="text-sm text-slate-500">Все важное за выбранный день в одном месте.</p>
+                        </div>
+                        <button type="button" class="btn-secondary" data-action="day-back">
+                            К списку
+                        </button>
+                    </div>
+                    <div class="space-y-4">
+                        <input type="date" id="diary-day-date" class="form-input" required>
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <input type="number" id="diary-day-water" class="form-input" placeholder="Вода, л" min="0" step="0.01">
+                            <input type="time" id="diary-day-sleep" class="form-input" placeholder="Сон, время отхода">
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" class="btn-secondary" data-action="quick-water" data-water-target="day" data-water-add="0.25">+250 мл</button>
+                            <button type="button" class="btn-secondary" data-action="quick-water" data-water-target="day" data-water-add="0.5">+500 мл</button>
+                            <button type="button" class="btn-secondary" data-action="quick-water" data-water-target="day" data-water-add="1">+1 л</button>
+                        </div>
+                        <label class="flex items-center gap-2 text-sm text-slate-600">
+                            <input type="checkbox" class="form-checkbox" id="diary-day-activity">
+                            <span>Сегодня я двигалась</span>
+                        </label>
+                        <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                            <button type="button" class="btn-primary" data-action="save-day-meta">
+                                Сохранить воду, сон и активность
+                            </button>
+                            <button type="button" class="btn-secondary" data-action="add-meal">
+                                Добавить приём пищи
+                            </button>
+                            <button type="button" class="btn-secondary" data-action="add-summary">
+                                Заполнить итоги дня
+                            </button>
+                        </div>
+                        <p id="diary-day-hint" class="text-sm text-slate-500"></p>
+                        <div class="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-3">
+                            <p class="font-semibold text-slate-700">Привычки дня</p>
+                            <div id="diary-day-habits" class="space-y-2"></div>
+                        </div>
+                        <div class="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="font-semibold text-slate-700">Питание по приёмам</span>
+                                <span id="diary-day-meals-count" class="text-xs text-slate-500"></span>
+                            </div>
+                            <div id="diary-day-meals" class="space-y-3 text-sm text-slate-600"></div>
+                        </div>
+                        <div class="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <span class="font-semibold text-slate-700">Итоги дня</span>
+                                <span id="diary-day-summary-status" class="text-xs text-slate-500"></span>
+                            </div>
+                            <div id="diary-day-summary" class="text-sm text-slate-600 space-y-2"></div>
+                        </div>
+                        <div class="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-2">
+                            <p class="font-semibold text-slate-700">Сводка за день</p>
+                            <div id="diary-day-totals" class="text-sm text-slate-600 space-y-1"></div>
+                        </div>
+                        <button type="button" class="btn-secondary w-full" data-action="clear-day">
+                            Очистить день полностью
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100" data-diary-section>
                     <div class="grid grid-cols-2 gap-3" id="diary-mode-toggle">
                         <button type="button" class="btn-secondary w-full" data-mode="summary">
                             Итоги дня
@@ -38,12 +103,22 @@
                     </div>
                 </div>
 
-                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100">
+                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100" data-diary-section>
                     <div id="diary-mode-products">
                         <h3 class="font-semibold text-slate-800 mb-4">Приём пищи</h3>
                         <form id="diary-products-form" class="space-y-4">
                             <input type="date" id="diary-products-date" class="form-input" required>
-                            <input type="number" id="diary-products-water" class="form-input" placeholder="Вода, л" min="0" step="0.1">
+                            <input type="time" id="diary-products-sleep" class="form-input" placeholder="Сон, время отхода">
+                            <input type="number" id="diary-products-water" class="form-input" placeholder="Вода, л" min="0" step="0.01">
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" class="btn-secondary" data-action="quick-water" data-water-target="products" data-water-add="0.25">+250 мл</button>
+                                <button type="button" class="btn-secondary" data-action="quick-water" data-water-target="products" data-water-add="0.5">+500 мл</button>
+                                <button type="button" class="btn-secondary" data-action="quick-water" data-water-target="products" data-water-add="1">+1 л</button>
+                            </div>
+                            <label class="flex items-center gap-2 text-sm text-slate-600">
+                                <input type="checkbox" class="form-checkbox" id="diary-products-activity">
+                                <span>Сегодня я двигалась</span>
+                            </label>
                             <select id="diary-products-meal" class="form-input" required>
                                 <option value="breakfast">Завтрак</option>
                                 <option value="lunch">Обед</option>
@@ -69,11 +144,24 @@
                         <h3 class="font-semibold text-slate-800 mb-4">Итоги дня</h3>
                         <form id="diary-summary-form" class="space-y-3">
                             <input type="date" id="diary-summary-date" class="form-input" required>
+                            <input type="time" id="diary-summary-sleep" class="form-input" placeholder="Сон, время отхода">
                             <input type="number" id="diary-summary-calories" class="form-input" placeholder="Калории" min="0" step="1" required>
                             <input type="number" id="diary-summary-protein" class="form-input" placeholder="Белки, г" min="0" step="0.1" required>
                             <input type="number" id="diary-summary-fat" class="form-input" placeholder="Жиры, г" min="0" step="0.1" required>
-                            <input type="number" id="diary-summary-carbs" class="form-input" placeholder="Углеводы, г" min="0" step="0.1" required>
-                            <input type="number" id="diary-summary-water" class="form-input" placeholder="Вода, л" min="0" step="0.1">
+                            <input type="number" id="diary-summary-carbs-simple" class="form-input" placeholder="Углеводы простые, г" min="0" step="0.1">
+                            <input type="number" id="diary-summary-carbs-complex" class="form-input" placeholder="Углеводы сложные, г" min="0" step="0.1">
+                            <input type="number" id="diary-summary-carbs" class="form-input" placeholder="Углеводы всего, г" min="0" step="0.1" readonly required>
+                            <input type="number" id="diary-summary-fiber" class="form-input" placeholder="Клетчатка, г" min="0" step="0.1">
+                            <input type="number" id="diary-summary-water" class="form-input" placeholder="Вода, л" min="0" step="0.01">
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" class="btn-secondary" data-action="quick-water" data-water-target="summary" data-water-add="0.25">+250 мл</button>
+                                <button type="button" class="btn-secondary" data-action="quick-water" data-water-target="summary" data-water-add="0.5">+500 мл</button>
+                                <button type="button" class="btn-secondary" data-action="quick-water" data-water-target="summary" data-water-add="1">+1 л</button>
+                            </div>
+                            <label class="flex items-center gap-2 text-sm text-slate-600">
+                                <input type="checkbox" class="form-checkbox" id="diary-summary-activity">
+                                <span>Сегодня я двигалась</span>
+                            </label>
                             <button type="submit" class="btn-primary w-full">
                                 Сохранить итоги дня
                             </button>
@@ -84,17 +172,17 @@
                     </div>
                 </div>
 
-                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100">
+                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100" data-diary-section>
                     <h3 class="font-semibold text-slate-800 mb-4">Итоги за день</h3>
                     <div id="daily-summary" class="text-sm text-slate-600 space-y-2"></div>
                 </div>
 
-                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100">
+                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100" data-diary-section>
                     <h3 class="font-semibold text-slate-800 mb-4">Последние дни</h3>
                     <div id="diary-list" class="space-y-3 text-sm text-slate-600"></div>
                 </div>
 
-                <div id="diary-risk-section" class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100">
+                <div id="diary-risk-section" class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100" data-diary-section>
                     <h3 class="font-semibold text-slate-800 mb-4">Риск отклонения</h3>
                     <div class="flex items-center gap-3">
                         <span id="diary-risk-indicator" class="inline-flex h-3 w-3 rounded-full bg-emerald-400"></span>
@@ -107,7 +195,7 @@
                     </a>
                 </div>
 
-                <div id="diary-ai-section" class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100">
+                <div id="diary-ai-section" class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100" data-diary-section>
                     <div class="flex items-center gap-2 mb-4">
                         <h3 class="font-semibold text-slate-800">Комментарий от ИИ</h3>
                         <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 hidden" data-ai-badge>
@@ -117,7 +205,7 @@
                     <div id="diary-ai-comment" class="space-y-2 text-sm text-slate-600"></div>
                 </div>
 
-                <div id="diary-paywall" class="bg-rose-50 rounded-2xl p-6 shadow-lg border border-rose-100 hidden">
+                <div id="diary-paywall" class="bg-rose-50 rounded-2xl p-6 shadow-lg border border-rose-100 hidden" data-diary-section>
                     <h3 class="font-semibold text-rose-800 mb-3">Подписка закончилась</h3>
                     <p id="diary-paywall-text" class="text-sm text-rose-700"></p>
                     <div class="mt-4 border-t border-rose-100 pt-4">

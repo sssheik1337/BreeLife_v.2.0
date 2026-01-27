@@ -95,7 +95,6 @@ function calculateWeightGoalForecast({ goal, weight_kg, target_weight_kg }) {
     const rateMap = adminConfig.weight_rates || {
         lose: -0.5,
         gain: 0.3,
-        muscle: 0.25,
         maintain: 0
     };
     const rate = rateMap[goal];

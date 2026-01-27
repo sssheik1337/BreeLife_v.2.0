@@ -7,31 +7,31 @@ function buildActivityOptions() {
         return [
             {
                 value: "1.2",
-                label: "Минимальная активность (почти без тренировок)",
+                label: "Тренировок мало либо они отсутствуют",
                 emoji: "🛋️",
                 tooltip: "Низкая активность",
             },
             {
                 value: "1.375",
-                label: "Лёгкая активность (1–3 тренировки в неделю)",
+                label: "Немного движения: прогулки или 1–3 тренировки",
                 emoji: "🚶",
                 tooltip: "Низкая активность",
             },
             {
                 value: "1.55",
-                label: "Умеренная активность (3–5 тренировок в неделю)",
+                label: "Регулярные тренировки 3–5 раз в неделю",
                 emoji: "🏃",
                 tooltip: "Умеренная активность",
             },
             {
                 value: "1.725",
-                label: "Высокая активность (6–7 тренировок в неделю)",
+                label: "Высокая активность почти каждый день",
                 emoji: "🏋️",
                 tooltip: "Высокая активность",
             },
             {
                 value: "1.9",
-                label: "Очень высокая активность (двойные тренировки)",
+                label: "Физическая активность + очень интенсивные тренировки",
                 emoji: "🔥",
                 tooltip: "Высокая активность",
             }
@@ -54,17 +54,16 @@ const questions = [
         icon: "user",
         options: [
             { value: "male", label: "Мужской", emoji: "👨" },
-            { value: "female", label: "Женский", emoji: "👩" },
-            { value: "other", label: "Предпочитаю не указывать", emoji: "🤔" }
+            { value: "female", label: "Женский", emoji: "👩" }
         ]
 },
     {
         id: 2,
-        title: "Когда вы родились?",
+        title: "Дата рождения",
         type: "date",
         icon: "calendar",
         placeholder: "Выберите дату рождения",
-min: "1900-01-01",
+        min: "1900-01-01",
         max: new Date().toISOString().split('T')[0]
     },
     {
@@ -91,7 +90,7 @@ unit: "kg",
     },
     {
         id: 5,
-        title: "Какой ваш целевой вес?",
+        title: "Желаемый вес",
         type: "number",
         icon: "target",
         placeholder: "Введите желаемый вес в килограммах",
@@ -102,7 +101,7 @@ unit: "kg",
     },
     {
         id: 6,
-        title: "Какой у вас уровень активности?",
+        title: "Какой у вас уровень физической активности?",
         type: "select",
         icon: "activity",
         options: buildActivityOptions()
@@ -113,10 +112,9 @@ unit: "kg",
         type: "select",
         icon: "flag",
         options: [
-            { value: "lose", label: "Похудение", emoji: "📉" },
-            { value: "muscle", label: "Набор мышц", emoji: "💪" },
+            { value: "lose", label: "Снижение веса", emoji: "📉" },
             { value: "gain", label: "Набор веса", emoji: "📈" },
-            { value: "maintain", label: "Поддержание", emoji: "⚖️" }
+            { value: "maintain", label: "Поддержание формы", emoji: "⚖️" }
         ]
     },
     {
@@ -128,16 +126,6 @@ unit: "kg",
         min: new Date().toISOString().split('T')[0],
         max: "2100-12-31",
         optional: true
-    },
-    {
-        id: 9,
-        title: "Планируете ли вести пищевой дневник?",
-        type: "select",
-        icon: "book",
-        options: [
-            { value: true, label: "Да", emoji: "✅" },
-            { value: false, label: "Нет", emoji: "❌" }
-        ]
     }
 ];
 
@@ -327,45 +315,124 @@ function displayInput(question) {
     const currentValue = window.userData[getDataKey(currentQuestionIndex)];
     
     if (question.type === 'date') {
+        const today = new Date();
+        const minYear = 1900;
+        const maxYear = today.getFullYear();
+        const months = [
+            'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+            'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+        ];
         inputContainer.innerHTML = `
-            <input 
-                type="date" 
-                id="question-input"
-                class="form-input"
-                placeholder="${question.placeholder}"
-                min="${question.min}"
-                max="${question.max}"
-                value="${currentValue || ''}"
-            >
-        `;
-    } else if (question.type === 'number') {
-        inputContainer.innerHTML = `
-            <div class="relative">
-                <input 
-                    type="number" 
-                    id="question-input"
-                    class="form-input pr-12"
-                    placeholder="${question.placeholder}"
-                    min="${question.min}"
-                    max="${question.max}"
-                    step="${question.step}"
-                    value="${currentValue || ''}"
-                >
-                <div class="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-500 font-medium">
-                    ${question.unit}
+            <div class="wheel-picker" data-role="birth-picker">
+                <div class="wheel-column">
+                    <select id="birth-day" class="wheel-select" size="7" aria-label="День рождения"></select>
+                </div>
+                <div class="wheel-column">
+                    <select id="birth-month" class="wheel-select" size="7" aria-label="Месяц рождения">
+                        ${months.map((label, index) => `<option value="${index + 1}">${label}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="wheel-column">
+                    <select id="birth-year" class="wheel-select" size="7" aria-label="Год рождения"></select>
                 </div>
             </div>
+        `;
+        const daySelect = document.getElementById('birth-day');
+        const monthSelect = document.getElementById('birth-month');
+        const yearSelect = document.getElementById('birth-year');
+        if (daySelect && monthSelect && yearSelect) {
+            const years = [];
+            for (let year = maxYear; year >= minYear; year -= 1) {
+                years.push(`<option value="${year}">${year}</option>`);
+            }
+            yearSelect.innerHTML = years.join('');
+
+            const setDayOptions = (year, month) => {
+                const safeYear = Number(year) || maxYear;
+                const safeMonth = Number(month) || 1;
+                const daysInMonth = new Date(safeYear, safeMonth, 0).getDate();
+                const currentDay = Number(daySelect.value) || 1;
+                daySelect.innerHTML = Array.from({ length: daysInMonth }, (_, index) => {
+                    const day = index + 1;
+                    return `<option value="${day}">${day}</option>`;
+                }).join('');
+                daySelect.value = String(Math.min(currentDay, daysInMonth));
+            };
+
+            const applyBirthDate = () => {
+                const year = Number(yearSelect.value);
+                const month = Number(monthSelect.value);
+                const day = Number(daySelect.value);
+                if (!year || !month || !day) {
+                    window.userData[getDataKey(currentQuestionIndex)] = '';
+                } else {
+                    const formatted = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    window.userData[getDataKey(currentQuestionIndex)] = formatted;
+                }
+                saveUserData();
+                updateButtonStates();
+            };
+
+            const syncFromStored = () => {
+                if (!currentValue) {
+                    setDayOptions(maxYear, 1);
+                    return;
+                }
+                const [yearStr, monthStr, dayStr] = currentValue.split('-');
+                const year = Number(yearStr);
+                const month = Number(monthStr);
+                const day = Number(dayStr);
+                if (year) {
+                    yearSelect.value = String(year);
+                }
+                if (month) {
+                    monthSelect.value = String(month);
+                }
+                setDayOptions(year || maxYear, month || 1);
+                if (day) {
+                    daySelect.value = String(day);
+                }
+            };
+
+            syncFromStored();
+            applyBirthDate();
+            monthSelect.addEventListener('change', () => {
+                setDayOptions(yearSelect.value, monthSelect.value);
+                applyBirthDate();
+            });
+            yearSelect.addEventListener('change', () => {
+                setDayOptions(yearSelect.value, monthSelect.value);
+                applyBirthDate();
+            });
+            daySelect.addEventListener('change', applyBirthDate);
+        }
+    } else if (question.type === 'number') {
+        const options = buildNumberOptions(question, currentValue);
+        inputContainer.innerHTML = `
+            <select id="question-input" class="form-input">
+                <option value="">${question.placeholder}</option>
+                ${options}
+            </select>
         `;
     }
     
     // Add input event listener
     const input = document.getElementById('question-input');
-    input.addEventListener('input', () => {
-        const value = input.value;
-        window.userData[getDataKey(currentQuestionIndex)] = value;
-        saveUserData();
-        updateButtonStates();
-    });
+    if (input) {
+        input.value = currentValue || '';
+        input.addEventListener('input', () => {
+            const value = input.value;
+            window.userData[getDataKey(currentQuestionIndex)] = value;
+            saveUserData();
+            updateButtonStates();
+        });
+        input.addEventListener('change', () => {
+            const value = input.value;
+            window.userData[getDataKey(currentQuestionIndex)] = value;
+            saveUserData();
+            updateButtonStates();
+        });
+    }
     
     // Update button state immediately if there's already a value
     if (currentValue) {
@@ -408,9 +475,22 @@ function getDataKey(index) {
         case 6: return 'activityLevel';
         case 7: return 'goalType';
         case 8: return 'deadline';
-        case 9: return 'foodDiary';
         default: return `question_${question.id}`;
     }
+}
+
+function buildNumberOptions(question, currentValue) {
+    const options = [];
+    const step = Number(question.step) || 1;
+    const min = Number(question.min) || 0;
+    const max = Number(question.max) || 0;
+    for (let value = min; value <= max + step / 2; value += step) {
+        const formatted = Number.isInteger(step) ? Math.round(value).toString() : value.toFixed(1);
+        const label = question.unit ? `${formatted} ${question.unit}` : formatted;
+        const isSelected = String(currentValue ?? '') === formatted;
+        options.push(`<option value="${formatted}" ${isSelected ? 'selected' : ''}>${label}</option>`);
+    }
+    return options.join('');
 }
 
 // Update button states

@@ -24,4 +24,11 @@ PAYMENT_SECRET_KEY = os.getenv("PAYMENT_SECRET_KEY", "")
 YANDEX_GPT_API_KEY = os.getenv("YANDEX_GPT_API_KEY", "")
 YANDEX_GPT_FOLDER_ID = os.getenv("YANDEX_GPT_FOLDER_ID", "")
 
+# Путь к базе данных SQLite (можно переопределить через переменные окружения).
+DB_PATH = os.getenv("DB_PATH", "data/breelife.sqlite3")
+
+# Данные доступа в админку.
+ADMIN_LOGIN = os.getenv("ADMIN_LOGIN", "")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+
 # reserved for future use

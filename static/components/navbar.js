@@ -214,6 +214,8 @@ class CustomNavbar extends HTMLElement {
               <a href="/diary?mode=summary" class="menu-link">Итоги дня</a>
               <a href="/diary?mode=products" class="menu-link">По продуктам</a>
               <a href="/foods" class="menu-link">Список продуктов</a>
+              <a href="/my-products" class="menu-link">Мои продукты</a>
+              <a href="/meal-plan" class="menu-link">Рацион</a>
               <a href="/menu#plans" class="menu-link">Тарифы</a>
               <span class="menu-link menu-link--disabled" title="Скоро">Настройки <span>Скоро</span></span>
             </div>
