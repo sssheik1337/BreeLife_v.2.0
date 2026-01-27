@@ -1,10 +1,12 @@
+import asyncio
 import logging
 import os
+from dataclasses import dataclass
 from typing import Final
 
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
 from dotenv import load_dotenv
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
-from telegram.ext import Application, ApplicationBuilder, CommandHandler, ContextTypes
 
 load_dotenv()
 
@@ -22,42 +24,55 @@ def _ensure_env() -> None:
         raise RuntimeError("TELEGRAM_WEBAPP_URL is required.")
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not update.message:
-        return
-    user = update.effective_user
-    user_id = user.id if user else "unknown"
-    logger.info("📩 /start получен от пользователя %s", user_id)
-    keyboard = InlineKeyboardMarkup(
-        [[InlineKeyboardButton(text="Открыть приложение", web_app=WebAppInfo(url=WEBAPP_URL))]]
-    )
-    await update.message.reply_text(
-        "Добро пожаловать! Откройте приложение 👇",
-        reply_markup=keyboard,
-    )
+@dataclass
+class BotState:
+    bot: Bot
+    dispatcher: Dispatcher
+    task: asyncio.Task | None
 
 
-def build_application() -> Application:
+def build_dispatcher() -> Dispatcher:
+    dispatcher = Dispatcher()
+
+    @dispatcher.message(Command("start"))
+    async def start(message: types.Message) -> None:
+        user_id = message.from_user.id if message.from_user else "unknown"
+        logger.info("INFO: /start received from user %s", user_id)
+        keyboard = types.InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    types.InlineKeyboardButton(
+                        text="Открыть приложение",
+                        web_app=types.WebAppInfo(url=WEBAPP_URL),
+                    )
+                ]
+            ]
+        )
+        logger.info("INFO: WebApp button sent with URL: %s", WEBAPP_URL)
+        await message.answer(
+            "Откройте приложение для управления питанием",
+            reply_markup=keyboard,
+        )
+
+    return dispatcher
+
+
+async def run_bot() -> BotState:
     _ensure_env()
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    return app
+    bot = Bot(token=TOKEN)
+    dispatcher = build_dispatcher()
+    task = asyncio.create_task(dispatcher.start_polling(bot))
+    logger.info("INFO: Telegram bot started (aiogram)")
+    return BotState(bot=bot, dispatcher=dispatcher, task=task)
 
 
-async def run_bot() -> Application:
-    app = build_application()
-    await app.initialize()
-    await app.start()
-    if app.updater:
-        await app.updater.start_polling()
-    logger.info("🤖 Telegram bot started (polling)")
-    return app
-
-
-async def stop_bot(app: Application | None) -> None:
-    if not app:
+async def stop_bot(state: BotState | None) -> None:
+    if not state:
         return
-    if app.updater:
-        await app.updater.stop()
-    await app.stop()
-    await app.shutdown()
+    if state.task:
+        state.task.cancel()
+        try:
+            await state.task
+        except asyncio.CancelledError:
+            pass
+    await state.bot.session.close()

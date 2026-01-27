@@ -52,7 +52,7 @@ templates.env.globals["APP_NAME"] = APP_NAME
 
 init_db()
 
-bot_app = None
+bot_state = None
 
 ADMIN_CONFIG_PATH = Path("config/admin_config.json")
 ADMIN_PRODUCTS_PATH = Path("static/data/products.json")
@@ -400,13 +400,13 @@ async def startup_event():
     except RuntimeError as exc:
         logger.error("Не удалось запустить Telegram-бота: %s", exc)
         return
-    global bot_app
-    bot_app = app_instance
+    global bot_state
+    bot_state = app_instance
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    await stop_bot(bot_app)
+    await stop_bot(bot_state)
 
 
 @app.get("/", response_class=HTMLResponse)
