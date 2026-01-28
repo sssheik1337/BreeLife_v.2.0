@@ -11,6 +11,8 @@ from typing import Literal
 from pathlib import Path
 
 import requests
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
 from fastapi import Depends, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -30,6 +32,7 @@ from config import (
     YANDEX_GPT_FOLDER_ID,
     TELEGRAM_BOT_TOKEN,
     PUBLIC_APP_URL,
+    PUBLIC_BASE_URL,
     ADMIN_LOGIN,
     ADMIN_PASSWORD,
 )
@@ -52,27 +55,54 @@ from services.storage_db import (
     read_payload,
     write_payload,
 )
-from telegram_bot import run_bot, stop_bot
-
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-bot_state = None
+bot = None
+dispatcher = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("🚀 FastAPI started")
-    try:
-        app_instance = await run_bot()
-    except RuntimeError as exc:
-        logger.error("Не удалось запустить Telegram-бота: %s", exc)
+    global bot, dispatcher
+    if not TELEGRAM_BOT_TOKEN:
+        logger.error("TELEGRAM_BOT_TOKEN не задан. Бот не будет запущен.")
         yield
         return
-    global bot_state
-    bot_state = app_instance
+    if not PUBLIC_BASE_URL:
+        logger.error("PUBLIC_BASE_URL не задан. Вебхук не будет установлен.")
+        yield
+        return
+    bot = Bot(token=TELEGRAM_BOT_TOKEN)
+    dispatcher = Dispatcher()
+
+    @dispatcher.message(Command("start"))
+    async def handle_start(message: types.Message) -> None:
+        user_id = message.from_user.id if message.from_user else "unknown"
+        logger.info("INFO: /start получен от пользователя %s", user_id)
+        keyboard = types.InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    types.InlineKeyboardButton(
+                        text="Открыть приложение",
+                        web_app=types.WebAppInfo(url=PUBLIC_APP_URL),
+                    )
+                ]
+            ]
+        )
+        logger.info("INFO: Отправлена кнопка WebApp с URL: %s", PUBLIC_APP_URL)
+        await message.answer(
+            "Добро пожаловать! Откройте приложение 👇",
+            reply_markup=keyboard,
+        )
+
+    webhook_url = f"{PUBLIC_BASE_URL.rstrip('/')}/telegram/webhook"
+    await bot.set_webhook(webhook_url)
+    logger.info("INFO: Telegram bot started (webhook): %s", webhook_url)
     yield
-    await stop_bot(bot_state)
+    await bot.delete_webhook(drop_pending_updates=True)
+    await bot.session.close()
 
 
 app = FastAPI(title=APP_NAME, lifespan=lifespan)
@@ -568,6 +598,17 @@ async def auth_telegram(payload: TelegramAuthRequest):
         secure=APP_ENV == "production",
     )
     return response
+
+
+@app.post("/telegram/webhook")
+async def telegram_webhook(update: dict):
+    if not bot or not dispatcher:
+        logger.error("Telegram webhook вызван без инициализированного бота.")
+        raise HTTPException(status_code=503, detail="Бот не инициализирован.")
+    logger.info("INFO: Получен webhook update.")
+    update_obj = types.Update.model_validate(update)
+    await dispatcher.feed_update(bot, update_obj)
+    return {"ok": True}
 
 
 @app.get("/questionnaire", response_class=HTMLResponse)
