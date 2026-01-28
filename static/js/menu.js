@@ -1,8 +1,8 @@
 // Отрисовка списка тарифов из JSON
 
 const PLANS_ENDPOINT = '/static/data/plans.json';
-const ACTIVE_PLAN_KEY = 'active_plan';
 let cachedPlans = [];
+let activePlan = 'free';
 
 document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('plans-container');
@@ -51,7 +51,6 @@ function createPlanCard(plan) {
     : isPremium
       ? 'Оплата подключается, тариф готовится'
       : 'Текущий бесплатный план';
-  const activePlan = localStorage.getItem(ACTIVE_PLAN_KEY) || 'free';
   const isActive = activePlan === plan.id;
   const buttonText = isPremium
     ? 'Доступно в пробном периоде'
@@ -82,7 +81,7 @@ function createPlanCard(plan) {
       if (isPremium) {
         return;
       }
-      localStorage.setItem(ACTIVE_PLAN_KEY, plan.id);
+      activePlan = plan.id;
       const message = isTrial
         ? 'Пробный период 30 дней доступен. Оплата не требуется.'
         : 'Бесплатный план выбран.';

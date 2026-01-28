@@ -1,6 +1,8 @@
 // Хранилище профиля пользователя и нормализация данных
 
 (function() {
+    const memoryStore = new Map();
+    const migrationFlags = new Set();
     const STORAGE_KEY = 'user_profile';
     const DIARY_STORAGE_KEY = 'bree_diary_entries';
     const LEGACY_DIARY_KEYS = ['health_bloom_food_entries', 'food_diary_entries'];
@@ -16,6 +18,18 @@
     let cachedProfile = null;
     let cachedDiaryEntries = null;
     let cachedHabitEntries = null;
+
+    function memoryGet(key) {
+        return memoryStore.has(key) ? memoryStore.get(key) : null;
+    }
+
+    function memorySet(key, value) {
+        memoryStore.set(key, value);
+    }
+
+    function memoryRemove(key) {
+        memoryStore.delete(key);
+    }
 
     function getTelegramUserId() {
         const authId = window.telegramAuthUserId;
@@ -440,7 +454,7 @@
     }
 
     function readRawDiaryEntries(key) {
-        const raw = localStorage.getItem(key);
+        const raw = memoryGet(key);
         if (!raw) {
             return [];
         }
@@ -506,13 +520,13 @@
             });
         });
 
-        localStorage.setItem(DIARY_STORAGE_KEY, JSON.stringify(unified));
+        memorySet(DIARY_STORAGE_KEY, JSON.stringify(unified));
         diaryMigrationDone = true;
         return unified;
     }
 
     function readLegacyUserData() {
-        const raw = localStorage.getItem('health_bloom_user_data');
+        const raw = memoryGet('health_bloom_user_data');
         if (!raw) {
             return null;
         }
@@ -529,7 +543,7 @@
         }
         let storedProfile = null;
         try {
-            const raw = localStorage.getItem(STORAGE_KEY);
+            const raw = memoryGet(STORAGE_KEY);
             storedProfile = raw ? JSON.parse(raw) : null;
         } catch (error) {
             storedProfile = null;
@@ -543,7 +557,7 @@
         const normalized = normalizeUserProfile(storedProfile);
         cachedProfile = normalized;
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+            memorySet(STORAGE_KEY, JSON.stringify(normalized));
         } catch (error) {
             // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
@@ -638,7 +652,7 @@
         const normalized = normalizeUserProfile(trialResult.merged);
         cachedProfile = normalized;
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+            memorySet(STORAGE_KEY, JSON.stringify(normalized));
         } catch (error) {
             // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
@@ -659,7 +673,7 @@
         const normalized = normalizeUserProfile(trialResult.merged);
         cachedProfile = normalized;
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+            memorySet(STORAGE_KEY, JSON.stringify(normalized));
         } catch (error) {
             // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
@@ -681,7 +695,7 @@
     function setDiaryEntries(entries, { skipBackend = false } = {}) {
         cachedDiaryEntries = Array.isArray(entries) ? entries : [];
         try {
-            localStorage.setItem(DIARY_STORAGE_KEY, JSON.stringify(cachedDiaryEntries));
+            memorySet(DIARY_STORAGE_KEY, JSON.stringify(cachedDiaryEntries));
         } catch (error) {
             // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
@@ -699,7 +713,7 @@
         if (cachedHabitEntries) {
             return cachedHabitEntries;
         }
-        const raw = localStorage.getItem(HABITS_STORAGE_KEY);
+        const raw = memoryGet(HABITS_STORAGE_KEY);
         if (!raw) {
             cachedHabitEntries = {};
             return cachedHabitEntries;
@@ -716,7 +730,7 @@
     function setHabitEntries(entries, { skipBackend = false } = {}) {
         cachedHabitEntries = entries && typeof entries === 'object' ? entries : {};
         try {
-            localStorage.setItem(HABITS_STORAGE_KEY, JSON.stringify(cachedHabitEntries));
+            memorySet(HABITS_STORAGE_KEY, JSON.stringify(cachedHabitEntries));
         } catch (error) {
             // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
@@ -727,12 +741,12 @@
     }
 
     function isMigrationDone(key) {
-        return localStorage.getItem(key) === 'true';
+        return memoryGet(key) === 'true';
     }
 
     function markMigrationDone(key) {
         try {
-            localStorage.setItem(key, 'true');
+            memorySet(key, 'true');
         } catch (error) {
             // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
@@ -779,7 +793,7 @@
                 const normalized = normalizeUserProfile(data);
                 cachedProfile = normalized;
                 try {
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+                    memorySet(STORAGE_KEY, JSON.stringify(normalized));
                 } catch (error) {
                     // Игнорируем ошибку сохранения, данные остаются в памяти.
                 }

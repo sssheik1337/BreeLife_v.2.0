@@ -13,6 +13,9 @@ const REMINDER_TYPES = {
     activity: 'activity'
 };
 
+let diaryEntriesMemory = [];
+let habitsEntriesMemory = {};
+
 function createProgressRing({ percent, size = 120, stroke = 10, color = '#10b981', label, value, emphasize = false }) {
     const radius = (size - stroke) / 2;
     const circumference = 2 * Math.PI * radius;
@@ -126,16 +129,7 @@ function readDiaryEntries() {
     if (typeof window.getDiaryEntries === 'function') {
         return window.getDiaryEntries();
     }
-    const raw = localStorage.getItem('bree_diary_entries');
-    if (!raw) {
-        return [];
-    }
-    try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch (error) {
-        return [];
-    }
+    return Array.isArray(diaryEntriesMemory) ? diaryEntriesMemory : [];
 }
 
 function normalizeDateKey(value) {
@@ -192,16 +186,7 @@ function readHabitEntries() {
     if (typeof window.getHabitEntries === 'function') {
         return window.getHabitEntries();
     }
-    const raw = localStorage.getItem(HABITS_STORAGE_KEY);
-    if (!raw) {
-        return {};
-    }
-    try {
-        const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch (error) {
-        return {};
-    }
+    return habitsEntriesMemory && typeof habitsEntriesMemory === 'object' ? habitsEntriesMemory : {};
 }
 
 function saveHabitEntries(entries) {
@@ -209,11 +194,7 @@ function saveHabitEntries(entries) {
         window.setHabitEntries(entries);
         return;
     }
-    try {
-        localStorage.setItem(HABITS_STORAGE_KEY, JSON.stringify(entries));
-    } catch (error) {
-        // Игнорируем ошибку сохранения, данные остаются в памяти.
-    }
+    habitsEntriesMemory = entries && typeof entries === 'object' ? entries : {};
 }
 
 function buildHabitDefaults(dateKey, dayData) {

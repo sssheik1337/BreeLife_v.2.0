@@ -1059,8 +1059,7 @@ function renderReminderActions() {
 
 // Save all data and redirect to profile
 function saveAndContinue() {
-    // Save data to localStorage
-    localStorage.setItem('health_bloom_user_data_final', JSON.stringify(window.userData));
+    // Данные сохраняются через API, локального хранения нет.
     
     // Show success notification
     if (typeof showNotification === 'function') {

@@ -239,44 +239,24 @@ function debounce(func, wait) {
     };
 }
 
-// Local storage helper
+const memoryStore = new Map();
+
+// Временное хранилище в памяти (без сохранения состояния приложения).
 const storage = {
     set(key, value) {
-        try {
-            localStorage.setItem(`health_bloom_${key}`, JSON.stringify(value));
-        } catch (e) {
-            return;
-        }
+        memoryStore.set(`health_bloom_${key}`, value);
     },
     
     get(key) {
-        try {
-            const item = localStorage.getItem(`health_bloom_${key}`);
-            return item ? JSON.parse(item) : null;
-        } catch (e) {
-            return null;
-        }
+        return memoryStore.get(`health_bloom_${key}`) ?? null;
     },
     
     remove(key) {
-        try {
-            localStorage.removeItem(`health_bloom_${key}`);
-        } catch (e) {
-            return;
-        }
+        memoryStore.delete(`health_bloom_${key}`);
     },
     
     clear() {
-        try {
-            // Only clear our app's data
-            Object.keys(localStorage).forEach(key => {
-                if (key.startsWith('health_bloom_')) {
-                    localStorage.removeItem(key);
-                }
-            });
-        } catch (e) {
-            return;
-        }
+        memoryStore.clear();
     }
 };
 
@@ -423,23 +403,7 @@ function syncLocalProfileCompletion(profileCompleted) {
     if (profileCompleted) {
         return;
     }
-    try {
-        const raw = localStorage.getItem('user_profile');
-        if (!raw) {
-            return;
-        }
-        const profile = JSON.parse(raw);
-        if (!profile || typeof profile !== 'object') {
-            return;
-        }
-        if (profile.completed === false) {
-            return;
-        }
-        profile.completed = false;
-        localStorage.setItem('user_profile', JSON.stringify(profile));
-    } catch (error) {
-        return;
-    }
+    window.profileCompleted = false;
 }
 
 // Initialize on page load
@@ -520,12 +484,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
 
-    const storedRegistrationDate = localStorage.getItem('health_bloom_registration_date');
-    if (storedRegistrationDate) {
-        userData.registrationDate = storedRegistrationDate;
-    } else {
-        const now = new Date().toISOString();
-        userData.registrationDate = now;
-        localStorage.setItem('health_bloom_registration_date', now);
+    if (!userData.registrationDate) {
+        userData.registrationDate = new Date().toISOString();
     }
 });

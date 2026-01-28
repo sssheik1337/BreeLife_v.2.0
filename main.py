@@ -561,6 +561,20 @@ async def me_status(request: Request):
     }
 
 
+@app.get("/api/session")
+async def session_status(request: Request):
+    session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
+    if not session_id:
+        return {"telegram_user_id": None, "profile_completed": False}
+    telegram_user_id = get_session_user(session_id)
+    if not telegram_user_id:
+        return {"telegram_user_id": None, "profile_completed": False}
+    return {
+        "telegram_user_id": telegram_user_id,
+        "profile_completed": is_profile_completed(telegram_user_id),
+    }
+
+
 @app.get("/api/telegram/bot-info")
 async def telegram_bot_info():
     if not TELEGRAM_BOT_TOKEN:

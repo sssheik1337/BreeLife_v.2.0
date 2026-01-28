@@ -186,12 +186,6 @@ function initQuestionnaire() {
         totalSteps.textContent = questions.length.toString();
     }
     
-    // Load saved progress
-    const savedIndex = localStorage.getItem('health_bloom_question_index');
-    if (savedIndex && savedIndex !== "0") {
-        currentQuestionIndex = parseInt(savedIndex);
-    }
-    
     // Load saved answers
     loadSavedAnswers();
     
@@ -202,7 +196,7 @@ function initQuestionnaire() {
     setupEventListeners();
 }
 
-// Load saved answers from localStorage
+// Загружаем сохранённые ответы из профиля
 function loadSavedAnswers() {
     if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
         const profile = getUserProfile();
@@ -210,15 +204,7 @@ function loadSavedAnswers() {
         return;
     }
 
-    const savedData = localStorage.getItem('health_bloom_user_data');
-    if (savedData) {
-        try {
-            const data = JSON.parse(savedData);
-            Object.assign(window.userData, data);
-        } catch (e) {
-            return null;
-        }
-    }
+    return null;
 }
 // Display current question
 function displayQuestion() {
@@ -623,10 +609,8 @@ if (window.feather) {
     }
 }
 
-// Save user data to localStorage
+// Сохраняем данные анкеты на бэкенд
 function saveUserData() {
-    localStorage.setItem('health_bloom_user_data', JSON.stringify(window.userData));
-    localStorage.setItem('health_bloom_question_index', currentQuestionIndex.toString());
     if (typeof patchUserProfile === 'function' && typeof mapUserDataToUserProfile === 'function') {
         patchUserProfile(mapUserDataToUserProfile(window.userData));
     }
@@ -665,8 +649,6 @@ function setupEventListeners() {
                 mappedProfile.completed = true;
                 profile = patchUserProfile(mappedProfile);
             }
-            localStorage.setItem('hasCompletedQuiz', 'true');
-            localStorage.setItem('profile_completed', 'true');
             if (!profile && typeof getUserProfile === 'function') {
                 profile = getUserProfile();
             }
