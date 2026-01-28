@@ -488,6 +488,17 @@ def get_current_user(request: Request) -> int:
     return telegram_user_id
 
 
+def optional_current_user(request: Request) -> int | None:
+    """Получить telegram_user_id из cookie или вернуть None."""
+    session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
+    if not session_id:
+        return None
+    telegram_user_id = get_session_user(session_id)
+    if not telegram_user_id:
+        return None
+    return telegram_user_id
+
+
 def is_profile_completed(telegram_user_id: int) -> bool:
     """Проверить, заполнен ли профиль пользователя."""
     profile = read_payload("profiles", telegram_user_id)
@@ -662,7 +673,12 @@ async def resume(request: Request):
 
 
 @app.get("/profile", response_class=HTMLResponse)
-async def profile(request: Request, telegram_user_id: int = Depends(get_current_user)):
+async def profile(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    if telegram_user_id is None:
+        return templates.TemplateResponse(
+            "profile.html",
+            {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+        )
     require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "profile.html",
@@ -671,7 +687,12 @@ async def profile(request: Request, telegram_user_id: int = Depends(get_current_
 
 
 @app.get("/profile.html", response_class=HTMLResponse)
-async def profile_legacy(request: Request, telegram_user_id: int = Depends(get_current_user)):
+async def profile_legacy(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    if telegram_user_id is None:
+        return templates.TemplateResponse(
+            "profile.html",
+            {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+        )
     require_completed_profile(telegram_user_id)
     # Поддержка старого пути, чтобы не ловить 404 при прямом заходе.
     return templates.TemplateResponse(
@@ -681,7 +702,12 @@ async def profile_legacy(request: Request, telegram_user_id: int = Depends(get_c
 
 
 @app.get("/diary", response_class=HTMLResponse)
-async def diary(request: Request, telegram_user_id: int = Depends(get_current_user)):
+async def diary(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    if telegram_user_id is None:
+        return templates.TemplateResponse(
+            "diary.html",
+            {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+        )
     require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "diary.html",
@@ -695,7 +721,12 @@ async def food_diary():
 
 
 @app.get("/foods", response_class=HTMLResponse)
-async def foods(request: Request, telegram_user_id: int = Depends(get_current_user)):
+async def foods(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    if telegram_user_id is None:
+        return templates.TemplateResponse(
+            "foods.html",
+            {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+        )
     require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "foods.html",
@@ -704,7 +735,12 @@ async def foods(request: Request, telegram_user_id: int = Depends(get_current_us
 
 
 @app.get("/my-products", response_class=HTMLResponse)
-async def my_products(request: Request, telegram_user_id: int = Depends(get_current_user)):
+async def my_products(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    if telegram_user_id is None:
+        return templates.TemplateResponse(
+            "my_products.html",
+            {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+        )
     require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "my_products.html",
@@ -712,7 +748,12 @@ async def my_products(request: Request, telegram_user_id: int = Depends(get_curr
     )
 
 @app.get("/meal-plan", response_class=HTMLResponse)
-async def meal_plan(request: Request, telegram_user_id: int = Depends(get_current_user)):
+async def meal_plan(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    if telegram_user_id is None:
+        return templates.TemplateResponse(
+            "meal_plan.html",
+            {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+        )
     require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "meal_plan.html",
@@ -721,7 +762,12 @@ async def meal_plan(request: Request, telegram_user_id: int = Depends(get_curren
 
 
 @app.get("/shopping-list", response_class=HTMLResponse)
-async def shopping_list(request: Request, telegram_user_id: int = Depends(get_current_user)):
+async def shopping_list(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    if telegram_user_id is None:
+        return templates.TemplateResponse(
+            "shopping_list.html",
+            {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+        )
     require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "shopping_list.html",
@@ -730,7 +776,12 @@ async def shopping_list(request: Request, telegram_user_id: int = Depends(get_cu
 
 
 @app.get("/menu", response_class=HTMLResponse)
-async def menu(request: Request, telegram_user_id: int = Depends(get_current_user)):
+async def menu(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    if telegram_user_id is None:
+        return templates.TemplateResponse(
+            "menu.html",
+            {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+        )
     require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "menu.html",
