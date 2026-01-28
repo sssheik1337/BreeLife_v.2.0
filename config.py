@@ -6,6 +6,10 @@ load_dotenv()
 
 
 APP_NAME = os.getenv("APP_NAME", "BreeLife")
+APP_MODE = os.getenv("APP_MODE", "development").lower()
+IS_DEV = APP_MODE == "development"
+IS_PROD = APP_MODE == "production"
+DEV_TELEGRAM_USER_ID = int(os.getenv("DEV_TELEGRAM_USER_ID", "999001"))
 APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
 APP_PORT = int(os.getenv("APP_PORT", "8000"))
 DEBUG = os.getenv("DEBUG", "false").lower() in {"1", "true", "yes"}

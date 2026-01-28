@@ -283,6 +283,29 @@ async function fetchBotInfo() {
     }
 }
 
+async function loadAppConfig() {
+    try {
+        const response = await fetch('/api/app/config');
+        if (!response.ok) {
+            return { mode: 'production', is_dev: false, is_prod: true };
+        }
+        return await response.json();
+    } catch (error) {
+        return { mode: 'production', is_dev: false, is_prod: true };
+    }
+}
+
+function showDevModeBadge() {
+    if (document.getElementById('dev-mode-badge')) {
+        return;
+    }
+    const badge = document.createElement('div');
+    badge.id = 'dev-mode-badge';
+    badge.className = 'dev-mode-badge';
+    badge.textContent = 'DEV MODE';
+    document.body.appendChild(badge);
+}
+
 function buildBotLink(username) {
     if (!username) {
         return null;
@@ -329,10 +352,21 @@ async function showTelegramRequiredOverlay() {
     document.body.appendChild(overlay);
 }
 
-async function initTelegramAuth() {
+async function initTelegramAuth(appConfig) {
+    if (appConfig?.is_dev) {
+        window.devUser = appConfig?.dev_user || { id: 'dev-user', first_name: 'Developer' };
+        window.telegramAuthUserId = appConfig?.dev_telegram_user_id ?? null;
+        showDevModeBadge();
+        return true;
+    }
     const tg = window.Telegram?.WebApp;
     if (!tg) {
         console.warn('NOT_IN_TELEGRAM');
+        await showTelegramRequiredOverlay();
+        return false;
+    }
+    if (!tg.initDataUnsafe?.user) {
+        console.warn('TELEGRAM_USER_MISSING');
         await showTelegramRequiredOverlay();
         return false;
     }
@@ -409,6 +443,8 @@ function syncLocalProfileCompletion(profileCompleted) {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async function() {
     animatePageTransition();
+    const appConfig = await loadAppConfig();
+    window.appMode = appConfig?.mode || 'production';
     const tg = window.Telegram?.WebApp;
     if (tg) {
         tg.expand();
@@ -430,7 +466,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             root.style.setProperty('--tg-hint-color', theme.hint_color);
         }
     }
-    const isAuthorized = await initTelegramAuth();
+    const isAuthorized = await initTelegramAuth(appConfig);
     if (!isAuthorized) {
         return;
     }

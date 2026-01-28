@@ -22,11 +22,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from config import (
     AI_ENABLED,
-    APP_ENV,
+    APP_MODE,
     APP_HOST,
     APP_NAME,
     APP_PORT,
     DEBUG,
+    DEV_TELEGRAM_USER_ID,
+    IS_DEV,
+    IS_PROD,
     REMINDERS_ENABLED,
     YANDEX_GPT_API_KEY,
     YANDEX_GPT_FOLDER_ID,
@@ -477,26 +480,43 @@ def verify_telegram_init_data(init_data: str, bot_token: str) -> dict[str, objec
     return parsed
 
 
-def get_current_user(request: Request) -> int:
-    """Получить telegram_user_id из сессионной cookie."""
+def resolve_session_user(
+    request: Request,
+    *,
+    required: bool,
+    allow_dev_user: bool = False,
+) -> int | None:
+    """Получить telegram_user_id из cookie или пропустить в DEV режиме."""
     session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
     if not session_id:
-        raise HTTPException(status_code=401, detail="Сессия не найдена.")
+        if IS_DEV:
+            logger.info("DEV MODE: Telegram validation skipped")
+            return DEV_TELEGRAM_USER_ID if allow_dev_user else None
+        if required:
+            raise HTTPException(status_code=401, detail="Сессия не найдена.")
+        return None
     telegram_user_id = get_session_user(session_id)
     if not telegram_user_id:
+        if IS_DEV:
+            logger.info("DEV MODE: Telegram validation skipped")
+            return DEV_TELEGRAM_USER_ID if allow_dev_user else None
+        if required:
+            raise HTTPException(status_code=401, detail="Сессия недействительна.")
+        return None
+    return telegram_user_id
+
+
+def get_current_user(request: Request) -> int:
+    """Получить telegram_user_id из сессионной cookie."""
+    telegram_user_id = resolve_session_user(request, required=True, allow_dev_user=True)
+    if telegram_user_id is None:
         raise HTTPException(status_code=401, detail="Сессия недействительна.")
     return telegram_user_id
 
 
 def optional_current_user(request: Request) -> int | None:
     """Получить telegram_user_id из cookie или вернуть None."""
-    session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
-    if not session_id:
-        return None
-    telegram_user_id = get_session_user(session_id)
-    if not telegram_user_id:
-        return None
-    return telegram_user_id
+    return resolve_session_user(request, required=False)
 
 
 def is_profile_completed(telegram_user_id: int) -> bool:
@@ -550,9 +570,23 @@ async def healthz():
 async def me_status(request: Request):
     session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
     if not session_id:
+        if IS_DEV:
+            logger.info("DEV MODE: Telegram validation skipped")
+            return {
+                "authorized": True,
+                "profile_completed": is_profile_completed(DEV_TELEGRAM_USER_ID),
+                "telegram_user_id": DEV_TELEGRAM_USER_ID,
+            }
         return {"authorized": False, "profile_completed": False, "telegram_user_id": None}
     telegram_user_id = get_session_user(session_id)
     if not telegram_user_id:
+        if IS_DEV:
+            logger.info("DEV MODE: Telegram validation skipped")
+            return {
+                "authorized": True,
+                "profile_completed": is_profile_completed(DEV_TELEGRAM_USER_ID),
+                "telegram_user_id": DEV_TELEGRAM_USER_ID,
+            }
         return {"authorized": False, "profile_completed": False, "telegram_user_id": None}
     return {
         "authorized": True,
@@ -565,9 +599,21 @@ async def me_status(request: Request):
 async def session_status(request: Request):
     session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
     if not session_id:
+        if IS_DEV:
+            logger.info("DEV MODE: Telegram validation skipped")
+            return {
+                "telegram_user_id": DEV_TELEGRAM_USER_ID,
+                "profile_completed": is_profile_completed(DEV_TELEGRAM_USER_ID),
+            }
         return {"telegram_user_id": None, "profile_completed": False}
     telegram_user_id = get_session_user(session_id)
     if not telegram_user_id:
+        if IS_DEV:
+            logger.info("DEV MODE: Telegram validation skipped")
+            return {
+                "telegram_user_id": DEV_TELEGRAM_USER_ID,
+                "profile_completed": is_profile_completed(DEV_TELEGRAM_USER_ID),
+            }
         return {"telegram_user_id": None, "profile_completed": False}
     return {
         "telegram_user_id": telegram_user_id,
@@ -602,8 +648,22 @@ async def app_public_url():
     return {"app_url": PUBLIC_APP_URL}
 
 
+@app.get("/api/app/config")
+async def app_config():
+    return {
+        "mode": APP_MODE,
+        "is_dev": IS_DEV,
+        "is_prod": IS_PROD,
+        "dev_user": {"id": "dev-user", "first_name": "Developer"},
+        "dev_telegram_user_id": DEV_TELEGRAM_USER_ID,
+    }
+
+
 @app.post("/api/auth/telegram")
 async def auth_telegram(payload: TelegramAuthRequest):
+    if IS_DEV:
+        logger.info("DEV MODE: Telegram validation skipped")
+        return {"ok": True, "telegram_user_id": DEV_TELEGRAM_USER_ID}
     try:
         parsed = verify_telegram_init_data(payload.initData, TELEGRAM_BOT_TOKEN)
     except ValueError as exc:
@@ -633,7 +693,7 @@ async def auth_telegram(payload: TelegramAuthRequest):
         session_id,
         httponly=True,
         samesite="lax",
-        secure=APP_ENV == "production",
+        secure=IS_PROD,
     )
     return response
 
@@ -1450,7 +1510,7 @@ async def subscription_status(telegram_user_id: int):
 
 @app.get("/api/admin/config")
 async def admin_config():
-    if APP_ENV != "development" and not DEBUG:
+    if IS_PROD and not DEBUG:
         raise HTTPException(status_code=403, detail="Доступ запрещён.")
     return loadAdminConfig()
 

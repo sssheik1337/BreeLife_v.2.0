@@ -302,6 +302,22 @@ textarea {
     font-size: 32px;
 }
 
+/* Бейдж для DEV режима */
+.dev-mode-badge {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    background: rgba(15, 23, 42, 0.9);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 6px 10px;
+    border-radius: 999px;
+    z-index: 9998;
+    text-transform: uppercase;
+}
+
 @media (hover: none) {
     .btn-primary:hover,
     .btn-secondary:hover,
