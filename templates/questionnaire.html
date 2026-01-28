@@ -72,6 +72,54 @@
         padding: 8px 0;
         scroll-snap-align: center;
       }
+      .picker-display {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+        font-size: 16px;
+        font-weight: 600;
+        color: #0f172a;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+      .picker-display:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+      }
+      .picker-display-text {
+        display: block;
+        font-weight: 600;
+      }
+      .picker-display-placeholder {
+        color: #94a3b8;
+        font-weight: 500;
+      }
+      .picker-display-icon {
+        font-size: 18px;
+        color: #64748b;
+      }
+      .picker-panel {
+        margin-top: 12px;
+      }
+      .picker-panel.hidden {
+        display: none;
+      }
+      .picker-done {
+        margin-top: 12px;
+        width: 100%;
+        border-radius: 14px;
+        padding: 10px 14px;
+        background: #0f172a;
+        color: #ffffff;
+        font-weight: 600;
+        font-size: 15px;
+      }
     </style>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#f0f9ff] to-[#f0fdf4]">

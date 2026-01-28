@@ -1,14 +1,20 @@
+import hashlib
+import hmac
 import json
 import logging
+from contextlib import asynccontextmanager
 import secrets
 import uuid
+from urllib.parse import parse_qsl
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 from pathlib import Path
 
 import requests
-from fastapi import FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
+from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -24,6 +30,9 @@ from config import (
     REMINDERS_ENABLED,
     YANDEX_GPT_API_KEY,
     YANDEX_GPT_FOLDER_ID,
+    TELEGRAM_BOT_TOKEN,
+    PUBLIC_APP_URL,
+    PUBLIC_BASE_URL,
     ADMIN_LOGIN,
     ADMIN_PASSWORD,
 )
@@ -39,12 +48,74 @@ from services.nutrition import (
     calculate_goal_calories,
 )
 from services.reminders import ReminderPayload, ReminderScheduler
-from services.storage_db import init_db, read_payload, write_payload
-
+from services.storage_db import (
+    create_session,
+    get_session_user,
+    init_db,
+    read_payload,
+    write_payload,
+)
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title=APP_NAME)
+bot = None
+dispatcher = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("🚀 FastAPI started")
+    global bot, dispatcher
+    if not TELEGRAM_BOT_TOKEN:
+        logger.error("TELEGRAM_BOT_TOKEN не задан. Бот не будет запущен.")
+        yield
+        return
+    if not PUBLIC_BASE_URL:
+        logger.error("PUBLIC_BASE_URL не задан. Вебхук не будет установлен.")
+        yield
+        return
+    bot = Bot(token=TELEGRAM_BOT_TOKEN)
+    dispatcher = Dispatcher()
+
+    @dispatcher.message(Command("start"))
+    async def handle_start(message: types.Message) -> None:
+        user_id = message.from_user.id if message.from_user else "unknown"
+        logger.info("INFO: /start получен от пользователя %s", user_id)
+        keyboard = types.InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    types.InlineKeyboardButton(
+                        text="Открыть приложение",
+                        web_app=types.WebAppInfo(url=PUBLIC_APP_URL),
+                    )
+                ]
+            ]
+        )
+        logger.info("INFO: Отправлена кнопка WebApp с URL: %s", PUBLIC_APP_URL)
+        await message.answer(
+            "Добро пожаловать! Откройте приложение 👇",
+            reply_markup=keyboard,
+        )
+
+    webhook_url = f"{PUBLIC_BASE_URL.rstrip('/')}/telegram/webhook"
+    try:
+        result = await bot.set_webhook(webhook_url)
+        logger.info("INFO: Webhook установлен: %s (result=%s)", webhook_url, result)
+    except Exception as exc:
+        logger.error("Не удалось установить webhook: %s", exc)
+        yield
+        return
+    logger.info("INFO: Telegram bot started (webhook): %s", webhook_url)
+    yield
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+        logger.info("INFO: Webhook удалён")
+    except Exception as exc:
+        logger.error("Не удалось удалить webhook: %s", exc)
+    await bot.session.close()
+
+
+app = FastAPI(title=APP_NAME, lifespan=lifespan)
 
 templates = Jinja2Templates(directory="templates")
 templates.env.globals["APP_NAME"] = APP_NAME
@@ -56,6 +127,7 @@ ADMIN_PRODUCTS_PATH = Path("static/data/products.json")
 ADMIN_CONFIG_CACHE: dict[str, object] | None = None
 ADMIN_CONFIG_MTIME: float | None = None
 ADMIN_SESSION_COOKIE = "admin_session"
+TELEGRAM_SESSION_COOKIE = "telegram_session"
 ADMIN_SESSION_TTL = timedelta(hours=12)
 ADMIN_SESSIONS: dict[str, datetime] = {}
 
@@ -377,6 +449,59 @@ class FoodDiaryEntry(BaseModel):
     carbs_complex_g: float = 0
 
 
+class TelegramAuthRequest(BaseModel):
+    initData: str = Field(..., description="Init data из Telegram WebApp")
+
+
+def verify_telegram_init_data(init_data: str, bot_token: str) -> dict[str, object]:
+    """Проверить initData Telegram WebApp и вернуть полезную нагрузку."""
+    if not init_data:
+        raise ValueError("initData отсутствует.")
+    if not bot_token:
+        raise ValueError("TELEGRAM_BOT_TOKEN не задан.")
+    parsed = dict(parse_qsl(init_data, keep_blank_values=True))
+    received_hash = parsed.pop("hash", None)
+    if not received_hash:
+        raise ValueError("Hash отсутствует.")
+    data_check_string = "\n".join(
+        f"{key}={value}" for key, value in sorted(parsed.items())
+    )
+    secret_key = hashlib.sha256(bot_token.encode("utf-8")).digest()
+    calculated_hash = hmac.new(
+        secret_key,
+        data_check_string.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not secrets.compare_digest(calculated_hash, received_hash):
+        raise ValueError("initData не прошёл проверку.")
+    return parsed
+
+
+def get_current_user(request: Request) -> int:
+    """Получить telegram_user_id из сессионной cookie."""
+    session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Сессия не найдена.")
+    telegram_user_id = get_session_user(session_id)
+    if not telegram_user_id:
+        raise HTTPException(status_code=401, detail="Сессия недействительна.")
+    return telegram_user_id
+
+
+def is_profile_completed(telegram_user_id: int) -> bool:
+    """Проверить, заполнен ли профиль пользователя."""
+    profile = read_payload("profiles", telegram_user_id)
+    if not isinstance(profile, dict):
+        return False
+    return profile.get("completed") is True
+
+
+def require_completed_profile(telegram_user_id: int) -> None:
+    """Проверить заполнение профиля или вернуть ошибку."""
+    if not is_profile_completed(telegram_user_id):
+        raise HTTPException(status_code=409, detail="PROFILE_INCOMPLETE")
+
+
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
@@ -410,6 +535,116 @@ async def healthz():
     return {"status": "ok"}
 
 
+@app.get("/api/me/status")
+async def me_status(request: Request):
+    session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
+    if not session_id:
+        return {"authorized": False, "profile_completed": False}
+    telegram_user_id = get_session_user(session_id)
+    if not telegram_user_id:
+        return {"authorized": False, "profile_completed": False}
+    return {
+        "authorized": True,
+        "profile_completed": is_profile_completed(telegram_user_id),
+    }
+
+
+@app.get("/api/telegram/bot-info")
+async def telegram_bot_info():
+    if not TELEGRAM_BOT_TOKEN:
+        raise HTTPException(status_code=500, detail="TELEGRAM_BOT_TOKEN не задан.")
+    try:
+        response = requests.get(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe",
+            timeout=10,
+        )
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail="Не удалось получить данные бота.") from exc
+    data = response.json()
+    if not data.get("ok"):
+        raise HTTPException(status_code=502, detail="Bot API вернул ошибку.")
+    result = data.get("result", {})
+    return {
+        "username": result.get("username"),
+        "name": result.get("first_name"),
+    }
+
+
+@app.get("/api/app/public-url")
+async def app_public_url():
+    return {"app_url": PUBLIC_APP_URL}
+
+
+@app.post("/api/auth/telegram")
+async def auth_telegram(payload: TelegramAuthRequest):
+    try:
+        parsed = verify_telegram_init_data(payload.initData, TELEGRAM_BOT_TOKEN)
+    except ValueError as exc:
+        logger.info("INFO: initData невалидна: %s", exc)
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    user_raw = parsed.get("user")
+    if not user_raw:
+        raise HTTPException(status_code=400, detail="Пользователь не найден в initData.")
+    try:
+        user_data = json.loads(user_raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Некорректный формат пользователя.") from exc
+    telegram_user_id = user_data.get("id")
+    if not telegram_user_id:
+        raise HTTPException(status_code=400, detail="telegram_user_id отсутствует.")
+    logger.info("INFO: initData валидна для user_id=%s", telegram_user_id)
+    session_id = create_session(int(telegram_user_id))
+    response = JSONResponse(
+        {
+            "ok": True,
+            "telegram_user_id": telegram_user_id,
+            "username": user_data.get("username"),
+        }
+    )
+    response.set_cookie(
+        TELEGRAM_SESSION_COOKIE,
+        session_id,
+        httponly=True,
+        samesite="lax",
+        secure=APP_ENV == "production",
+    )
+    return response
+
+
+@app.post("/telegram/webhook")
+async def telegram_webhook(update: dict):
+    if not bot or not dispatcher:
+        logger.error("Telegram webhook вызван без инициализированного бота.")
+        raise HTTPException(status_code=503, detail="Бот не инициализирован.")
+    update_type = update.get("message") and "message" or update.get("callback_query") and "callback_query" or "unknown"
+    from_user = None
+    if update.get("message") and isinstance(update["message"], dict):
+        from_user = update["message"].get("from", {}).get("id")
+    logger.info("INFO: Получен webhook update (type=%s, from=%s)", update_type, from_user)
+    update_obj = types.Update.model_validate(update)
+    await dispatcher.feed_update(bot, update_obj)
+    return {"ok": True}
+
+
+@app.get("/api/health/telegram")
+async def telegram_health():
+    if not TELEGRAM_BOT_TOKEN:
+        raise HTTPException(status_code=500, detail="TELEGRAM_BOT_TOKEN не задан.")
+    base_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+    try:
+        me_response = requests.get(f"{base_url}/getMe", timeout=10)
+        webhook_response = requests.get(f"{base_url}/getWebhookInfo", timeout=10)
+        me_response.raise_for_status()
+        webhook_response.raise_for_status()
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail="Не удалось получить статус Telegram API.") from exc
+    return {
+        "getMe": me_response.json(),
+        "getWebhookInfo": webhook_response.json(),
+    }
+
+
 @app.get("/questionnaire", response_class=HTMLResponse)
 async def questionnaire(request: Request):
     return templates.TemplateResponse(
@@ -427,7 +662,8 @@ async def resume(request: Request):
 
 
 @app.get("/profile", response_class=HTMLResponse)
-async def profile(request: Request):
+async def profile(request: Request, telegram_user_id: int = Depends(get_current_user)):
+    require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "profile.html",
         {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
@@ -435,7 +671,8 @@ async def profile(request: Request):
 
 
 @app.get("/profile.html", response_class=HTMLResponse)
-async def profile_legacy(request: Request):
+async def profile_legacy(request: Request, telegram_user_id: int = Depends(get_current_user)):
+    require_completed_profile(telegram_user_id)
     # Поддержка старого пути, чтобы не ловить 404 при прямом заходе.
     return templates.TemplateResponse(
         "profile.html",
@@ -444,7 +681,8 @@ async def profile_legacy(request: Request):
 
 
 @app.get("/diary", response_class=HTMLResponse)
-async def diary(request: Request):
+async def diary(request: Request, telegram_user_id: int = Depends(get_current_user)):
+    require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "diary.html",
         {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
@@ -457,7 +695,8 @@ async def food_diary():
 
 
 @app.get("/foods", response_class=HTMLResponse)
-async def foods(request: Request):
+async def foods(request: Request, telegram_user_id: int = Depends(get_current_user)):
+    require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "foods.html",
         {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
@@ -465,14 +704,16 @@ async def foods(request: Request):
 
 
 @app.get("/my-products", response_class=HTMLResponse)
-async def my_products(request: Request):
+async def my_products(request: Request, telegram_user_id: int = Depends(get_current_user)):
+    require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "my_products.html",
         {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
     )
 
 @app.get("/meal-plan", response_class=HTMLResponse)
-async def meal_plan(request: Request):
+async def meal_plan(request: Request, telegram_user_id: int = Depends(get_current_user)):
+    require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "meal_plan.html",
         {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
@@ -480,7 +721,8 @@ async def meal_plan(request: Request):
 
 
 @app.get("/shopping-list", response_class=HTMLResponse)
-async def shopping_list(request: Request):
+async def shopping_list(request: Request, telegram_user_id: int = Depends(get_current_user)):
+    require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "shopping_list.html",
         {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
@@ -488,7 +730,8 @@ async def shopping_list(request: Request):
 
 
 @app.get("/menu", response_class=HTMLResponse)
-async def menu(request: Request):
+async def menu(request: Request, telegram_user_id: int = Depends(get_current_user)):
+    require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "menu.html",
         {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},

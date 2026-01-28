@@ -112,6 +112,11 @@ class CustomFooter extends HTMLElement {
           background: #ecfdf3;
         }
 
+        .bottom-link--disabled {
+          color: #cbd5e1;
+          background: #f8fafc;
+        }
+
         @media (min-width: 768px) {
           .bottom-nav {
             left: 50%;
@@ -170,23 +175,7 @@ class CustomFooter extends HTMLElement {
       profile: this.shadowRoot.querySelector('[data-link="profile"]'),
     };
 
-    const isProfileCompleted = () => {
-      try {
-        const raw = localStorage.getItem('user_profile');
-        if (!raw) {
-          return false;
-        }
-        const profile = JSON.parse(raw);
-        if (!profile || typeof profile !== 'object') {
-          return false;
-        }
-        return profile.completed === true;
-      } catch (error) {
-        return false;
-      }
-    };
-
-    const hasCompletedProfile = isProfileCompleted();
+    const hasCompletedProfile = window.profileCompleted === true;
 
     if (links.home) {
       links.home.href = '/profile';
@@ -213,6 +202,23 @@ class CustomFooter extends HTMLElement {
       mealPlan: this.shadowRoot.querySelector('[data-bottom-link="meal-plan"]'),
       progress: this.shadowRoot.querySelector('[data-bottom-link="progress"]'),
     };
+
+    if (!hasCompletedProfile) {
+      Object.values(bottomLinks).forEach((link) => {
+        if (!link) {
+          return;
+        }
+        link.href = '/questionnaire';
+        link.classList.add('bottom-link--disabled');
+        link.addEventListener('click', (event) => {
+          event.preventDefault();
+          if (typeof showNotification === 'function') {
+            showNotification('Сначала заполните анкету.', 'error');
+          }
+          window.location.href = '/questionnaire';
+        });
+      });
+    }
 
     const currentPath = window.location.pathname || '/';
     const currentHash = window.location.hash || '';

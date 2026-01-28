@@ -291,8 +291,122 @@ function animatePageTransition() {
     }, 50);
 }
 
+async function fetchBotInfo() {
+    try {
+        const response = await fetch('/api/telegram/bot-info');
+        if (!response.ok) {
+            return null;
+        }
+        return await response.json();
+    } catch (error) {
+        return null;
+    }
+}
+
+function buildBotLink(username) {
+    if (!username) {
+        return null;
+    }
+    return `https://t.me/${username}?start=miniapp`;
+}
+
+function showTelegramAuthErrorOverlay(message) {
+    let overlay = document.getElementById('telegram-auth-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'telegram-auth-overlay';
+        overlay.className = 'telegram-auth-overlay';
+    }
+    overlay.innerHTML = `
+        <div class="telegram-auth-overlay__card">
+            <div class="telegram-auth-overlay__icon">⚠️</div>
+            <h2>Не удалось авторизоваться</h2>
+            <p>${message}</p>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+async function showTelegramRequiredOverlay() {
+    let overlay = document.getElementById('telegram-auth-overlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        return;
+    }
+    const botInfo = await fetchBotInfo();
+    const botLink = buildBotLink(botInfo?.username);
+    overlay = document.createElement('div');
+    overlay.id = 'telegram-auth-overlay';
+    overlay.className = 'telegram-auth-overlay';
+    overlay.innerHTML = `
+        <div class="telegram-auth-overlay__card">
+            <div class="telegram-auth-overlay__icon">📲</div>
+            <h2>Откройте в Telegram</h2>
+            <p>Это приложение работает только внутри Telegram.</p>
+            ${botLink ? `<a class="telegram-auth-overlay__button" href="${botLink}">Открыть в Telegram</a>` : ''}
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+async function initTelegramAuth() {
+    const tg = window.Telegram?.WebApp;
+    if (!tg?.initData) {
+        console.warn('NOT_IN_TELEGRAM');
+        await showTelegramRequiredOverlay();
+        return false;
+    }
+    try {
+        const response = await fetch('/api/auth/telegram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initData: tg.initData })
+        });
+        if (!response.ok) {
+            showTelegramAuthErrorOverlay('Не удалось подтвердить Telegram-сессию. Откройте приложение через бота.');
+            return false;
+        }
+        const data = await response.json();
+        if (!data?.ok) {
+            showTelegramAuthErrorOverlay('Ответ авторизации некорректен. Попробуйте открыть приложение через бота ещё раз.');
+            return false;
+        }
+        window.telegramAuthUserId = data.telegram_user_id ?? null;
+        return true;
+    } catch (error) {
+        showTelegramAuthErrorOverlay('Сервис недоступен. Попробуйте позже или откройте приложение через бота.');
+        return false;
+    }
+}
+
+async function loadProfileStatus() {
+    try {
+        const response = await fetch('/api/me/status');
+        if (!response.ok) {
+            return { authorized: false, profile_completed: false };
+        }
+        const data = await response.json();
+        return {
+            authorized: Boolean(data?.authorized),
+            profile_completed: Boolean(data?.profile_completed)
+        };
+    } catch (error) {
+        return { authorized: false, profile_completed: false };
+    }
+}
+
+function redirectToQuestionnaireIfNeeded(profileCompleted) {
+    const path = window.location.pathname || '/';
+    if (path.startsWith('/questionnaire')) {
+        return;
+    }
+    if (!profileCompleted) {
+        window.location.replace('/questionnaire');
+    }
+}
+
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     animatePageTransition();
     const tg = window.Telegram?.WebApp;
     if (tg) {
@@ -315,6 +429,14 @@ document.addEventListener('DOMContentLoaded', function() {
             root.style.setProperty('--tg-hint-color', theme.hint_color);
         }
     }
+    const isAuthorized = await initTelegramAuth();
+    if (!isAuthorized) {
+        return;
+    }
+    const status = await loadProfileStatus();
+    window.profileCompleted = status.profile_completed;
+    redirectToQuestionnaireIfNeeded(status.profile_completed);
+
     // Add ripple effect to all primary buttons
     document.querySelectorAll('.btn-primary').forEach(button => {
         button.addEventListener('click', function(e) {
