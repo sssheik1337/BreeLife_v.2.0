@@ -419,6 +419,29 @@ function redirectToQuestionnaireIfNeeded(profileCompleted) {
     }
 }
 
+function syncLocalProfileCompletion(profileCompleted) {
+    if (profileCompleted) {
+        return;
+    }
+    try {
+        const raw = localStorage.getItem('user_profile');
+        if (!raw) {
+            return;
+        }
+        const profile = JSON.parse(raw);
+        if (!profile || typeof profile !== 'object') {
+            return;
+        }
+        if (profile.completed === false) {
+            return;
+        }
+        profile.completed = false;
+        localStorage.setItem('user_profile', JSON.stringify(profile));
+    } catch (error) {
+        return;
+    }
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async function() {
     animatePageTransition();
@@ -452,6 +475,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (status.telegram_user_id) {
         window.telegramAuthUserId = status.telegram_user_id;
     }
+    syncLocalProfileCompletion(status.profile_completed);
     redirectToQuestionnaireIfNeeded(status.profile_completed);
 
     // Add ripple effect to all primary buttons
