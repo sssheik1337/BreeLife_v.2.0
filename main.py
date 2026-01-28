@@ -550,13 +550,14 @@ async def healthz():
 async def me_status(request: Request):
     session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
     if not session_id:
-        return {"authorized": False, "profile_completed": False}
+        return {"authorized": False, "profile_completed": False, "telegram_user_id": None}
     telegram_user_id = get_session_user(session_id)
     if not telegram_user_id:
-        return {"authorized": False, "profile_completed": False}
+        return {"authorized": False, "profile_completed": False, "telegram_user_id": None}
     return {
         "authorized": True,
         "profile_completed": is_profile_completed(telegram_user_id),
+        "telegram_user_id": telegram_user_id,
     }
 
 

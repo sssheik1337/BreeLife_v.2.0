@@ -401,10 +401,11 @@ async function loadProfileStatus() {
         const data = await response.json();
         return {
             authorized: Boolean(data?.authorized),
-            profile_completed: Boolean(data?.profile_completed)
+            profile_completed: Boolean(data?.profile_completed),
+            telegram_user_id: data?.telegram_user_id ?? null
         };
     } catch (error) {
-        return { authorized: false, profile_completed: false };
+        return { authorized: false, profile_completed: false, telegram_user_id: null };
     }
 }
 
@@ -448,6 +449,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     const status = await loadProfileStatus();
     window.profileCompleted = status.profile_completed;
+    if (status.telegram_user_id) {
+        window.telegramAuthUserId = status.telegram_user_id;
+    }
     redirectToQuestionnaireIfNeeded(status.profile_completed);
 
     // Add ripple effect to all primary buttons
