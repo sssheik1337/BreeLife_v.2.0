@@ -6,7 +6,6 @@ load_dotenv()
 
 
 APP_NAME = os.getenv("APP_NAME", "BreeLife")
-APP_ENV = os.getenv("APP_ENV", "development")
 APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
 APP_PORT = int(os.getenv("APP_PORT", "8000"))
 DEBUG = os.getenv("DEBUG", "false").lower() in {"1", "true", "yes"}
@@ -34,5 +33,3 @@ if not DB_PATH:
 # Данные доступа в админку.
 ADMIN_LOGIN = os.getenv("ADMIN_LOGIN", "")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
-
-# reserved for future use
