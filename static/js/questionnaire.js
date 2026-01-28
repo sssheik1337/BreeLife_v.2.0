@@ -313,7 +313,48 @@ function displayOptions(options) {
 // Display input field for date/number questions
 function displayInput(question) {
     const currentValue = window.userData[getDataKey(currentQuestionIndex)];
-    
+
+    const unitLabels = {
+        cm: 'см',
+        kg: 'кг'
+    };
+
+    const formatDateDisplay = (value) => {
+        if (!value) {
+            return null;
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return null;
+        }
+        return date.toLocaleDateString('ru-RU', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+    };
+
+    const formatNumberDisplay = (value) => {
+        if (!value) {
+            return null;
+        }
+        const unit = unitLabels[question.unit] || question.unit || '';
+        const formatted = Number.isFinite(Number(value))
+            ? Number(value).toLocaleString('ru-RU')
+            : value;
+        return unit ? `${formatted} ${unit}` : formatted;
+    };
+
+    const renderPickerWrapper = (displayValue, icon) => `
+        <div class="picker-display" data-role="picker-display">
+            <span class="picker-display-text${displayValue ? '' : ' picker-display-placeholder'}">
+                ${displayValue || question.placeholder}
+            </span>
+            <span class="picker-display-icon">${icon}</span>
+        </div>
+        <div class="picker-panel hidden" data-role="picker-panel"></div>
+    `;
+
     if (question.type === 'date') {
         const today = new Date();
         const minYear = 1900;
@@ -322,24 +363,49 @@ function displayInput(question) {
             'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
             'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
         ];
-        inputContainer.innerHTML = `
-            <div class="wheel-picker" data-role="birth-picker">
-                <div class="wheel-column">
-                    <select id="birth-day" class="wheel-select" size="7" aria-label="День рождения"></select>
+        const displayValue = formatDateDisplay(currentValue);
+        inputContainer.innerHTML = renderPickerWrapper(displayValue, '📅');
+        const panel = inputContainer.querySelector('[data-role="picker-panel"]');
+        if (panel) {
+            panel.innerHTML = `
+                <div class="wheel-picker" data-role="birth-picker">
+                    <div class="wheel-column">
+                        <select id="birth-day" class="wheel-select" size="7" aria-label="День рождения"></select>
+                    </div>
+                    <div class="wheel-column">
+                        <select id="birth-month" class="wheel-select" size="7" aria-label="Месяц рождения">
+                            ${months.map((label, index) => `<option value="${index + 1}">${label}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="wheel-column">
+                        <select id="birth-year" class="wheel-select" size="7" aria-label="Год рождения"></select>
+                    </div>
                 </div>
-                <div class="wheel-column">
-                    <select id="birth-month" class="wheel-select" size="7" aria-label="Месяц рождения">
-                        ${months.map((label, index) => `<option value="${index + 1}">${label}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="wheel-column">
-                    <select id="birth-year" class="wheel-select" size="7" aria-label="Год рождения"></select>
-                </div>
-            </div>
-        `;
+                <button type="button" class="picker-done" data-role="picker-done">Готово</button>
+            `;
+        }
         const daySelect = document.getElementById('birth-day');
         const monthSelect = document.getElementById('birth-month');
         const yearSelect = document.getElementById('birth-year');
+        const display = inputContainer.querySelector('[data-role="picker-display"]');
+        const displayText = inputContainer.querySelector('.picker-display-text');
+        const doneButton = inputContainer.querySelector('[data-role="picker-done"]');
+        const panelElement = inputContainer.querySelector('[data-role="picker-panel"]');
+
+        const togglePicker = (isOpen) => {
+            if (!panelElement || !display) {
+                return;
+            }
+            panelElement.classList.toggle('hidden', !isOpen);
+            display.style.display = isOpen ? 'none' : 'flex';
+        };
+
+        if (display) {
+            display.addEventListener('click', () => togglePicker(true));
+        }
+        if (doneButton) {
+            doneButton.addEventListener('click', () => togglePicker(false));
+        }
         if (daySelect && monthSelect && yearSelect) {
             const years = [];
             for (let year = maxYear; year >= minYear; year -= 1) {
@@ -371,6 +437,11 @@ function displayInput(question) {
                 }
                 saveUserData();
                 updateButtonStates();
+                if (displayText) {
+                    const displayValueText = formatDateDisplay(window.userData[getDataKey(currentQuestionIndex)]);
+                    displayText.textContent = displayValueText || question.placeholder;
+                    displayText.classList.toggle('picker-display-placeholder', !displayValueText);
+                }
             };
 
             const syncFromStored = () => {
@@ -408,12 +479,37 @@ function displayInput(question) {
         }
     } else if (question.type === 'number') {
         const options = buildNumberOptions(question, currentValue);
-        inputContainer.innerHTML = `
-            <select id="question-input" class="form-input">
-                <option value="">${question.placeholder}</option>
-                ${options}
-            </select>
-        `;
+        const displayValue = formatNumberDisplay(currentValue);
+        inputContainer.innerHTML = renderPickerWrapper(displayValue, '⌄');
+        const panel = inputContainer.querySelector('[data-role="picker-panel"]');
+        if (panel) {
+            panel.innerHTML = `
+                <select id="question-input" class="form-input">
+                    <option value="">${question.placeholder}</option>
+                    ${options}
+                </select>
+                <button type="button" class="picker-done" data-role="picker-done">Готово</button>
+            `;
+        }
+        const display = inputContainer.querySelector('[data-role="picker-display"]');
+        const panelElement = inputContainer.querySelector('[data-role="picker-panel"]');
+        const doneButton = inputContainer.querySelector('[data-role="picker-done"]');
+        const displayText = inputContainer.querySelector('.picker-display-text');
+
+        const togglePicker = (isOpen) => {
+            if (!panelElement || !display) {
+                return;
+            }
+            panelElement.classList.toggle('hidden', !isOpen);
+            display.style.display = isOpen ? 'none' : 'flex';
+        };
+
+        if (display) {
+            display.addEventListener('click', () => togglePicker(true));
+        }
+        if (doneButton) {
+            doneButton.addEventListener('click', () => togglePicker(false));
+        }
     }
     
     // Add input event listener
@@ -425,12 +521,24 @@ function displayInput(question) {
             window.userData[getDataKey(currentQuestionIndex)] = value;
             saveUserData();
             updateButtonStates();
+            const displayText = inputContainer.querySelector('.picker-display-text');
+            if (displayText) {
+                const displayValue = formatNumberDisplay(value);
+                displayText.textContent = displayValue || question.placeholder;
+                displayText.classList.toggle('picker-display-placeholder', !displayValue);
+            }
         });
         input.addEventListener('change', () => {
             const value = input.value;
             window.userData[getDataKey(currentQuestionIndex)] = value;
             saveUserData();
             updateButtonStates();
+            const displayText = inputContainer.querySelector('.picker-display-text');
+            if (displayText) {
+                const displayValue = formatNumberDisplay(value);
+                displayText.textContent = displayValue || question.placeholder;
+                displayText.classList.toggle('picker-display-placeholder', !displayValue);
+            }
         });
     }
     
