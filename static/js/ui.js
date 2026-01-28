@@ -351,16 +351,29 @@ async function showTelegramRequiredOverlay() {
 
 async function initTelegramAuth() {
     const tg = window.Telegram?.WebApp;
-    if (!tg?.initData) {
+    if (!tg) {
         console.warn('NOT_IN_TELEGRAM');
         await showTelegramRequiredOverlay();
+        return false;
+    }
+    if (typeof tg.ready === 'function') {
+        tg.ready();
+    }
+    let initData = tg.initData;
+    if (!initData) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        initData = tg.initData;
+    }
+    if (!initData) {
+        console.warn('INITDATA_EMPTY');
+        showTelegramAuthErrorOverlay('Telegram не передал данные авторизации. Откройте приложение через кнопку бота.');
         return false;
     }
     try {
         const response = await fetch('/api/auth/telegram', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ initData: tg.initData })
+            body: JSON.stringify({ initData })
         });
         if (!response.ok) {
             showTelegramAuthErrorOverlay('Не удалось подтвердить Telegram-сессию. Откройте приложение через бота.');
