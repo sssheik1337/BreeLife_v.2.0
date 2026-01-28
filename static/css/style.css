@@ -246,6 +246,44 @@ textarea {
     font-size: 16px;
 }
 
+.telegram-auth-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.72);
+    z-index: 9999;
+    padding: 24px;
+}
+
+.telegram-auth-overlay__card {
+    max-width: 360px;
+    width: 100%;
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 28px;
+    text-align: center;
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
+    color: #0f172a;
+}
+
+.telegram-auth-overlay__card h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 12px 0 8px;
+}
+
+.telegram-auth-overlay__card p {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0;
+}
+
+.telegram-auth-overlay__icon {
+    font-size: 32px;
+}
+
 @media (hover: none) {
     .btn-primary:hover,
     .btn-secondary:hover,

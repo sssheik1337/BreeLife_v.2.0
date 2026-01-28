@@ -1,15 +1,18 @@
+import hashlib
+import hmac
 import json
 import logging
 from contextlib import asynccontextmanager
 import secrets
 import uuid
+from urllib.parse import parse_qsl
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 from pathlib import Path
 
 import requests
-from fastapi import FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -25,6 +28,7 @@ from config import (
     REMINDERS_ENABLED,
     YANDEX_GPT_API_KEY,
     YANDEX_GPT_FOLDER_ID,
+    TELEGRAM_BOT_TOKEN,
     ADMIN_LOGIN,
     ADMIN_PASSWORD,
 )
@@ -40,7 +44,13 @@ from services.nutrition import (
     calculate_goal_calories,
 )
 from services.reminders import ReminderPayload, ReminderScheduler
-from services.storage_db import init_db, read_payload, write_payload
+from services.storage_db import (
+    create_session,
+    get_session_user,
+    init_db,
+    read_payload,
+    write_payload,
+)
 from telegram_bot import run_bot, stop_bot
 
 logging.basicConfig(level=logging.DEBUG)
@@ -76,6 +86,7 @@ ADMIN_PRODUCTS_PATH = Path("static/data/products.json")
 ADMIN_CONFIG_CACHE: dict[str, object] | None = None
 ADMIN_CONFIG_MTIME: float | None = None
 ADMIN_SESSION_COOKIE = "admin_session"
+TELEGRAM_SESSION_COOKIE = "telegram_session"
 ADMIN_SESSION_TTL = timedelta(hours=12)
 ADMIN_SESSIONS: dict[str, datetime] = {}
 
@@ -397,6 +408,45 @@ class FoodDiaryEntry(BaseModel):
     carbs_complex_g: float = 0
 
 
+class TelegramAuthRequest(BaseModel):
+    initData: str = Field(..., description="Init data из Telegram WebApp")
+
+
+def verify_telegram_init_data(init_data: str, bot_token: str) -> dict[str, object]:
+    """Проверить initData Telegram WebApp и вернуть полезную нагрузку."""
+    if not init_data:
+        raise ValueError("initData отсутствует.")
+    if not bot_token:
+        raise ValueError("TELEGRAM_BOT_TOKEN не задан.")
+    parsed = dict(parse_qsl(init_data, keep_blank_values=True))
+    received_hash = parsed.pop("hash", None)
+    if not received_hash:
+        raise ValueError("Hash отсутствует.")
+    data_check_string = "\n".join(
+        f"{key}={value}" for key, value in sorted(parsed.items())
+    )
+    secret_key = hashlib.sha256(bot_token.encode("utf-8")).digest()
+    calculated_hash = hmac.new(
+        secret_key,
+        data_check_string.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    if not secrets.compare_digest(calculated_hash, received_hash):
+        raise ValueError("initData не прошёл проверку.")
+    return parsed
+
+
+def get_current_user(request: Request) -> int:
+    """Получить telegram_user_id из сессионной cookie."""
+    session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
+    if not session_id:
+        raise HTTPException(status_code=401, detail="Сессия не найдена.")
+    telegram_user_id = get_session_user(session_id)
+    if not telegram_user_id:
+        raise HTTPException(status_code=401, detail="Сессия недействительна.")
+    return telegram_user_id
+
+
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
@@ -428,6 +478,40 @@ async def index_alias(request: Request):
 @app.get("/healthz")
 async def healthz():
     return {"status": "ok"}
+
+
+@app.post("/api/auth/telegram")
+async def auth_telegram(payload: TelegramAuthRequest):
+    try:
+        parsed = verify_telegram_init_data(payload.initData, TELEGRAM_BOT_TOKEN)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    user_raw = parsed.get("user")
+    if not user_raw:
+        raise HTTPException(status_code=400, detail="Пользователь не найден в initData.")
+    try:
+        user_data = json.loads(user_raw)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Некорректный формат пользователя.") from exc
+    telegram_user_id = user_data.get("id")
+    if not telegram_user_id:
+        raise HTTPException(status_code=400, detail="telegram_user_id отсутствует.")
+    session_id = create_session(int(telegram_user_id))
+    response = JSONResponse(
+        {
+            "ok": True,
+            "telegram_user_id": telegram_user_id,
+            "username": user_data.get("username"),
+        }
+    )
+    response.set_cookie(
+        TELEGRAM_SESSION_COOKIE,
+        session_id,
+        httponly=True,
+        samesite="lax",
+        secure=APP_ENV == "production",
+    )
+    return response
 
 
 @app.get("/questionnaire", response_class=HTMLResponse)

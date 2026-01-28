@@ -291,8 +291,56 @@ function animatePageTransition() {
     }, 50);
 }
 
+function showTelegramRequiredOverlay() {
+    let overlay = document.getElementById('telegram-auth-overlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        return;
+    }
+    overlay = document.createElement('div');
+    overlay.id = 'telegram-auth-overlay';
+    overlay.className = 'telegram-auth-overlay';
+    overlay.innerHTML = `
+        <div class="telegram-auth-overlay__card">
+            <div class="telegram-auth-overlay__icon">📲</div>
+            <h2>Откройте в Telegram</h2>
+            <p>Это мини‑приложение работает только внутри Telegram. Вернитесь и откройте его через бот.</p>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+async function initTelegramAuth() {
+    const tg = window.Telegram?.WebApp;
+    if (!tg?.initData) {
+        showTelegramRequiredOverlay();
+        return false;
+    }
+    try {
+        const response = await fetch('/api/auth/telegram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initData: tg.initData })
+        });
+        if (!response.ok) {
+            showTelegramRequiredOverlay();
+            return false;
+        }
+        const data = await response.json();
+        if (!data?.ok) {
+            showTelegramRequiredOverlay();
+            return false;
+        }
+        window.telegramAuthUserId = data.telegram_user_id ?? null;
+        return true;
+    } catch (error) {
+        showTelegramRequiredOverlay();
+        return false;
+    }
+}
+
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     animatePageTransition();
     const tg = window.Telegram?.WebApp;
     if (tg) {
@@ -315,6 +363,11 @@ document.addEventListener('DOMContentLoaded', function() {
             root.style.setProperty('--tg-hint-color', theme.hint_color);
         }
     }
+    const isAuthorized = await initTelegramAuth();
+    if (!isAuthorized) {
+        return;
+    }
+
     // Add ripple effect to all primary buttons
     document.querySelectorAll('.btn-primary').forEach(button => {
         button.addEventListener('click', function(e) {

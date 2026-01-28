@@ -18,12 +18,12 @@
     let cachedHabitEntries = null;
 
     function getTelegramUserId() {
-        const rawId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
-        if (typeof rawId === 'number') {
-            return rawId;
+        const authId = window.telegramAuthUserId;
+        if (typeof authId === 'number') {
+            return authId;
         }
-        if (typeof rawId === 'string') {
-            const parsed = Number(rawId);
+        if (typeof authId === 'string') {
+            const parsed = Number(authId);
             return Number.isFinite(parsed) ? parsed : null;
         }
         return null;
