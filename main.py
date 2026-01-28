@@ -98,10 +98,20 @@ async def lifespan(app: FastAPI):
         )
 
     webhook_url = f"{PUBLIC_BASE_URL.rstrip('/')}/telegram/webhook"
-    await bot.set_webhook(webhook_url)
+    try:
+        result = await bot.set_webhook(webhook_url)
+        logger.info("INFO: Webhook установлен: %s (result=%s)", webhook_url, result)
+    except Exception as exc:
+        logger.error("Не удалось установить webhook: %s", exc)
+        yield
+        return
     logger.info("INFO: Telegram bot started (webhook): %s", webhook_url)
     yield
-    await bot.delete_webhook(drop_pending_updates=True)
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+        logger.info("INFO: Webhook удалён")
+    except Exception as exc:
+        logger.error("Не удалось удалить webhook: %s", exc)
     await bot.session.close()
 
 
@@ -571,6 +581,7 @@ async def auth_telegram(payload: TelegramAuthRequest):
     try:
         parsed = verify_telegram_init_data(payload.initData, TELEGRAM_BOT_TOKEN)
     except ValueError as exc:
+        logger.info("INFO: initData невалидна: %s", exc)
         raise HTTPException(status_code=401, detail=str(exc)) from exc
     user_raw = parsed.get("user")
     if not user_raw:
@@ -582,6 +593,7 @@ async def auth_telegram(payload: TelegramAuthRequest):
     telegram_user_id = user_data.get("id")
     if not telegram_user_id:
         raise HTTPException(status_code=400, detail="telegram_user_id отсутствует.")
+    logger.info("INFO: initData валидна для user_id=%s", telegram_user_id)
     session_id = create_session(int(telegram_user_id))
     response = JSONResponse(
         {
@@ -605,10 +617,32 @@ async def telegram_webhook(update: dict):
     if not bot or not dispatcher:
         logger.error("Telegram webhook вызван без инициализированного бота.")
         raise HTTPException(status_code=503, detail="Бот не инициализирован.")
-    logger.info("INFO: Получен webhook update.")
+    update_type = update.get("message") and "message" or update.get("callback_query") and "callback_query" or "unknown"
+    from_user = None
+    if update.get("message") and isinstance(update["message"], dict):
+        from_user = update["message"].get("from", {}).get("id")
+    logger.info("INFO: Получен webhook update (type=%s, from=%s)", update_type, from_user)
     update_obj = types.Update.model_validate(update)
     await dispatcher.feed_update(bot, update_obj)
     return {"ok": True}
+
+
+@app.get("/api/health/telegram")
+async def telegram_health():
+    if not TELEGRAM_BOT_TOKEN:
+        raise HTTPException(status_code=500, detail="TELEGRAM_BOT_TOKEN не задан.")
+    base_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
+    try:
+        me_response = requests.get(f"{base_url}/getMe", timeout=10)
+        webhook_response = requests.get(f"{base_url}/getWebhookInfo", timeout=10)
+        me_response.raise_for_status()
+        webhook_response.raise_for_status()
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail="Не удалось получить статус Telegram API.") from exc
+    return {
+        "getMe": me_response.json(),
+        "getWebhookInfo": webhook_response.json(),
+    }
 
 
 @app.get("/questionnaire", response_class=HTMLResponse)

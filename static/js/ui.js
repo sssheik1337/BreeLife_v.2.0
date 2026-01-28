@@ -310,6 +310,23 @@ function buildBotLink(username) {
     return `https://t.me/${username}?start=miniapp`;
 }
 
+function showTelegramAuthErrorOverlay(message) {
+    let overlay = document.getElementById('telegram-auth-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'telegram-auth-overlay';
+        overlay.className = 'telegram-auth-overlay';
+    }
+    overlay.innerHTML = `
+        <div class="telegram-auth-overlay__card">
+            <div class="telegram-auth-overlay__icon">⚠️</div>
+            <h2>Не удалось авторизоваться</h2>
+            <p>${message}</p>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
 async function showTelegramRequiredOverlay() {
     let overlay = document.getElementById('telegram-auth-overlay');
     if (overlay) {
@@ -335,6 +352,7 @@ async function showTelegramRequiredOverlay() {
 async function initTelegramAuth() {
     const tg = window.Telegram?.WebApp;
     if (!tg?.initData) {
+        console.warn('NOT_IN_TELEGRAM');
         await showTelegramRequiredOverlay();
         return false;
     }
@@ -345,18 +363,18 @@ async function initTelegramAuth() {
             body: JSON.stringify({ initData: tg.initData })
         });
         if (!response.ok) {
-            await showTelegramRequiredOverlay();
+            showTelegramAuthErrorOverlay('Не удалось подтвердить Telegram-сессию. Откройте приложение через бота.');
             return false;
         }
         const data = await response.json();
         if (!data?.ok) {
-            await showTelegramRequiredOverlay();
+            showTelegramAuthErrorOverlay('Ответ авторизации некорректен. Попробуйте открыть приложение через бота ещё раз.');
             return false;
         }
         window.telegramAuthUserId = data.telegram_user_id ?? null;
         return true;
     } catch (error) {
-        await showTelegramRequiredOverlay();
+        showTelegramAuthErrorOverlay('Сервис недоступен. Попробуйте позже или откройте приложение через бота.');
         return false;
     }
 }
