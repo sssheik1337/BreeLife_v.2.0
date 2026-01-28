@@ -280,6 +280,24 @@ textarea {
     margin: 0;
 }
 
+.telegram-auth-overlay__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 16px;
+    padding: 12px 18px;
+    border-radius: 999px;
+    background: #10b981;
+    color: #ffffff;
+    font-weight: 600;
+    text-decoration: none;
+    box-shadow: 0 10px 20px rgba(16, 185, 129, 0.25);
+}
+
+.telegram-auth-overlay__button:active {
+    background: #059669;
+}
+
 .telegram-auth-overlay__icon {
     font-size: 32px;
 }

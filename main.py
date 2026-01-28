@@ -29,6 +29,7 @@ from config import (
     YANDEX_GPT_API_KEY,
     YANDEX_GPT_FOLDER_ID,
     TELEGRAM_BOT_TOKEN,
+    PUBLIC_APP_URL,
     ADMIN_LOGIN,
     ADMIN_PASSWORD,
 )
@@ -506,6 +507,33 @@ async def me_status(request: Request):
         "authorized": True,
         "profile_completed": is_profile_completed(telegram_user_id),
     }
+
+
+@app.get("/api/telegram/bot-info")
+async def telegram_bot_info():
+    if not TELEGRAM_BOT_TOKEN:
+        raise HTTPException(status_code=500, detail="TELEGRAM_BOT_TOKEN не задан.")
+    try:
+        response = requests.get(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getMe",
+            timeout=10,
+        )
+        response.raise_for_status()
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=502, detail="Не удалось получить данные бота.") from exc
+    data = response.json()
+    if not data.get("ok"):
+        raise HTTPException(status_code=502, detail="Bot API вернул ошибку.")
+    result = data.get("result", {})
+    return {
+        "username": result.get("username"),
+        "name": result.get("first_name"),
+    }
+
+
+@app.get("/api/app/public-url")
+async def app_public_url():
+    return {"app_url": PUBLIC_APP_URL}
 
 
 @app.post("/api/auth/telegram")

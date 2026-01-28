@@ -291,12 +291,33 @@ function animatePageTransition() {
     }, 50);
 }
 
-function showTelegramRequiredOverlay() {
+async function fetchBotInfo() {
+    try {
+        const response = await fetch('/api/telegram/bot-info');
+        if (!response.ok) {
+            return null;
+        }
+        return await response.json();
+    } catch (error) {
+        return null;
+    }
+}
+
+function buildBotLink(username) {
+    if (!username) {
+        return null;
+    }
+    return `https://t.me/${username}?start=miniapp`;
+}
+
+async function showTelegramRequiredOverlay() {
     let overlay = document.getElementById('telegram-auth-overlay');
     if (overlay) {
         overlay.classList.remove('hidden');
         return;
     }
+    const botInfo = await fetchBotInfo();
+    const botLink = buildBotLink(botInfo?.username);
     overlay = document.createElement('div');
     overlay.id = 'telegram-auth-overlay';
     overlay.className = 'telegram-auth-overlay';
@@ -304,7 +325,8 @@ function showTelegramRequiredOverlay() {
         <div class="telegram-auth-overlay__card">
             <div class="telegram-auth-overlay__icon">📲</div>
             <h2>Откройте в Telegram</h2>
-            <p>Это мини‑приложение работает только внутри Telegram. Вернитесь и откройте его через бот.</p>
+            <p>Это приложение работает только внутри Telegram.</p>
+            ${botLink ? `<a class="telegram-auth-overlay__button" href="${botLink}">Открыть в Telegram</a>` : ''}
         </div>
     `;
     document.body.appendChild(overlay);
@@ -313,7 +335,7 @@ function showTelegramRequiredOverlay() {
 async function initTelegramAuth() {
     const tg = window.Telegram?.WebApp;
     if (!tg?.initData) {
-        showTelegramRequiredOverlay();
+        await showTelegramRequiredOverlay();
         return false;
     }
     try {
@@ -323,18 +345,18 @@ async function initTelegramAuth() {
             body: JSON.stringify({ initData: tg.initData })
         });
         if (!response.ok) {
-            showTelegramRequiredOverlay();
+            await showTelegramRequiredOverlay();
             return false;
         }
         const data = await response.json();
         if (!data?.ok) {
-            showTelegramRequiredOverlay();
+            await showTelegramRequiredOverlay();
             return false;
         }
         window.telegramAuthUserId = data.telegram_user_id ?? null;
         return true;
     } catch (error) {
-        showTelegramRequiredOverlay();
+        await showTelegramRequiredOverlay();
         return false;
     }
 }
