@@ -1093,6 +1093,9 @@ function renderReminderActions() {
 // Save all data and redirect to profile
 function saveAndContinue() {
     // Данные сохраняются через API, локального хранения нет.
+    if (typeof patchUserProfile === 'function') {
+        patchUserProfile({ completed: true });
+    }
     
     // Show success notification
     if (typeof showNotification === 'function') {
