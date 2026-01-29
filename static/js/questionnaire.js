@@ -341,86 +341,6 @@ function displayInput(question) {
         <div class="picker-panel hidden" data-role="picker-panel"></div>
     `;
 
-    const ITEM_HEIGHT = 36;
-
-    const scrollToIndex = (list, index) => {
-        if (!list) {
-            return;
-        }
-        list.scrollTo({ top: index * ITEM_HEIGHT, behavior: 'auto' });
-    };
-
-    const setActiveItem = (list, index) => {
-        if (!list) {
-            return;
-        }
-        const items = Array.from(list.querySelectorAll('.wheel-item'));
-        items.forEach((item, idx) => {
-            item.classList.toggle('wheel-item--active', idx === index);
-        });
-    };
-
-    const getIndexByValue = (values, value) => {
-        if (!values.length) {
-            return 0;
-        }
-        const index = values.findIndex((item) => String(item.value) === String(value));
-        return index >= 0 ? index : 0;
-    };
-
-    const attachWheelHandlers = (list, values, onChange) => {
-        if (!list) {
-            return;
-        }
-        let scrollTimeout;
-        const updateFromScroll = () => {
-            const index = Math.round(list.scrollTop / ITEM_HEIGHT);
-            setActiveItem(list, index);
-            const selected = values[index];
-            if (selected) {
-                onChange(selected);
-            }
-        };
-        list.addEventListener('scroll', () => {
-            window.clearTimeout(scrollTimeout);
-            scrollTimeout = window.setTimeout(() => {
-                const index = Math.round(list.scrollTop / ITEM_HEIGHT);
-                scrollToIndex(list, index);
-                updateFromScroll();
-            }, 80);
-        });
-        list.addEventListener('click', (event) => {
-            const target = event.target.closest('.wheel-item');
-            if (!target) {
-                return;
-            }
-            const index = Number(target.dataset.index);
-            if (!Number.isFinite(index)) {
-                return;
-            }
-            scrollToIndex(list, index);
-            updateFromScroll();
-        });
-        updateFromScroll();
-    };
-
-    const renderWheelList = (list, values, selectedValue, onChange) => {
-        if (!list) {
-            return;
-        }
-        list.innerHTML = values
-            .map((item, index) => `
-                <div class="wheel-item" data-index="${index}" data-value="${item.value}">
-                    ${item.label}
-                </div>
-            `)
-            .join('');
-        const selectedIndex = getIndexByValue(values, selectedValue);
-        scrollToIndex(list, selectedIndex);
-        setActiveItem(list, selectedIndex);
-        attachWheelHandlers(list, values, onChange);
-    };
-
     if (question.type === 'date') {
         const today = new Date();
         const minYear = 1900;
@@ -436,21 +356,23 @@ function displayInput(question) {
             panel.innerHTML = `
                 <div class="wheel-picker" data-role="birth-picker">
                     <div class="wheel-column">
-                        <div class="wheel-list" data-role="birth-day" aria-label="День рождения"></div>
+                        <select id="birth-day" class="wheel-select" size="7" aria-label="День рождения"></select>
                     </div>
                     <div class="wheel-column">
-                        <div class="wheel-list" data-role="birth-month" aria-label="Месяц рождения"></div>
+                        <select id="birth-month" class="wheel-select" size="7" aria-label="Месяц рождения">
+                            ${months.map((label, index) => `<option value="${index + 1}">${label}</option>`).join('')}
+                        </select>
                     </div>
                     <div class="wheel-column">
-                        <div class="wheel-list" data-role="birth-year" aria-label="Год рождения"></div>
+                        <select id="birth-year" class="wheel-select" size="7" aria-label="Год рождения"></select>
                     </div>
                 </div>
                 <button type="button" class="picker-done" data-role="picker-done">Готово</button>
             `;
         }
-        const dayList = inputContainer.querySelector('[data-role="birth-day"]');
-        const monthList = inputContainer.querySelector('[data-role="birth-month"]');
-        const yearList = inputContainer.querySelector('[data-role="birth-year"]');
+        const daySelect = document.getElementById('birth-day');
+        const monthSelect = document.getElementById('birth-month');
+        const yearSelect = document.getElementById('birth-year');
         const display = inputContainer.querySelector('[data-role="picker-display"]');
         const displayText = inputContainer.querySelector('.picker-display-text');
         const doneButton = inputContainer.querySelector('[data-role="picker-done"]');
@@ -470,42 +392,33 @@ function displayInput(question) {
         if (doneButton) {
             doneButton.addEventListener('click', () => togglePicker(false));
         }
-        if (dayList && monthList && yearList) {
-            const yearValues = [];
+        if (daySelect && monthSelect && yearSelect) {
+            const years = [];
             for (let year = maxYear; year >= minYear; year -= 1) {
-                yearValues.push({ value: year, label: year });
+                years.push(`<option value="${year}">${year}</option>`);
             }
-            const monthValues = months.map((label, index) => ({
-                value: index + 1,
-                label
-            }));
-            let selectedYear = maxYear;
-            let selectedMonth = 1;
-            let selectedDay = 1;
+            yearSelect.innerHTML = years.join('');
 
-            const syncFromStored = () => {
-                if (!currentValue) {
-                    return;
-                }
-                const [yearStr, monthStr, dayStr] = currentValue.split('-');
-                selectedYear = Number(yearStr) || selectedYear;
-                selectedMonth = Number(monthStr) || selectedMonth;
-                selectedDay = Number(dayStr) || selectedDay;
-            };
-
-            const buildDayValues = (year, month) => {
-                const daysInMonth = new Date(year, month, 0).getDate();
-                return Array.from({ length: daysInMonth }, (_, index) => ({
-                    value: index + 1,
-                    label: index + 1
-                }));
+            const setDayOptions = (year, month) => {
+                const safeYear = Number(year) || maxYear;
+                const safeMonth = Number(month) || 1;
+                const daysInMonth = new Date(safeYear, safeMonth, 0).getDate();
+                const currentDay = Number(daySelect.value) || 1;
+                daySelect.innerHTML = Array.from({ length: daysInMonth }, (_, index) => {
+                    const day = index + 1;
+                    return `<option value="${day}">${day}</option>`;
+                }).join('');
+                daySelect.value = String(Math.min(currentDay, daysInMonth));
             };
 
             const applyBirthDate = () => {
-                if (!selectedYear || !selectedMonth || !selectedDay) {
+                const year = Number(yearSelect.value);
+                const month = Number(monthSelect.value);
+                const day = Number(daySelect.value);
+                if (!year || !month || !day) {
                     window.userData[getDataKey(currentQuestionIndex)] = '';
                 } else {
-                    const formatted = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`;
+                    const formatted = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                     window.userData[getDataKey(currentQuestionIndex)] = formatted;
                 }
                 saveUserData();
@@ -517,51 +430,50 @@ function displayInput(question) {
                 }
             };
 
-            const updateDays = () => {
-                const dayValues = buildDayValues(selectedYear, selectedMonth);
-                if (selectedDay > dayValues.length) {
-                    selectedDay = dayValues.length;
+            const syncFromStored = () => {
+                if (!currentValue) {
+                    setDayOptions(maxYear, 1);
+                    return;
                 }
-                renderWheelList(dayList, dayValues, selectedDay, (item) => {
-                    selectedDay = Number(item.value);
-                    applyBirthDate();
-                });
+                const [yearStr, monthStr, dayStr] = currentValue.split('-');
+                const year = Number(yearStr);
+                const month = Number(monthStr);
+                const day = Number(dayStr);
+                if (year) {
+                    yearSelect.value = String(year);
+                }
+                if (month) {
+                    monthSelect.value = String(month);
+                }
+                setDayOptions(year || maxYear, month || 1);
+                if (day) {
+                    daySelect.value = String(day);
+                }
             };
 
             syncFromStored();
-            renderWheelList(yearList, yearValues, selectedYear, (item) => {
-                selectedYear = Number(item.value);
-                updateDays();
-                applyBirthDate();
-            });
-            renderWheelList(monthList, monthValues, selectedMonth, (item) => {
-                selectedMonth = Number(item.value);
-                updateDays();
-                applyBirthDate();
-            });
-            updateDays();
             applyBirthDate();
+            monthSelect.addEventListener('change', () => {
+                setDayOptions(yearSelect.value, monthSelect.value);
+                applyBirthDate();
+            });
+            yearSelect.addEventListener('change', () => {
+                setDayOptions(yearSelect.value, monthSelect.value);
+                applyBirthDate();
+            });
+            daySelect.addEventListener('change', applyBirthDate);
         }
     } else if (question.type === 'number') {
         const options = buildNumberOptions(question, currentValue);
-        const step = Number(question.step) || 1;
-        const min = Number(question.min) || 0;
-        const max = Number(question.max) || 0;
         const displayValue = formatNumberDisplay(currentValue);
         inputContainer.innerHTML = renderPickerWrapper(displayValue, '⌄');
         const panel = inputContainer.querySelector('[data-role="picker-panel"]');
         if (panel) {
             panel.innerHTML = `
-                <div class="wheel-picker wheel-picker--single" data-role="number-picker">
-                    <div class="wheel-column">
-                        <div class="wheel-list" data-role="number-list" aria-label="${question.title}"></div>
-                    </div>
-                </div>
-                <div class="number-controls" data-role="number-controls">
-                    <button type="button" class="number-control" data-action="decrease" aria-label="Уменьшить">−</button>
-                    <div class="number-value" data-role="number-value"></div>
-                    <button type="button" class="number-control" data-action="increase" aria-label="Увеличить">+</button>
-                </div>
+                <select id="question-input" class="form-input">
+                    <option value="">${question.placeholder}</option>
+                    ${options}
+                </select>
                 <button type="button" class="picker-done" data-role="picker-done">Готово</button>
             `;
         }
@@ -569,48 +481,6 @@ function displayInput(question) {
         const panelElement = inputContainer.querySelector('[data-role="picker-panel"]');
         const doneButton = inputContainer.querySelector('[data-role="picker-done"]');
         const displayText = inputContainer.querySelector('.picker-display-text');
-        const numberList = inputContainer.querySelector('[data-role="number-list"]');
-        const numberValue = inputContainer.querySelector('[data-role="number-value"]');
-        const decreaseButton = inputContainer.querySelector('[data-action="decrease"]');
-        const increaseButton = inputContainer.querySelector('[data-action="increase"]');
-        let currentNumberIndex = getIndexByValue(options, currentValue);
-
-        const applyNumberValue = (value) => {
-            window.userData[getDataKey(currentQuestionIndex)] = value;
-            saveUserData();
-            updateButtonStates();
-            if (displayText) {
-                const displayValueText = formatNumberDisplay(value);
-                displayText.textContent = displayValueText || question.placeholder;
-                displayText.classList.toggle('picker-display-placeholder', !displayValueText);
-            }
-            if (numberValue) {
-                numberValue.textContent = formatNumberDisplay(value) || question.placeholder;
-            }
-        };
-
-        const clampNumber = (value) => {
-            const numeric = Number(value);
-            if (!Number.isFinite(numeric)) {
-                return min;
-            }
-            return Math.min(max, Math.max(min, numeric));
-        };
-
-        const shiftNumber = (direction) => {
-            let nextValue = currentValue ? Number(currentValue) : min;
-            if (!Number.isFinite(nextValue)) {
-                nextValue = min;
-            }
-            nextValue = clampNumber(nextValue + direction * step);
-            const formatted = Number.isInteger(step) ? Math.round(nextValue).toString() : nextValue.toFixed(1);
-            currentNumberIndex = getIndexByValue(options, formatted);
-            if (numberList) {
-                scrollToIndex(numberList, currentNumberIndex);
-                setActiveItem(numberList, currentNumberIndex);
-            }
-            applyNumberValue(formatted);
-        };
 
         const togglePicker = (isOpen) => {
             if (!panelElement || !display) {
@@ -626,10 +496,11 @@ function displayInput(question) {
         if (doneButton) {
             doneButton.addEventListener('click', () => togglePicker(false));
         }
-        if (numberList) {
-            renderWheelList(numberList, options, currentValue, (item) => {
-                const value = item.value;
-                currentNumberIndex = getIndexByValue(options, value);
+        const input = document.getElementById('question-input');
+        if (input) {
+            input.value = currentValue || '';
+            input.addEventListener('input', () => {
+                const value = input.value;
                 window.userData[getDataKey(currentQuestionIndex)] = value;
                 saveUserData();
                 updateButtonStates();
@@ -638,45 +509,16 @@ function displayInput(question) {
                     displayText.textContent = displayValueText || question.placeholder;
                     displayText.classList.toggle('picker-display-placeholder', !displayValueText);
                 }
-                if (numberValue) {
-                    numberValue.textContent = formatNumberDisplay(value) || question.placeholder;
-                }
             });
-        }
-        if (numberValue) {
-            numberValue.textContent = formatNumberDisplay(currentValue) || question.placeholder;
-        }
-        if (decreaseButton) {
-            decreaseButton.addEventListener('click', () => shiftNumber(-1));
-        }
-        if (increaseButton) {
-            increaseButton.addEventListener('click', () => shiftNumber(1));
-        }
-        if (panelElement) {
-            panelElement.addEventListener('wheel', (event) => {
-                if (!panelElement.classList.contains('hidden')) {
-                    event.preventDefault();
-                    shiftNumber(event.deltaY > 0 ? -1 : 1);
-                }
-            }, { passive: false });
-        }
-        if (numberList) {
-            let dragStartY = null;
-            numberList.addEventListener('touchstart', (event) => {
-                dragStartY = event.touches[0]?.clientY ?? null;
-            });
-            numberList.addEventListener('touchend', () => {
-                dragStartY = null;
-            });
-            numberList.addEventListener('touchmove', (event) => {
-                if (dragStartY === null) {
-                    return;
-                }
-                const currentY = event.touches[0]?.clientY ?? dragStartY;
-                const diff = dragStartY - currentY;
-                if (Math.abs(diff) >= ITEM_HEIGHT) {
-                    shiftNumber(diff > 0 ? 1 : -1);
-                    dragStartY = currentY;
+            input.addEventListener('change', () => {
+                const value = input.value;
+                window.userData[getDataKey(currentQuestionIndex)] = value;
+                saveUserData();
+                updateButtonStates();
+                if (displayText) {
+                    const displayValueText = formatNumberDisplay(value);
+                    displayText.textContent = displayValueText || question.placeholder;
+                    displayText.classList.toggle('picker-display-placeholder', !displayValueText);
                 }
             });
         }
@@ -735,9 +577,10 @@ function buildNumberOptions(question, currentValue) {
     for (let value = min; value <= max + step / 2; value += step) {
         const formatted = Number.isInteger(step) ? Math.round(value).toString() : value.toFixed(1);
         const label = question.unit ? `${formatted} ${question.unit}` : formatted;
-        options.push({ value: formatted, label });
+        const isSelected = String(currentValue ?? '') === formatted;
+        options.push(`<option value="${formatted}" ${isSelected ? 'selected' : ''}>${label}</option>`);
     }
-    return options;
+    return options.join('');
 }
 
 // Update button states
