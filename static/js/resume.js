@@ -1094,7 +1094,13 @@ function renderReminderActions() {
 function saveAndContinue() {
     // Данные сохраняются через API, локального хранения нет.
     if (typeof patchUserProfile === 'function') {
-        patchUserProfile({ completed: true });
+        if (typeof mapUserDataToUserProfile === 'function') {
+            const mappedProfile = mapUserDataToUserProfile(window.userData || {});
+            mappedProfile.completed = true;
+            patchUserProfile(mappedProfile);
+        } else {
+            patchUserProfile({ completed: true });
+        }
     }
     
     // Show success notification
