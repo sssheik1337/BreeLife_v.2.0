@@ -22,7 +22,7 @@
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
-        padding: 10px;
+        padding: 12px;
         border-radius: 16px;
         background: #f8fafc;
         border: 1px solid #e2e8f0;
@@ -50,20 +50,19 @@
       }
       .wheel-select {
         width: 100%;
-        height: 140px;
+        height: 48px;
         border: 1px solid #e2e8f0;
         border-radius: 14px;
         background: #ffffff;
         font-size: 15px;
         font-weight: 600;
         color: #0f172a;
-        scroll-snap-type: y mandatory;
-        overflow-y: auto;
+        overflow: hidden;
         text-align: center;
         appearance: none;
         -webkit-appearance: none;
-        padding: 6px 0;
-        box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.15);
+        padding: 0 12px;
+        box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.12);
       }
       .wheel-select:focus {
         outline: none;
@@ -72,49 +71,35 @@
       }
       .wheel-select option {
         padding: 6px 0;
-        scroll-snap-align: center;
       }
       .wheel-select option.wheel-placeholder {
         color: #94a3b8;
         font-weight: 500;
-      }
-      .picker-display {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 14px 16px;
-        border-radius: 16px;
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-        font-size: 16px;
-        font-weight: 600;
-        color: #0f172a;
-        cursor: pointer;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-      }
-      .picker-display:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
-      }
-      .picker-display-text {
-        display: block;
-        font-weight: 600;
-      }
-      .picker-display-placeholder {
-        color: #94a3b8;
-        font-weight: 500;
-      }
-      .picker-display-icon {
-        font-size: 18px;
-        color: #64748b;
       }
       .picker-panel {
         margin-top: 12px;
       }
       .picker-panel.hidden {
         display: none;
+      }
+      .picker-panel--inline {
+        margin-top: 0;
+      }
+      .number-picker {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px;
+        border-radius: 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+      }
+      .number-picker__label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
       }
     </style>
 </head>

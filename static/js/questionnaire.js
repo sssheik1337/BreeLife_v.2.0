@@ -320,25 +320,10 @@ function displayInput(question) {
         });
     };
 
-    const formatNumberDisplay = (value) => {
-        if (!value) {
-            return null;
-        }
-        const unit = unitLabels[question.unit] || question.unit || '';
-        const formatted = Number.isFinite(Number(value))
-            ? Number(value).toLocaleString('ru-RU')
-            : value;
-        return unit ? `${formatted} ${unit}` : formatted;
-    };
-
-    const renderPickerWrapper = (displayValue, icon) => `
-        <div class="picker-display" data-role="picker-display">
-            <span class="picker-display-text${displayValue ? '' : ' picker-display-placeholder'}">
-                ${displayValue || question.placeholder}
-            </span>
-            <span class="picker-display-icon">${icon}</span>
+    const renderPickerWrapper = (content) => `
+        <div class="picker-panel picker-panel--inline" data-role="picker-panel">
+            ${content}
         </div>
-        <div class="picker-panel hidden" data-role="picker-panel"></div>
     `;
 
     if (question.type === 'date') {
@@ -349,44 +334,24 @@ function displayInput(question) {
             'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
             'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
         ];
-        const displayValue = formatDateDisplay(currentValue);
-        inputContainer.innerHTML = renderPickerWrapper(displayValue, '📅');
-        const panel = inputContainer.querySelector('[data-role="picker-panel"]');
-        if (panel) {
-            panel.innerHTML = `
-                <div class="wheel-picker" data-role="birth-picker">
-                    <div class="wheel-column">
-                        <select id="birth-day" class="wheel-select" size="5" aria-label="День рождения"></select>
-                    </div>
-                    <div class="wheel-column">
-                        <select id="birth-month" class="wheel-select" size="5" aria-label="Месяц рождения">
-                            ${months.map((label, index) => `<option value="${index + 1}">${label}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div class="wheel-column">
-                        <select id="birth-year" class="wheel-select" size="5" aria-label="Год рождения"></select>
-                    </div>
+        inputContainer.innerHTML = renderPickerWrapper(`
+            <div class="wheel-picker" data-role="birth-picker">
+                <div class="wheel-column">
+                    <select id="birth-day" class="wheel-select" aria-label="День рождения"></select>
                 </div>
-            `;
-        }
+                <div class="wheel-column">
+                    <select id="birth-month" class="wheel-select" aria-label="Месяц рождения">
+                        ${months.map((label, index) => `<option value="${index + 1}">${label}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="wheel-column">
+                    <select id="birth-year" class="wheel-select" aria-label="Год рождения"></select>
+                </div>
+            </div>
+        `);
         const daySelect = document.getElementById('birth-day');
         const monthSelect = document.getElementById('birth-month');
         const yearSelect = document.getElementById('birth-year');
-        const display = inputContainer.querySelector('[data-role="picker-display"]');
-        const displayText = inputContainer.querySelector('.picker-display-text');
-        const panelElement = inputContainer.querySelector('[data-role="picker-panel"]');
-
-        const togglePicker = (isOpen) => {
-            if (!panelElement || !display) {
-                return;
-            }
-            panelElement.classList.toggle('hidden', !isOpen);
-            display.style.display = isOpen ? 'none' : 'flex';
-        };
-
-        if (display) {
-            display.addEventListener('click', () => togglePicker(true));
-        }
         if (daySelect && monthSelect && yearSelect) {
             const years = [];
             for (let year = maxYear; year >= minYear; year -= 1) {
@@ -422,14 +387,7 @@ function displayInput(question) {
                 }
                 saveUserData();
                 updateButtonStates();
-                if (displayText) {
-                    const displayValueText = formatDateDisplay(window.userData[getDataKey(currentQuestionIndex)]);
-                    displayText.textContent = displayValueText || question.placeholder;
-                    displayText.classList.toggle('picker-display-placeholder', !displayValueText);
-                }
-                if (hasAllFields) {
-                    togglePicker(false);
-                }
+                return;
             };
 
             const syncFromStored = () => {
@@ -470,32 +428,16 @@ function displayInput(question) {
         }
     } else if (question.type === 'number') {
         const options = buildNumberOptions(question, currentValue);
-        const displayValue = formatNumberDisplay(currentValue);
-        inputContainer.innerHTML = renderPickerWrapper(displayValue, '⌄');
-        const panel = inputContainer.querySelector('[data-role="picker-panel"]');
-        if (panel) {
-            panel.innerHTML = `
+        const labelText = question.unit ? `${question.unit}` : 'значение';
+        inputContainer.innerHTML = renderPickerWrapper(`
+            <div class="number-picker">
+                <span class="number-picker__label">${labelText}</span>
                 <select id="question-input" class="form-input">
                     <option value="">${question.placeholder}</option>
                     ${options}
                 </select>
-            `;
-        }
-        const display = inputContainer.querySelector('[data-role="picker-display"]');
-        const panelElement = inputContainer.querySelector('[data-role="picker-panel"]');
-        const displayText = inputContainer.querySelector('.picker-display-text');
-
-        const togglePicker = (isOpen) => {
-            if (!panelElement || !display) {
-                return;
-            }
-            panelElement.classList.toggle('hidden', !isOpen);
-            display.style.display = isOpen ? 'none' : 'flex';
-        };
-
-        if (display) {
-            display.addEventListener('click', () => togglePicker(true));
-        }
+            </div>
+        `);
         const input = document.getElementById('question-input');
         if (input) {
             input.value = currentValue || '';
@@ -504,28 +446,12 @@ function displayInput(question) {
                 window.userData[getDataKey(currentQuestionIndex)] = value;
                 saveUserData();
                 updateButtonStates();
-                if (displayText) {
-                    const displayValueText = formatNumberDisplay(value);
-                    displayText.textContent = displayValueText || question.placeholder;
-                    displayText.classList.toggle('picker-display-placeholder', !displayValueText);
-                }
-                if (value !== '') {
-                    togglePicker(false);
-                }
             });
             input.addEventListener('change', () => {
                 const value = input.value;
                 window.userData[getDataKey(currentQuestionIndex)] = value;
                 saveUserData();
                 updateButtonStates();
-                if (displayText) {
-                    const displayValueText = formatNumberDisplay(value);
-                    displayText.textContent = displayValueText || question.placeholder;
-                    displayText.classList.toggle('picker-display-placeholder', !displayValueText);
-                }
-                if (value !== '') {
-                    togglePicker(false);
-                }
             });
         }
     }
