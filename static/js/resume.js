@@ -1106,9 +1106,9 @@ function saveAndContinue() {
 }
 
 // Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     if (typeof syncProfileWithBackend === 'function') {
-        void syncProfileWithBackend();
+        await syncProfileWithBackend();
     }
     generateSummary();
     calculateBMI();
