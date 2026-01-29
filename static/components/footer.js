@@ -178,6 +178,7 @@ class CustomFooter extends HTMLElement {
     };
 
     const hasCompletedProfile = window.profileCompleted === true;
+    const isDevMode = window.appIsDev === true || window.appMode === 'development';
 
     if (links.home) {
       links.home.href = '/profile';
@@ -205,7 +206,7 @@ class CustomFooter extends HTMLElement {
       progress: this.shadowRoot.querySelector('[data-bottom-link="progress"]'),
     };
 
-    if (!hasCompletedProfile) {
+    if (!hasCompletedProfile && !isDevMode) {
       Object.values(bottomLinks).forEach((link) => {
         if (!link) {
           return;
