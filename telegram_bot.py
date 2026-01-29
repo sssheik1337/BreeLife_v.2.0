@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 TOKEN: Final[str] = os.getenv("TELEGRAM_BOT_TOKEN", "")
 WEBAPP_URL: Final[str] = os.getenv("TELEGRAM_WEBAPP_URL", "")
+APP_NAME: Final[str] = os.getenv("APP_NAME", "BreeLife")
 
 
 def _ensure_env() -> None:
@@ -42,7 +43,7 @@ def build_dispatcher() -> Dispatcher:
             inline_keyboard=[
                 [
                     types.InlineKeyboardButton(
-                        text="Открыть приложение",
+                        text=APP_NAME,
                         web_app=types.WebAppInfo(url=WEBAPP_URL),
                     )
                 ]
@@ -63,7 +64,7 @@ async def run_bot() -> BotState:
     try:
         await bot.set_chat_menu_button(
             menu_button=types.MenuButtonWebApp(
-                text="Открыть приложение",
+                text=APP_NAME,
                 web_app=types.WebAppInfo(url=WEBAPP_URL),
             )
         )

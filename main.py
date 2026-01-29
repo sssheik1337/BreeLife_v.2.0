@@ -82,7 +82,7 @@ async def lifespan(app: FastAPI):
     try:
         await bot.set_chat_menu_button(
             menu_button=types.MenuButtonWebApp(
-                text="Открыть приложение",
+                text=APP_NAME,
                 web_app=types.WebAppInfo(url=PUBLIC_APP_URL),
             )
         )
@@ -98,7 +98,7 @@ async def lifespan(app: FastAPI):
             inline_keyboard=[
                 [
                     types.InlineKeyboardButton(
-                        text="Открыть приложение",
+                        text=APP_NAME,
                         web_app=types.WebAppInfo(url=PUBLIC_APP_URL),
                     )
                 ]
