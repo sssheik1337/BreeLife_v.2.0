@@ -112,6 +112,13 @@ class CustomFooter extends HTMLElement {
           background: #ecfdf3;
         }
 
+        .bottom-link--disabled {
+          color: #cbd5e1;
+          background: #f8fafc;
+          opacity: 0.6;
+          pointer-events: none;
+        }
+
         @media (min-width: 768px) {
           .bottom-nav {
             left: 50%;
@@ -170,23 +177,8 @@ class CustomFooter extends HTMLElement {
       profile: this.shadowRoot.querySelector('[data-link="profile"]'),
     };
 
-    const isProfileCompleted = () => {
-      try {
-        const raw = localStorage.getItem('user_profile');
-        if (!raw) {
-          return false;
-        }
-        const profile = JSON.parse(raw);
-        if (!profile || typeof profile !== 'object') {
-          return false;
-        }
-        return profile.completed === true;
-      } catch (error) {
-        return false;
-      }
-    };
-
-    const hasCompletedProfile = isProfileCompleted();
+    const hasCompletedProfile = window.profileCompleted === true;
+    const isDevMode = window.appIsDev === true || window.appMode === 'development';
 
     if (links.home) {
       links.home.href = '/profile';
@@ -213,6 +205,45 @@ class CustomFooter extends HTMLElement {
       mealPlan: this.shadowRoot.querySelector('[data-bottom-link="meal-plan"]'),
       progress: this.shadowRoot.querySelector('[data-bottom-link="progress"]'),
     };
+
+    const applyBottomNavState = (profileCompleted, devMode) => {
+      const shouldDisable = !profileCompleted && !devMode;
+      Object.values(bottomLinks).forEach((link) => {
+        if (!link) {
+          return;
+        }
+        if (!link.dataset.originalHref) {
+          link.dataset.originalHref = link.getAttribute('href') || '/profile';
+        }
+        if (shouldDisable) {
+          link.href = '/questionnaire';
+          link.classList.add('bottom-link--disabled');
+          if (!link.dataset.disableHandlerAttached) {
+            link.dataset.disableHandlerAttached = 'true';
+            link.addEventListener('click', (event) => {
+              if (!link.classList.contains('bottom-link--disabled')) {
+                return;
+              }
+              event.preventDefault();
+              if (typeof showNotification === 'function') {
+                showNotification('Сначала заполните анкету.', 'error');
+              }
+              window.location.href = '/questionnaire';
+            });
+          }
+        } else {
+          link.href = link.dataset.originalHref;
+          link.classList.remove('bottom-link--disabled');
+        }
+      });
+    };
+
+    applyBottomNavState(hasCompletedProfile, isDevMode);
+    window.addEventListener('profile-status-updated', (event) => {
+      const profileCompleted = Boolean(event?.detail?.profileCompleted);
+      const devMode = Boolean(event?.detail?.isDevMode);
+      applyBottomNavState(profileCompleted, devMode);
+    });
 
     const currentPath = window.location.pathname || '/';
     const currentHash = window.location.hash || '';

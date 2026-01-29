@@ -186,12 +186,6 @@ function initQuestionnaire() {
         totalSteps.textContent = questions.length.toString();
     }
     
-    // Load saved progress
-    const savedIndex = localStorage.getItem('health_bloom_question_index');
-    if (savedIndex && savedIndex !== "0") {
-        currentQuestionIndex = parseInt(savedIndex);
-    }
-    
     // Load saved answers
     loadSavedAnswers();
     
@@ -202,7 +196,7 @@ function initQuestionnaire() {
     setupEventListeners();
 }
 
-// Load saved answers from localStorage
+// Загружаем сохранённые ответы из профиля
 function loadSavedAnswers() {
     if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
         const profile = getUserProfile();
@@ -210,15 +204,7 @@ function loadSavedAnswers() {
         return;
     }
 
-    const savedData = localStorage.getItem('health_bloom_user_data');
-    if (savedData) {
-        try {
-            const data = JSON.parse(savedData);
-            Object.assign(window.userData, data);
-        } catch (e) {
-            return null;
-        }
-    }
+    return null;
 }
 // Display current question
 function displayQuestion() {
@@ -313,7 +299,48 @@ function displayOptions(options) {
 // Display input field for date/number questions
 function displayInput(question) {
     const currentValue = window.userData[getDataKey(currentQuestionIndex)];
-    
+
+    const unitLabels = {
+        cm: 'см',
+        kg: 'кг'
+    };
+
+    const formatDateDisplay = (value) => {
+        if (!value) {
+            return null;
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return null;
+        }
+        return date.toLocaleDateString('ru-RU', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+    };
+
+    const formatNumberDisplay = (value) => {
+        if (!value) {
+            return null;
+        }
+        const unit = unitLabels[question.unit] || question.unit || '';
+        const formatted = Number.isFinite(Number(value))
+            ? Number(value).toLocaleString('ru-RU')
+            : value;
+        return unit ? `${formatted} ${unit}` : formatted;
+    };
+
+    const renderPickerWrapper = (displayValue, icon) => `
+        <div class="picker-display" data-role="picker-display">
+            <span class="picker-display-text${displayValue ? '' : ' picker-display-placeholder'}">
+                ${displayValue || question.placeholder}
+            </span>
+            <span class="picker-display-icon">${icon}</span>
+        </div>
+        <div class="picker-panel hidden" data-role="picker-panel"></div>
+    `;
+
     if (question.type === 'date') {
         const today = new Date();
         const minYear = 1900;
@@ -322,60 +349,95 @@ function displayInput(question) {
             'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
             'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
         ];
-        inputContainer.innerHTML = `
-            <div class="wheel-picker" data-role="birth-picker">
-                <div class="wheel-column">
-                    <select id="birth-day" class="wheel-select" size="7" aria-label="День рождения"></select>
+        const displayValue = formatDateDisplay(currentValue);
+        inputContainer.innerHTML = renderPickerWrapper(displayValue, '📅');
+        const panel = inputContainer.querySelector('[data-role="picker-panel"]');
+        if (panel) {
+            panel.innerHTML = `
+                <div class="wheel-picker" data-role="birth-picker">
+                    <div class="wheel-column">
+                        <select id="birth-day" class="wheel-select" size="5" aria-label="День рождения"></select>
+                    </div>
+                    <div class="wheel-column">
+                        <select id="birth-month" class="wheel-select" size="5" aria-label="Месяц рождения">
+                            ${months.map((label, index) => `<option value="${index + 1}">${label}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="wheel-column">
+                        <select id="birth-year" class="wheel-select" size="5" aria-label="Год рождения"></select>
+                    </div>
                 </div>
-                <div class="wheel-column">
-                    <select id="birth-month" class="wheel-select" size="7" aria-label="Месяц рождения">
-                        ${months.map((label, index) => `<option value="${index + 1}">${label}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="wheel-column">
-                    <select id="birth-year" class="wheel-select" size="7" aria-label="Год рождения"></select>
-                </div>
-            </div>
-        `;
+            `;
+        }
         const daySelect = document.getElementById('birth-day');
         const monthSelect = document.getElementById('birth-month');
         const yearSelect = document.getElementById('birth-year');
+        const display = inputContainer.querySelector('[data-role="picker-display"]');
+        const displayText = inputContainer.querySelector('.picker-display-text');
+        const panelElement = inputContainer.querySelector('[data-role="picker-panel"]');
+
+        const togglePicker = (isOpen) => {
+            if (!panelElement || !display) {
+                return;
+            }
+            panelElement.classList.toggle('hidden', !isOpen);
+            display.style.display = isOpen ? 'none' : 'flex';
+        };
+
+        if (display) {
+            display.addEventListener('click', () => togglePicker(true));
+        }
         if (daySelect && monthSelect && yearSelect) {
             const years = [];
             for (let year = maxYear; year >= minYear; year -= 1) {
                 years.push(`<option value="${year}">${year}</option>`);
             }
-            yearSelect.innerHTML = years.join('');
+            yearSelect.innerHTML = `<option value="" class="wheel-placeholder">Год</option>${years.join('')}`;
+            monthSelect.innerHTML = `<option value="" class="wheel-placeholder">Месяц</option>${months.map((label, index) => `<option value="${index + 1}">${label}</option>`).join('')}`;
 
             const setDayOptions = (year, month) => {
                 const safeYear = Number(year) || maxYear;
                 const safeMonth = Number(month) || 1;
                 const daysInMonth = new Date(safeYear, safeMonth, 0).getDate();
                 const currentDay = Number(daySelect.value) || 1;
-                daySelect.innerHTML = Array.from({ length: daysInMonth }, (_, index) => {
+                daySelect.innerHTML = `<option value="" class="wheel-placeholder">День</option>${Array.from({ length: daysInMonth }, (_, index) => {
                     const day = index + 1;
                     return `<option value="${day}">${day}</option>`;
-                }).join('');
-                daySelect.value = String(Math.min(currentDay, daysInMonth));
+                }).join('')}`;
+                if (daySelect.value) {
+                    daySelect.value = String(Math.min(currentDay, daysInMonth));
+                }
             };
 
             const applyBirthDate = () => {
                 const year = Number(yearSelect.value);
                 const month = Number(monthSelect.value);
                 const day = Number(daySelect.value);
-                if (!year || !month || !day) {
-                    window.userData[getDataKey(currentQuestionIndex)] = '';
-                } else {
+                const hasAllFields = Boolean(year && month && day);
+                if (hasAllFields) {
                     const formatted = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                     window.userData[getDataKey(currentQuestionIndex)] = formatted;
+                } else {
+                    window.userData[getDataKey(currentQuestionIndex)] = '';
                 }
                 saveUserData();
                 updateButtonStates();
+                if (displayText) {
+                    const displayValueText = formatDateDisplay(window.userData[getDataKey(currentQuestionIndex)]);
+                    displayText.textContent = displayValueText || question.placeholder;
+                    displayText.classList.toggle('picker-display-placeholder', !displayValueText);
+                }
+                if (hasAllFields) {
+                    togglePicker(false);
+                }
             };
 
             const syncFromStored = () => {
                 if (!currentValue) {
-                    setDayOptions(maxYear, 1);
+                    setDayOptions(null, null);
+                    daySelect.value = '';
+                    monthSelect.value = '';
+                    yearSelect.value = '';
                     return;
                 }
                 const [yearStr, monthStr, dayStr] = currentValue.split('-');
@@ -408,30 +470,64 @@ function displayInput(question) {
         }
     } else if (question.type === 'number') {
         const options = buildNumberOptions(question, currentValue);
-        inputContainer.innerHTML = `
-            <select id="question-input" class="form-input">
-                <option value="">${question.placeholder}</option>
-                ${options}
-            </select>
-        `;
-    }
-    
-    // Add input event listener
-    const input = document.getElementById('question-input');
-    if (input) {
-        input.value = currentValue || '';
-        input.addEventListener('input', () => {
-            const value = input.value;
-            window.userData[getDataKey(currentQuestionIndex)] = value;
-            saveUserData();
-            updateButtonStates();
-        });
-        input.addEventListener('change', () => {
-            const value = input.value;
-            window.userData[getDataKey(currentQuestionIndex)] = value;
-            saveUserData();
-            updateButtonStates();
-        });
+        const displayValue = formatNumberDisplay(currentValue);
+        inputContainer.innerHTML = renderPickerWrapper(displayValue, '⌄');
+        const panel = inputContainer.querySelector('[data-role="picker-panel"]');
+        if (panel) {
+            panel.innerHTML = `
+                <select id="question-input" class="form-input">
+                    <option value="">${question.placeholder}</option>
+                    ${options}
+                </select>
+            `;
+        }
+        const display = inputContainer.querySelector('[data-role="picker-display"]');
+        const panelElement = inputContainer.querySelector('[data-role="picker-panel"]');
+        const displayText = inputContainer.querySelector('.picker-display-text');
+
+        const togglePicker = (isOpen) => {
+            if (!panelElement || !display) {
+                return;
+            }
+            panelElement.classList.toggle('hidden', !isOpen);
+            display.style.display = isOpen ? 'none' : 'flex';
+        };
+
+        if (display) {
+            display.addEventListener('click', () => togglePicker(true));
+        }
+        const input = document.getElementById('question-input');
+        if (input) {
+            input.value = currentValue || '';
+            input.addEventListener('input', () => {
+                const value = input.value;
+                window.userData[getDataKey(currentQuestionIndex)] = value;
+                saveUserData();
+                updateButtonStates();
+                if (displayText) {
+                    const displayValueText = formatNumberDisplay(value);
+                    displayText.textContent = displayValueText || question.placeholder;
+                    displayText.classList.toggle('picker-display-placeholder', !displayValueText);
+                }
+                if (value !== '') {
+                    togglePicker(false);
+                }
+            });
+            input.addEventListener('change', () => {
+                const value = input.value;
+                window.userData[getDataKey(currentQuestionIndex)] = value;
+                saveUserData();
+                updateButtonStates();
+                if (displayText) {
+                    const displayValueText = formatNumberDisplay(value);
+                    displayText.textContent = displayValueText || question.placeholder;
+                    displayText.classList.toggle('picker-display-placeholder', !displayValueText);
+                }
+                if (value !== '') {
+                    togglePicker(false);
+                }
+            });
+        }
     }
     
     // Update button state immediately if there's already a value
@@ -515,17 +611,15 @@ if (window.feather) {
     }
 }
 
-// Save user data to localStorage
+// Сохраняем данные анкеты на бэкенд
 function saveUserData() {
-    localStorage.setItem('health_bloom_user_data', JSON.stringify(window.userData));
-    localStorage.setItem('health_bloom_question_index', currentQuestionIndex.toString());
     if (typeof patchUserProfile === 'function' && typeof mapUserDataToUserProfile === 'function') {
         patchUserProfile(mapUserDataToUserProfile(window.userData));
     }
 }
 
 async function saveProfileToServer(profile) {
-    if (!profile || !profile.telegram_user_id) {
+    if (!profile) {
         return;
     }
     try {
@@ -533,7 +627,6 @@ async function saveProfileToServer(profile) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                telegram_user_id: profile.telegram_user_id,
                 user_profile: profile
             })
         });
@@ -557,8 +650,6 @@ function setupEventListeners() {
                 mappedProfile.completed = true;
                 profile = patchUserProfile(mappedProfile);
             }
-            localStorage.setItem('hasCompletedQuiz', 'true');
-            localStorage.setItem('profile_completed', 'true');
             if (!profile && typeof getUserProfile === 'function') {
                 profile = getUserProfile();
             }

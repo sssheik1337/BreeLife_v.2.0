@@ -9,6 +9,10 @@ function generateSummary() {
     
     // Get user data
     const data = window.userData || {};
+    if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
+        const profile = getUserProfile();
+        Object.assign(data, mapUserProfileToUserData(profile));
+    }
     
     // Create cards for each data point
     const dataPoints = [
@@ -391,6 +395,10 @@ function calculateWeightDifference(current, target) {
 // Calculate and display BMI
 function calculateBMI() {
     const data = window.userData || {};
+    if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
+        const profile = getUserProfile();
+        Object.assign(data, mapUserProfileToUserData(profile));
+    }
     const height = parseFloat(data.height);
     const weight = parseFloat(data.currentWeight);
     
@@ -737,6 +745,7 @@ async function renderTrialStatus() {
     }
 
     const profile = getUserProfile();
+    const isDevMode = window.appIsDev === true || window.appMode === 'development';
     const telegramUserId = profile.telegram_user_id;
     if (!telegramUserId) {
         statusElement.textContent = 'Telegram ID не найден';
@@ -816,6 +825,30 @@ async function renderTrialStatus() {
         return;
     }
 
+    if (subscription.subscription_status === 'disabled' || isDevMode) {
+        statusElement.textContent = 'DEV MODE: подписки отключены';
+        datesElement.textContent = 'Оплата и пробный период недоступны в режиме разработки.';
+        badgeElement.textContent = 'DEV MODE';
+        paywallElement.classList.add('hidden');
+        if (warningElement) {
+            warningElement.textContent = '';
+            warningElement.classList.add('hidden');
+        }
+        if (recommendationsSection) {
+            recommendationsSection.classList.remove('hidden');
+        }
+        if (nutritionSection) {
+            nutritionSection.classList.remove('hidden');
+        }
+        if (payButton) {
+            payButton.disabled = true;
+            payButton.classList.add('opacity-60', 'cursor-not-allowed');
+        }
+        if (trialCard) {
+            trialCard.classList.remove('is-loading');
+        }
+        return;
+    }
     if (subscription.subscription_status === 'none') {
         try {
             subscription = await startTrial();
@@ -1059,8 +1092,7 @@ function renderReminderActions() {
 
 // Save all data and redirect to profile
 function saveAndContinue() {
-    // Save data to localStorage
-    localStorage.setItem('health_bloom_user_data_final', JSON.stringify(window.userData));
+    // Данные сохраняются через API, локального хранения нет.
     
     // Show success notification
     if (typeof showNotification === 'function') {
@@ -1074,7 +1106,10 @@ function saveAndContinue() {
 }
 
 // Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+    if (typeof syncProfileWithBackend === 'function') {
+        await syncProfileWithBackend();
+    }
     generateSummary();
     calculateBMI();
     updateCalculatedMetrics();

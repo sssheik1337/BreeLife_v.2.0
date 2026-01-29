@@ -1,9 +1,11 @@
 const DIARY_STORAGE_KEY = window.DIARY_STORAGE_KEY || 'bree_diary_entries';
-const MODE_STORAGE_KEY = 'bree_diary_mode';
 const HABITS_STORAGE_KEY = 'bree_habits';
 
 let diaryInitialized = false;
 let diaryGlobalHandlersBound = false;
+let diaryEntriesMemory = [];
+let habitsEntriesMemory = [];
+let diaryModeMemory = null;
 
 const MODE_PRODUCTS = 'products';
 const MODE_SUMMARY = 'summary';
@@ -24,16 +26,7 @@ function readDiaryEntries() {
     if (typeof window.getDiaryEntries === 'function') {
         return window.getDiaryEntries();
     }
-    const raw = localStorage.getItem(DIARY_STORAGE_KEY);
-    if (!raw) {
-        return [];
-    }
-    try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.map(normalizeEntry).filter(Boolean) : [];
-    } catch (error) {
-        return [];
-    }
+    return Array.isArray(diaryEntriesMemory) ? diaryEntriesMemory.map(normalizeEntry).filter(Boolean) : [];
 }
 
 function saveDiaryEntries(entries) {
@@ -41,7 +34,7 @@ function saveDiaryEntries(entries) {
         window.setDiaryEntries(entries);
         return;
     }
-    localStorage.setItem(DIARY_STORAGE_KEY, JSON.stringify(entries));
+    diaryEntriesMemory = Array.isArray(entries) ? entries : [];
 }
 
 function normalizeEntry(entry) {
@@ -210,16 +203,7 @@ function readHabitEntries() {
     if (typeof window.getHabitEntries === 'function') {
         return window.getHabitEntries();
     }
-    const raw = localStorage.getItem(HABITS_STORAGE_KEY);
-    if (!raw) {
-        return {};
-    }
-    try {
-        const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch (error) {
-        return {};
-    }
+    return habitsEntriesMemory && typeof habitsEntriesMemory === 'object' ? habitsEntriesMemory : {};
 }
 
 function saveHabitEntries(entries) {
@@ -227,7 +211,7 @@ function saveHabitEntries(entries) {
         window.setHabitEntries(entries);
         return;
     }
-    localStorage.setItem(HABITS_STORAGE_KEY, JSON.stringify(entries));
+    habitsEntriesMemory = entries && typeof entries === 'object' ? entries : {};
 }
 
 function buildHabitDefaults(dateKey, entries) {
@@ -1016,6 +1000,18 @@ function updateDayMeta(entries, dateKey, waterValue, sleepValue, activityValue) 
     if (!dateKey) {
         return entries;
     }
+    const hasDayEntries = entries.some((entry) => entry.date === dateKey);
+    if (!hasDayEntries) {
+        return [
+            ...entries,
+            {
+                date: dateKey,
+                water_l: Number.isFinite(waterValue) ? waterValue : 0,
+                sleep_time: sleepValue || null,
+                activity: typeof activityValue === 'boolean' ? activityValue : false
+            }
+        ];
+    }
     return entries.map((entry) => {
         if (entry.date !== dateKey) {
             return entry;
@@ -1031,15 +1027,12 @@ function updateDayMeta(entries, dateKey, waterValue, sleepValue, activityValue) 
 
 function persistDayMeta(dateKey, waterValue, sleepValue, activityValue, options = {}) {
     const entries = readDiaryEntries();
-    if (!dateKey || entries.filter((entry) => entry.date === dateKey).length === 0) {
-        const hint = options.hintId ? document.getElementById(options.hintId) : null;
-        if (hint) {
-            hint.textContent = 'Сначала добавьте приём пищи или итоги дня, затем сохраните воду, сон и активность.';
-        }
-        if (typeof showNotification === 'function') {
-            showNotification('Сначала добавьте запись за день, затем отметьте воду.', 'error');
-        }
+    if (!dateKey) {
         return false;
+    }
+    const hint = options.hintId ? document.getElementById(options.hintId) : null;
+    if (hint) {
+        hint.textContent = '';
     }
     const updated = updateDayMeta(entries, dateKey, waterValue, sleepValue, activityValue);
     saveDiaryEntries(updated);
@@ -1303,10 +1296,10 @@ function getModeFromUrl() {
     const params = new URLSearchParams(window.location.search);
     const rawMode = params.get('mode');
     if (rawMode === MODE_SUMMARY || rawMode === MODE_PRODUCTS || rawMode === MODE_DAY) {
-        localStorage.setItem(MODE_STORAGE_KEY, rawMode);
+        diaryModeMemory = rawMode;
         return rawMode;
     }
-    const stored = localStorage.getItem(MODE_STORAGE_KEY);
+    const stored = diaryModeMemory;
     if (stored === MODE_SUMMARY || stored === MODE_PRODUCTS || stored === MODE_DAY) {
         return stored;
     }
@@ -1360,7 +1353,7 @@ function setActiveMode(mode) {
     });
     productsBlock.classList.toggle('hidden', mode !== MODE_PRODUCTS);
     summaryBlock.classList.toggle('hidden', mode !== MODE_SUMMARY);
-    localStorage.setItem(MODE_STORAGE_KEY, mode);
+    diaryModeMemory = mode;
 
     const params = new URLSearchParams(window.location.search);
     params.set('mode', mode);
