@@ -473,6 +473,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (status.telegram_user_id) {
         window.telegramAuthUserId = status.telegram_user_id;
     }
+    if (typeof window.syncProfileWithBackend === 'function') {
+        await window.syncProfileWithBackend();
+    }
     syncLocalProfileCompletion(status.profile_completed);
     redirectToQuestionnaireIfNeeded(status.profile_completed);
 
