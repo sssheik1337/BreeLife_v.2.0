@@ -79,6 +79,16 @@ async def lifespan(app: FastAPI):
         return
     bot = Bot(token=TELEGRAM_BOT_TOKEN)
     dispatcher = Dispatcher()
+    try:
+        await bot.set_chat_menu_button(
+            menu_button=types.MenuButtonWebApp(
+                text="Открыть приложение",
+                web_app=types.WebAppInfo(url=PUBLIC_APP_URL),
+            )
+        )
+        logger.info("INFO: Кнопка приложения установлена в меню чата")
+    except Exception as exc:
+        logger.error("Не удалось установить кнопку приложения в меню чата: %s", exc)
 
     @dispatcher.message(Command("start"))
     async def handle_start(message: types.Message) -> None:

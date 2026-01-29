@@ -60,6 +60,16 @@ def build_dispatcher() -> Dispatcher:
 async def run_bot() -> BotState:
     _ensure_env()
     bot = Bot(token=TOKEN)
+    try:
+        await bot.set_chat_menu_button(
+            menu_button=types.MenuButtonWebApp(
+                text="Открыть приложение",
+                web_app=types.WebAppInfo(url=WEBAPP_URL),
+            )
+        )
+        logger.info("INFO: Кнопка приложения установлена в меню чата")
+    except Exception as exc:
+        logger.error("Не удалось установить кнопку приложения в меню чата: %s", exc)
     dispatcher = build_dispatcher()
     task = asyncio.create_task(dispatcher.start_polling(bot))
     logger.info("INFO: Telegram bot started (aiogram)")
