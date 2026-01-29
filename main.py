@@ -1594,6 +1594,17 @@ async def save_profile(request: Request, payload: ProfileSaveRequest):
     profile = payload.user_profile if isinstance(payload.user_profile, dict) else {}
     profile["telegram_user_id"] = telegram_user_id
     profile_completed = profile.get("profile_completed") is True or profile.get("completed") is True
+    if not profile_completed:
+        required_fields = [
+            profile.get("sex"),
+            profile.get("birth_date"),
+            profile.get("height_cm"),
+            profile.get("weight_kg"),
+            profile.get("target_weight_kg"),
+            profile.get("goal"),
+            profile.get("activity_factor"),
+        ]
+        profile_completed = all(value not in (None, "", []) for value in required_fields)
     profile["profile_completed"] = profile_completed
     profile["completed"] = profile_completed
     save_profile_data(telegram_user_id, profile)
