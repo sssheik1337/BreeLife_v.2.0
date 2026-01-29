@@ -360,17 +360,20 @@ function displayInput(question) {
             yearSelect.innerHTML = `<option value="" class="wheel-placeholder">Год</option>${years.join('')}`;
             monthSelect.innerHTML = `<option value="" class="wheel-placeholder">Месяц</option>${months.map((label, index) => `<option value="${index + 1}">${label}</option>`).join('')}`;
 
-            const setDayOptions = (year, month) => {
+            const setDayOptions = (year, month, preferredDay = '') => {
                 const safeYear = Number(year) || maxYear;
                 const safeMonth = Number(month) || 1;
                 const daysInMonth = new Date(safeYear, safeMonth, 0).getDate();
-                const currentDay = Number(daySelect.value) || 1;
+                const numericPreferred = Number(preferredDay);
+                const nextDay = Number.isFinite(numericPreferred) && numericPreferred > 0
+                    ? Math.min(numericPreferred, daysInMonth)
+                    : null;
                 daySelect.innerHTML = `<option value="" class="wheel-placeholder">День</option>${Array.from({ length: daysInMonth }, (_, index) => {
                     const day = index + 1;
                     return `<option value="${day}">${day}</option>`;
                 }).join('')}`;
-                if (daySelect.value) {
-                    daySelect.value = String(Math.min(currentDay, daysInMonth));
+                if (nextDay) {
+                    daySelect.value = String(nextDay);
                 }
             };
 
@@ -408,7 +411,7 @@ function displayInput(question) {
                 if (month) {
                     monthSelect.value = String(month);
                 }
-                setDayOptions(year || maxYear, month || 1);
+                setDayOptions(year || maxYear, month || 1, dayStr || '');
                 if (day) {
                     daySelect.value = String(day);
                 }
@@ -417,11 +420,11 @@ function displayInput(question) {
             syncFromStored();
             applyBirthDate();
             monthSelect.addEventListener('change', () => {
-                setDayOptions(yearSelect.value, monthSelect.value);
+                setDayOptions(yearSelect.value, monthSelect.value, daySelect.value);
                 applyBirthDate();
             });
             yearSelect.addEventListener('change', () => {
-                setDayOptions(yearSelect.value, monthSelect.value);
+                setDayOptions(yearSelect.value, monthSelect.value, daySelect.value);
                 applyBirthDate();
             });
             daySelect.addEventListener('change', applyBirthDate);
