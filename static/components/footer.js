@@ -115,6 +115,8 @@ class CustomFooter extends HTMLElement {
         .bottom-link--disabled {
           color: #cbd5e1;
           background: #f8fafc;
+          opacity: 0.6;
+          pointer-events: none;
         }
 
         @media (min-width: 768px) {

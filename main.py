@@ -524,6 +524,8 @@ def is_profile_completed(telegram_user_id: int) -> bool:
     profile = read_payload("profiles", telegram_user_id)
     if not isinstance(profile, dict):
         return False
+    if profile.get("profile_completed") is True:
+        return True
     return profile.get("completed") is True
 
 
@@ -1609,6 +1611,9 @@ async def start_payment(payload: PaymentRequest):
 @app.post("/api/profile")
 async def save_profile(payload: ProfileSaveRequest):
     profile = payload.user_profile if isinstance(payload.user_profile, dict) else {}
+    profile_completed = profile.get("profile_completed") is True or profile.get("completed") is True
+    profile["profile_completed"] = profile_completed
+    profile["completed"] = profile_completed
     save_profile_data(payload.telegram_user_id, profile)
     return {"status": "ok"}
 
@@ -1617,7 +1622,10 @@ async def save_profile(payload: ProfileSaveRequest):
 async def get_profile(telegram_user_id: int):
     profile = load_profile(telegram_user_id)
     if not profile:
-        return {"status": "not_found"}
+        return {"status": "not_found", "profile_completed": False}
+    profile_completed = profile.get("profile_completed") is True or profile.get("completed") is True
+    profile["profile_completed"] = profile_completed
+    profile["completed"] = profile_completed
     return profile
 
 
