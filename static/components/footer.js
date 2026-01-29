@@ -206,8 +206,8 @@ class CustomFooter extends HTMLElement {
       progress: this.shadowRoot.querySelector('[data-bottom-link="progress"]'),
     };
 
-    const applyBottomNavState = (profileCompleted, devMode) => {
-      const shouldDisable = !profileCompleted && !devMode;
+    const applyBottomNavState = (profileCompleted) => {
+      const shouldDisable = !profileCompleted;
       Object.values(bottomLinks).forEach((link) => {
         if (!link) {
           return;
@@ -238,11 +238,10 @@ class CustomFooter extends HTMLElement {
       });
     };
 
-    applyBottomNavState(hasCompletedProfile, isDevMode);
+    applyBottomNavState(hasCompletedProfile);
     window.addEventListener('profile-status-updated', (event) => {
       const profileCompleted = Boolean(event?.detail?.profileCompleted);
-      const devMode = Boolean(event?.detail?.isDevMode);
-      applyBottomNavState(profileCompleted, devMode);
+      applyBottomNavState(profileCompleted);
     });
 
     const currentPath = window.location.pathname || '/';
