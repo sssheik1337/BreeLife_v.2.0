@@ -611,11 +611,9 @@ if (window.feather) {
     }
 }
 
-// Сохраняем данные анкеты на бэкенд
+// Сохраняем данные анкеты локально до завершения
 function saveUserData() {
-    if (typeof patchUserProfile === 'function' && typeof mapUserDataToUserProfile === 'function') {
-        patchUserProfile(mapUserDataToUserProfile(window.userData));
-    }
+    return;
 }
 
 async function saveProfileToServer(profile) {
