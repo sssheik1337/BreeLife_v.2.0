@@ -417,7 +417,7 @@ class PaymentRequest(BaseModel):
 
 
 class ProfileSaveRequest(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     user_profile: dict[str, object] = Field(default_factory=dict)
 
 
@@ -480,34 +480,27 @@ def verify_telegram_init_data(init_data: str, bot_token: str) -> dict[str, objec
     return parsed
 
 
-def resolve_session_user(
+def resolve_telegram_user_id(
     request: Request,
     *,
     required: bool,
 ) -> int | None:
-    """Получить telegram_user_id из cookie или пропустить в DEV режиме."""
+    """Определить telegram_user_id через сессию или DEV-режим."""
     session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
-    if not session_id:
-        if IS_DEV:
-            logger.info("DEV MODE: Telegram validation skipped")
-            return DEV_TELEGRAM_USER_ID
-        if required:
-            raise HTTPException(status_code=401, detail="Сессия не найдена.")
-        return None
-    telegram_user_id = get_session_user(session_id)
-    if not telegram_user_id:
-        if IS_DEV:
-            logger.info("DEV MODE: Telegram validation skipped")
-            return DEV_TELEGRAM_USER_ID
-        if required:
-            raise HTTPException(status_code=401, detail="Сессия недействительна.")
-        return None
-    return telegram_user_id
+    telegram_user_id = get_session_user(session_id) if session_id else None
+    if telegram_user_id:
+        return telegram_user_id
+    if IS_DEV:
+        logger.info("DEV MODE: Telegram validation skipped")
+        return DEV_TELEGRAM_USER_ID
+    if required:
+        raise HTTPException(status_code=401, detail="Telegram не авторизован.")
+    return None
 
 
 def get_current_user(request: Request) -> int:
     """Получить telegram_user_id из сессионной cookie."""
-    telegram_user_id = resolve_session_user(request, required=True)
+    telegram_user_id = resolve_telegram_user_id(request, required=True)
     if telegram_user_id is None:
         raise HTTPException(status_code=401, detail="Сессия недействительна.")
     return telegram_user_id
@@ -515,7 +508,7 @@ def get_current_user(request: Request) -> int:
 
 def optional_current_user(request: Request) -> int | None:
     """Получить telegram_user_id из cookie или вернуть None."""
-    return resolve_session_user(request, required=False)
+    return resolve_telegram_user_id(request, required=False)
 
 
 def is_profile_completed(telegram_user_id: int) -> bool:
@@ -569,25 +562,8 @@ async def healthz():
 
 @app.get("/api/me/status")
 async def me_status(request: Request):
-    session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
-    if not session_id:
-        if IS_DEV:
-            logger.info("DEV MODE: Telegram validation skipped")
-            return {
-                "authorized": True,
-                "profile_completed": is_profile_completed(DEV_TELEGRAM_USER_ID),
-                "telegram_user_id": DEV_TELEGRAM_USER_ID,
-            }
-        return {"authorized": False, "profile_completed": False, "telegram_user_id": None}
-    telegram_user_id = get_session_user(session_id)
+    telegram_user_id = resolve_telegram_user_id(request, required=False)
     if not telegram_user_id:
-        if IS_DEV:
-            logger.info("DEV MODE: Telegram validation skipped")
-            return {
-                "authorized": True,
-                "profile_completed": is_profile_completed(DEV_TELEGRAM_USER_ID),
-                "telegram_user_id": DEV_TELEGRAM_USER_ID,
-            }
         return {"authorized": False, "profile_completed": False, "telegram_user_id": None}
     return {
         "authorized": True,
@@ -598,23 +574,8 @@ async def me_status(request: Request):
 
 @app.get("/api/session")
 async def session_status(request: Request):
-    session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
-    if not session_id:
-        if IS_DEV:
-            logger.info("DEV MODE: Telegram validation skipped")
-            return {
-                "telegram_user_id": DEV_TELEGRAM_USER_ID,
-                "profile_completed": is_profile_completed(DEV_TELEGRAM_USER_ID),
-            }
-        return {"telegram_user_id": None, "profile_completed": False}
-    telegram_user_id = get_session_user(session_id)
+    telegram_user_id = resolve_telegram_user_id(request, required=False)
     if not telegram_user_id:
-        if IS_DEV:
-            logger.info("DEV MODE: Telegram validation skipped")
-            return {
-                "telegram_user_id": DEV_TELEGRAM_USER_ID,
-                "profile_completed": is_profile_completed(DEV_TELEGRAM_USER_ID),
-            }
         return {"telegram_user_id": None, "profile_completed": False}
     return {
         "telegram_user_id": telegram_user_id,
@@ -1618,17 +1579,20 @@ async def start_payment(payload: PaymentRequest):
 
 
 @app.post("/api/profile")
-async def save_profile(payload: ProfileSaveRequest):
+async def save_profile(request: Request, payload: ProfileSaveRequest):
+    telegram_user_id = resolve_telegram_user_id(request, required=True)
     profile = payload.user_profile if isinstance(payload.user_profile, dict) else {}
+    profile["telegram_user_id"] = telegram_user_id
     profile_completed = profile.get("profile_completed") is True or profile.get("completed") is True
     profile["profile_completed"] = profile_completed
     profile["completed"] = profile_completed
-    save_profile_data(payload.telegram_user_id, profile)
+    save_profile_data(telegram_user_id, profile)
     return {"status": "ok"}
 
 
 @app.get("/api/profile")
-async def get_profile(telegram_user_id: int):
+async def get_profile(request: Request):
+    telegram_user_id = resolve_telegram_user_id(request, required=True)
     profile = load_profile(telegram_user_id)
     if not profile:
         return {"status": "not_found", "profile_completed": False}
@@ -1639,13 +1603,13 @@ async def get_profile(telegram_user_id: int):
 
 
 @app.post("/api/profile/save")
-async def save_profile_legacy(payload: ProfileSaveRequest):
-    return await save_profile(payload)
+async def save_profile_legacy(request: Request, payload: ProfileSaveRequest):
+    return await save_profile(request, payload)
 
 
 @app.get("/api/profile/get")
-async def get_profile_legacy(telegram_user_id: int):
-    return await get_profile(telegram_user_id)
+async def get_profile_legacy(request: Request):
+    return await get_profile(request)
 
 
 @app.get("/api/diary")

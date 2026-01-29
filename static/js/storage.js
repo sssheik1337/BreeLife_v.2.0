@@ -753,15 +753,11 @@
     }
 
     async function saveProfileToBackend(profile) {
-        if (!profile?.telegram_user_id) {
-            return;
-        }
         try {
             await fetch('/api/profile', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    telegram_user_id: profile.telegram_user_id,
                     user_profile: profile
                 })
             });
@@ -771,12 +767,8 @@
     }
 
     async function syncProfileWithBackend() {
-        const telegramUserId = getTelegramUserId();
-        if (!telegramUserId) {
-            return getUserProfile();
-        }
         try {
-            const response = await fetch(`/api/profile?telegram_user_id=${telegramUserId}`);
+            const response = await fetch('/api/profile');
             if (!response.ok) {
                 return getUserProfile();
             }

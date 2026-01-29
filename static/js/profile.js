@@ -1742,13 +1742,8 @@ async function loadProfileFromServer() {
     if (typeof getUserProfile !== 'function' || typeof setUserProfile !== 'function') {
         return;
     }
-    const profile = getUserProfile();
-    const telegramUserId = profile.telegram_user_id;
-    if (!telegramUserId) {
-        return;
-    }
     try {
-        const response = await fetch(`/api/profile/get?telegram_user_id=${telegramUserId}`);
+        const response = await fetch('/api/profile/get');
         if (!response.ok) {
             return;
         }

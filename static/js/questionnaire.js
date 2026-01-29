@@ -616,16 +616,11 @@ async function saveProfileToServer(profile) {
     if (!profile) {
         return;
     }
-    const telegramUserId = profile.telegram_user_id ?? window.telegramAuthUserId ?? null;
-    if (!telegramUserId) {
-        return;
-    }
     try {
         await fetch('/api/profile/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                telegram_user_id: telegramUserId,
                 user_profile: profile
             })
         });
