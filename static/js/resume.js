@@ -9,6 +9,10 @@ function generateSummary() {
     
     // Get user data
     const data = window.userData || {};
+    if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
+        const profile = getUserProfile();
+        Object.assign(data, mapUserProfileToUserData(profile));
+    }
     
     // Create cards for each data point
     const dataPoints = [
@@ -391,6 +395,10 @@ function calculateWeightDifference(current, target) {
 // Calculate and display BMI
 function calculateBMI() {
     const data = window.userData || {};
+    if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
+        const profile = getUserProfile();
+        Object.assign(data, mapUserProfileToUserData(profile));
+    }
     const height = parseFloat(data.height);
     const weight = parseFloat(data.currentWeight);
     
@@ -1099,6 +1107,9 @@ function saveAndContinue() {
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
+    if (typeof syncProfileWithBackend === 'function') {
+        void syncProfileWithBackend();
+    }
     generateSummary();
     calculateBMI();
     updateCalculatedMetrics();
