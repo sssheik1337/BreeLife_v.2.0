@@ -1536,6 +1536,25 @@ async function applySubscriptionAccess() {
         return;
     }
 
+    const isDevMode = window.appIsDev === true || window.appMode === 'development';
+    if (isDevMode) {
+        paywallElement.classList.add('hidden');
+        if (payButton) {
+            payButton.disabled = true;
+            payButton.classList.add('opacity-60', 'cursor-not-allowed');
+        }
+        if (weeklyProgress) {
+            weeklyProgress.classList.remove('hidden');
+        }
+        if (dailyRings) {
+            dailyRings.classList.remove('hidden');
+        }
+        if (monthGrid) {
+            monthGrid.classList.remove('hidden');
+        }
+        return;
+    }
+
     try {
         const response = await fetch(`/api/subscription/status?telegram_user_id=${telegramUserId}`);
         if (!response.ok) {

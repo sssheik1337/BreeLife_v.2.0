@@ -737,6 +737,7 @@ async function renderTrialStatus() {
     }
 
     const profile = getUserProfile();
+    const isDevMode = window.appIsDev === true || window.appMode === 'development';
     const telegramUserId = profile.telegram_user_id;
     if (!telegramUserId) {
         statusElement.textContent = 'Telegram ID не найден';
@@ -816,6 +817,30 @@ async function renderTrialStatus() {
         return;
     }
 
+    if (subscription.subscription_status === 'disabled' || isDevMode) {
+        statusElement.textContent = 'DEV MODE: подписки отключены';
+        datesElement.textContent = 'Оплата и пробный период недоступны в режиме разработки.';
+        badgeElement.textContent = 'DEV MODE';
+        paywallElement.classList.add('hidden');
+        if (warningElement) {
+            warningElement.textContent = '';
+            warningElement.classList.add('hidden');
+        }
+        if (recommendationsSection) {
+            recommendationsSection.classList.remove('hidden');
+        }
+        if (nutritionSection) {
+            nutritionSection.classList.remove('hidden');
+        }
+        if (payButton) {
+            payButton.disabled = true;
+            payButton.classList.add('opacity-60', 'cursor-not-allowed');
+        }
+        if (trialCard) {
+            trialCard.classList.remove('is-loading');
+        }
+        return;
+    }
     if (subscription.subscription_status === 'none') {
         try {
             subscription = await startTrial();

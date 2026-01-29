@@ -443,6 +443,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     animatePageTransition();
     const appConfig = await loadAppConfig();
     window.appMode = appConfig?.mode || 'production';
+    window.appIsDev = Boolean(appConfig?.is_dev);
     const tg = window.Telegram?.WebApp;
     if (tg) {
         tg.expand();

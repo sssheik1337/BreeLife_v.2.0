@@ -1505,6 +1505,12 @@ def ensure_entry_ids(entries: list[dict[str, object]]) -> list[dict[str, object]
 
 @app.get("/api/subscription/status")
 async def subscription_status(telegram_user_id: int):
+    if IS_DEV:
+        return {
+            "subscription_status": "disabled",
+            "subscription_until": None,
+            "subscription_started_at": None,
+        }
     stored = load_subscription(telegram_user_id)
     return compute_subscription_status(stored)
 
@@ -1540,6 +1546,8 @@ async def products_search(q: str):
 
 @app.post("/api/subscription/start_trial")
 async def start_trial(payload: SubscriptionRequest):
+    if IS_DEV:
+        raise HTTPException(status_code=403, detail="DEV_MODE_DISABLED")
     stored = load_subscription(payload.telegram_user_id)
     if stored and stored.get("subscription_until"):
         return compute_subscription_status(stored)
@@ -1573,6 +1581,8 @@ async def start_trial(payload: SubscriptionRequest):
 
 @app.post("/api/payments/start")
 async def start_payment(payload: PaymentRequest):
+    if IS_DEV:
+        raise HTTPException(status_code=403, detail="DEV_MODE_DISABLED")
     if payload.days <= 0:
         raise HTTPException(status_code=400, detail="Срок продления должен быть больше нуля.")
 
