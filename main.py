@@ -1685,6 +1685,23 @@ async def save_water_entries_endpoint(payload: WaterEntriesPayload):
     entries = payload.entries if isinstance(payload.entries, list) else []
     normalized = ensure_entry_ids(entries)
     save_water_entries(payload.telegram_user_id, normalized)
+    diary_entries = load_diary_entries(payload.telegram_user_id)
+    updated_diary = list(diary_entries)
+    for entry in normalized:
+        date_value = entry.get("date")
+        water_value = entry.get("water_l")
+        if not date_value:
+            continue
+        existing = next((item for item in updated_diary if item.get("date") == date_value), None)
+        if existing:
+            existing["water_l"] = water_value
+        else:
+            updated_diary.append({
+                "date": date_value,
+                "water_l": water_value
+            })
+    if updated_diary != diary_entries:
+        save_diary_entries(payload.telegram_user_id, ensure_entry_ids(updated_diary))
     return {"status": "ok", "entries": normalized}
 
 

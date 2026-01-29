@@ -1000,6 +1000,18 @@ function updateDayMeta(entries, dateKey, waterValue, sleepValue, activityValue) 
     if (!dateKey) {
         return entries;
     }
+    const hasDayEntries = entries.some((entry) => entry.date === dateKey);
+    if (!hasDayEntries) {
+        return [
+            ...entries,
+            {
+                date: dateKey,
+                water_l: Number.isFinite(waterValue) ? waterValue : 0,
+                sleep_time: sleepValue || null,
+                activity: typeof activityValue === 'boolean' ? activityValue : false
+            }
+        ];
+    }
     return entries.map((entry) => {
         if (entry.date !== dateKey) {
             return entry;
@@ -1015,15 +1027,12 @@ function updateDayMeta(entries, dateKey, waterValue, sleepValue, activityValue) 
 
 function persistDayMeta(dateKey, waterValue, sleepValue, activityValue, options = {}) {
     const entries = readDiaryEntries();
-    if (!dateKey || entries.filter((entry) => entry.date === dateKey).length === 0) {
-        const hint = options.hintId ? document.getElementById(options.hintId) : null;
-        if (hint) {
-            hint.textContent = 'Сначала добавьте приём пищи или итоги дня, затем сохраните воду, сон и активность.';
-        }
-        if (typeof showNotification === 'function') {
-            showNotification('Сначала добавьте запись за день, затем отметьте воду.', 'error');
-        }
+    if (!dateKey) {
         return false;
+    }
+    const hint = options.hintId ? document.getElementById(options.hintId) : null;
+    if (hint) {
+        hint.textContent = '';
     }
     const updated = updateDayMeta(entries, dateKey, waterValue, sleepValue, activityValue);
     saveDiaryEntries(updated);
