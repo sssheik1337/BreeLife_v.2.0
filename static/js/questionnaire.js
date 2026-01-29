@@ -544,6 +544,9 @@ function displayInput(question) {
         }
     } else if (question.type === 'number') {
         const options = buildNumberOptions(question, currentValue);
+        const step = Number(question.step) || 1;
+        const min = Number(question.min) || 0;
+        const max = Number(question.max) || 0;
         const displayValue = formatNumberDisplay(currentValue);
         inputContainer.innerHTML = renderPickerWrapper(displayValue, '⌄');
         const panel = inputContainer.querySelector('[data-role="picker-panel"]');
@@ -554,6 +557,11 @@ function displayInput(question) {
                         <div class="wheel-list" data-role="number-list" aria-label="${question.title}"></div>
                     </div>
                 </div>
+                <div class="number-controls" data-role="number-controls">
+                    <button type="button" class="number-control" data-action="decrease" aria-label="Уменьшить">−</button>
+                    <div class="number-value" data-role="number-value"></div>
+                    <button type="button" class="number-control" data-action="increase" aria-label="Увеличить">+</button>
+                </div>
                 <button type="button" class="picker-done" data-role="picker-done">Готово</button>
             `;
         }
@@ -562,6 +570,47 @@ function displayInput(question) {
         const doneButton = inputContainer.querySelector('[data-role="picker-done"]');
         const displayText = inputContainer.querySelector('.picker-display-text');
         const numberList = inputContainer.querySelector('[data-role="number-list"]');
+        const numberValue = inputContainer.querySelector('[data-role="number-value"]');
+        const decreaseButton = inputContainer.querySelector('[data-action="decrease"]');
+        const increaseButton = inputContainer.querySelector('[data-action="increase"]');
+        let currentNumberIndex = getIndexByValue(options, currentValue);
+
+        const applyNumberValue = (value) => {
+            window.userData[getDataKey(currentQuestionIndex)] = value;
+            saveUserData();
+            updateButtonStates();
+            if (displayText) {
+                const displayValueText = formatNumberDisplay(value);
+                displayText.textContent = displayValueText || question.placeholder;
+                displayText.classList.toggle('picker-display-placeholder', !displayValueText);
+            }
+            if (numberValue) {
+                numberValue.textContent = formatNumberDisplay(value) || question.placeholder;
+            }
+        };
+
+        const clampNumber = (value) => {
+            const numeric = Number(value);
+            if (!Number.isFinite(numeric)) {
+                return min;
+            }
+            return Math.min(max, Math.max(min, numeric));
+        };
+
+        const shiftNumber = (direction) => {
+            let nextValue = currentValue ? Number(currentValue) : min;
+            if (!Number.isFinite(nextValue)) {
+                nextValue = min;
+            }
+            nextValue = clampNumber(nextValue + direction * step);
+            const formatted = Number.isInteger(step) ? Math.round(nextValue).toString() : nextValue.toFixed(1);
+            currentNumberIndex = getIndexByValue(options, formatted);
+            if (numberList) {
+                scrollToIndex(numberList, currentNumberIndex);
+                setActiveItem(numberList, currentNumberIndex);
+            }
+            applyNumberValue(formatted);
+        };
 
         const togglePicker = (isOpen) => {
             if (!panelElement || !display) {
@@ -580,6 +629,7 @@ function displayInput(question) {
         if (numberList) {
             renderWheelList(numberList, options, currentValue, (item) => {
                 const value = item.value;
+                currentNumberIndex = getIndexByValue(options, value);
                 window.userData[getDataKey(currentQuestionIndex)] = value;
                 saveUserData();
                 updateButtonStates();
@@ -587,6 +637,46 @@ function displayInput(question) {
                     const displayValueText = formatNumberDisplay(value);
                     displayText.textContent = displayValueText || question.placeholder;
                     displayText.classList.toggle('picker-display-placeholder', !displayValueText);
+                }
+                if (numberValue) {
+                    numberValue.textContent = formatNumberDisplay(value) || question.placeholder;
+                }
+            });
+        }
+        if (numberValue) {
+            numberValue.textContent = formatNumberDisplay(currentValue) || question.placeholder;
+        }
+        if (decreaseButton) {
+            decreaseButton.addEventListener('click', () => shiftNumber(-1));
+        }
+        if (increaseButton) {
+            increaseButton.addEventListener('click', () => shiftNumber(1));
+        }
+        if (panelElement) {
+            panelElement.addEventListener('wheel', (event) => {
+                if (!panelElement.classList.contains('hidden')) {
+                    event.preventDefault();
+                    shiftNumber(event.deltaY > 0 ? -1 : 1);
+                }
+            }, { passive: false });
+        }
+        if (numberList) {
+            let dragStartY = null;
+            numberList.addEventListener('touchstart', (event) => {
+                dragStartY = event.touches[0]?.clientY ?? null;
+            });
+            numberList.addEventListener('touchend', () => {
+                dragStartY = null;
+            });
+            numberList.addEventListener('touchmove', (event) => {
+                if (dragStartY === null) {
+                    return;
+                }
+                const currentY = event.touches[0]?.clientY ?? dragStartY;
+                const diff = dragStartY - currentY;
+                if (Math.abs(diff) >= ITEM_HEIGHT) {
+                    shiftNumber(diff > 0 ? 1 : -1);
+                    dragStartY = currentY;
                 }
             });
         }
