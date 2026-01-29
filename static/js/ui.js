@@ -65,6 +65,7 @@ function mapUserDataToUserProfile(data) {
     const age = calculateAge(birthDate);
 
     return {
+        telegram_user_id: window.telegramAuthUserId ?? null,
         sex: data.gender === 'male' || data.gender === 'female' ? data.gender : null,
         birth_date: birthDate,
         age: age ?? null,

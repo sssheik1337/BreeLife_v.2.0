@@ -613,7 +613,11 @@ function saveUserData() {
 }
 
 async function saveProfileToServer(profile) {
-    if (!profile || !profile.telegram_user_id) {
+    if (!profile) {
+        return;
+    }
+    const telegramUserId = profile.telegram_user_id ?? window.telegramAuthUserId ?? null;
+    if (!telegramUserId) {
         return;
     }
     try {
@@ -621,7 +625,7 @@ async function saveProfileToServer(profile) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                telegram_user_id: profile.telegram_user_id,
+                telegram_user_id: telegramUserId,
                 user_profile: profile
             })
         });
