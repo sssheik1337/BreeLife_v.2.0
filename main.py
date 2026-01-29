@@ -22,7 +22,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from config import (
     AI_ENABLED,
-    APP_MODE,
+    APP_ENV,
     APP_HOST,
     APP_NAME,
     APP_PORT,
@@ -651,7 +651,7 @@ async def app_public_url():
 @app.get("/api/app/config")
 async def app_config():
     return {
-        "mode": APP_MODE,
+        "mode": APP_ENV,
         "is_dev": IS_DEV,
         "is_prod": IS_PROD,
         "dev_user": {"id": "dev-user", "first_name": "Developer"},
