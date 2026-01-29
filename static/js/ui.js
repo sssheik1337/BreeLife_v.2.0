@@ -354,8 +354,6 @@ async function showTelegramRequiredOverlay() {
 
 async function initTelegramAuth(appConfig) {
     if (appConfig?.is_dev) {
-        window.devUser = appConfig?.dev_user || { id: 'dev-user', first_name: 'Developer' };
-        window.telegramAuthUserId = appConfig?.dev_telegram_user_id ?? null;
         showDevModeBadge();
         return true;
     }

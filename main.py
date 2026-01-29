@@ -484,14 +484,13 @@ def resolve_session_user(
     request: Request,
     *,
     required: bool,
-    allow_dev_user: bool = False,
 ) -> int | None:
     """Получить telegram_user_id из cookie или пропустить в DEV режиме."""
     session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
     if not session_id:
         if IS_DEV:
             logger.info("DEV MODE: Telegram validation skipped")
-            return DEV_TELEGRAM_USER_ID if allow_dev_user else None
+            return DEV_TELEGRAM_USER_ID
         if required:
             raise HTTPException(status_code=401, detail="Сессия не найдена.")
         return None
@@ -499,7 +498,7 @@ def resolve_session_user(
     if not telegram_user_id:
         if IS_DEV:
             logger.info("DEV MODE: Telegram validation skipped")
-            return DEV_TELEGRAM_USER_ID if allow_dev_user else None
+            return DEV_TELEGRAM_USER_ID
         if required:
             raise HTTPException(status_code=401, detail="Сессия недействительна.")
         return None
@@ -508,7 +507,7 @@ def resolve_session_user(
 
 def get_current_user(request: Request) -> int:
     """Получить telegram_user_id из сессионной cookie."""
-    telegram_user_id = resolve_session_user(request, required=True, allow_dev_user=True)
+    telegram_user_id = resolve_session_user(request, required=True)
     if telegram_user_id is None:
         raise HTTPException(status_code=401, detail="Сессия недействительна.")
     return telegram_user_id
