@@ -1,8 +1,8 @@
 // Экран "Список покупок": группировка продуктов и отметки "куплено".
 
 const SHOPPING_PRODUCTS_ENDPOINT = '/static/data/products.json';
-const SHOPPING_CHECKS_KEY = 'bree_shopping_checks_v1';
 const SHOPPING_DEFAULT_WEIGHT = 100;
+let shoppingChecksMemory = {};
 
 const SHOPPING_MEAL_DISTRIBUTION = [
     { key: 'breakfast', title: 'Завтрак', share: 0.25, items: 2 },
@@ -231,29 +231,15 @@ function buildCheckKey(item) {
 }
 
 function loadShoppingChecks() {
-    try {
-        const raw = localStorage.getItem(SHOPPING_CHECKS_KEY);
-        const parsed = raw ? JSON.parse(raw) : {};
-        return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch (error) {
-        return {};
-    }
+    return shoppingChecksMemory && typeof shoppingChecksMemory === 'object' ? shoppingChecksMemory : {};
 }
 
 function saveShoppingChecks(checks) {
-    try {
-        localStorage.setItem(SHOPPING_CHECKS_KEY, JSON.stringify(checks));
-    } catch (error) {
-        // Игнорируем ошибку сохранения, отметки остаются в памяти.
-    }
+    shoppingChecksMemory = checks && typeof checks === 'object' ? checks : {};
 }
 
 function clearShoppingChecks() {
-    try {
-        localStorage.removeItem(SHOPPING_CHECKS_KEY);
-    } catch (error) {
-        // Если локальное хранилище недоступно, просто игнорируем.
-    }
+    shoppingChecksMemory = {};
 }
 
 function copyShoppingList(grouped) {

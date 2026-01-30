@@ -65,6 +65,7 @@ function mapUserDataToUserProfile(data) {
     const age = calculateAge(birthDate);
 
     return {
+        telegram_user_id: window.telegramAuthUserId ?? null,
         sex: data.gender === 'male' || data.gender === 'female' ? data.gender : null,
         birth_date: birthDate,
         age: age ?? null,
@@ -239,44 +240,24 @@ function debounce(func, wait) {
     };
 }
 
-// Local storage helper
+const memoryStore = new Map();
+
+// Временное хранилище в памяти (без сохранения состояния приложения).
 const storage = {
     set(key, value) {
-        try {
-            localStorage.setItem(`health_bloom_${key}`, JSON.stringify(value));
-        } catch (e) {
-            return;
-        }
+        memoryStore.set(`health_bloom_${key}`, value);
     },
     
     get(key) {
-        try {
-            const item = localStorage.getItem(`health_bloom_${key}`);
-            return item ? JSON.parse(item) : null;
-        } catch (e) {
-            return null;
-        }
+        return memoryStore.get(`health_bloom_${key}`) ?? null;
     },
     
     remove(key) {
-        try {
-            localStorage.removeItem(`health_bloom_${key}`);
-        } catch (e) {
-            return;
-        }
+        memoryStore.delete(`health_bloom_${key}`);
     },
     
     clear() {
-        try {
-            // Only clear our app's data
-            Object.keys(localStorage).forEach(key => {
-                if (key.startsWith('health_bloom_')) {
-                    localStorage.removeItem(key);
-                }
-            });
-        } catch (e) {
-            return;
-        }
+        memoryStore.clear();
     }
 };
 
@@ -291,9 +272,190 @@ function animatePageTransition() {
     }, 50);
 }
 
+async function fetchBotInfo() {
+    try {
+        const response = await fetch('/api/telegram/bot-info');
+        if (!response.ok) {
+            return null;
+        }
+        return await response.json();
+    } catch (error) {
+        return null;
+    }
+}
+
+async function loadAppConfig() {
+    try {
+        const response = await fetch('/api/app/config');
+        if (!response.ok) {
+            return { mode: 'production', is_dev: false, is_prod: true };
+        }
+        return await response.json();
+    } catch (error) {
+        return { mode: 'production', is_dev: false, is_prod: true };
+    }
+}
+
+function showDevModeBadge() {
+    if (document.getElementById('dev-mode-badge')) {
+        return;
+    }
+    const badge = document.createElement('div');
+    badge.id = 'dev-mode-badge';
+    badge.className = 'dev-mode-badge';
+    badge.textContent = 'DEV MODE';
+    document.body.appendChild(badge);
+}
+
+function buildBotLink(username) {
+    if (!username) {
+        return null;
+    }
+    return `https://t.me/${username}?start=miniapp`;
+}
+
+function showTelegramAuthErrorOverlay(message) {
+    let overlay = document.getElementById('telegram-auth-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'telegram-auth-overlay';
+        overlay.className = 'telegram-auth-overlay';
+    }
+    overlay.innerHTML = `
+        <div class="telegram-auth-overlay__card">
+            <div class="telegram-auth-overlay__icon">⚠️</div>
+            <h2>Не удалось авторизоваться</h2>
+            <p>${message}</p>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+async function showTelegramRequiredOverlay() {
+    let overlay = document.getElementById('telegram-auth-overlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        return;
+    }
+    const botInfo = await fetchBotInfo();
+    const botLink = buildBotLink(botInfo?.username);
+    overlay = document.createElement('div');
+    overlay.id = 'telegram-auth-overlay';
+    overlay.className = 'telegram-auth-overlay';
+    overlay.innerHTML = `
+        <div class="telegram-auth-overlay__card">
+            <div class="telegram-auth-overlay__icon">📲</div>
+            <h2>Откройте в Telegram</h2>
+            <p>Это приложение работает только внутри Telegram.</p>
+            ${botLink ? `<a class="telegram-auth-overlay__button" href="${botLink}">Открыть в Telegram</a>` : ''}
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+async function initTelegramAuth(appConfig) {
+    if (appConfig?.is_dev) {
+        showDevModeBadge();
+        // В DEV режиме фиксируем тестовый telegram_user_id сразу,
+        // чтобы синхронизация дневника и статистики работала до запросов к API.
+        window.telegramAuthUserId = appConfig.dev_telegram_user_id ?? null;
+        return true;
+    }
+    const tg = window.Telegram?.WebApp;
+    if (!tg) {
+        console.warn('NOT_IN_TELEGRAM');
+        await showTelegramRequiredOverlay();
+        return false;
+    }
+    if (!tg.initDataUnsafe?.user) {
+        console.warn('TELEGRAM_USER_MISSING');
+        await showTelegramRequiredOverlay();
+        return false;
+    }
+    if (typeof tg.ready === 'function') {
+        tg.ready();
+    }
+    let initData = tg.initData;
+    if (!initData) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        initData = tg.initData;
+    }
+    if (!initData) {
+        console.warn('INITDATA_EMPTY');
+        showTelegramAuthErrorOverlay('Telegram не передал данные авторизации. Откройте приложение через кнопку бота.');
+        return false;
+    }
+    try {
+        const response = await fetch('/api/auth/telegram', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initData })
+        });
+        if (!response.ok) {
+            showTelegramAuthErrorOverlay('Не удалось подтвердить Telegram-сессию. Откройте приложение через бота.');
+            return false;
+        }
+        const data = await response.json();
+        if (!data?.ok) {
+            showTelegramAuthErrorOverlay('Ответ авторизации некорректен. Попробуйте открыть приложение через бота ещё раз.');
+            return false;
+        }
+        window.telegramAuthUserId = data.telegram_user_id ?? null;
+        return true;
+    } catch (error) {
+        showTelegramAuthErrorOverlay('Сервис недоступен. Попробуйте позже или откройте приложение через бота.');
+        return false;
+    }
+}
+
+async function loadProfileStatus() {
+    try {
+        const response = await fetch('/api/me/status');
+        if (!response.ok) {
+            return { authorized: false, profile_completed: false };
+        }
+        const data = await response.json();
+        return {
+            authorized: Boolean(data?.authorized),
+            profile_completed: Boolean(data?.profile_completed),
+            telegram_user_id: data?.telegram_user_id ?? null
+        };
+    } catch (error) {
+        return { authorized: false, profile_completed: false, telegram_user_id: null };
+    }
+}
+
+function redirectToQuestionnaireIfNeeded(profileCompleted) {
+    const path = window.location.pathname || '/';
+    if (path.startsWith('/questionnaire')) {
+        return;
+    }
+    if (!profileCompleted) {
+        window.location.replace('/questionnaire');
+    }
+}
+
+function syncLocalProfileCompletion(profileCompleted) {
+    if (profileCompleted) {
+        return;
+    }
+    window.profileCompleted = false;
+}
+
+function notifyProfileStatus() {
+    const detail = {
+        profileCompleted: window.profileCompleted === true,
+        isDevMode: window.appIsDev === true || window.appMode === 'development'
+    };
+    window.dispatchEvent(new CustomEvent('profile-status-updated', { detail }));
+}
+
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     animatePageTransition();
+    const appConfig = await loadAppConfig();
+    window.appMode = appConfig?.mode || 'production';
+    window.appIsDev = Boolean(appConfig?.is_dev);
     const tg = window.Telegram?.WebApp;
     if (tg) {
         tg.expand();
@@ -315,6 +477,22 @@ document.addEventListener('DOMContentLoaded', function() {
             root.style.setProperty('--tg-hint-color', theme.hint_color);
         }
     }
+    const isAuthorized = await initTelegramAuth(appConfig);
+    if (!isAuthorized) {
+        return;
+    }
+    const status = await loadProfileStatus();
+    window.profileCompleted = status.profile_completed;
+    if (status.telegram_user_id) {
+        window.telegramAuthUserId = status.telegram_user_id;
+    }
+    if (typeof window.syncProfileWithBackend === 'function') {
+        await window.syncProfileWithBackend();
+    }
+    syncLocalProfileCompletion(status.profile_completed);
+    redirectToQuestionnaireIfNeeded(status.profile_completed);
+    notifyProfileStatus();
+
     // Add ripple effect to all primary buttons
     document.querySelectorAll('.btn-primary').forEach(button => {
         button.addEventListener('click', function(e) {
@@ -357,12 +535,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    const storedRegistrationDate = localStorage.getItem('health_bloom_registration_date');
-    if (storedRegistrationDate) {
-        userData.registrationDate = storedRegistrationDate;
-    } else {
-        const now = new Date().toISOString();
-        userData.registrationDate = now;
-        localStorage.setItem('health_bloom_registration_date', now);
+    if (!userData.registrationDate) {
+        userData.registrationDate = new Date().toISOString();
     }
 });

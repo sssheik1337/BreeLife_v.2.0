@@ -186,12 +186,6 @@ function initQuestionnaire() {
         totalSteps.textContent = questions.length.toString();
     }
     
-    // Load saved progress
-    const savedIndex = localStorage.getItem('health_bloom_question_index');
-    if (savedIndex && savedIndex !== "0") {
-        currentQuestionIndex = parseInt(savedIndex);
-    }
-    
     // Load saved answers
     loadSavedAnswers();
     
@@ -202,7 +196,7 @@ function initQuestionnaire() {
     setupEventListeners();
 }
 
-// Load saved answers from localStorage
+// Загружаем сохранённые ответы из профиля
 function loadSavedAnswers() {
     if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
         const profile = getUserProfile();
@@ -210,15 +204,7 @@ function loadSavedAnswers() {
         return;
     }
 
-    const savedData = localStorage.getItem('health_bloom_user_data');
-    if (savedData) {
-        try {
-            const data = JSON.parse(savedData);
-            Object.assign(window.userData, data);
-        } catch (e) {
-            return null;
-        }
-    }
+    return null;
 }
 // Display current question
 function displayQuestion() {
@@ -313,7 +299,33 @@ function displayOptions(options) {
 // Display input field for date/number questions
 function displayInput(question) {
     const currentValue = window.userData[getDataKey(currentQuestionIndex)];
-    
+
+    const unitLabels = {
+        cm: 'см',
+        kg: 'кг'
+    };
+
+    const formatDateDisplay = (value) => {
+        if (!value) {
+            return null;
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return null;
+        }
+        return date.toLocaleDateString('ru-RU', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+    };
+
+    const renderPickerWrapper = (content) => `
+        <div class="picker-panel picker-panel--inline" data-role="picker-panel">
+            ${content}
+        </div>
+    `;
+
     if (question.type === 'date') {
         const today = new Date();
         const minYear = 1900;
@@ -322,21 +334,21 @@ function displayInput(question) {
             'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
             'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
         ];
-        inputContainer.innerHTML = `
+        inputContainer.innerHTML = renderPickerWrapper(`
             <div class="wheel-picker" data-role="birth-picker">
                 <div class="wheel-column">
-                    <select id="birth-day" class="wheel-select" size="7" aria-label="День рождения"></select>
+                    <select id="birth-day" class="wheel-select" aria-label="День рождения"></select>
                 </div>
                 <div class="wheel-column">
-                    <select id="birth-month" class="wheel-select" size="7" aria-label="Месяц рождения">
+                    <select id="birth-month" class="wheel-select" aria-label="Месяц рождения">
                         ${months.map((label, index) => `<option value="${index + 1}">${label}</option>`).join('')}
                     </select>
                 </div>
                 <div class="wheel-column">
-                    <select id="birth-year" class="wheel-select" size="7" aria-label="Год рождения"></select>
+                    <select id="birth-year" class="wheel-select" aria-label="Год рождения"></select>
                 </div>
             </div>
-        `;
+        `);
         const daySelect = document.getElementById('birth-day');
         const monthSelect = document.getElementById('birth-month');
         const yearSelect = document.getElementById('birth-year');
@@ -345,37 +357,48 @@ function displayInput(question) {
             for (let year = maxYear; year >= minYear; year -= 1) {
                 years.push(`<option value="${year}">${year}</option>`);
             }
-            yearSelect.innerHTML = years.join('');
+            yearSelect.innerHTML = `<option value="" class="wheel-placeholder">Год</option>${years.join('')}`;
+            monthSelect.innerHTML = `<option value="" class="wheel-placeholder">Месяц</option>${months.map((label, index) => `<option value="${index + 1}">${label}</option>`).join('')}`;
 
-            const setDayOptions = (year, month) => {
+            const setDayOptions = (year, month, preferredDay = '') => {
                 const safeYear = Number(year) || maxYear;
                 const safeMonth = Number(month) || 1;
                 const daysInMonth = new Date(safeYear, safeMonth, 0).getDate();
-                const currentDay = Number(daySelect.value) || 1;
-                daySelect.innerHTML = Array.from({ length: daysInMonth }, (_, index) => {
+                const numericPreferred = Number(preferredDay);
+                const nextDay = Number.isFinite(numericPreferred) && numericPreferred > 0
+                    ? Math.min(numericPreferred, daysInMonth)
+                    : null;
+                daySelect.innerHTML = `<option value="" class="wheel-placeholder">День</option>${Array.from({ length: daysInMonth }, (_, index) => {
                     const day = index + 1;
                     return `<option value="${day}">${day}</option>`;
-                }).join('');
-                daySelect.value = String(Math.min(currentDay, daysInMonth));
+                }).join('')}`;
+                if (nextDay) {
+                    daySelect.value = String(nextDay);
+                }
             };
 
             const applyBirthDate = () => {
                 const year = Number(yearSelect.value);
                 const month = Number(monthSelect.value);
                 const day = Number(daySelect.value);
-                if (!year || !month || !day) {
-                    window.userData[getDataKey(currentQuestionIndex)] = '';
-                } else {
+                const hasAllFields = Boolean(year && month && day);
+                if (hasAllFields) {
                     const formatted = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                     window.userData[getDataKey(currentQuestionIndex)] = formatted;
+                } else {
+                    window.userData[getDataKey(currentQuestionIndex)] = '';
                 }
                 saveUserData();
                 updateButtonStates();
+                return;
             };
 
             const syncFromStored = () => {
                 if (!currentValue) {
-                    setDayOptions(maxYear, 1);
+                    setDayOptions(null, null);
+                    daySelect.value = '';
+                    monthSelect.value = '';
+                    yearSelect.value = '';
                     return;
                 }
                 const [yearStr, monthStr, dayStr] = currentValue.split('-');
@@ -388,7 +411,7 @@ function displayInput(question) {
                 if (month) {
                     monthSelect.value = String(month);
                 }
-                setDayOptions(year || maxYear, month || 1);
+                setDayOptions(year || maxYear, month || 1, dayStr || '');
                 if (day) {
                     daySelect.value = String(day);
                 }
@@ -397,41 +420,43 @@ function displayInput(question) {
             syncFromStored();
             applyBirthDate();
             monthSelect.addEventListener('change', () => {
-                setDayOptions(yearSelect.value, monthSelect.value);
+                setDayOptions(yearSelect.value, monthSelect.value, daySelect.value);
                 applyBirthDate();
             });
             yearSelect.addEventListener('change', () => {
-                setDayOptions(yearSelect.value, monthSelect.value);
+                setDayOptions(yearSelect.value, monthSelect.value, daySelect.value);
                 applyBirthDate();
             });
             daySelect.addEventListener('change', applyBirthDate);
         }
     } else if (question.type === 'number') {
         const options = buildNumberOptions(question, currentValue);
-        inputContainer.innerHTML = `
-            <select id="question-input" class="form-input">
-                <option value="">${question.placeholder}</option>
-                ${options}
-            </select>
-        `;
-    }
-    
-    // Add input event listener
-    const input = document.getElementById('question-input');
-    if (input) {
-        input.value = currentValue || '';
-        input.addEventListener('input', () => {
-            const value = input.value;
-            window.userData[getDataKey(currentQuestionIndex)] = value;
-            saveUserData();
-            updateButtonStates();
-        });
-        input.addEventListener('change', () => {
-            const value = input.value;
-            window.userData[getDataKey(currentQuestionIndex)] = value;
-            saveUserData();
-            updateButtonStates();
-        });
+        const labelText = question.unit ? `${question.unit}` : 'значение';
+        inputContainer.innerHTML = renderPickerWrapper(`
+            <div class="number-picker">
+                <span class="number-picker__label">${labelText}</span>
+                <select id="question-input" class="form-input">
+                    <option value="">${question.placeholder}</option>
+                    ${options}
+                </select>
+            </div>
+        `);
+        const input = document.getElementById('question-input');
+        if (input) {
+            input.value = currentValue || '';
+            input.addEventListener('input', () => {
+                const value = input.value;
+                window.userData[getDataKey(currentQuestionIndex)] = value;
+                saveUserData();
+                updateButtonStates();
+            });
+            input.addEventListener('change', () => {
+                const value = input.value;
+                window.userData[getDataKey(currentQuestionIndex)] = value;
+                saveUserData();
+                updateButtonStates();
+            });
+        }
     }
     
     // Update button state immediately if there's already a value
@@ -515,17 +540,13 @@ if (window.feather) {
     }
 }
 
-// Save user data to localStorage
+// Сохраняем данные анкеты локально до завершения
 function saveUserData() {
-    localStorage.setItem('health_bloom_user_data', JSON.stringify(window.userData));
-    localStorage.setItem('health_bloom_question_index', currentQuestionIndex.toString());
-    if (typeof patchUserProfile === 'function' && typeof mapUserDataToUserProfile === 'function') {
-        patchUserProfile(mapUserDataToUserProfile(window.userData));
-    }
+    return;
 }
 
 async function saveProfileToServer(profile) {
-    if (!profile || !profile.telegram_user_id) {
+    if (!profile) {
         return;
     }
     try {
@@ -533,7 +554,6 @@ async function saveProfileToServer(profile) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                telegram_user_id: profile.telegram_user_id,
                 user_profile: profile
             })
         });
@@ -557,8 +577,6 @@ function setupEventListeners() {
                 mappedProfile.completed = true;
                 profile = patchUserProfile(mappedProfile);
             }
-            localStorage.setItem('hasCompletedQuiz', 'true');
-            localStorage.setItem('profile_completed', 'true');
             if (!profile && typeof getUserProfile === 'function') {
                 profile = getUserProfile();
             }

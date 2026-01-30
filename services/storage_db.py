@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -62,6 +63,14 @@ TABLES = {
             updated_at TEXT NOT NULL
         )
     """,
+    "sessions": """
+        CREATE TABLE IF NOT EXISTS sessions (
+            session_id TEXT PRIMARY KEY,
+            telegram_user_id INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            last_seen_at TEXT NOT NULL
+        )
+    """,
 }
 
 
@@ -111,3 +120,40 @@ def write_payload(table: str, telegram_user_id: int, payload: dict | list) -> No
             (telegram_user_id, serialized, updated_at),
         )
         connection.commit()
+
+
+def create_session(telegram_user_id: int) -> str:
+    """Создать сессию пользователя и вернуть её идентификатор."""
+    session_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.execute(
+            """
+            INSERT INTO sessions (session_id, telegram_user_id, created_at, last_seen_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (session_id, telegram_user_id, now, now),
+        )
+        connection.commit()
+    return session_id
+
+
+def get_session_user(session_id: str) -> int | None:
+    """Получить telegram_user_id по session_id и обновить last_seen_at."""
+    if not session_id:
+        return None
+    now = datetime.now(timezone.utc).isoformat()
+    with sqlite3.connect(DB_PATH) as connection:
+        cursor = connection.execute(
+            "SELECT telegram_user_id FROM sessions WHERE session_id = ?",
+            (session_id,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+        connection.execute(
+            "UPDATE sessions SET last_seen_at = ? WHERE session_id = ?",
+            (now, session_id),
+        )
+        connection.commit()
+    return int(row[0])
