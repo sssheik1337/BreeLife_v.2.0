@@ -1439,34 +1439,6 @@ function bindGlobalDiaryHandlers() {
 
     // Делаем обработчики устойчивыми, чтобы клики не терялись из-за состояния DOM.
     document.addEventListener('click', (event) => {
-        const fabToggle = event.target.closest('[data-action="fab-toggle"]');
-        if (fabToggle) {
-            toggleFabMenu();
-            return;
-        }
-
-        const fabBackdrop = event.target.closest('#diary-fab-backdrop');
-        if (fabBackdrop) {
-            closeFabMenu();
-            return;
-        }
-
-        const fabItem = event.target.closest('[data-fab-action]');
-        if (fabItem) {
-            const action = fabItem.dataset.fabAction;
-            closeFabMenu();
-            if (action === 'meal') {
-                openProductsForm(getSelectedDate(), fabItem.dataset.meal || 'breakfast');
-            } else if (action === 'water') {
-                const waterInput = document.getElementById('diary-day-water');
-                waterInput?.focus();
-            } else if (action === 'sleep') {
-                const sleepInput = document.getElementById('diary-day-sleep');
-                sleepInput?.focus();
-            }
-            return;
-        }
-
         const quickWaterButton = event.target.closest('[data-action="quick-water"]');
         if (quickWaterButton) {
             const target = quickWaterButton.dataset.waterTarget;
@@ -1600,6 +1572,27 @@ function bindGlobalDiaryHandlers() {
             renderDayScreen(readDiaryEntries(), dateKey);
         }
     });
+
+    document.addEventListener('fab:add', (event) => {
+        const detail = event?.detail;
+        if (typeof detail === 'string') {
+            if (detail === 'water') {
+                const waterInput = document.getElementById('diary-day-water');
+                waterInput?.focus();
+                return;
+            }
+            return;
+        }
+        if (detail?.action === 'meal') {
+            openProductsForm(getSelectedDate(), detail.meal || 'breakfast');
+            return;
+        }
+        if (detail?.action === 'water') {
+            const waterInput = document.getElementById('diary-day-water');
+            waterInput?.focus();
+            return;
+        }
+    });
 }
 
 function getSelectedDate() {
@@ -1648,24 +1641,6 @@ function openProductsForm(dateKey, mealKey) {
         dateValue,
         mealSelect?.value || mealKey || 'breakfast'
     );
-}
-
-function closeFabMenu() {
-    const menu = document.getElementById('diary-fab-menu');
-    const backdrop = document.getElementById('diary-fab-backdrop');
-    menu?.classList.add('hidden');
-    backdrop?.classList.add('hidden');
-}
-
-function toggleFabMenu() {
-    const menu = document.getElementById('diary-fab-menu');
-    const backdrop = document.getElementById('diary-fab-backdrop');
-    if (!menu || !backdrop) {
-        return;
-    }
-    const isHidden = menu.classList.contains('hidden');
-    menu.classList.toggle('hidden', !isHidden);
-    backdrop.classList.toggle('hidden', !isHidden);
 }
 
 async function refreshDiary() {
@@ -1736,9 +1711,6 @@ async function initDiary() {
     const initialDate = getDateFromUrl();
     const initialMode = getModeFromUrl();
     const initialMeal = getMealFromUrl();
-    const params = new URLSearchParams(window.location.search);
-    const openFabOnLoad = params.get('fab') === '1';
-
     setActiveMode(initialMode);
 
     const resolvedDate = initialDate || ensureDiaryDate();
@@ -1813,7 +1785,6 @@ async function initDiary() {
             updateProductsForm(merged, dateKey, meal);
             await refreshDiary();
             setActiveMode(MODE_DAY);
-            closeFabMenu();
             if (typeof showNotification === 'function') {
                 showNotification('Приём пищи сохранён.');
             }
@@ -1907,14 +1878,6 @@ async function initDiary() {
 
     renderDailySummary(readDiaryEntries(), resolvedDate);
     renderDayScreen(readDiaryEntries(), resolvedDate);
-
-    if (openFabOnLoad) {
-        toggleFabMenu();
-        params.delete('fab');
-        const next = params.toString();
-        const nextUrl = next ? `${window.location.pathname}?${next}` : window.location.pathname;
-        window.history.replaceState({}, '', nextUrl);
-    }
 
     void refreshDiary();
 }

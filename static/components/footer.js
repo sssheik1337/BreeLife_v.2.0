@@ -136,10 +136,90 @@ class CustomFooter extends HTMLElement {
           text-decoration: none;
           box-shadow: 0 12px 24px rgba(16, 185, 129, 0.3);
           z-index: 2;
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+          cursor: pointer;
         }
 
         .bottom-fab:active {
           transform: scale(0.98);
+        }
+
+        .bottom-fab.is-open {
+          transform: scale(1.05) rotate(45deg);
+          box-shadow: 0 16px 30px rgba(16, 185, 129, 0.4);
+        }
+
+        .bottom-fab:disabled,
+        .bottom-fab.bottom-link--disabled {
+          cursor: not-allowed;
+          opacity: 0.6;
+          transform: none;
+          box-shadow: none;
+        }
+
+        .fab-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.35);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.2s ease;
+          z-index: 45;
+        }
+
+        .fab-backdrop.is-open {
+          opacity: 1;
+          pointer-events: auto;
+        }
+
+        .fab-menu {
+          position: fixed;
+          left: 50%;
+          bottom: 110px;
+          transform: translateX(-50%) scale(0.96);
+          opacity: 0;
+          pointer-events: none;
+          display: flex;
+          flex-direction: column;
+          gap: 0.6rem;
+          padding: 0.75rem;
+          background: white;
+          border-radius: 1.25rem;
+          box-shadow: 0 20px 40px rgba(15, 23, 42, 0.2);
+          border: 1px solid #e2e8f0;
+          z-index: 50;
+          transition: opacity 0.2s ease, transform 0.2s ease;
+          min-width: min(320px, 90vw);
+        }
+
+        .fab-menu.is-open {
+          opacity: 1;
+          pointer-events: auto;
+          transform: translateX(-50%) scale(1);
+        }
+
+        .fab-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.5rem;
+          padding: 0.75rem 0.9rem;
+          border-radius: 0.9rem;
+          border: none;
+          background: #f8fafc;
+          color: #0f172a;
+          font-weight: 600;
+          font-size: 0.95rem;
+          cursor: pointer;
+          transition: background 0.2s ease, transform 0.2s ease;
+        }
+
+        .fab-item:active {
+          transform: scale(0.98);
+        }
+
+        .fab-item:hover {
+          background: #ecfdf3;
         }
 
         @media (min-width: 768px) {
@@ -149,10 +229,22 @@ class CustomFooter extends HTMLElement {
             width: min(420px, 100%);
             border-radius: 1rem 1rem 0 0;
           }
+
+          .fab-menu {
+            bottom: 120px;
+          }
         }
       </style>
 
       <div class="bottom-spacer" aria-hidden="true"></div>
+      <div class="fab-backdrop" aria-hidden="true"></div>
+      <div class="fab-menu" role="menu" aria-hidden="true">
+        <button type="button" class="fab-item" data-fab-action="meal" data-meal="breakfast">➕ Завтрак</button>
+        <button type="button" class="fab-item" data-fab-action="meal" data-meal="lunch">➕ Обед</button>
+        <button type="button" class="fab-item" data-fab-action="meal" data-meal="dinner">➕ Ужин</button>
+        <button type="button" class="fab-item" data-fab-action="meal" data-meal="snack">➕ Перекус</button>
+        <button type="button" class="fab-item" data-fab-action="water">💧 Вода</button>
+      </div>
       
       <footer class="footer">
         <div class="footer-content">
@@ -181,7 +273,7 @@ class CustomFooter extends HTMLElement {
             <span class="bottom-link__icon" aria-hidden="true">🍽️</span>
             <span>Дневник</span>
           </a>
-          <a href="/diary?fab=1" class="bottom-fab" aria-label="Добавить запись">+</a>
+          <button type="button" class="bottom-fab" aria-label="Добавить запись">+</button>
           <a href="/meal-plan" class="bottom-link" data-bottom-link="meal-plan">
             <span class="bottom-link__icon" aria-hidden="true">📋</span>
             <span>Рацион</span>
@@ -230,6 +322,40 @@ class CustomFooter extends HTMLElement {
       progress: this.shadowRoot.querySelector('[data-bottom-link="progress"]'),
     };
     const bottomFab = this.shadowRoot.querySelector('.bottom-fab');
+    const fabMenu = this.shadowRoot.querySelector('.fab-menu');
+    const fabBackdrop = this.shadowRoot.querySelector('.fab-backdrop');
+    const fabItems = this.shadowRoot.querySelectorAll('[data-fab-action]');
+
+    const closeFabMenu = () => {
+      if (!fabMenu || !fabBackdrop || !bottomFab) {
+        return;
+      }
+      fabMenu.classList.remove('is-open');
+      fabBackdrop.classList.remove('is-open');
+      bottomFab.classList.remove('is-open');
+      fabMenu.setAttribute('aria-hidden', 'true');
+    };
+
+    const openFabMenu = () => {
+      if (!fabMenu || !fabBackdrop || !bottomFab) {
+        return;
+      }
+      fabMenu.classList.add('is-open');
+      fabBackdrop.classList.add('is-open');
+      bottomFab.classList.add('is-open');
+      fabMenu.setAttribute('aria-hidden', 'false');
+    };
+
+    const toggleFabMenu = () => {
+      if (!fabMenu || !fabBackdrop) {
+        return;
+      }
+      if (fabMenu.classList.contains('is-open')) {
+        closeFabMenu();
+      } else {
+        openFabMenu();
+      }
+    };
 
     const applyBottomNavState = (profileCompleted) => {
       const shouldDisable = !profileCompleted;
@@ -262,15 +388,12 @@ class CustomFooter extends HTMLElement {
         }
       });
       if (bottomFab) {
-        if (!bottomFab.dataset.originalHref) {
-          bottomFab.dataset.originalHref = bottomFab.getAttribute('href') || '/diary';
-        }
         if (shouldDisable) {
-          bottomFab.href = '/questionnaire';
           bottomFab.classList.add('bottom-link--disabled');
+          bottomFab.disabled = true;
         } else {
-          bottomFab.href = bottomFab.dataset.originalHref;
           bottomFab.classList.remove('bottom-link--disabled');
+          bottomFab.disabled = false;
         }
       }
     };
@@ -299,6 +422,43 @@ class CustomFooter extends HTMLElement {
         return;
       }
       link.classList.toggle('bottom-link--active', key === activeKey);
+    });
+
+    if (bottomFab) {
+      bottomFab.addEventListener('click', () => {
+        if (bottomFab.classList.contains('bottom-link--disabled') || bottomFab.disabled) {
+          return;
+        }
+        toggleFabMenu();
+      });
+    }
+
+    if (fabBackdrop) {
+      fabBackdrop.addEventListener('click', () => {
+        closeFabMenu();
+      });
+    }
+
+    fabItems.forEach((item) => {
+      item.addEventListener('click', () => {
+        if (bottomFab?.classList.contains('bottom-link--disabled')) {
+          return;
+        }
+        const action = item.dataset.fabAction || '';
+        const meal = item.dataset.meal || '';
+        closeFabMenu();
+        document.dispatchEvent(
+          new CustomEvent('fab:add', {
+            detail: action === 'meal' ? { action, meal } : action
+          })
+        );
+      });
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeFabMenu();
+      }
     });
   }
 }
