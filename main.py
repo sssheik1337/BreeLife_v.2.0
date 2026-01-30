@@ -34,6 +34,7 @@ from config import (
     YANDEX_GPT_API_KEY,
     YANDEX_GPT_FOLDER_ID,
     TELEGRAM_BOT_TOKEN,
+    TELEGRAM_WEBHOOK_URL,
     PUBLIC_APP_URL,
     PUBLIC_BASE_URL,
     ADMIN_LOGIN,
@@ -76,8 +77,10 @@ async def lifespan(app: FastAPI):
         logger.error("TELEGRAM_BOT_TOKEN не задан. Бот не будет запущен.")
         yield
         return
-    if not PUBLIC_BASE_URL:
-        logger.error("PUBLIC_BASE_URL не задан. Вебхук не будет установлен.")
+    if not TELEGRAM_WEBHOOK_URL and not PUBLIC_BASE_URL:
+        logger.error(
+            "TELEGRAM_WEBHOOK_URL или PUBLIC_BASE_URL не заданы. Вебхук не будет установлен."
+        )
         yield
         return
     bot = Bot(token=TELEGRAM_BOT_TOKEN)
@@ -119,7 +122,7 @@ async def lifespan(app: FastAPI):
             reply_markup=keyboard,
         )
 
-    webhook_url = f"{PUBLIC_BASE_URL.rstrip('/')}/telegram/webhook"
+    webhook_url = TELEGRAM_WEBHOOK_URL or f"{PUBLIC_BASE_URL.rstrip('/')}/telegram/webhook"
     try:
         result = await bot.set_webhook(webhook_url)
         logger.info("INFO: Webhook установлен: %s (result=%s)", webhook_url, result)
