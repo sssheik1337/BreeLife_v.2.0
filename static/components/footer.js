@@ -264,11 +264,11 @@ class CustomFooter extends HTMLElement {
           <span>Добавить перекус</span>
           <span class="fab-menu__meta">🌗</span>
         </a>
-        <a class="fab-menu__item" href="/diary#diary-day-water" role="menuitem">
+        <a class="fab-menu__item" href="/diary?mode=water" role="menuitem" data-fab-mode="water">
           <span>Добавить воду</span>
           <span class="fab-menu__meta">💧</span>
         </a>
-        <a class="fab-menu__item" href="/diary#diary-day-sleep" role="menuitem">
+        <a class="fab-menu__item" href="/diary?mode=sleep" role="menuitem" data-fab-mode="sleep">
           <span>Добавить сон</span>
           <span class="fab-menu__meta">🌙</span>
         </a>
@@ -381,7 +381,12 @@ class CustomFooter extends HTMLElement {
       });
 
       fabMenu.querySelectorAll('a[href]').forEach((link) => {
-        link.addEventListener('click', () => {
+        link.addEventListener('click', (event) => {
+          const mode = link.dataset.fabMode;
+          if (currentPath.startsWith('/diary') && mode) {
+            event.preventDefault();
+            window.dispatchEvent(new CustomEvent('diary-open-panel', { detail: { mode } }));
+          }
           setFabOpenState(false);
         });
       });

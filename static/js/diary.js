@@ -168,6 +168,27 @@ function getDayMetaForDate(entries, dateKey) {
     };
 }
 
+function getDayMetaSnapshot(dateKey) {
+    const meta = getDayMetaForDate(readDayMetaEntries(), dateKey);
+    return {
+        waterLiters: meta.water_ml > 0 ? meta.water_ml / 1000 : 0,
+        sleepHours: Number.isFinite(meta.sleep_hours) ? meta.sleep_hours : null,
+        activityFlag: Boolean(meta.activity_flag)
+    };
+}
+
+function persistDayMetaWithExisting(dateKey, values, options = {}) {
+    if (!dateKey) {
+        return false;
+    }
+    const snapshot = getDayMetaSnapshot(dateKey);
+    const waterValue = Number.isFinite(values?.waterLiters) ? values.waterLiters : snapshot.waterLiters;
+    const sleepHours = Number.isFinite(values?.sleepHours) ? values.sleepHours : snapshot.sleepHours;
+    const sleepValue = sleepHours !== null ? formatSleepHours(sleepHours) : '';
+    const activityValue = typeof values?.activityFlag === 'boolean' ? values.activityFlag : snapshot.activityFlag;
+    return persistDayMeta(dateKey, waterValue, sleepValue, activityValue, options);
+}
+
 function formatSleepHours(hours) {
     if (!Number.isFinite(hours) || hours < 0) {
         return '';
@@ -191,6 +212,63 @@ function parseSleepHours(value) {
         return null;
     }
     return hours + minutes / 60;
+}
+
+function parseTimeToMinutes(value) {
+    if (!value || typeof value !== 'string') {
+        return null;
+    }
+    const [hours, minutes] = value.split(':').map((part) => Number(part));
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+        return null;
+    }
+    if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+        return null;
+    }
+    return hours * 60 + minutes;
+}
+
+function addDaysToDate(dateKey, daysToAdd) {
+    if (!dateKey) {
+        return '';
+    }
+    const [year, month, day] = dateKey.split('-').map((value) => Number(value));
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+        return '';
+    }
+    const date = new Date(Date.UTC(year, month - 1, day));
+    date.setUTCDate(date.getUTCDate() + daysToAdd);
+    return date.toISOString().slice(0, 10);
+}
+
+function formatShortDate(dateKey) {
+    if (!dateKey) {
+        return '';
+    }
+    const [year, month, day] = dateKey.split('-').map((value) => Number(value));
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+        return '';
+    }
+    return `${String(day).padStart(2, '0')}.${String(month).padStart(2, '0')}.${year}`;
+}
+
+function calculateSleepDuration(dateKey, startTime, endTime) {
+    const startMinutes = parseTimeToMinutes(startTime);
+    const endMinutes = parseTimeToMinutes(endTime);
+    if (!Number.isFinite(startMinutes) || !Number.isFinite(endMinutes)) {
+        return null;
+    }
+    let durationMinutes = endMinutes - startMinutes;
+    let endDateKey = dateKey;
+    if (durationMinutes <= 0) {
+        durationMinutes += 24 * 60;
+        endDateKey = addDaysToDate(dateKey, 1);
+    }
+    return {
+        durationMinutes,
+        durationHours: durationMinutes / 60,
+        endDateKey
+    };
 }
 
 function readHabitEntries() {
@@ -1208,11 +1286,9 @@ function bindGlobalDiaryHandlers() {
             if (action === 'meal') {
                 openProductsForm(getSelectedDate(), fabItem.dataset.meal || 'breakfast');
             } else if (action === 'water') {
-                const waterInput = document.getElementById('diary-day-water');
-                waterInput?.focus();
+                openWaterPanel(getSelectedDate());
             } else if (action === 'sleep') {
-                const sleepInput = document.getElementById('diary-day-sleep');
-                sleepInput?.focus();
+                openSleepPanel(getSelectedDate());
             }
             return;
         }
@@ -1228,6 +1304,11 @@ function bindGlobalDiaryHandlers() {
                     sleepInput: document.getElementById('diary-day-sleep'),
                     activityInput: document.getElementById('diary-day-activity'),
                     hintId: 'diary-day-hint'
+                },
+                panel: {
+                    dateInput: document.getElementById('diary-water-date'),
+                    waterInput: document.getElementById('diary-water-amount'),
+                    hintId: 'diary-water-hint'
                 }
             };
             const config = target ? targets[target] : null;
@@ -1238,9 +1319,13 @@ function bindGlobalDiaryHandlers() {
             const current = Number(config.waterInput.value) || 0;
             const next = Math.round((current + amount) * 100) / 100;
             config.waterInput.value = next.toString();
-            const sleepValue = config.sleepInput?.value || '';
-            const activityValue = Boolean(config.activityInput?.checked);
-            persistDayMeta(dateKey, next, sleepValue, activityValue, { hintId: config.hintId });
+            if (target === 'day') {
+                const sleepValue = config.sleepInput?.value || '';
+                const activityValue = Boolean(config.activityInput?.checked);
+                persistDayMeta(dateKey, next, sleepValue, activityValue, { hintId: config.hintId });
+            } else {
+                persistDayMetaWithExisting(dateKey, { waterLiters: next }, { hintId: config.hintId });
+            }
             return;
         }
 
@@ -1375,6 +1460,90 @@ function closeProductsPanel() {
     }
 }
 
+function openWaterPanel(dateKey) {
+    const panel = document.getElementById('diary-water-panel');
+    const dateInput = document.getElementById('diary-water-date');
+    const waterInput = document.getElementById('diary-water-amount');
+    const hint = document.getElementById('diary-water-hint');
+    const resolvedDate = dateKey || ensureDiaryDate();
+    if (dateInput && resolvedDate) {
+        dateInput.value = resolvedDate;
+    }
+    if (waterInput) {
+        const snapshot = getDayMetaSnapshot(resolvedDate);
+        waterInput.value = snapshot.waterLiters > 0 ? snapshot.waterLiters.toFixed(2) : '';
+    }
+    if (hint) {
+        hint.textContent = 'Добавьте воду и сохраните, чтобы обновить дневник.';
+    }
+    panel?.classList.remove('hidden');
+}
+
+function closeWaterPanel() {
+    const panel = document.getElementById('diary-water-panel');
+    panel?.classList.add('hidden');
+}
+
+function updateSleepPanelSummary() {
+    const dateInput = document.getElementById('diary-sleep-date');
+    const startInput = document.getElementById('diary-sleep-start');
+    const endInput = document.getElementById('diary-sleep-end');
+    const summary = document.getElementById('diary-sleep-summary');
+    if (!summary) {
+        return;
+    }
+    const dateKey = dateInput?.value;
+    const startTime = startInput?.value;
+    const endTime = endInput?.value;
+    if (!dateKey || !startTime || !endTime) {
+        summary.textContent = 'Укажите время начала и окончания сна.';
+        return;
+    }
+    const result = calculateSleepDuration(dateKey, startTime, endTime);
+    if (!result) {
+        summary.textContent = 'Не удалось рассчитать сон. Проверьте время.';
+        return;
+    }
+    const hours = Math.floor(result.durationMinutes / 60);
+    const minutes = Math.round(result.durationMinutes % 60);
+    const durationLabel = minutes ? `${hours} ч ${minutes} мин` : `${hours} ч`;
+    const endDateLabel = result.endDateKey && result.endDateKey !== dateKey
+        ? `Окончание: ${formatShortDate(result.endDateKey)}.`
+        : 'Окончание в тот же день.';
+    summary.textContent = `Длительность: ${durationLabel}. ${endDateLabel}`;
+}
+
+function openSleepPanel(dateKey) {
+    const panel = document.getElementById('diary-sleep-panel');
+    const dateInput = document.getElementById('diary-sleep-date');
+    const startInput = document.getElementById('diary-sleep-start');
+    const endInput = document.getElementById('diary-sleep-end');
+    const hint = document.getElementById('diary-sleep-hint');
+    const resolvedDate = dateKey || ensureDiaryDate();
+    if (dateInput && resolvedDate) {
+        dateInput.value = resolvedDate;
+    }
+    if (startInput) {
+        startInput.value = '';
+    }
+    if (endInput) {
+        endInput.value = '';
+    }
+    if (hint) {
+        const snapshot = getDayMetaSnapshot(resolvedDate);
+        hint.textContent = snapshot.sleepHours !== null
+            ? `Сейчас сохранено: ${formatSleepHours(snapshot.sleepHours)}.`
+            : 'Сон пока не заполнен.';
+    }
+    updateSleepPanelSummary();
+    panel?.classList.remove('hidden');
+}
+
+function closeSleepPanel() {
+    const panel = document.getElementById('diary-sleep-panel');
+    panel?.classList.add('hidden');
+}
+
 function openProductsForm(dateKey, mealKey) {
     const dateValue = dateKey || ensureDiaryDate();
     openProductsPanel();
@@ -1482,9 +1651,21 @@ async function initDiary() {
     const productsItems = document.getElementById('diary-products-items');
     const addItemButton = document.getElementById('diary-add-item');
     const deleteProductsButton = document.getElementById('diary-products-delete');
+    const waterPanel = document.getElementById('diary-water-panel');
+    const waterForm = document.getElementById('diary-water-form');
+    const waterDate = document.getElementById('diary-water-date');
+    const waterAmount = document.getElementById('diary-water-amount');
+    const waterClose = document.getElementById('diary-water-close');
+    const sleepPanel = document.getElementById('diary-sleep-panel');
+    const sleepForm = document.getElementById('diary-sleep-form');
+    const sleepDate = document.getElementById('diary-sleep-date');
+    const sleepStart = document.getElementById('diary-sleep-start');
+    const sleepEnd = document.getElementById('diary-sleep-end');
+    const sleepClose = document.getElementById('diary-sleep-close');
     const initialDate = getDateFromUrl();
     const initialMeal = getMealFromUrl();
     const params = new URLSearchParams(window.location.search);
+    const initialMode = params.get('mode');
 
     if (params.has('mode')) {
         params.delete('mode');
@@ -1521,10 +1702,16 @@ async function initDiary() {
     renderDayScreen(readDiaryEntries(), resolvedDate);
 
     if (window.location.hash === '#diary-day-water') {
-        document.getElementById('diary-day-water')?.focus();
+        openWaterPanel(resolvedDate);
     }
     if (window.location.hash === '#diary-day-sleep') {
-        document.getElementById('diary-day-sleep')?.focus();
+        openSleepPanel(resolvedDate);
+    }
+    if (initialMode === 'water') {
+        openWaterPanel(resolvedDate);
+    }
+    if (initialMode === 'sleep') {
+        openSleepPanel(resolvedDate);
     }
 
     if (addItemButton && productsItems) {
@@ -1654,6 +1841,87 @@ async function initDiary() {
     await refreshDiary();
         });
     }
+
+    if (waterForm) {
+        waterForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const dateKey = waterDate?.value || getSelectedDate();
+            if (!dateKey) {
+                return;
+            }
+            const waterValue = Number(waterAmount?.value) || 0;
+            persistDayMetaWithExisting(dateKey, { waterLiters: Math.max(0, waterValue) }, { hintId: 'diary-water-hint' });
+            closeWaterPanel();
+            if (typeof showNotification === 'function') {
+                showNotification('Вода сохранена.');
+            }
+        });
+    }
+
+    if (waterClose) {
+        waterClose.addEventListener('click', () => {
+            closeWaterPanel();
+        });
+    }
+
+    if (waterPanel) {
+        waterPanel.addEventListener('click', (event) => {
+            if (event.target === waterPanel) {
+                closeWaterPanel();
+            }
+        });
+    }
+
+    if (sleepForm) {
+        sleepForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const dateKey = sleepDate?.value || getSelectedDate();
+            if (!dateKey) {
+                return;
+            }
+            const result = calculateSleepDuration(dateKey, sleepStart?.value || '', sleepEnd?.value || '');
+            if (!result) {
+                if (typeof showNotification === 'function') {
+                    showNotification('Укажите корректное время сна.', 'error');
+                }
+                return;
+            }
+            persistDayMetaWithExisting(dateKey, { sleepHours: result.durationHours }, { hintId: 'diary-sleep-hint' });
+            closeSleepPanel();
+            if (typeof showNotification === 'function') {
+                showNotification('Сон сохранён.');
+            }
+        });
+    }
+
+    sleepStart?.addEventListener('input', updateSleepPanelSummary);
+    sleepEnd?.addEventListener('input', updateSleepPanelSummary);
+    sleepDate?.addEventListener('change', updateSleepPanelSummary);
+
+    if (sleepClose) {
+        sleepClose.addEventListener('click', () => {
+            closeSleepPanel();
+        });
+    }
+
+    if (sleepPanel) {
+        sleepPanel.addEventListener('click', (event) => {
+            if (event.target === sleepPanel) {
+                closeSleepPanel();
+            }
+        });
+    }
+
+    window.addEventListener('diary-open-panel', (event) => {
+        const mode = event?.detail?.mode;
+        const dateKey = getSelectedDate() || ensureDiaryDate();
+        if (mode === 'water') {
+            openWaterPanel(dateKey);
+        }
+        if (mode === 'sleep') {
+            openSleepPanel(dateKey);
+        }
+    });
 
     renderDayScreen(readDiaryEntries(), resolvedDate);
 
