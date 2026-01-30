@@ -1496,7 +1496,7 @@ function updateSleepPanelSummary() {
     const startTime = startInput?.value;
     const endTime = endInput?.value;
     if (!dateKey || !startTime || !endTime) {
-        summary.textContent = 'Укажите время начала и окончания сна.';
+        summary.textContent = 'Укажите дату отхода ко сну и время пробуждения.';
         return;
     }
     const result = calculateSleepDuration(dateKey, startTime, endTime);
@@ -1533,7 +1533,7 @@ function openSleepPanel(dateKey) {
         const snapshot = getDayMetaSnapshot(resolvedDate);
         hint.textContent = snapshot.sleepHours !== null
             ? `Сейчас сохранено: ${formatSleepHours(snapshot.sleepHours)}.`
-            : 'Сон пока не заполнен.';
+            : 'Дата — день, когда вы легли спать. Если пробуждение после полуночи, оно сохранится на следующий день.';
     }
     updateSleepPanelSummary();
     panel?.classList.remove('hidden');
