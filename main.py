@@ -65,31 +65,7 @@ bot = None
 dispatcher = None
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info("🚀 FastAPI started")
-    global bot, dispatcher
-    if not TELEGRAM_BOT_TOKEN:
-        logger.error("TELEGRAM_BOT_TOKEN не задан. Бот не будет запущен.")
-        yield
-        return
-    if not PUBLIC_BASE_URL:
-        logger.error("PUBLIC_BASE_URL не задан. Вебхук не будет установлен.")
-        yield
-        return
-    bot = Bot(token=TELEGRAM_BOT_TOKEN)
-    dispatcher = Dispatcher()
-    try:
-        await bot.set_chat_menu_button(
-            menu_button=types.MenuButtonWebApp(
-                text=APP_NAME,
-                web_app=types.WebAppInfo(url=PUBLIC_APP_URL),
-            )
-        )
-        logger.info("INFO: Кнопка приложения установлена в меню чата")
-    except Exception as exc:
-        logger.error("Не удалось установить кнопку приложения в меню чата: %s", exc)
-
+def register_telegram_handlers(dispatcher: Dispatcher) -> None:
     @dispatcher.message(Command("start"))
     async def handle_start(message: types.Message) -> None:
         user_id = message.from_user.id if message.from_user else "unknown"
@@ -112,6 +88,33 @@ async def lifespan(app: FastAPI):
             )
         except Exception as exc:
             logger.error("Не удалось отправить ответ на /start: %s", exc)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("🚀 FastAPI started")
+    global bot, dispatcher
+    if not TELEGRAM_BOT_TOKEN:
+        logger.error("TELEGRAM_BOT_TOKEN не задан. Бот не будет запущен.")
+        yield
+        return
+    if not PUBLIC_BASE_URL:
+        logger.error("PUBLIC_BASE_URL не задан. Вебхук не будет установлен.")
+        yield
+        return
+    bot = Bot(token=TELEGRAM_BOT_TOKEN)
+    dispatcher = Dispatcher()
+    register_telegram_handlers(dispatcher)
+    try:
+        await bot.set_chat_menu_button(
+            menu_button=types.MenuButtonWebApp(
+                text=APP_NAME,
+                web_app=types.WebAppInfo(url=PUBLIC_APP_URL),
+            )
+        )
+        logger.info("INFO: Кнопка приложения установлена в меню чата")
+    except Exception as exc:
+        logger.error("Не удалось установить кнопку приложения в меню чата: %s", exc)
 
     webhook_url = f"{PUBLIC_BASE_URL.rstrip('/')}/telegram/webhook"
     try:
@@ -725,11 +728,22 @@ async def telegram_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Некорректный webhook payload.") from exc
     update_type = update.get("message") and "message" or update.get("callback_query") and "callback_query" or "unknown"
     from_user = None
+    message_text = None
     if update.get("message") and isinstance(update["message"], dict):
         from_user = update["message"].get("from", {}).get("id")
-    logger.info("INFO: Получен webhook update (type=%s, from=%s)", update_type, from_user)
+        message_text = update["message"].get("text")
+    logger.info(
+        "INFO: Получен webhook update (type=%s, from=%s, text=%s)",
+        update_type,
+        from_user,
+        message_text,
+    )
     update_obj = types.Update.model_validate(update)
-    await dispatcher.feed_update(bot, update_obj)
+    try:
+        await dispatcher.feed_update(bot, update_obj)
+    except Exception as exc:
+        logger.error("Ошибка при обработке webhook update: %s", exc)
+        raise HTTPException(status_code=500, detail="Не удалось обработать webhook update.") from exc
     return {"ok": True}
 
 
