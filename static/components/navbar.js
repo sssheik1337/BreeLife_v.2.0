@@ -209,14 +209,15 @@ class CustomNavbar extends HTMLElement {
               <span class="nav-emoji" aria-hidden="true">📋</span>
             </button>
             <div class="menu-panel" id="menu-panel">
-              <a href="/profile" class="menu-link">Профиль</a>
               <div class="menu-section">Дневник</div>
               <a href="/diary?mode=summary" class="menu-link">Итоги дня</a>
               <a href="/diary?mode=products" class="menu-link">По продуктам</a>
               <a href="/foods" class="menu-link">Список продуктов</a>
               <a href="/my-products" class="menu-link">Мои продукты</a>
-              <a href="/meal-plan" class="menu-link">Рацион</a>
+              <div class="menu-section">Разделы</div>
               <a href="/menu#plans" class="menu-link">Тарифы</a>
+              <a href="/questionnaire" class="menu-link">Опрос</a>
+              <a href="/resume" class="menu-link">Сводка</a>
               <span class="menu-link menu-link--disabled" title="Скоро">Настройки <span>Скоро</span></span>
             </div>
           </div>

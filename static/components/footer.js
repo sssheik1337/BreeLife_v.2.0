@@ -25,26 +25,6 @@ class CustomFooter extends HTMLElement {
           color: #64748b;
           line-height: 1.5;
         }
-.footer-links {
-          display: flex;
-          justify-content: center;
-          gap: 1.5rem;
-          margin-top: 1rem;
-          margin-bottom: 1.5rem;
-        }
-        
-        .footer-link {
-          color: #34d399;
-          text-decoration: none;
-          font-weight: 500;
-          font-size: 0.875rem;
-          transition: color 0.2s ease;
-        }
-        
-        .footer-link:active {
-          color: #10b981;
-        }
-        
         .copyright {
           font-size: 0.75rem;
           color: #94a3b8;
@@ -58,10 +38,6 @@ class CustomFooter extends HTMLElement {
             padding: 1.75rem 1.25rem 1.25rem;
           }
           
-          .footer-links {
-            flex-wrap: wrap;
-            gap: 1rem 1.5rem;
-          }
         }
 
         .bottom-spacer {
@@ -133,13 +109,92 @@ class CustomFooter extends HTMLElement {
           display: flex;
           align-items: center;
           justify-content: center;
-          text-decoration: none;
           box-shadow: 0 12px 24px rgba(16, 185, 129, 0.3);
           z-index: 2;
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+          cursor: pointer;
+        }
+
+        .bottom-fab--open {
+          transform: scale(1.05);
+          box-shadow: 0 16px 30px rgba(16, 185, 129, 0.35);
+        }
+
+        .bottom-fab--disabled {
+          opacity: 0.6;
+          cursor: default;
+          pointer-events: none;
         }
 
         .bottom-fab:active {
           transform: scale(0.98);
+        }
+
+        .fab-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.25);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.2s ease;
+          z-index: 38;
+        }
+
+        .fab-backdrop.is-open {
+          opacity: 1;
+          pointer-events: auto;
+        }
+
+        .fab-menu {
+          position: fixed;
+          left: 50%;
+          bottom: 96px;
+          transform: translate(-50%, 16px);
+          opacity: 0;
+          pointer-events: none;
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          width: min(320px, calc(100% - 2rem));
+          background: white;
+          border-radius: 1rem;
+          padding: 0.75rem;
+          box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+          border: 1px solid #e2e8f0;
+          transition: opacity 0.2s ease, transform 0.2s ease;
+          z-index: 39;
+        }
+
+        .fab-menu.is-open {
+          opacity: 1;
+          pointer-events: auto;
+          transform: translate(-50%, 0);
+        }
+
+        .fab-menu__item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.75rem;
+          padding: 0.65rem 0.85rem;
+          border-radius: 0.75rem;
+          background: #f8fafc;
+          color: #0f172a;
+          font-weight: 600;
+          text-decoration: none;
+          font-size: 0.85rem;
+          transition: background 0.2s ease, transform 0.2s ease;
+        }
+
+        .fab-menu__item:active {
+          background: #ecfdf3;
+          transform: scale(0.98);
+        }
+
+        .fab-menu__meta {
+          font-size: 0.75rem;
+          color: #64748b;
+          font-weight: 500;
         }
 
         @media (min-width: 768px) {
@@ -148,6 +203,10 @@ class CustomFooter extends HTMLElement {
             transform: translateX(-50%);
             width: min(420px, 100%);
             border-radius: 1rem 1rem 0 0;
+          }
+
+          .fab-menu {
+            bottom: 110px;
           }
         }
       </style>
@@ -159,12 +218,6 @@ class CustomFooter extends HTMLElement {
           <p class="footer-text">
             🌱 Посадите здоровье сегодня, расцветёте завтра. Делайте маленькие шаги каждый день к более здоровому себе.
           </p>
-<div class="footer-links">
-            <a href="/profile" class="footer-link" data-link="home">Главная</a>
-            <a href="/questionnaire" class="footer-link" data-link="questionnaire">Опрос</a>
-            <a href="/resume" class="footer-link" data-link="resume">Сводка</a>
-            <a href="/profile" class="footer-link" data-link="profile">Профиль</a>
-</div>
           <div class="copyright">
             © ${new Date().getFullYear()} Health Bloom • Сделано с ❤️ для здоровой жизни
           </div>
@@ -181,7 +234,7 @@ class CustomFooter extends HTMLElement {
             <span class="bottom-link__icon" aria-hidden="true">🍽️</span>
             <span>Дневник</span>
           </a>
-          <a href="/diary?fab=1" class="bottom-fab" aria-label="Добавить запись">+</a>
+          <button type="button" class="bottom-fab" data-fab-toggle aria-label="Добавить запись" aria-expanded="false">+</button>
           <a href="/meal-plan" class="bottom-link" data-bottom-link="meal-plan">
             <span class="bottom-link__icon" aria-hidden="true">📋</span>
             <span>Рацион</span>
@@ -192,36 +245,37 @@ class CustomFooter extends HTMLElement {
           </a>
         </div>
       </nav>
+
+      <div class="fab-backdrop" data-fab-backdrop aria-hidden="true"></div>
+      <div class="fab-menu" id="fab-menu" role="menu" aria-label="Быстрое добавление">
+        <a class="fab-menu__item" href="/diary?mode=products&meal=breakfast" role="menuitem">
+          <span>Добавить завтрак</span>
+          <span class="fab-menu__meta">☀️</span>
+        </a>
+        <a class="fab-menu__item" href="/diary?mode=products&meal=lunch" role="menuitem">
+          <span>Добавить обед</span>
+          <span class="fab-menu__meta">🌤</span>
+        </a>
+        <a class="fab-menu__item" href="/diary?mode=products&meal=dinner" role="menuitem">
+          <span>Добавить ужин</span>
+          <span class="fab-menu__meta">🌙</span>
+        </a>
+        <a class="fab-menu__item" href="/diary?mode=products&meal=snack" role="menuitem">
+          <span>Добавить перекус</span>
+          <span class="fab-menu__meta">🌗</span>
+        </a>
+        <a class="fab-menu__item" href="/diary?mode=day#diary-day-water" role="menuitem">
+          <span>Добавить воду</span>
+          <span class="fab-menu__meta">💧</span>
+        </a>
+        <a class="fab-menu__item" href="/diary?mode=day#diary-day-sleep" role="menuitem">
+          <span>Добавить сон</span>
+          <span class="fab-menu__meta">🌙</span>
+        </a>
+      </div>
     `;
 
-    const links = {
-      home: this.shadowRoot.querySelector('[data-link="home"]'),
-      questionnaire: this.shadowRoot.querySelector('[data-link="questionnaire"]'),
-      resume: this.shadowRoot.querySelector('[data-link="resume"]'),
-      profile: this.shadowRoot.querySelector('[data-link="profile"]'),
-    };
-
     const hasCompletedProfile = window.profileCompleted === true;
-    const isDevMode = window.appIsDev === true || window.appMode === 'development';
-
-    if (links.home) {
-      links.home.href = '/profile';
-    }
-    if (links.resume) {
-      links.resume.href = '/resume';
-    }
-    if (links.profile) {
-      links.profile.href = '/profile';
-    }
-      if (links.questionnaire) {
-        if (hasCompletedProfile) {
-          links.questionnaire.textContent = 'Редактировать данные';
-          links.questionnaire.href = '/questionnaire?edit=1';
-        } else {
-          links.questionnaire.textContent = 'Опрос';
-          links.questionnaire.href = '/questionnaire';
-      }
-    }
 
     const bottomLinks = {
       profile: this.shadowRoot.querySelector('[data-bottom-link="profile"]'),
@@ -229,7 +283,19 @@ class CustomFooter extends HTMLElement {
       mealPlan: this.shadowRoot.querySelector('[data-bottom-link="meal-plan"]'),
       progress: this.shadowRoot.querySelector('[data-bottom-link="progress"]'),
     };
-    const bottomFab = this.shadowRoot.querySelector('.bottom-fab');
+    const bottomFab = this.shadowRoot.querySelector('[data-fab-toggle]');
+    const fabMenu = this.shadowRoot.getElementById('fab-menu');
+    const fabBackdrop = this.shadowRoot.querySelector('[data-fab-backdrop]');
+
+    const setFabOpenState = (isOpen) => {
+      if (!bottomFab || !fabMenu || !fabBackdrop) {
+        return;
+      }
+      bottomFab.classList.toggle('bottom-fab--open', isOpen);
+      bottomFab.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      fabMenu.classList.toggle('is-open', isOpen);
+      fabBackdrop.classList.toggle('is-open', isOpen);
+    };
 
     const applyBottomNavState = (profileCompleted) => {
       const shouldDisable = !profileCompleted;
@@ -262,15 +328,15 @@ class CustomFooter extends HTMLElement {
         }
       });
       if (bottomFab) {
-        if (!bottomFab.dataset.originalHref) {
-          bottomFab.dataset.originalHref = bottomFab.getAttribute('href') || '/diary';
-        }
         if (shouldDisable) {
-          bottomFab.href = '/questionnaire';
-          bottomFab.classList.add('bottom-link--disabled');
+          bottomFab.classList.add('bottom-fab--disabled');
+          bottomFab.setAttribute('aria-disabled', 'true');
+          bottomFab.setAttribute('disabled', 'true');
+          setFabOpenState(false);
         } else {
-          bottomFab.href = bottomFab.dataset.originalHref;
-          bottomFab.classList.remove('bottom-link--disabled');
+          bottomFab.classList.remove('bottom-fab--disabled');
+          bottomFab.removeAttribute('aria-disabled');
+          bottomFab.removeAttribute('disabled');
         }
       }
     };
@@ -300,6 +366,33 @@ class CustomFooter extends HTMLElement {
       }
       link.classList.toggle('bottom-link--active', key === activeKey);
     });
+
+    if (bottomFab && fabMenu && fabBackdrop) {
+      bottomFab.addEventListener('click', (event) => {
+        event.preventDefault();
+        if (bottomFab.classList.contains('bottom-fab--disabled')) {
+          return;
+        }
+        setFabOpenState(!fabMenu.classList.contains('is-open'));
+      });
+
+      fabBackdrop.addEventListener('click', () => {
+        setFabOpenState(false);
+      });
+
+      fabMenu.querySelectorAll('a[href]').forEach((link) => {
+        link.addEventListener('click', () => {
+          setFabOpenState(false);
+        });
+      });
+
+      document.addEventListener('click', (event) => {
+        const isInside = event.composedPath().includes(this);
+        if (!isInside) {
+          setFabOpenState(false);
+        }
+      });
+    }
   }
 }
 
