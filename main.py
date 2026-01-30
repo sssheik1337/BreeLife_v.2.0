@@ -289,11 +289,69 @@ def renderAdminProducts(
     products = loadAdminProducts()
     config = loadAdminConfig()
     groups = collect_product_groups(products, config if isinstance(config, dict) else {})
+    selected_group = request.query_params.get("group")
+    if selected_group:
+        selected_group = selected_group.strip()
+    if selected_group == "all":
+        selected_group = None
+    if selected_group == "ungrouped":
+        filtered_products = [product for product in products if not str(product.get("group") or "").strip()]
+    elif selected_group:
+        filtered_products = [
+            product
+            for product in products
+            if str(product.get("group") or "").strip() == selected_group
+        ]
+    else:
+        filtered_products = products
+    grouped_products: dict[str, list[dict[str, object]]] = {}
+    for product in filtered_products:
+        group = str(product.get("group") or "").strip()
+        if not group:
+            group = "Без группы"
+        grouped_products.setdefault(group, []).append(product)
+    group_items = []
+    group_counts = {group: 0 for group in groups}
+    ungrouped_count = 0
+    for product in products:
+        group = str(product.get("group") or "").strip()
+        if not group:
+            ungrouped_count += 1
+        else:
+            group_counts[group] = group_counts.get(group, 0) + 1
+    group_items.append(
+        {
+            "label": "Все группы",
+            "value": "all",
+            "count": len(products),
+            "selected": selected_group is None,
+        }
+    )
+    for group in groups:
+        group_items.append(
+            {
+                "label": group,
+                "value": group,
+                "count": group_counts.get(group, 0),
+                "selected": selected_group == group,
+            }
+        )
+    if ungrouped_count:
+        group_items.append(
+            {
+                "label": "Без группы",
+                "value": "ungrouped",
+                "count": ungrouped_count,
+                "selected": selected_group == "ungrouped",
+            }
+        )
     return templates.TemplateResponse(
         "admin_products.html",
         {
             "request": request,
-            "products": products,
+            "products": grouped_products,
+            "selected_group": selected_group or "all",
+            "group_items": group_items,
             "groups": groups,
             "error": error,
             "success": success,
@@ -307,7 +365,8 @@ def renderAdminGroups(
     success: str | None = None,
 ) -> HTMLResponse:
     config = loadAdminConfig()
-    groups = normalize_group_list(config.get("product_groups") if isinstance(config, dict) else [])
+    products = loadAdminProducts()
+    groups = collect_product_groups(products, config if isinstance(config, dict) else {})
     return templates.TemplateResponse(
         "admin_groups.html",
         {
