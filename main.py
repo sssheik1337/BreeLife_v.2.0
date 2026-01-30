@@ -116,7 +116,11 @@ async def lifespan(app: FastAPI):
     webhook_url = f"{PUBLIC_BASE_URL.rstrip('/')}/telegram/webhook"
     try:
         # В DEBUG режиме не сбрасываем апдейты, чтобы /start не терялся при перезапусках.
-        result = await bot.set_webhook(webhook_url, drop_pending_updates=not DEBUG)
+        result = await bot.set_webhook(
+            webhook_url,
+            drop_pending_updates=not DEBUG,
+            allowed_updates=["message", "callback_query"],
+        )
         logger.info("INFO: Webhook установлен: %s (result=%s)", webhook_url, result)
     except Exception as exc:
         logger.error("Не удалось установить webhook: %s", exc)
@@ -710,10 +714,15 @@ async def auth_telegram(payload: TelegramAuthRequest):
 
 
 @app.post("/telegram/webhook")
-async def telegram_webhook(update: dict):
+async def telegram_webhook(request: Request):
     if not bot or not dispatcher:
         logger.error("Telegram webhook вызван без инициализированного бота.")
         raise HTTPException(status_code=503, detail="Бот не инициализирован.")
+    try:
+        update = await request.json()
+    except Exception as exc:
+        logger.error("Не удалось прочитать webhook update: %s", exc)
+        raise HTTPException(status_code=400, detail="Некорректный webhook payload.") from exc
     update_type = update.get("message") and "message" or update.get("callback_query") and "callback_query" or "unknown"
     from_user = None
     if update.get("message") and isinstance(update["message"], dict):
