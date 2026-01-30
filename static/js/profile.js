@@ -1755,31 +1755,6 @@ async function loadProfileFromServer() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const navigateToDiary = (event, link) => {
-        if (!link) {
-            return;
-        }
-        event.preventDefault();
-        const target = link.getAttribute('href') || '/diary';
-        window.location.href = target;
-    };
-
-    document.addEventListener(
-        'click',
-        (event) => {
-            const quickActionLink = event.target.closest('.quick-actions a[href^="/diary"]');
-            if (quickActionLink) {
-                navigateToDiary(event, quickActionLink);
-            }
-        },
-        true
-    );
-
-    const quickDiaryLinks = document.querySelectorAll('[data-quick-action^="diary"]');
-    quickDiaryLinks.forEach((link) => {
-        link.addEventListener('click', (event) => navigateToDiary(event, link));
-    });
-
     const rangeButtons = Array.from(document.querySelectorAll('[data-calorie-range]'));
     let activeRange = '7';
     if (rangeButtons.length) {
