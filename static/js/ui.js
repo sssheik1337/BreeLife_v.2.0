@@ -388,6 +388,35 @@ async function showTelegramRequiredOverlay() {
     document.body.appendChild(overlay);
 }
 
+function wait(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForTelegramWebApp(timeoutMs = 2000) {
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            return tg;
+        }
+        await wait(100);
+    }
+    return window.Telegram?.WebApp || null;
+}
+
+async function waitForTelegramInitData(tg, timeoutMs = 2000) {
+    if (!tg) {
+        return '';
+    }
+    const startedAt = Date.now();
+    let initData = tg.initData;
+    while (!initData && Date.now() - startedAt < timeoutMs) {
+        await wait(100);
+        initData = tg.initData;
+    }
+    return initData || '';
+}
+
 async function initTelegramAuth(appConfig) {
     if (appConfig?.is_dev) {
         showDevModeBadge();
@@ -398,12 +427,16 @@ async function initTelegramAuth(appConfig) {
         return true;
     }
     setTelegramAccessLock(true);
-    const tg = window.Telegram?.WebApp;
+    const tg = await waitForTelegramWebApp();
     if (!tg) {
         console.warn('NOT_IN_TELEGRAM');
         await showTelegramRequiredOverlay();
         return false;
     }
+    console.debug('TELEGRAM_WEBAPP_READY', {
+        initDataLength: tg.initData ? tg.initData.length : 0,
+        hasUser: Boolean(tg.initDataUnsafe?.user)
+    });
     if (!tg.initDataUnsafe?.user) {
         console.warn('TELEGRAM_USER_MISSING');
         await showTelegramRequiredOverlay();
@@ -412,11 +445,7 @@ async function initTelegramAuth(appConfig) {
     if (typeof tg.ready === 'function') {
         tg.ready();
     }
-    let initData = tg.initData;
-    if (!initData) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        initData = tg.initData;
-    }
+    let initData = await waitForTelegramInitData(tg);
     if (!initData) {
         console.warn('INITDATA_EMPTY');
         showTelegramAuthErrorOverlay('Telegram не передал данные авторизации. Откройте приложение через кнопку бота.');
