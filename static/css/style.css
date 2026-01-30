@@ -240,10 +240,90 @@ input[type="date"].form-input {
     appearance: none;
 }
 
+input[type="time"].form-input {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
 input,
 select,
 textarea {
     font-size: 16px;
+}
+
+.telegram-auth-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.72);
+    z-index: 9999;
+    padding: 24px;
+}
+
+.telegram-auth-overlay__card {
+    max-width: 360px;
+    width: 100%;
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 28px;
+    text-align: center;
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.2);
+    color: #0f172a;
+}
+
+.telegram-auth-overlay__card h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 12px 0 8px;
+}
+
+.telegram-auth-overlay__card p {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0;
+}
+
+.telegram-auth-overlay__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 16px;
+    padding: 12px 18px;
+    border-radius: 999px;
+    background: #10b981;
+    color: #ffffff;
+    font-weight: 600;
+    text-decoration: none;
+    box-shadow: 0 10px 20px rgba(16, 185, 129, 0.25);
+}
+
+.telegram-auth-overlay__button:active {
+    background: #059669;
+}
+
+.telegram-auth-overlay__icon {
+    font-size: 32px;
+}
+
+/* Бейдж для DEV режима */
+.dev-mode-badge {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    background: rgba(15, 23, 42, 0.9);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 6px 10px;
+    border-radius: 999px;
+    z-index: 9998;
+    text-transform: uppercase;
 }
 
 @media (hover: none) {
