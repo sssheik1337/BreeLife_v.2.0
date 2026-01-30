@@ -13,7 +13,7 @@ from pathlib import Path
 import requests
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -494,6 +494,7 @@ def resolve_telegram_user_id(
     request: Request,
     *,
     required: bool,
+    response: Response | None = None,
 ) -> int | None:
     """Определить telegram_user_id через сессию или DEV-режим."""
     session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
@@ -503,22 +504,53 @@ def resolve_telegram_user_id(
     if IS_DEV:
         logger.info("DEV MODE: Telegram validation skipped")
         return DEV_TELEGRAM_USER_ID
+    init_data = request.headers.get("x-telegram-init-data")
+    if init_data:
+        logger.info("INFO: initData получена из заголовка (len=%s)", len(init_data))
+        try:
+            parsed = verify_telegram_init_data(init_data, TELEGRAM_BOT_TOKEN)
+        except ValueError as exc:
+            logger.info("INFO: initData невалидна: %s", exc)
+        else:
+            user_raw = parsed.get("user")
+            if user_raw:
+                try:
+                    user_data = json.loads(user_raw)
+                except json.JSONDecodeError:
+                    user_data = {}
+                telegram_user_id = user_data.get("id")
+                if telegram_user_id:
+                    session_id = create_session(int(telegram_user_id))
+                    if response is not None:
+                        response.set_cookie(
+                            TELEGRAM_SESSION_COOKIE,
+                            session_id,
+                            httponly=True,
+                            samesite="lax",
+                            secure=IS_PROD,
+                        )
+                    logger.info(
+                        "INFO: Создана сессия по initData (user_id=%s, session_id=%s)",
+                        telegram_user_id,
+                        session_id,
+                    )
+                    return int(telegram_user_id)
     if required:
         raise HTTPException(status_code=401, detail="Telegram не авторизован.")
     return None
 
 
-def get_current_user(request: Request) -> int:
+def get_current_user(request: Request, response: Response) -> int:
     """Получить telegram_user_id из сессионной cookie."""
-    telegram_user_id = resolve_telegram_user_id(request, required=True)
+    telegram_user_id = resolve_telegram_user_id(request, required=True, response=response)
     if telegram_user_id is None:
         raise HTTPException(status_code=401, detail="Сессия недействительна.")
     return telegram_user_id
 
 
-def optional_current_user(request: Request) -> int | None:
+def optional_current_user(request: Request, response: Response) -> int | None:
     """Получить telegram_user_id из cookie или вернуть None."""
-    return resolve_telegram_user_id(request, required=False)
+    return resolve_telegram_user_id(request, required=False, response=response)
 
 
 def is_profile_completed(telegram_user_id: int) -> bool:
@@ -571,8 +603,8 @@ async def healthz():
 
 
 @app.get("/api/me/status")
-async def me_status(request: Request):
-    telegram_user_id = resolve_telegram_user_id(request, required=False)
+async def me_status(request: Request, response: Response):
+    telegram_user_id = resolve_telegram_user_id(request, required=False, response=response)
     if not telegram_user_id:
         return {"authorized": False, "profile_completed": False, "telegram_user_id": None}
     return {
@@ -583,8 +615,8 @@ async def me_status(request: Request):
 
 
 @app.get("/api/session")
-async def session_status(request: Request):
-    telegram_user_id = resolve_telegram_user_id(request, required=False)
+async def session_status(request: Request, response: Response):
+    telegram_user_id = resolve_telegram_user_id(request, required=False, response=response)
     if not telegram_user_id:
         return {"telegram_user_id": None, "profile_completed": False}
     return {
@@ -636,6 +668,8 @@ async def auth_telegram(payload: TelegramAuthRequest):
     if IS_DEV:
         logger.info("DEV MODE: Telegram validation skipped")
         return {"ok": True, "telegram_user_id": DEV_TELEGRAM_USER_ID}
+    if payload.initData:
+        logger.info("INFO: /api/auth/telegram initData получена (len=%s)", len(payload.initData))
     try:
         parsed = verify_telegram_init_data(payload.initData, TELEGRAM_BOT_TOKEN)
     except ValueError as exc:
@@ -653,6 +687,7 @@ async def auth_telegram(payload: TelegramAuthRequest):
         raise HTTPException(status_code=400, detail="telegram_user_id отсутствует.")
     logger.info("INFO: initData валидна для user_id=%s", telegram_user_id)
     session_id = create_session(int(telegram_user_id))
+    logger.info("INFO: Создана сессия (user_id=%s, session_id=%s)", telegram_user_id, session_id)
     response = JSONResponse(
         {
             "ok": True,
@@ -1589,8 +1624,8 @@ async def start_payment(payload: PaymentRequest):
 
 
 @app.post("/api/profile")
-async def save_profile(request: Request, payload: ProfileSaveRequest):
-    telegram_user_id = resolve_telegram_user_id(request, required=True)
+async def save_profile(request: Request, response: Response, payload: ProfileSaveRequest):
+    telegram_user_id = resolve_telegram_user_id(request, required=True, response=response)
     profile = payload.user_profile if isinstance(payload.user_profile, dict) else {}
     profile["telegram_user_id"] = telegram_user_id
     profile_completed = profile.get("profile_completed") is True or profile.get("completed") is True
@@ -1612,8 +1647,8 @@ async def save_profile(request: Request, payload: ProfileSaveRequest):
 
 
 @app.get("/api/profile")
-async def get_profile(request: Request):
-    telegram_user_id = resolve_telegram_user_id(request, required=True)
+async def get_profile(request: Request, response: Response):
+    telegram_user_id = resolve_telegram_user_id(request, required=True, response=response)
     profile = load_profile(telegram_user_id)
     if not profile:
         return {"status": "not_found", "profile_completed": False}
@@ -1624,13 +1659,13 @@ async def get_profile(request: Request):
 
 
 @app.post("/api/profile/save")
-async def save_profile_legacy(request: Request, payload: ProfileSaveRequest):
-    return await save_profile(request, payload)
+async def save_profile_legacy(request: Request, response: Response, payload: ProfileSaveRequest):
+    return await save_profile(request, response, payload)
 
 
 @app.get("/api/profile/get")
-async def get_profile_legacy(request: Request):
-    return await get_profile(request)
+async def get_profile_legacy(request: Request, response: Response):
+    return await get_profile(request, response)
 
 
 @app.get("/api/diary")

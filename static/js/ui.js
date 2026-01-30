@@ -284,6 +284,34 @@ async function fetchBotInfo() {
     }
 }
 
+function isSameOriginRequest(input) {
+    if (typeof input === 'string') {
+        return input.startsWith('/') || input.startsWith(window.location.origin);
+    }
+    if (input && typeof input.url === 'string') {
+        return input.url.startsWith('/') || input.url.startsWith(window.location.origin);
+    }
+    return false;
+}
+
+function installTelegramInitDataInterceptor(initData) {
+    if (!initData || window.__telegramInitDataInterceptorInstalled) {
+        return;
+    }
+    window.__telegramInitDataInterceptorInstalled = true;
+    const originalFetch = window.fetch;
+    window.fetch = function(input, init = {}) {
+        if (isSameOriginRequest(input)) {
+            const headers = new Headers(init.headers || {});
+            if (!headers.has('X-Telegram-Init-Data')) {
+                headers.set('X-Telegram-Init-Data', initData);
+            }
+            return originalFetch(input, { ...init, headers });
+        }
+        return originalFetch(input, init);
+    };
+}
+
 async function loadAppConfig() {
     try {
         const response = await fetch('/api/app/config');
@@ -394,6 +422,8 @@ async function initTelegramAuth(appConfig) {
         showTelegramAuthErrorOverlay('Telegram не передал данные авторизации. Откройте приложение через кнопку бота.');
         return false;
     }
+    window.telegramInitData = initData;
+    installTelegramInitDataInterceptor(initData);
     try {
         const response = await fetch('/api/auth/telegram', {
             method: 'POST',
