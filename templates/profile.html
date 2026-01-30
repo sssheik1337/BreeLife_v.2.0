@@ -79,6 +79,8 @@
         border-radius: 1.5rem;
         border: 1px solid #e2e8f0;
         box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+        width: 100%;
+        box-sizing: border-box;
       }
 
       .profile-card--secondary {
@@ -107,6 +109,46 @@
         padding: 0.5rem;
         border-radius: 1rem;
         background: transparent;
+      }
+
+      #reminders-settings label {
+        display: block;
+        min-width: 0;
+      }
+
+      #reminders-settings .grid {
+        width: 100%;
+      }
+
+      #reminders-settings .form-input {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+      }
+
+      #reminders-settings input[type="time"] {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .reminder-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.875rem;
+        color: #475569;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 9999px;
+        padding: 0.35rem 0.75rem;
+      }
+
+      .reminder-toggle span {
+        white-space: nowrap;
+      }
+
+      .reminder-field {
+        width: 100%;
       }
 
       .countup {
@@ -400,22 +442,24 @@
                     </div>
                     <div class="space-y-4" id="reminders-settings">
                         <div class="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-3">
-                            <div class="flex items-start justify-between gap-3">
-                                <div>
+                            <div class="flex flex-col gap-3">
+                                <div class="flex items-start gap-3">
+                                    <label class="reminder-toggle">
+                                        <input type="checkbox" class="form-checkbox" data-reminder-toggle="water">
+                                        <span>Включено</span>
+                                    </label>
+                                    <div>
                                     <p class="font-semibold text-slate-800">💧 Напоминать пить воду</p>
                                     <p class="text-sm text-slate-500">Помогает держать энергию и концентрацию в течение дня.</p>
+                                    </div>
                                 </div>
-                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
-                                    <input type="checkbox" class="form-checkbox" data-reminder-toggle="water">
-                                    <span>Включено</span>
-                                </label>
                             </div>
                             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <label class="text-sm text-slate-500">
+                                <label class="reminder-field text-sm text-slate-500">
                                     Время
                                     <input type="time" class="form-input mt-1" data-reminder-time="water">
                                 </label>
-                                <label class="text-sm text-slate-500">
+                                <label class="reminder-field text-sm text-slate-500">
                                     Периодичность
                                     <select class="form-input mt-1" data-reminder-frequency="water">
                                         <option value="daily">Каждый день</option>
@@ -426,22 +470,24 @@
                         </div>
 
                         <div class="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-3">
-                            <div class="flex items-start justify-between gap-3">
-                                <div>
+                            <div class="flex flex-col gap-3">
+                                <div class="flex items-start gap-3">
+                                    <label class="reminder-toggle">
+                                        <input type="checkbox" class="form-checkbox" data-reminder-toggle="sleep">
+                                        <span>Включено</span>
+                                    </label>
+                                    <div>
                                     <p class="font-semibold text-slate-800">🌙 Напоминать отход ко сну</p>
                                     <p class="text-sm text-slate-500">Мягко помогает завершать день вовремя и восстанавливаться.</p>
+                                    </div>
                                 </div>
-                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
-                                    <input type="checkbox" class="form-checkbox" data-reminder-toggle="sleep">
-                                    <span>Включено</span>
-                                </label>
                             </div>
                             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <label class="text-sm text-slate-500">
+                                <label class="reminder-field text-sm text-slate-500">
                                     Время
                                     <input type="time" class="form-input mt-1" data-reminder-time="sleep">
                                 </label>
-                                <label class="text-sm text-slate-500">
+                                <label class="reminder-field text-sm text-slate-500">
                                     Периодичность
                                     <select class="form-input mt-1" data-reminder-frequency="sleep">
                                         <option value="daily">Каждый день</option>
@@ -452,22 +498,24 @@
                         </div>
 
                         <div class="rounded-xl border border-slate-100 bg-slate-50 p-4 space-y-3">
-                            <div class="flex items-start justify-between gap-3">
-                                <div>
+                            <div class="flex flex-col gap-3">
+                                <div class="flex items-start gap-3">
+                                    <label class="reminder-toggle">
+                                        <input type="checkbox" class="form-checkbox" data-reminder-toggle="activity">
+                                        <span>Включено</span>
+                                    </label>
+                                    <div>
                                     <p class="font-semibold text-slate-800">🚶 Напоминать про активность</p>
                                     <p class="text-sm text-slate-500">Поддерживает бодрость: небольшой шаг лучше, чем ничего.</p>
+                                    </div>
                                 </div>
-                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
-                                    <input type="checkbox" class="form-checkbox" data-reminder-toggle="activity">
-                                    <span>Включено</span>
-                                </label>
                             </div>
                             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <label class="text-sm text-slate-500">
+                                <label class="reminder-field text-sm text-slate-500">
                                     Время
                                     <input type="time" class="form-input mt-1" data-reminder-time="activity">
                                 </label>
-                                <label class="text-sm text-slate-500">
+                                <label class="reminder-field text-sm text-slate-500">
                                     Периодичность
                                     <select class="form-input mt-1" data-reminder-frequency="activity">
                                         <option value="daily">Каждый день</option>

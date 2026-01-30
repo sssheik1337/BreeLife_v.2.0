@@ -1,9 +1,11 @@
 const DIARY_STORAGE_KEY = window.DIARY_STORAGE_KEY || 'bree_diary_entries';
-const MODE_STORAGE_KEY = 'bree_diary_mode';
 const HABITS_STORAGE_KEY = 'bree_habits';
 
 let diaryInitialized = false;
 let diaryGlobalHandlersBound = false;
+let diaryEntriesMemory = [];
+let habitsEntriesMemory = [];
+let diaryModeMemory = null;
 
 const MODE_PRODUCTS = 'products';
 const MODE_SUMMARY = 'summary';
@@ -24,16 +26,7 @@ function readDiaryEntries() {
     if (typeof window.getDiaryEntries === 'function') {
         return window.getDiaryEntries();
     }
-    const raw = localStorage.getItem(DIARY_STORAGE_KEY);
-    if (!raw) {
-        return [];
-    }
-    try {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.map(normalizeEntry).filter(Boolean) : [];
-    } catch (error) {
-        return [];
-    }
+    return Array.isArray(diaryEntriesMemory) ? diaryEntriesMemory.map(normalizeEntry).filter(Boolean) : [];
 }
 
 function saveDiaryEntries(entries) {
@@ -41,7 +34,7 @@ function saveDiaryEntries(entries) {
         window.setDiaryEntries(entries);
         return;
     }
-    localStorage.setItem(DIARY_STORAGE_KEY, JSON.stringify(entries));
+    diaryEntriesMemory = Array.isArray(entries) ? entries : [];
 }
 
 function normalizeEntry(entry) {
@@ -210,16 +203,7 @@ function readHabitEntries() {
     if (typeof window.getHabitEntries === 'function') {
         return window.getHabitEntries();
     }
-    const raw = localStorage.getItem(HABITS_STORAGE_KEY);
-    if (!raw) {
-        return {};
-    }
-    try {
-        const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === 'object' ? parsed : {};
-    } catch (error) {
-        return {};
-    }
+    return habitsEntriesMemory && typeof habitsEntriesMemory === 'object' ? habitsEntriesMemory : {};
 }
 
 function saveHabitEntries(entries) {
@@ -227,7 +211,7 @@ function saveHabitEntries(entries) {
         window.setHabitEntries(entries);
         return;
     }
-    localStorage.setItem(HABITS_STORAGE_KEY, JSON.stringify(entries));
+    habitsEntriesMemory = entries && typeof entries === 'object' ? entries : {};
 }
 
 function buildHabitDefaults(dateKey, entries) {
@@ -861,42 +845,53 @@ function renderDayScreen(entries, dateKey) {
     const waterInput = document.getElementById('diary-day-water');
     const sleepInput = document.getElementById('diary-day-sleep');
     const activityInput = document.getElementById('diary-day-activity');
-    const mealsContainer = document.getElementById('diary-day-meals');
-    const mealsCount = document.getElementById('diary-day-meals-count');
-    const summaryContainer = document.getElementById('diary-day-summary');
-    const summaryStatus = document.getElementById('diary-day-summary-status');
-    const totalsContainer = document.getElementById('diary-day-totals');
+    const caloriesEl = document.getElementById('diary-day-summary-calories');
+    const macrosEl = document.getElementById('diary-day-summary-macros');
+    const waterEl = document.getElementById('diary-day-summary-water');
+    const sleepEl = document.getElementById('diary-day-summary-sleep');
+    const waterTotal = document.getElementById('diary-water-total');
     const hint = document.getElementById('diary-day-hint');
-    if (!container || !dateInput || !waterInput || !sleepInput || !activityInput || !mealsContainer || !mealsCount || !summaryContainer || !summaryStatus || !totalsContainer || !hint) {
+    if (!container || !dateInput || !waterInput || !sleepInput || !activityInput || !hint) {
         return;
     }
     if (!dateKey) {
         dateInput.value = '';
         hint.textContent = 'Выберите дату, чтобы управлять днём.';
-        mealsContainer.innerHTML = '';
-        summaryContainer.innerHTML = '';
-        totalsContainer.innerHTML = '';
-        mealsCount.textContent = '';
-        summaryStatus.textContent = '';
+        if (caloriesEl) {
+            caloriesEl.textContent = '—';
+        }
+        if (macrosEl) {
+            macrosEl.textContent = '—';
+        }
+        if (waterEl) {
+            waterEl.textContent = '—';
+        }
+        if (sleepEl) {
+            sleepEl.textContent = '—';
+        }
+        if (waterTotal) {
+            waterTotal.textContent = '';
+        }
         waterInput.value = '';
         sleepInput.value = '';
         activityInput.checked = false;
+        ['breakfast', 'lunch', 'dinner', 'snack'].forEach((meal) => {
+            const list = document.getElementById(`diary-meal-${meal}-list`);
+            const total = document.getElementById(`diary-meal-${meal}-total`);
+            if (list) {
+                list.innerHTML = '<p class="text-sm text-slate-400">Ничего не добавлено.</p>';
+            }
+            if (total) {
+                total.textContent = '';
+            }
+        });
         return;
     }
     dateInput.value = dateKey;
     const dayEntries = getEntriesByDate(entries, dateKey);
-    const summaryEntry = findSummaryEntry(entries, dateKey);
-    const productEntries = dayEntries.filter((entry) => entry.mode === MODE_PRODUCTS);
     const waterMax = getMaxWaterForDate(entries, dateKey);
     const sleepMinutes = getMinSleepForDate(entries, dateKey);
     const activityValue = getActivityForDate(entries, dateKey);
-    const habits = getHabitStatus(dateKey, entries) || { water: false, sleep: false, diary: false };
-    const sleepTarget = window.adminConfig?.reminders?.sleep_target;
-    const sleepLabel = sleepTarget ? `Лечь до ${sleepTarget}` : 'Лечь вовремя';
-    const waterTarget = Number(window.adminConfig?.reminders?.water_min_l);
-    const waterLabel = Number.isFinite(waterTarget) && waterTarget > 0
-        ? `Выпить воду (цель ${waterTarget.toFixed(1)} л)`
-        : 'Выпить воду';
     waterInput.value = waterMax > 0 ? waterMax.toFixed(1) : '';
     sleepInput.value = sleepMinutes !== null
         ? `${String(Math.floor(sleepMinutes / 60)).padStart(2, '0')}:${String(sleepMinutes % 60).padStart(2, '0')}`
@@ -904,117 +899,80 @@ function renderDayScreen(entries, dateKey) {
     activityInput.checked = activityValue;
     hint.textContent = dayEntries.length
         ? 'Изменения сохраняются сразу для выбранной даты.'
-        : 'За этот день пока нет записей. Добавьте приём пищи или итоги дня.';
+        : 'За этот день пока нет записей. Добавьте приём пищи или воду.';
 
-    const habitChecklist = `
-        <div class="space-y-2">
-            <label class="flex items-center gap-2 text-sm text-slate-600">
-                <input type="checkbox" class="form-checkbox" data-habit-toggle data-habit-key="water" ${habits.water ? 'checked' : ''}>
-                <span>${waterLabel}</span>
-            </label>
-            <label class="flex items-center gap-2 text-sm text-slate-600">
-                <input type="checkbox" class="form-checkbox" data-habit-toggle data-habit-key="sleep" ${habits.sleep ? 'checked' : ''}>
-                <span>${sleepLabel}</span>
-            </label>
-            <label class="flex items-center gap-2 text-sm text-slate-600">
-                <input type="checkbox" class="form-checkbox" data-habit-toggle data-habit-key="diary" ${habits.diary ? 'checked' : ''}>
-                <span>Вести дневник питания</span>
-            </label>
-        </div>
-    `;
-    const habitContainer = document.getElementById('diary-day-habits');
-    if (habitContainer) {
-        habitContainer.innerHTML = habitChecklist;
+    if (waterTotal) {
+        waterTotal.textContent = `${waterMax.toFixed(1)} л`;
     }
 
-    if (productEntries.length) {
-        mealsCount.textContent = `${productEntries.length} приём(а) пищи`;
-        mealsContainer.innerHTML = productEntries.map((entry) => {
-            const totals = entry.totals || calculateTotals(entry.items || []);
-            const mealLabel = mealLabels[entry.meal] || 'Приём пищи';
-            const itemsLabel = Array.isArray(entry.items) && entry.items.length
-                ? entry.items.map((item) => item?.name).filter(Boolean).join(', ')
-                : 'Список продуктов не заполнен';
-            return `
-                <div class="rounded-lg border border-slate-100 bg-white p-3 space-y-2">
-                    <div class="flex items-center justify-between">
-                        <span class="font-semibold text-slate-700">${mealLabel}</span>
-                        <div class="flex items-center gap-2">
-                            <a href="/diary?date=${entry.date}&mode=${MODE_PRODUCTS}&meal=${entry.meal}" class="text-xs text-emerald-600 font-semibold">Редактировать</a>
-                            <button type="button" class="text-xs text-rose-500 font-semibold" data-action="delete-entry" data-date="${entry.date}" data-mode="${MODE_PRODUCTS}" data-meal="${entry.meal || ''}">
-                                Удалить
-                            </button>
-                        </div>
-                    </div>
-                    <div class="text-xs text-slate-500">${itemsLabel}</div>
-                    <div class="text-xs text-slate-500">Итог: ${Math.round(totals.calories)} ккал</div>
-                </div>
-            `;
-        }).join('');
-    } else {
-        mealsCount.textContent = 'Нет приёмов пищи';
-        mealsContainer.innerHTML = '<p class="text-sm text-slate-400">Добавьте приём пищи, чтобы увидеть детали.</p>';
-    }
-
-    if (summaryEntry) {
-        summaryStatus.textContent = 'Заполнено';
-        const summaryCarbs = resolveCarbTotals(
-            summaryEntry.carbs_g ?? 0,
-            summaryEntry.carbs_simple_g ?? 0,
-            summaryEntry.carbs_complex_g ?? 0
-        );
-        const summaryWithCarbs = {
-            ...summaryEntry,
-            carbs_g: summaryCarbs.total,
-            carbs_simple_g: summaryCarbs.simple,
-            carbs_complex_g: summaryCarbs.complex
-        };
-        summaryContainer.innerHTML = `
-            <div class="rounded-lg border border-slate-100 bg-white p-3 space-y-2">
-                <div class="flex items-center justify-between">
-                    <span class="font-semibold text-slate-700">Итоги дня</span>
-                    <div class="flex items-center gap-2">
-                        <a href="/diary?date=${summaryEntry.date}&mode=${MODE_SUMMARY}" class="text-xs text-emerald-600 font-semibold">Редактировать</a>
-                        <button type="button" class="text-xs text-rose-500 font-semibold" data-action="delete-entry" data-date="${summaryEntry.date}" data-mode="${MODE_SUMMARY}">
-                            Удалить
-                        </button>
-                    </div>
-                </div>
-                <div class="text-xs text-slate-500">Калории: ${Math.round(summaryEntry.calories)} ккал</div>
-                <div class="text-xs text-slate-500">Белки / жиры / углеводы / клетчатка: ${Math.round(summaryEntry.protein_g)} / ${Math.round(summaryEntry.fat_g)} / ${Math.round(summaryWithCarbs.carbs_g)} / ${Math.round(summaryEntry.fiber_g || 0)} г</div>
-                <div class="text-xs text-slate-500">${formatCarbSplit(summaryWithCarbs)}</div>
-            </div>
-        `;
-    } else {
-        summaryStatus.textContent = 'Не заполнено';
-        summaryContainer.innerHTML = '<p class="text-sm text-slate-400">Итоги дня пока не заполнены.</p>';
-    }
-
-    if (!dayEntries.length) {
-        totalsContainer.innerHTML = '<p class="text-sm text-slate-400">Пока нет данных для сводки.</p>';
-        return;
-    }
     const summary = buildDayTotals(dayEntries, entries, dateKey);
     const totals = summary.totals;
-    const sleepText = summary.sleepMinutes !== null
-        ? `${String(Math.floor(summary.sleepMinutes / 60)).padStart(2, '0')}:${String(summary.sleepMinutes % 60).padStart(2, '0')}`
-        : '—';
-    const activityText = getActivityForDate(dayEntries, dateKey) ? 'да' : 'нет';
-    totalsContainer.innerHTML = `
-        <div>Всего энергии: ${Math.round(totals.calories)} ккал</div>
-        <div>Белки: ${Math.round(totals.protein_g)} г</div>
-        <div>Жиры: ${Math.round(totals.fat_g)} г</div>
-        <div>${formatCarbSplit(totals)}</div>
-        <div>Клетчатка: ${Math.round(totals.fiber_g)} г</div>
-        <div>Сон: ${sleepText}</div>
-        <div>Вода: ${summary.water.toFixed(1)} л</div>
-        <div>Активность: ${activityText}</div>
-    `;
+    if (caloriesEl) {
+        caloriesEl.textContent = dayEntries.length ? `${Math.round(totals.calories)} ккал` : '—';
+    }
+    if (macrosEl) {
+        macrosEl.textContent = dayEntries.length
+            ? `Б ${Math.round(totals.protein_g)} · Ж ${Math.round(totals.fat_g)} · У ${Math.round(totals.carbs_g)}`
+            : '—';
+    }
+    if (waterEl) {
+        waterEl.textContent = waterMax > 0 ? `${waterMax.toFixed(1)} л` : '—';
+    }
+    if (sleepEl) {
+        sleepEl.textContent = sleepMinutes !== null
+            ? `${String(Math.floor(sleepMinutes / 60)).padStart(2, '0')}:${String(sleepMinutes % 60).padStart(2, '0')}`
+            : '—';
+    }
+
+    const renderMealCard = (mealKey) => {
+        const list = document.getElementById(`diary-meal-${mealKey}-list`);
+        const total = document.getElementById(`diary-meal-${mealKey}-total`);
+        if (!list || !total) {
+            return;
+        }
+        const entry = findProductsEntry(entries, dateKey, mealKey);
+        if (!entry) {
+            list.innerHTML = '<p class="text-sm text-slate-400">Ничего не добавлено.</p>';
+            total.textContent = '';
+            return;
+        }
+        const totals = entry.totals || calculateTotals(entry.items || []);
+        total.textContent = `${Math.round(totals.calories)} ккал`;
+        const itemsMarkup = Array.isArray(entry.items) && entry.items.length
+            ? entry.items.map((item) => `
+                <div class="flex items-center justify-between">
+                    <span>${item?.name || 'Без названия'}</span>
+                    <span class="text-xs text-slate-400">${Math.round(item?.calories || 0)} ккал</span>
+                </div>
+            `).join('')
+            : '<p class="text-sm text-slate-400">Список продуктов не заполнен.</p>';
+        list.innerHTML = `
+            <div class="space-y-2">${itemsMarkup}</div>
+            <div class="mt-3 flex items-center gap-3 text-xs">
+                <button type="button" class="text-emerald-600 font-semibold" data-action="edit-meal" data-meal="${mealKey}">Редактировать</button>
+                <button type="button" class="text-rose-500 font-semibold" data-action="delete-entry" data-date="${entry.date}" data-mode="${MODE_PRODUCTS}" data-meal="${mealKey}">Удалить</button>
+            </div>
+        `;
+    };
+
+    ['breakfast', 'lunch', 'dinner', 'snack'].forEach(renderMealCard);
 }
 
 function updateDayMeta(entries, dateKey, waterValue, sleepValue, activityValue) {
     if (!dateKey) {
         return entries;
+    }
+    const hasDayEntries = entries.some((entry) => entry.date === dateKey);
+    if (!hasDayEntries) {
+        return [
+            ...entries,
+            {
+                date: dateKey,
+                water_l: Number.isFinite(waterValue) ? waterValue : 0,
+                sleep_time: sleepValue || null,
+                activity: typeof activityValue === 'boolean' ? activityValue : false
+            }
+        ];
     }
     return entries.map((entry) => {
         if (entry.date !== dateKey) {
@@ -1031,15 +989,12 @@ function updateDayMeta(entries, dateKey, waterValue, sleepValue, activityValue) 
 
 function persistDayMeta(dateKey, waterValue, sleepValue, activityValue, options = {}) {
     const entries = readDiaryEntries();
-    if (!dateKey || entries.filter((entry) => entry.date === dateKey).length === 0) {
-        const hint = options.hintId ? document.getElementById(options.hintId) : null;
-        if (hint) {
-            hint.textContent = 'Сначала добавьте приём пищи или итоги дня, затем сохраните воду, сон и активность.';
-        }
-        if (typeof showNotification === 'function') {
-            showNotification('Сначала добавьте запись за день, затем отметьте воду.', 'error');
-        }
+    if (!dateKey) {
         return false;
+    }
+    const hint = options.hintId ? document.getElementById(options.hintId) : null;
+    if (hint) {
+        hint.textContent = '';
     }
     const updated = updateDayMeta(entries, dateKey, waterValue, sleepValue, activityValue);
     saveDiaryEntries(updated);
@@ -1303,14 +1258,14 @@ function getModeFromUrl() {
     const params = new URLSearchParams(window.location.search);
     const rawMode = params.get('mode');
     if (rawMode === MODE_SUMMARY || rawMode === MODE_PRODUCTS || rawMode === MODE_DAY) {
-        localStorage.setItem(MODE_STORAGE_KEY, rawMode);
-        return rawMode;
+        diaryModeMemory = rawMode === MODE_SUMMARY ? MODE_DAY : rawMode;
+        return diaryModeMemory;
     }
-    const stored = localStorage.getItem(MODE_STORAGE_KEY);
+    const stored = diaryModeMemory;
     if (stored === MODE_SUMMARY || stored === MODE_PRODUCTS || stored === MODE_DAY) {
-        return stored;
+        return stored === MODE_SUMMARY ? MODE_DAY : stored;
     }
-    return MODE_SUMMARY;
+    return MODE_DAY;
 }
 
 function getDateFromUrl() {
@@ -1334,41 +1289,27 @@ function getMealFromUrl() {
 }
 
 function setActiveMode(mode) {
-    const toggle = document.getElementById('diary-mode-toggle');
+    const productsPanel = document.getElementById('diary-products-panel');
     const productsBlock = document.getElementById('diary-mode-products');
-    const summaryBlock = document.getElementById('diary-mode-summary');
     const dayBlock = document.getElementById('diary-mode-day');
-    const sections = document.querySelectorAll('[data-diary-section]');
-    if (!productsBlock || !summaryBlock || !dayBlock) {
-        return;
+    if (dayBlock) {
+        dayBlock.classList.toggle('hidden', mode === MODE_PRODUCTS);
     }
-    if (toggle) {
-        const buttons = toggle.querySelectorAll('[data-mode]');
-        buttons.forEach((button) => {
-            const isActive = button.dataset.mode === mode;
-            button.classList.toggle('btn-primary', isActive);
-            button.classList.toggle('btn-secondary', !isActive);
-        });
-        toggle.closest('[data-diary-section]')?.classList.toggle('hidden', mode === MODE_DAY);
+    if (productsBlock) {
+        productsBlock.classList.toggle('hidden', mode !== MODE_PRODUCTS);
     }
-    dayBlock.classList.toggle('hidden', mode !== MODE_DAY);
-    sections.forEach((section) => {
-        if (section.contains(toggle)) {
-            return;
-        }
-        section.classList.toggle('hidden', mode === MODE_DAY);
-    });
-    productsBlock.classList.toggle('hidden', mode !== MODE_PRODUCTS);
-    summaryBlock.classList.toggle('hidden', mode !== MODE_SUMMARY);
-    localStorage.setItem(MODE_STORAGE_KEY, mode);
+    if (productsPanel) {
+        productsPanel.classList.toggle('hidden', mode !== MODE_PRODUCTS);
+    }
+    diaryModeMemory = mode === MODE_PRODUCTS ? MODE_PRODUCTS : MODE_DAY;
 
     const params = new URLSearchParams(window.location.search);
-    params.set('mode', mode);
+    params.set('mode', diaryModeMemory);
     const dateValue = getSelectedDate();
     if (dateValue) {
         params.set('date', dateValue);
     }
-    if (mode !== MODE_PRODUCTS) {
+    if (diaryModeMemory !== MODE_PRODUCTS) {
         params.delete('meal');
     }
     const next = `${window.location.pathname}?${params.toString()}`;
@@ -1498,37 +1439,31 @@ function bindGlobalDiaryHandlers() {
 
     // Делаем обработчики устойчивыми, чтобы клики не терялись из-за состояния DOM.
     document.addEventListener('click', (event) => {
-        const modeButton = event.target.closest('#diary-mode-toggle [data-mode]');
-        if (modeButton) {
-            setActiveMode(modeButton.dataset.mode);
-            const entries = readDiaryEntries();
-            const selectedDate = getSelectedDate();
-            renderDailySummary(entries, selectedDate);
-            if (modeButton.dataset.mode === MODE_DAY) {
-                renderDayScreen(entries, selectedDate);
+        const fabToggle = event.target.closest('[data-action="fab-toggle"]');
+        if (fabToggle) {
+            toggleFabMenu();
+            return;
+        }
+
+        const fabBackdrop = event.target.closest('#diary-fab-backdrop');
+        if (fabBackdrop) {
+            closeFabMenu();
+            return;
+        }
+
+        const fabItem = event.target.closest('[data-fab-action]');
+        if (fabItem) {
+            const action = fabItem.dataset.fabAction;
+            closeFabMenu();
+            if (action === 'meal') {
+                openProductsForm(getSelectedDate(), fabItem.dataset.meal || 'breakfast');
+            } else if (action === 'water') {
+                const waterInput = document.getElementById('diary-day-water');
+                waterInput?.focus();
+            } else if (action === 'sleep') {
+                const sleepInput = document.getElementById('diary-day-sleep');
+                sleepInput?.focus();
             }
-            updateSummaryForm(entries, selectedDate);
-            updateProductsForm(
-                entries,
-                selectedDate,
-                document.getElementById('diary-products-meal')?.value || 'breakfast'
-            );
-            return;
-        }
-
-        const backButton = event.target.closest('[data-action="day-back"]');
-        if (backButton) {
-            setActiveMode(MODE_SUMMARY);
-            return;
-        }
-
-        const saveMetaButton = event.target.closest('[data-action="save-day-meta"]');
-        if (saveMetaButton) {
-            const dateKey = getSelectedDate();
-            const waterValue = Number(document.getElementById('diary-day-water')?.value);
-            const sleepValue = document.getElementById('diary-day-sleep')?.value || '';
-            const activityValue = Boolean(document.getElementById('diary-day-activity')?.checked);
-            persistDayMeta(dateKey, waterValue, sleepValue, activityValue, { hintId: 'diary-day-hint' });
             return;
         }
 
@@ -1571,27 +1506,15 @@ function bindGlobalDiaryHandlers() {
             return;
         }
 
-        const addMealButton = event.target.closest('[data-action="add-meal"]');
-        if (addMealButton) {
-            const dateKey = getSelectedDate();
-            setActiveMode(MODE_PRODUCTS);
-            const productsDate = document.getElementById('diary-products-date');
-            if (productsDate && dateKey) {
-                productsDate.value = dateKey;
-            }
-            updateProductsForm(readDiaryEntries(), dateKey, document.getElementById('diary-products-meal')?.value || 'breakfast');
+        const editMealButton = event.target.closest('[data-action="edit-meal"]');
+        if (editMealButton) {
+            openProductsForm(getSelectedDate(), editMealButton.dataset.meal || 'breakfast');
             return;
         }
 
-        const addSummaryButton = event.target.closest('[data-action="add-summary"]');
-        if (addSummaryButton) {
-            const dateKey = getSelectedDate();
-            setActiveMode(MODE_SUMMARY);
-            const summaryDate = document.getElementById('diary-summary-date');
-            if (summaryDate && dateKey) {
-                summaryDate.value = dateKey;
-            }
-            updateSummaryForm(readDiaryEntries(), dateKey);
+        const closeProductsButton = event.target.closest('#diary-products-close');
+        if (closeProductsButton) {
+            setActiveMode(MODE_DAY);
             return;
         }
 
@@ -1695,6 +1618,56 @@ function getSelectedDate() {
     return '';
 }
 
+function ensureDiaryDate() {
+    const dayDate = document.getElementById('diary-day-date');
+    if (!dayDate) {
+        return '';
+    }
+    if (!dayDate.value) {
+        const today = typeof window.normalizeLocalDate === 'function'
+            ? window.normalizeLocalDate(new Date())
+            : new Date().toISOString().split('T')[0];
+        dayDate.value = today || '';
+    }
+    return dayDate.value;
+}
+
+function openProductsForm(dateKey, mealKey) {
+    const dateValue = dateKey || ensureDiaryDate();
+    setActiveMode(MODE_PRODUCTS);
+    const productsDate = document.getElementById('diary-products-date');
+    if (productsDate && dateValue) {
+        productsDate.value = dateValue;
+    }
+    const mealSelect = document.getElementById('diary-products-meal');
+    if (mealSelect && mealKey) {
+        mealSelect.value = mealKey;
+    }
+    updateProductsForm(
+        readDiaryEntries(),
+        dateValue,
+        mealSelect?.value || mealKey || 'breakfast'
+    );
+}
+
+function closeFabMenu() {
+    const menu = document.getElementById('diary-fab-menu');
+    const backdrop = document.getElementById('diary-fab-backdrop');
+    menu?.classList.add('hidden');
+    backdrop?.classList.add('hidden');
+}
+
+function toggleFabMenu() {
+    const menu = document.getElementById('diary-fab-menu');
+    const backdrop = document.getElementById('diary-fab-backdrop');
+    if (!menu || !backdrop) {
+        return;
+    }
+    const isHidden = menu.classList.contains('hidden');
+    menu.classList.toggle('hidden', !isHidden);
+    backdrop.classList.toggle('hidden', !isHidden);
+}
+
 async function refreshDiary() {
     setDiaryLoadingState(true);
     const localEntries = readDiaryEntries();
@@ -1747,41 +1720,33 @@ async function refreshDiary() {
     setDiaryLoadingState(false);
 }
 
-function initDiary() {
+async function initDiary() {
     if (diaryInitialized) {
         return;
     }
     diaryInitialized = true;
 
     bindGlobalDiaryHandlers();
-    const toggle = document.getElementById('diary-mode-toggle');
     const productsForm = document.getElementById('diary-products-form');
-    const summaryForm = document.getElementById('diary-summary-form');
     const productsDate = document.getElementById('diary-products-date');
-    const summaryDate = document.getElementById('diary-summary-date');
     const dayDate = document.getElementById('diary-day-date');
     const productsItems = document.getElementById('diary-products-items');
     const addItemButton = document.getElementById('diary-add-item');
-    const deleteSummaryButton = document.getElementById('diary-summary-delete');
     const deleteProductsButton = document.getElementById('diary-products-delete');
     const initialDate = getDateFromUrl();
     const initialMode = getModeFromUrl();
     const initialMeal = getMealFromUrl();
+    const params = new URLSearchParams(window.location.search);
+    const openFabOnLoad = params.get('fab') === '1';
 
-    if (toggle) {
-        setActiveMode(initialMode);
+    setActiveMode(initialMode);
+
+    const resolvedDate = initialDate || ensureDiaryDate();
+    if (productsDate) {
+        productsDate.value = resolvedDate;
     }
-
-    if (initialDate) {
-        if (productsDate) {
-            productsDate.value = initialDate;
-        }
-        if (summaryDate) {
-            summaryDate.value = initialDate;
-        }
-        if (dayDate) {
-            dayDate.value = initialDate;
-        }
+    if (dayDate) {
+        dayDate.value = resolvedDate;
     }
 
     if (initialMeal) {
@@ -1791,13 +1756,16 @@ function initDiary() {
         }
     }
 
-    updateSummaryForm(readDiaryEntries(), initialDate);
+    if (typeof window.syncProfileWithBackend === 'function') {
+        await window.syncProfileWithBackend();
+    }
+
     updateProductsForm(
         readDiaryEntries(),
-        initialDate,
+        resolvedDate,
         document.getElementById('diary-products-meal')?.value || 'breakfast'
     );
-    renderDayScreen(readDiaryEntries(), initialDate);
+    renderDayScreen(readDiaryEntries(), resolvedDate);
 
     if (addItemButton && productsItems) {
         addItemButton.setAttribute('type', 'button');
@@ -1844,75 +1812,36 @@ function initDiary() {
             await syncEntryWithBackend(entry);
             updateProductsForm(merged, dateKey, meal);
             await refreshDiary();
+            setActiveMode(MODE_DAY);
+            closeFabMenu();
             if (typeof showNotification === 'function') {
                 showNotification('Приём пищи сохранён.');
             }
         });
     }
 
-    if (summaryForm) {
-        const summaryCarbsSimple = document.getElementById('diary-summary-carbs-simple');
-        const summaryCarbsComplex = document.getElementById('diary-summary-carbs-complex');
-        if (summaryCarbsSimple) {
-            summaryCarbsSimple.addEventListener('input', updateSummaryCarbTotal);
+    const dayWaterInput = document.getElementById('diary-day-water');
+    const daySleepInput = document.getElementById('diary-day-sleep');
+    const dayActivityInput = document.getElementById('diary-day-activity');
+    const persistDayChanges = () => {
+        const dateKey = getSelectedDate();
+        if (!dateKey) {
+            return;
         }
-        if (summaryCarbsComplex) {
-            summaryCarbsComplex.addEventListener('input', updateSummaryCarbTotal);
-        }
-        summaryForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const date = summaryDate?.value;
-            if (!date) {
-                return;
-            }
-            const calories = Number(document.getElementById('diary-summary-calories')?.value);
-            const protein = Number(document.getElementById('diary-summary-protein')?.value);
-            const fat = Number(document.getElementById('diary-summary-fat')?.value);
-            const carbsResolved = updateSummaryCarbTotal();
-            const fiber = Number(document.getElementById('diary-summary-fiber')?.value);
-            const sleepTime = document.getElementById('diary-summary-sleep')?.value || null;
-            const water = Number(document.getElementById('diary-summary-water')?.value);
-            const activity = Boolean(document.getElementById('diary-summary-activity')?.checked);
-            const entry = normalizeEntry({
-                date,
-                mode: MODE_SUMMARY,
-                calories: Number.isFinite(calories) ? calories : 0,
-                protein_g: Number.isFinite(protein) ? protein : 0,
-                fat_g: Number.isFinite(fat) ? fat : 0,
-                carbs_g: carbsResolved.total,
-                carbs_simple_g: carbsResolved.simple,
-                carbs_complex_g: carbsResolved.complex,
-                fiber_g: Number.isFinite(fiber) ? fiber : 0,
-                water_l: Number.isFinite(water) ? water : 0,
-                sleep_time: sleepTime,
-                activity
-            });
-            const entries = readDiaryEntries();
-            const dateKey = entry?.date;
-            const existing = dateKey ? findSummaryEntry(entries, dateKey) : null;
-            let updated = entries;
-            if (existing) {
-                updated = entries.map((item) => (item === existing ? entry : item));
-            } else {
-                updated = [...entries, entry];
-            }
-            const merged = sortEntries(updated);
-            saveDiaryEntries(merged);
-            await syncEntryWithBackend(entry);
-            updateSummaryForm(merged, dateKey);
-            await refreshDiary();
-            if (typeof showNotification === 'function') {
-                showNotification('Итоги дня сохранены.');
-            }
-        });
-    }
+        const waterValue = Number(dayWaterInput?.value);
+        const sleepValue = daySleepInput?.value || '';
+        const activityValue = Boolean(dayActivityInput?.checked);
+        persistDayMeta(dateKey, waterValue, sleepValue, activityValue, { hintId: 'diary-day-hint' });
+    };
+    dayWaterInput?.addEventListener('change', persistDayChanges);
+    daySleepInput?.addEventListener('change', persistDayChanges);
+    dayActivityInput?.addEventListener('change', persistDayChanges);
 
     const handleDateChange = () => {
         const entries = readDiaryEntries();
         const selected = getSelectedDate();
         renderDailySummary(entries, selected);
         renderDayScreen(entries, selected);
-        updateSummaryForm(entries, selected);
         updateProductsForm(
             entries,
             selected,
@@ -1935,9 +1864,6 @@ function initDiary() {
 
     if (productsDate) {
         productsDate.addEventListener('change', handleDateChange);
-    }
-    if (summaryDate) {
-        summaryDate.addEventListener('change', handleDateChange);
     }
     if (dayDate) {
         dayDate.addEventListener('change', handleDateChange);
@@ -1963,21 +1889,6 @@ function initDiary() {
         });
     }
 
-    if (deleteSummaryButton) {
-        deleteSummaryButton.addEventListener('click', async () => {
-            const summaryDateValue = summaryDate?.value;
-            const dateKey = getDiaryDateKey(summaryDateValue);
-            if (!dateKey) {
-                return;
-            }
-            const entries = readDiaryEntries();
-            const updated = entries.filter((entryItem) => !(entryItem.mode === MODE_SUMMARY && entryItem.date === dateKey));
-            saveDiaryEntries(updated);
-            updateSummaryForm(updated, dateKey);
-            await refreshDiary();
-        });
-    }
-
     if (deleteProductsButton) {
         deleteProductsButton.addEventListener('click', async () => {
             const productsDateValue = productsDate?.value;
@@ -1994,20 +1905,28 @@ function initDiary() {
         });
     }
 
-        if (initialDate) {
-            renderDailySummary(readDiaryEntries(), initialDate);
-        }
-    if (initialDate) {
-        renderDayScreen(readDiaryEntries(), initialDate);
+    renderDailySummary(readDiaryEntries(), resolvedDate);
+    renderDayScreen(readDiaryEntries(), resolvedDate);
+
+    if (openFabOnLoad) {
+        toggleFabMenu();
+        params.delete('fab');
+        const next = params.toString();
+        const nextUrl = next ? `${window.location.pathname}?${next}` : window.location.pathname;
+        window.history.replaceState({}, '', nextUrl);
     }
 
     void refreshDiary();
 }
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initDiary);
+    document.addEventListener('DOMContentLoaded', () => {
+        void initDiary();
+    });
 } else {
-    initDiary();
+    void initDiary();
 }
 
-window.addEventListener('load', initDiary);
+window.addEventListener('load', () => {
+    void initDiary();
+});

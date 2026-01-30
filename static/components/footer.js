@@ -65,7 +65,7 @@ class CustomFooter extends HTMLElement {
         }
 
         .bottom-spacer {
-          height: 76px;
+          height: 96px;
         }
 
         .bottom-nav {
@@ -84,7 +84,7 @@ class CustomFooter extends HTMLElement {
           max-width: 420px;
           margin: 0 auto;
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
+          grid-template-columns: repeat(5, minmax(0, 1fr));
           gap: 0.5rem;
         }
 
@@ -110,6 +110,36 @@ class CustomFooter extends HTMLElement {
         .bottom-link--active {
           color: #047857;
           background: #ecfdf3;
+        }
+
+        .bottom-link--disabled {
+          color: #cbd5e1;
+          background: #f8fafc;
+          opacity: 0.6;
+          pointer-events: none;
+        }
+
+        .bottom-fab {
+          position: relative;
+          top: -28px;
+          width: 56px;
+          height: 56px;
+          border-radius: 999px;
+          border: none;
+          background: linear-gradient(135deg, #34d399, #06b6d4);
+          color: white;
+          font-size: 32px;
+          line-height: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-decoration: none;
+          box-shadow: 0 12px 24px rgba(16, 185, 129, 0.3);
+          z-index: 2;
+        }
+
+        .bottom-fab:active {
+          transform: scale(0.98);
         }
 
         @media (min-width: 768px) {
@@ -147,10 +177,11 @@ class CustomFooter extends HTMLElement {
             <span class="bottom-link__icon" aria-hidden="true">👤</span>
             <span>Профиль</span>
           </a>
-          <a href="/diary?mode=summary" class="bottom-link" data-bottom-link="diary">
+          <a href="/diary" class="bottom-link" data-bottom-link="diary">
             <span class="bottom-link__icon" aria-hidden="true">🍽️</span>
             <span>Дневник</span>
           </a>
+          <a href="/diary?fab=1" class="bottom-fab" aria-label="Добавить запись">+</a>
           <a href="/meal-plan" class="bottom-link" data-bottom-link="meal-plan">
             <span class="bottom-link__icon" aria-hidden="true">📋</span>
             <span>Рацион</span>
@@ -170,23 +201,8 @@ class CustomFooter extends HTMLElement {
       profile: this.shadowRoot.querySelector('[data-link="profile"]'),
     };
 
-    const isProfileCompleted = () => {
-      try {
-        const raw = localStorage.getItem('user_profile');
-        if (!raw) {
-          return false;
-        }
-        const profile = JSON.parse(raw);
-        if (!profile || typeof profile !== 'object') {
-          return false;
-        }
-        return profile.completed === true;
-      } catch (error) {
-        return false;
-      }
-    };
-
-    const hasCompletedProfile = isProfileCompleted();
+    const hasCompletedProfile = window.profileCompleted === true;
+    const isDevMode = window.appIsDev === true || window.appMode === 'development';
 
     if (links.home) {
       links.home.href = '/profile';
@@ -213,6 +229,57 @@ class CustomFooter extends HTMLElement {
       mealPlan: this.shadowRoot.querySelector('[data-bottom-link="meal-plan"]'),
       progress: this.shadowRoot.querySelector('[data-bottom-link="progress"]'),
     };
+    const bottomFab = this.shadowRoot.querySelector('.bottom-fab');
+
+    const applyBottomNavState = (profileCompleted) => {
+      const shouldDisable = !profileCompleted;
+      Object.values(bottomLinks).forEach((link) => {
+        if (!link) {
+          return;
+        }
+        if (!link.dataset.originalHref) {
+          link.dataset.originalHref = link.getAttribute('href') || '/profile';
+        }
+        if (shouldDisable) {
+          link.href = '/questionnaire';
+          link.classList.add('bottom-link--disabled');
+          if (!link.dataset.disableHandlerAttached) {
+            link.dataset.disableHandlerAttached = 'true';
+            link.addEventListener('click', (event) => {
+              if (!link.classList.contains('bottom-link--disabled')) {
+                return;
+              }
+              event.preventDefault();
+              if (typeof showNotification === 'function') {
+                showNotification('Сначала заполните анкету.', 'error');
+              }
+              window.location.href = '/questionnaire';
+            });
+          }
+        } else {
+          link.href = link.dataset.originalHref;
+          link.classList.remove('bottom-link--disabled');
+        }
+      });
+      if (bottomFab) {
+        if (!bottomFab.dataset.originalHref) {
+          bottomFab.dataset.originalHref = bottomFab.getAttribute('href') || '/diary';
+        }
+        if (shouldDisable) {
+          bottomFab.href = '/questionnaire';
+          bottomFab.classList.add('bottom-link--disabled');
+        } else {
+          bottomFab.href = bottomFab.dataset.originalHref;
+          bottomFab.classList.remove('bottom-link--disabled');
+        }
+      }
+    };
+
+    applyBottomNavState(hasCompletedProfile);
+    window.addEventListener('profile-status-updated', (event) => {
+      const profileCompleted = Boolean(event?.detail?.profileCompleted);
+      applyBottomNavState(profileCompleted);
+    });
 
     const currentPath = window.location.pathname || '/';
     const currentHash = window.location.hash || '';
