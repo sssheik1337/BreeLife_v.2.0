@@ -726,7 +726,7 @@ async def profile(request: Request, telegram_user_id: int | None = Depends(optio
             "profile.html",
             {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
         )
-    require_completed_profile(telegram_user_id)
+    # Профиль может открываться до завершения анкеты, редирект делает фронтенд.
     return templates.TemplateResponse(
         "profile.html",
         {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
@@ -740,7 +740,7 @@ async def profile_legacy(request: Request, telegram_user_id: int | None = Depend
             "profile.html",
             {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
         )
-    require_completed_profile(telegram_user_id)
+    # Профиль может открываться до завершения анкеты, редирект делает фронтенд.
     # Поддержка старого пути, чтобы не ловить 404 при прямом заходе.
     return templates.TemplateResponse(
         "profile.html",
