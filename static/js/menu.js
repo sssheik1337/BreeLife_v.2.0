@@ -1,12 +1,17 @@
 // Отрисовка списка тарифов из JSON
 
-const PLANS_ENDPOINT = '/static/data/plans.json';
+const PLANS_ENDPOINT = window.plansUrl || '';
 let cachedPlans = [];
 let activePlan = 'free';
 
 document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('plans-container');
   if (!container) {
+    return;
+  }
+
+  if (!PLANS_ENDPOINT) {
+    container.textContent = 'Не задан источник тарифов.';
     return;
   }
 

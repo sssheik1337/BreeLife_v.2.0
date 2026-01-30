@@ -44,3 +44,8 @@ if not ADMIN_CONFIG_PATH:
 ADMIN_PRODUCTS_PATH = os.getenv("ADMIN_PRODUCTS_PATH")
 if not ADMIN_PRODUCTS_PATH:
     raise RuntimeError("ADMIN_PRODUCTS_PATH is required. Set it in the environment.")
+
+# URL с тарифными планами для меню.
+PLANS_DATA_URL = os.getenv("PLANS_DATA_URL")
+if not PLANS_DATA_URL:
+    raise RuntimeError("PLANS_DATA_URL is required. Set it in the environment.")

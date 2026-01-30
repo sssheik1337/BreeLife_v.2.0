@@ -40,6 +40,7 @@ from config import (
     ADMIN_PASSWORD,
     ADMIN_CONFIG_PATH as ADMIN_CONFIG_PATH_VALUE,
     ADMIN_PRODUCTS_PATH as ADMIN_PRODUCTS_PATH_VALUE,
+    PLANS_DATA_URL,
 )
 from services.ai_profile import (
     calculate_deviation_risk,
@@ -888,12 +889,22 @@ async def menu(request: Request, telegram_user_id: int | None = Depends(optional
     if telegram_user_id is None:
         return templates.TemplateResponse(
             "menu.html",
-            {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+            {
+                "request": request,
+                "admin_config": loadAdminConfig(),
+                "ai_enabled": AI_ENABLED,
+                "plans_url": PLANS_DATA_URL,
+            },
         )
     require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "menu.html",
-        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+        {
+            "request": request,
+            "admin_config": loadAdminConfig(),
+            "ai_enabled": AI_ENABLED,
+            "plans_url": PLANS_DATA_URL,
+        },
     )
 
 
