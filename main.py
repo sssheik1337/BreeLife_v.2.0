@@ -115,7 +115,8 @@ async def lifespan(app: FastAPI):
 
     webhook_url = f"{PUBLIC_BASE_URL.rstrip('/')}/telegram/webhook"
     try:
-        result = await bot.set_webhook(webhook_url, drop_pending_updates=True)
+        # В DEBUG режиме не сбрасываем апдейты, чтобы /start не терялся при перезапусках.
+        result = await bot.set_webhook(webhook_url, drop_pending_updates=not DEBUG)
         logger.info("INFO: Webhook установлен: %s (result=%s)", webhook_url, result)
     except Exception as exc:
         logger.error("Не удалось установить webhook: %s", exc)
@@ -124,7 +125,7 @@ async def lifespan(app: FastAPI):
     logger.info("INFO: Telegram bot started (webhook): %s", webhook_url)
     yield
     try:
-        await bot.delete_webhook(drop_pending_updates=True)
+        await bot.delete_webhook(drop_pending_updates=not DEBUG)
         logger.info("INFO: Webhook удалён")
     except Exception as exc:
         logger.error("Не удалось удалить webhook: %s", exc)
