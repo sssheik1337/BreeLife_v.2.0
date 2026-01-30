@@ -34,14 +34,10 @@ from config import (
     YANDEX_GPT_API_KEY,
     YANDEX_GPT_FOLDER_ID,
     TELEGRAM_BOT_TOKEN,
-    TELEGRAM_WEBHOOK_URL,
     PUBLIC_APP_URL,
     PUBLIC_BASE_URL,
     ADMIN_LOGIN,
     ADMIN_PASSWORD,
-    ADMIN_CONFIG_PATH as ADMIN_CONFIG_PATH_VALUE,
-    ADMIN_PRODUCTS_PATH as ADMIN_PRODUCTS_PATH_VALUE,
-    PLANS_DATA_URL,
 )
 from services.ai_profile import (
     calculate_deviation_risk,
@@ -77,21 +73,13 @@ async def lifespan(app: FastAPI):
         logger.error("TELEGRAM_BOT_TOKEN не задан. Бот не будет запущен.")
         yield
         return
-    if not TELEGRAM_WEBHOOK_URL and not PUBLIC_BASE_URL:
-        logger.error(
-            "TELEGRAM_WEBHOOK_URL или PUBLIC_BASE_URL не заданы. Вебхук не будет установлен."
-        )
+    if not PUBLIC_BASE_URL:
+        logger.error("PUBLIC_BASE_URL не задан. Вебхук не будет установлен.")
         yield
         return
     bot = Bot(token=TELEGRAM_BOT_TOKEN)
     dispatcher = Dispatcher()
     try:
-        bot_info = await bot.get_me()
-        logger.info(
-            "INFO: Telegram bot connected: @%s (%s)",
-            bot_info.username or "unknown",
-            bot_info.first_name or "unknown",
-        )
         await bot.set_chat_menu_button(
             menu_button=types.MenuButtonWebApp(
                 text=APP_NAME,
@@ -122,7 +110,7 @@ async def lifespan(app: FastAPI):
             reply_markup=keyboard,
         )
 
-    webhook_url = TELEGRAM_WEBHOOK_URL or f"{PUBLIC_BASE_URL.rstrip('/')}/telegram/webhook"
+    webhook_url = f"{PUBLIC_BASE_URL.rstrip('/')}/telegram/webhook"
     try:
         result = await bot.set_webhook(webhook_url)
         logger.info("INFO: Webhook установлен: %s (result=%s)", webhook_url, result)
@@ -147,8 +135,8 @@ templates.env.globals["APP_NAME"] = APP_NAME
 
 init_db()
 
-ADMIN_CONFIG_PATH = Path(ADMIN_CONFIG_PATH_VALUE)
-ADMIN_PRODUCTS_PATH = Path(ADMIN_PRODUCTS_PATH_VALUE)
+ADMIN_CONFIG_PATH = Path("config/admin_config.json")
+ADMIN_PRODUCTS_PATH = Path("static/data/products.json")
 ADMIN_CONFIG_CACHE: dict[str, object] | None = None
 ADMIN_CONFIG_MTIME: float | None = None
 ADMIN_SESSION_COOKIE = "admin_session"
@@ -301,69 +289,11 @@ def renderAdminProducts(
     products = loadAdminProducts()
     config = loadAdminConfig()
     groups = collect_product_groups(products, config if isinstance(config, dict) else {})
-    selected_group = request.query_params.get("group")
-    if selected_group:
-        selected_group = selected_group.strip()
-    if selected_group == "all":
-        selected_group = None
-    if selected_group == "ungrouped":
-        filtered_products = [product for product in products if not str(product.get("group") or "").strip()]
-    elif selected_group:
-        filtered_products = [
-            product
-            for product in products
-            if str(product.get("group") or "").strip() == selected_group
-        ]
-    else:
-        filtered_products = products
-    grouped_products: dict[str, list[dict[str, object]]] = {}
-    for product in filtered_products:
-        group = str(product.get("group") or "").strip()
-        if not group:
-            group = "Без группы"
-        grouped_products.setdefault(group, []).append(product)
-    group_items = []
-    group_counts = {group: 0 for group in groups}
-    ungrouped_count = 0
-    for product in products:
-        group = str(product.get("group") or "").strip()
-        if not group:
-            ungrouped_count += 1
-        else:
-            group_counts[group] = group_counts.get(group, 0) + 1
-    group_items.append(
-        {
-            "label": "Все группы",
-            "value": "all",
-            "count": len(products),
-            "selected": selected_group is None,
-        }
-    )
-    for group in groups:
-        group_items.append(
-            {
-                "label": group,
-                "value": group,
-                "count": group_counts.get(group, 0),
-                "selected": selected_group == group,
-            }
-        )
-    if ungrouped_count:
-        group_items.append(
-            {
-                "label": "Без группы",
-                "value": "ungrouped",
-                "count": ungrouped_count,
-                "selected": selected_group == "ungrouped",
-            }
-        )
     return templates.TemplateResponse(
         "admin_products.html",
         {
             "request": request,
-            "products": grouped_products,
-            "selected_group": selected_group or "all",
-            "group_items": group_items,
+            "products": products,
             "groups": groups,
             "error": error,
             "success": success,
@@ -377,8 +307,7 @@ def renderAdminGroups(
     success: str | None = None,
 ) -> HTMLResponse:
     config = loadAdminConfig()
-    products = loadAdminProducts()
-    groups = collect_product_groups(products, config if isinstance(config, dict) else {})
+    groups = normalize_group_list(config.get("product_groups") if isinstance(config, dict) else [])
     return templates.TemplateResponse(
         "admin_groups.html",
         {
@@ -835,7 +764,7 @@ async def diary(request: Request, telegram_user_id: int | None = Depends(optiona
 
 @app.get("/food-diary")
 async def food_diary():
-    return RedirectResponse(url="/diary")
+    return RedirectResponse(url="/diary?mode=products")
 
 
 @app.get("/foods", response_class=HTMLResponse)
@@ -898,22 +827,12 @@ async def menu(request: Request, telegram_user_id: int | None = Depends(optional
     if telegram_user_id is None:
         return templates.TemplateResponse(
             "menu.html",
-            {
-                "request": request,
-                "admin_config": loadAdminConfig(),
-                "ai_enabled": AI_ENABLED,
-                "plans_url": PLANS_DATA_URL,
-            },
+            {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
         )
     require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "menu.html",
-        {
-            "request": request,
-            "admin_config": loadAdminConfig(),
-            "ai_enabled": AI_ENABLED,
-            "plans_url": PLANS_DATA_URL,
-        },
+        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
     )
 
 

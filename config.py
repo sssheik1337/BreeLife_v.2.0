@@ -17,7 +17,6 @@ AI_ENABLED = os.getenv("AI_ENABLED", "false").lower() in {"1", "true", "yes"}
 REMINDERS_ENABLED = os.getenv("REMINDERS_ENABLED", "false").lower() in {"1", "true", "yes"}
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_WEBHOOK_URL = os.getenv("TELEGRAM_WEBHOOK_URL", "")
 TELEGRAM_WEBAPP_URL = os.getenv("TELEGRAM_WEBAPP_URL", "")
 PUBLIC_APP_URL = os.getenv("PUBLIC_APP_URL", TELEGRAM_WEBAPP_URL)
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "")
@@ -37,16 +36,3 @@ if not DB_PATH:
 # Данные доступа в админку.
 ADMIN_LOGIN = os.getenv("ADMIN_LOGIN", "")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
-
-# Пути к данным админки (обязательны через переменные окружения).
-ADMIN_CONFIG_PATH = os.getenv("ADMIN_CONFIG_PATH")
-if not ADMIN_CONFIG_PATH:
-    raise RuntimeError("ADMIN_CONFIG_PATH is required. Set it in the environment.")
-ADMIN_PRODUCTS_PATH = os.getenv("ADMIN_PRODUCTS_PATH")
-if not ADMIN_PRODUCTS_PATH:
-    raise RuntimeError("ADMIN_PRODUCTS_PATH is required. Set it in the environment.")
-
-# URL с тарифными планами для меню.
-PLANS_DATA_URL = os.getenv("PLANS_DATA_URL")
-if not PLANS_DATA_URL:
-    raise RuntimeError("PLANS_DATA_URL is required. Set it in the environment.")

@@ -119,6 +119,14 @@
                         </div>
                         <form id="diary-products-form" class="space-y-4 mt-4">
                             <input type="date" id="diary-products-date" class="form-input" required>
+                            <div class="hidden">
+                                <input type="time" id="diary-products-sleep" class="form-input" placeholder="Сон, время отхода">
+                                <input type="number" id="diary-products-water" class="form-input" placeholder="Вода, л" min="0" step="0.01">
+                                <label class="flex items-center gap-2 text-sm text-slate-600">
+                                    <input type="checkbox" class="form-checkbox" id="diary-products-activity">
+                                    <span>Сегодня была активность</span>
+                                </label>
+                            </div>
                             <select id="diary-products-meal" class="form-input" required>
                                 <option value="breakfast">Завтрак</option>
                                 <option value="lunch">Обед</option>
@@ -137,49 +145,6 @@
                             <button type="button" id="diary-products-delete" class="btn-secondary w-full hidden">
                                 Удалить приём пищи
                             </button>
-                        </form>
-                    </div>
-                </div>
-
-                <div id="diary-water-panel" class="diary-panel hidden">
-                    <div class="diary-panel__card">
-                        <div class="flex items-center justify-between">
-                            <h3 class="font-semibold text-slate-800">Добавить воду</h3>
-                            <button type="button" id="diary-water-close" class="btn-secondary">Закрыть</button>
-                        </div>
-                        <form id="diary-water-form" class="space-y-4 mt-4">
-                            <input type="date" id="diary-water-date" class="form-input" required>
-                            <input type="number" id="diary-water-amount" class="form-input" placeholder="Вода, л" min="0" step="0.01">
-                            <div class="flex flex-wrap gap-2">
-                                <button type="button" class="btn-secondary" data-action="quick-water" data-water-target="panel" data-water-add="0.01">+10 мл</button>
-                                <button type="button" class="btn-secondary" data-action="quick-water" data-water-target="panel" data-water-add="0.5">+500 мл</button>
-                                <button type="button" class="btn-secondary" data-action="quick-water" data-water-target="panel" data-water-add="1">+1 л</button>
-                            </div>
-                            <p id="diary-water-hint" class="text-sm text-slate-500"></p>
-                            <button type="submit" class="btn-primary w-full">Сохранить воду</button>
-                        </form>
-                    </div>
-                </div>
-
-                <div id="diary-sleep-panel" class="diary-panel hidden">
-                    <div class="diary-panel__card">
-                        <div class="flex items-center justify-between">
-                            <h3 class="font-semibold text-slate-800">Указать сон</h3>
-                            <button type="button" id="diary-sleep-close" class="btn-secondary">Закрыть</button>
-                        </div>
-                        <form id="diary-sleep-form" class="space-y-4 mt-4">
-                            <input type="date" id="diary-sleep-date" class="form-input" required>
-                            <label class="text-sm text-slate-600">
-                                Время отхода ко сну
-                                <input type="time" id="diary-sleep-start" class="form-input mt-2" required>
-                            </label>
-                            <label class="text-sm text-slate-600">
-                                Время пробуждения
-                                <input type="time" id="diary-sleep-end" class="form-input mt-2" required>
-                            </label>
-                            <p id="diary-sleep-summary" class="text-sm text-slate-500">Укажите время начала и окончания сна.</p>
-                            <p id="diary-sleep-hint" class="text-sm text-slate-500"></p>
-                            <button type="submit" class="btn-primary w-full">Сохранить сон</button>
                         </form>
                     </div>
                 </div>
