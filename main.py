@@ -83,6 +83,12 @@ async def lifespan(app: FastAPI):
     bot = Bot(token=TELEGRAM_BOT_TOKEN)
     dispatcher = Dispatcher()
     try:
+        bot_info = await bot.get_me()
+        logger.info(
+            "INFO: Telegram bot connected: @%s (%s)",
+            bot_info.username or "unknown",
+            bot_info.first_name or "unknown",
+        )
         await bot.set_chat_menu_button(
             menu_button=types.MenuButtonWebApp(
                 text=APP_NAME,
