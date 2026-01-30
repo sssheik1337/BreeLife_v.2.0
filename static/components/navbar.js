@@ -218,9 +218,6 @@ class CustomNavbar extends HTMLElement {
               <span class="menu-link menu-link--disabled" title="Скоро">Настройки <span>Скоро</span></span>
             </div>
           </div>
-          <button type="button" class="nav-button nav-button--disabled" aria-label="Настройки" title="Скоро" disabled>
-            <span class="nav-emoji" aria-hidden="true">⚙️</span>
-          </button>
         </div>
       </nav>
     `;
