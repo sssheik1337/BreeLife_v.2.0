@@ -37,6 +37,10 @@ if not DB_PATH:
 ADMIN_LOGIN = os.getenv("ADMIN_LOGIN", "")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 
-# Пути к данным админки.
-ADMIN_CONFIG_PATH = os.getenv("ADMIN_CONFIG_PATH", "config/admin_config.json")
-ADMIN_PRODUCTS_PATH = os.getenv("ADMIN_PRODUCTS_PATH", "static/data/products.json")
+# Пути к данным админки (обязательны через переменные окружения).
+ADMIN_CONFIG_PATH = os.getenv("ADMIN_CONFIG_PATH")
+if not ADMIN_CONFIG_PATH:
+    raise RuntimeError("ADMIN_CONFIG_PATH is required. Set it in the environment.")
+ADMIN_PRODUCTS_PATH = os.getenv("ADMIN_PRODUCTS_PATH")
+if not ADMIN_PRODUCTS_PATH:
+    raise RuntimeError("ADMIN_PRODUCTS_PATH is required. Set it in the environment.")
