@@ -348,6 +348,18 @@ textarea {
     padding: 24px;
 }
 
+.telegram-auth-locked {
+    overflow: hidden;
+}
+
+.telegram-auth-locked > * {
+    visibility: hidden;
+}
+
+.telegram-auth-locked .telegram-auth-overlay {
+    visibility: visible;
+}
+
 .telegram-auth-overlay__card {
     max-width: 360px;
     width: 100%;

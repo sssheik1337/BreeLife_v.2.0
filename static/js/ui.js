@@ -307,6 +307,13 @@ function showDevModeBadge() {
     document.body.appendChild(badge);
 }
 
+function setTelegramAccessLock(isLocked) {
+    if (!document.body) {
+        return;
+    }
+    document.body.classList.toggle('telegram-auth-locked', Boolean(isLocked));
+}
+
 function buildBotLink(username) {
     if (!username) {
         return null;
@@ -356,11 +363,13 @@ async function showTelegramRequiredOverlay() {
 async function initTelegramAuth(appConfig) {
     if (appConfig?.is_dev) {
         showDevModeBadge();
+        setTelegramAccessLock(false);
         // В DEV режиме фиксируем тестовый telegram_user_id сразу,
         // чтобы синхронизация дневника и статистики работала до запросов к API.
         window.telegramAuthUserId = appConfig.dev_telegram_user_id ?? null;
         return true;
     }
+    setTelegramAccessLock(true);
     const tg = window.Telegram?.WebApp;
     if (!tg) {
         console.warn('NOT_IN_TELEGRAM');
@@ -401,6 +410,7 @@ async function initTelegramAuth(appConfig) {
             return false;
         }
         window.telegramAuthUserId = data.telegram_user_id ?? null;
+        setTelegramAccessLock(false);
         return true;
     } catch (error) {
         showTelegramAuthErrorOverlay('Сервис недоступен. Попробуйте позже или откройте приложение через бота.');
