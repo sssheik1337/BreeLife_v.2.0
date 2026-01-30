@@ -17,7 +17,6 @@ AI_ENABLED = os.getenv("AI_ENABLED", "false").lower() in {"1", "true", "yes"}
 REMINDERS_ENABLED = os.getenv("REMINDERS_ENABLED", "false").lower() in {"1", "true", "yes"}
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_WEBHOOK_URL = os.getenv("TELEGRAM_WEBHOOK_URL", "")
 TELEGRAM_WEBAPP_URL = os.getenv("TELEGRAM_WEBAPP_URL", "")
 PUBLIC_APP_URL = os.getenv("PUBLIC_APP_URL", TELEGRAM_WEBAPP_URL)
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "")
