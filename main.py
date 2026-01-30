@@ -12,7 +12,7 @@ from pathlib import Path
 
 import requests
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
+from aiogram.filters import CommandStart
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -66,10 +66,14 @@ dispatcher = None
 
 
 def register_telegram_handlers(dispatcher: Dispatcher) -> None:
-    @dispatcher.message(Command("start"))
+    @dispatcher.message(CommandStart())
     async def handle_start(message: types.Message) -> None:
         user_id = message.from_user.id if message.from_user else "unknown"
-        logger.info("INFO: /start получен от пользователя %s", user_id)
+        logger.info(
+            "INFO: /start получен от пользователя %s (text=%s)",
+            user_id,
+            message.text,
+        )
         keyboard = types.InlineKeyboardMarkup(
             inline_keyboard=[
                 [
@@ -105,6 +109,8 @@ async def lifespan(app: FastAPI):
     bot = Bot(token=TELEGRAM_BOT_TOKEN)
     dispatcher = Dispatcher()
     register_telegram_handlers(dispatcher)
+    allowed_updates = dispatcher.resolve_used_update_types()
+    logger.info("INFO: Разрешённые типы обновлений: %s", allowed_updates)
     try:
         await bot.set_chat_menu_button(
             menu_button=types.MenuButtonWebApp(
@@ -122,7 +128,7 @@ async def lifespan(app: FastAPI):
         result = await bot.set_webhook(
             webhook_url,
             drop_pending_updates=not DEBUG,
-            allowed_updates=["message", "callback_query"],
+            allowed_updates=allowed_updates,
         )
         logger.info("INFO: Webhook установлен: %s (result=%s)", webhook_url, result)
     except Exception as exc:
