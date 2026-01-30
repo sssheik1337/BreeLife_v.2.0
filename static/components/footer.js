@@ -248,27 +248,27 @@ class CustomFooter extends HTMLElement {
 
       <div class="fab-backdrop" data-fab-backdrop aria-hidden="true"></div>
       <div class="fab-menu" id="fab-menu" role="menu" aria-label="Быстрое добавление">
-        <a class="fab-menu__item" href="/diary?mode=products&meal=breakfast" role="menuitem">
+        <a class="fab-menu__item" href="/diary?meal=breakfast" role="menuitem">
           <span>Добавить завтрак</span>
           <span class="fab-menu__meta">☀️</span>
         </a>
-        <a class="fab-menu__item" href="/diary?mode=products&meal=lunch" role="menuitem">
+        <a class="fab-menu__item" href="/diary?meal=lunch" role="menuitem">
           <span>Добавить обед</span>
           <span class="fab-menu__meta">🌤</span>
         </a>
-        <a class="fab-menu__item" href="/diary?mode=products&meal=dinner" role="menuitem">
+        <a class="fab-menu__item" href="/diary?meal=dinner" role="menuitem">
           <span>Добавить ужин</span>
           <span class="fab-menu__meta">🌙</span>
         </a>
-        <a class="fab-menu__item" href="/diary?mode=products&meal=snack" role="menuitem">
+        <a class="fab-menu__item" href="/diary?meal=snack" role="menuitem">
           <span>Добавить перекус</span>
           <span class="fab-menu__meta">🌗</span>
         </a>
-        <a class="fab-menu__item" href="/diary?mode=day#diary-day-water" role="menuitem">
+        <a class="fab-menu__item" href="/diary#diary-day-water" role="menuitem">
           <span>Добавить воду</span>
           <span class="fab-menu__meta">💧</span>
         </a>
-        <a class="fab-menu__item" href="/diary?mode=day#diary-day-sleep" role="menuitem">
+        <a class="fab-menu__item" href="/diary#diary-day-sleep" role="menuitem">
           <span>Добавить сон</span>
           <span class="fab-menu__meta">🌙</span>
         </a>

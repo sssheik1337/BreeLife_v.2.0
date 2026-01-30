@@ -5,10 +5,12 @@
     const migrationFlags = new Set();
     const STORAGE_KEY = 'user_profile';
     const DIARY_STORAGE_KEY = 'bree_diary_entries';
+    const DAY_META_STORAGE_KEY = 'bree_day_meta';
     const LEGACY_DIARY_KEYS = ['health_bloom_food_entries', 'food_diary_entries'];
     const HABITS_STORAGE_KEY = 'bree_habits';
     const PROFILE_MIGRATION_KEY = 'bree_profile_migrated_v1';
     const DIARY_MIGRATION_KEY = 'bree_diary_migrated_v1';
+    const DAY_META_MIGRATION_KEY = 'bree_day_meta_migrated_v1';
     const HABITS_MIGRATION_KEY = 'bree_habits_migrated_v1';
     const WATER_MIGRATION_KEY = 'bree_water_migrated_v1';
     const SLEEP_MIGRATION_KEY = 'bree_sleep_migrated_v1';
@@ -17,6 +19,7 @@
     const ALLOWED_RISKS = new Set(['low', 'medium', 'high']);
     let cachedProfile = null;
     let cachedDiaryEntries = null;
+    let cachedDayMetaEntries = null;
     let cachedHabitEntries = null;
 
     function memoryGet(key) {
@@ -390,66 +393,34 @@
             return null;
         }
         const isProducts = entry.mode === 'products' || Array.isArray(entry.items);
+        if (!isProducts) {
+            return null;
+        }
         const items = Array.isArray(entry.items) ? entry.items : [];
-        const totals = isProducts
-            ? (entry.totals
-                ? (() => {
-                    const resolved = resolveCarbTotals(
-                        entry.totals.carbs_g,
-                        entry.totals.carbs_simple_g,
-                        entry.totals.carbs_complex_g
-                    );
-                    return {
-                        calories: Number(entry.totals.calories) || 0,
-                        protein_g: Number(entry.totals.protein_g) || 0,
-                        fat_g: Number(entry.totals.fat_g) || 0,
-                        carbs_g: resolved.total,
-                        carbs_simple_g: resolved.simple,
-                        carbs_complex_g: resolved.complex,
-                        fiber_g: Number(entry.totals.fiber_g) || 0
-                    };
-                })()
-                : calculateDiaryTotals(items))
-            : (() => {
+        const totals = entry.totals
+            ? (() => {
                 const resolved = resolveCarbTotals(
-                    entry.carbs_g ?? entry.carbs ?? 0,
-                    entry.carbs_simple_g ?? entry.carbs_simple ?? 0,
-                    entry.carbs_complex_g ?? entry.carbs_complex ?? 0
+                    entry.totals.carbs_g,
+                    entry.totals.carbs_simple_g,
+                    entry.totals.carbs_complex_g
                 );
                 return {
-                    calories: Number(entry.calories ?? 0) || 0,
-                    protein_g: Number(entry.protein_g ?? entry.protein ?? 0) || 0,
-                    fat_g: Number(entry.fat_g ?? entry.fat ?? 0) || 0,
+                    calories: Number(entry.totals.calories) || 0,
+                    protein_g: Number(entry.totals.protein_g) || 0,
+                    fat_g: Number(entry.totals.fat_g) || 0,
                     carbs_g: resolved.total,
                     carbs_simple_g: resolved.simple,
                     carbs_complex_g: resolved.complex,
-                    fiber_g: Number(entry.fiber_g ?? entry.fiber ?? 0) || 0,
-                    water_l: Number(entry.water_l ?? entry.water ?? 0) || 0
+                    fiber_g: Number(entry.totals.fiber_g) || 0
                 };
-            })();
-        if (isProducts) {
-            return {
-                date: dateKey,
-                mode: 'products',
-                meal: entry.meal || null,
-                items,
-                totals,
-                water_l: Number(entry.water_l ?? entry.water ?? 0) || 0,
-                sleep_time: entry.sleep_time || null
-            };
-        }
+            })()
+            : calculateDiaryTotals(items);
         return {
             date: dateKey,
-            mode: 'summary',
-            calories: totals.calories,
-            protein_g: totals.protein_g,
-            fat_g: totals.fat_g,
-            carbs_g: totals.carbs_g,
-            carbs_simple_g: totals.carbs_simple_g,
-            carbs_complex_g: totals.carbs_complex_g,
-            fiber_g: totals.fiber_g,
-            water_l: totals.water_l,
-            sleep_time: entry.sleep_time || null
+            mode: 'products',
+            meal: entry.meal || null,
+            items,
+            totals
         };
     }
 
@@ -482,16 +453,14 @@
             if (!normalized) {
                 return;
             }
-            const totals = normalized.mode === 'products'
-                ? normalized.totals
-                : {
-                    calories: normalized.calories,
-                    protein_g: normalized.protein_g,
-                    fat_g: normalized.fat_g,
-                    carbs_g: normalized.carbs_g,
-                    carbs_simple_g: normalized.carbs_simple_g,
-                    carbs_complex_g: normalized.carbs_complex_g
-                };
+            const totals = normalized.totals || {
+                calories: 0,
+                protein_g: 0,
+                fat_g: 0,
+                carbs_g: 0,
+                carbs_simple_g: 0,
+                carbs_complex_g: 0
+            };
             const key = `${normalized.date}-${normalized.mode}-${normalized.meal || ''}-${totals.calories}-${totals.protein_g}-${totals.fat_g}-${totals.carbs_g}-${totals.carbs_simple_g || 0}-${totals.carbs_complex_g || 0}-${normalized.items?.length || 0}`;
             if (seen.has(key)) {
                 return;
@@ -501,16 +470,6 @@
         };
 
         readRawDiaryEntries(DIARY_STORAGE_KEY).forEach(collect);
-        readRawDiaryEntries(LEGACY_DIARY_KEYS[0]).forEach((entry) => {
-            collect({
-                date: entry.date,
-                mode: 'summary',
-                calories: entry.calories,
-                protein: entry.protein_g,
-                fat: entry.fat_g,
-                carbs: entry.carbs_g
-            });
-        });
         readRawDiaryEntries(LEGACY_DIARY_KEYS[1]).forEach((entry) => {
             collect({
                 date: entry.date,
@@ -523,6 +482,65 @@
         memorySet(DIARY_STORAGE_KEY, JSON.stringify(unified));
         diaryMigrationDone = true;
         return unified;
+    }
+
+    function normalizeDayMetaEntry(entry) {
+        if (!entry) {
+            return null;
+        }
+        const dateKey = normalizeLocalDate(entry.date);
+        if (!dateKey) {
+            return null;
+        }
+        const waterMlRaw = Number(entry.water_ml ?? entry.waterMl);
+        const waterFromLiters = Number(entry.water_l ?? entry.water ?? 0);
+        const water_ml = Number.isFinite(waterMlRaw)
+            ? Math.max(0, Math.round(waterMlRaw))
+            : Number.isFinite(waterFromLiters)
+                ? Math.max(0, Math.round(waterFromLiters * 1000))
+                : 0;
+        const sleepHoursRaw = Number(entry.sleep_hours ?? entry.sleepHours);
+        let sleep_hours = Number.isFinite(sleepHoursRaw) ? Math.max(0, sleepHoursRaw) : null;
+        if (sleep_hours === null && typeof entry.sleep_time === 'string') {
+            const minutes = parseSleepMinutes(entry.sleep_time);
+            sleep_hours = minutes !== null ? minutes / 60 : null;
+        }
+        const activity_flag = Boolean(entry.activity_flag ?? entry.activity ?? false);
+        return {
+            date: dateKey,
+            water_ml,
+            sleep_hours,
+            activity_flag
+        };
+    }
+
+    function buildDayMetaFromDiary(entries) {
+        const metaByDate = new Map();
+        (entries || []).forEach((entry) => {
+            if (!entry?.date) {
+                return;
+            }
+            const current = metaByDate.get(entry.date) || { water_ml: 0, sleep_hours: null, activity_flag: false };
+            const waterLiters = Number(entry.water_l ?? entry.water ?? 0) || 0;
+            if (waterLiters > 0) {
+                current.water_ml = Math.max(current.water_ml, Math.round(waterLiters * 1000));
+            }
+            const minutes = parseSleepMinutes(entry.sleep_time);
+            if (minutes !== null) {
+                const hours = minutes / 60;
+                if (current.sleep_hours === null || hours < current.sleep_hours) {
+                    current.sleep_hours = hours;
+                }
+            }
+            current.activity_flag = current.activity_flag || Boolean(entry.activity);
+            metaByDate.set(entry.date, current);
+        });
+        return Array.from(metaByDate.entries()).map(([date, meta]) => ({
+            date,
+            water_ml: meta.water_ml,
+            sleep_hours: meta.sleep_hours,
+            activity_flag: meta.activity_flag
+        }));
     }
 
     function readLegacyUserData() {
@@ -692,6 +710,32 @@
         return cachedDiaryEntries;
     }
 
+    function getDayMetaEntries() {
+        if (cachedDayMetaEntries) {
+            return cachedDayMetaEntries;
+        }
+        const raw = memoryGet(DAY_META_STORAGE_KEY);
+        if (!raw) {
+            const migrated = buildDayMetaFromDiary(getDiaryEntries());
+            cachedDayMetaEntries = migrated;
+            if (migrated.length && !isMigrationDone(DAY_META_MIGRATION_KEY)) {
+                setDayMetaEntries(migrated, { skipBackend: true });
+                markMigrationDone(DAY_META_MIGRATION_KEY);
+            }
+            return cachedDayMetaEntries;
+        }
+        try {
+            const parsed = JSON.parse(raw);
+            const normalized = Array.isArray(parsed)
+                ? parsed.map(normalizeDayMetaEntry).filter(Boolean)
+                : [];
+            cachedDayMetaEntries = normalized;
+        } catch (error) {
+            cachedDayMetaEntries = [];
+        }
+        return cachedDayMetaEntries;
+    }
+
     function setDiaryEntries(entries, { skipBackend = false } = {}) {
         cachedDiaryEntries = Array.isArray(entries) ? entries : [];
         try {
@@ -701,12 +745,26 @@
         }
         if (!skipBackend) {
             void saveDiaryEntriesToBackend(cachedDiaryEntries);
-            const waterEntries = buildWaterEntriesFromDiary(cachedDiaryEntries);
-            const sleepEntries = buildSleepEntriesFromDiary(cachedDiaryEntries);
+        }
+        return cachedDiaryEntries;
+    }
+
+    function setDayMetaEntries(entries, { skipBackend = false } = {}) {
+        cachedDayMetaEntries = Array.isArray(entries)
+            ? entries.map(normalizeDayMetaEntry).filter(Boolean)
+            : [];
+        try {
+            memorySet(DAY_META_STORAGE_KEY, JSON.stringify(cachedDayMetaEntries));
+        } catch (error) {
+            // Игнорируем ошибку сохранения, данные остаются в памяти.
+        }
+        if (!skipBackend) {
+            const waterEntries = buildWaterEntriesFromDayMeta(cachedDayMetaEntries);
+            const sleepEntries = buildSleepEntriesFromDayMeta(cachedDayMetaEntries);
             void saveWaterEntriesToBackend(waterEntries);
             void saveSleepEntriesToBackend(sleepEntries);
         }
-        return cachedDiaryEntries;
+        return cachedDayMetaEntries;
     }
 
     function getHabitEntries() {
@@ -814,6 +872,17 @@
         }));
     }
 
+    function buildWaterEntriesFromDayMeta(entries) {
+        return (entries || []).map((entry) => {
+            const waterMl = Number(entry?.water_ml) || 0;
+            return {
+                id: `water-${entry.date}`,
+                date: entry.date,
+                water_l: Math.round((waterMl / 1000) * 10) / 10
+            };
+        }).filter((entry) => entry.date);
+    }
+
     function buildSleepEntriesFromDiary(entries) {
         const sleepByDate = new Map();
         (entries || []).forEach((entry) => {
@@ -834,6 +903,49 @@
             date,
             sleep_time: data.sleep_time
         }));
+    }
+
+    function formatSleepTimeFromHours(hours) {
+        if (!Number.isFinite(hours) || hours < 0) {
+            return null;
+        }
+        const totalMinutes = Math.round(hours * 60);
+        const safeMinutes = Math.min(Math.max(totalMinutes, 0), 23 * 60 + 59);
+        const hh = String(Math.floor(safeMinutes / 60)).padStart(2, '0');
+        const mm = String(safeMinutes % 60).padStart(2, '0');
+        return `${hh}:${mm}`;
+    }
+
+    function buildSleepEntriesFromDayMeta(entries) {
+        return (entries || []).map((entry) => {
+            const sleepHours = entry?.sleep_hours;
+            const sleepTime = formatSleepTimeFromHours(sleepHours);
+            if (!sleepTime) {
+                return null;
+            }
+            return {
+                id: `sleep-${entry.date}`,
+                date: entry.date,
+                sleep_time: sleepTime
+            };
+        }).filter(Boolean);
+    }
+
+    function mergeDayMeta(baseEntries, updates) {
+        const merged = new Map();
+        (baseEntries || []).forEach((entry) => {
+            if (entry?.date) {
+                merged.set(entry.date, { ...entry });
+            }
+        });
+        (updates || []).forEach((entry) => {
+            if (!entry?.date) {
+                return;
+            }
+            const existing = merged.get(entry.date) || { date: entry.date, water_ml: 0, sleep_hours: null, activity_flag: false };
+            merged.set(entry.date, { ...existing, ...entry });
+        });
+        return Array.from(merged.values());
     }
 
     async function saveDiaryEntriesToBackend(entries) {
@@ -968,16 +1080,24 @@
         return localEntries;
     }
 
-    async function syncWaterEntriesWithBackend(entries) {
+    async function syncWaterEntriesWithBackend() {
         const telegramUserId = getTelegramUserId();
         if (!telegramUserId) {
             return [];
         }
         const remoteEntries = await fetchWaterEntriesFromBackend(telegramUserId);
         if (Array.isArray(remoteEntries) && remoteEntries.length) {
+            const dayMeta = getDayMetaEntries();
+            const updates = remoteEntries.map((entry) => ({
+                date: entry?.date,
+                water_ml: Number(entry?.water_l) > 0 ? Math.round(Number(entry.water_l) * 1000) : 0
+            })).filter((entry) => entry.date);
+            if (updates.length) {
+                setDayMetaEntries(mergeDayMeta(dayMeta, updates), { skipBackend: true });
+            }
             return remoteEntries;
         }
-        const localEntries = buildWaterEntriesFromDiary(entries);
+        const localEntries = buildWaterEntriesFromDayMeta(getDayMetaEntries());
         if (localEntries.length && !isMigrationDone(WATER_MIGRATION_KEY)) {
             await saveWaterEntriesToBackend(localEntries);
             markMigrationDone(WATER_MIGRATION_KEY);
@@ -985,16 +1105,30 @@
         return localEntries;
     }
 
-    async function syncSleepEntriesWithBackend(entries) {
+    async function syncSleepEntriesWithBackend() {
         const telegramUserId = getTelegramUserId();
         if (!telegramUserId) {
             return [];
         }
         const remoteEntries = await fetchSleepEntriesFromBackend(telegramUserId);
         if (Array.isArray(remoteEntries) && remoteEntries.length) {
+            const dayMeta = getDayMetaEntries();
+            const updates = remoteEntries.map((entry) => {
+                const minutes = parseSleepMinutes(entry?.sleep_time);
+                if (minutes === null) {
+                    return null;
+                }
+                return {
+                    date: entry?.date,
+                    sleep_hours: minutes / 60
+                };
+            }).filter(Boolean);
+            if (updates.length) {
+                setDayMetaEntries(mergeDayMeta(dayMeta, updates), { skipBackend: true });
+            }
             return remoteEntries;
         }
-        const localEntries = buildSleepEntriesFromDiary(entries);
+        const localEntries = buildSleepEntriesFromDayMeta(getDayMetaEntries());
         if (localEntries.length && !isMigrationDone(SLEEP_MIGRATION_KEY)) {
             await saveSleepEntriesToBackend(localEntries);
             markMigrationDone(SLEEP_MIGRATION_KEY);
@@ -1063,6 +1197,8 @@
     window.normalizeLocalDate = normalizeLocalDate;
     window.getDiaryEntries = getDiaryEntries;
     window.setDiaryEntries = setDiaryEntries;
+    window.getDayMetaEntries = getDayMetaEntries;
+    window.setDayMetaEntries = setDayMetaEntries;
     window.getHabitEntries = getHabitEntries;
     window.setHabitEntries = setHabitEntries;
     window.syncProfileWithBackend = syncProfileWithBackend;
@@ -1071,10 +1207,11 @@
     window.syncSleepEntriesWithBackend = syncSleepEntriesWithBackend;
     window.syncHabitEntriesWithBackend = syncHabitEntriesWithBackend;
     window.DIARY_STORAGE_KEY = DIARY_STORAGE_KEY;
+    window.DAY_META_STORAGE_KEY = DAY_META_STORAGE_KEY;
 
     void syncProfileWithBackend();
     void syncDiaryEntriesWithBackend();
-    void syncWaterEntriesWithBackend(getDiaryEntries());
-    void syncSleepEntriesWithBackend(getDiaryEntries());
+    void syncWaterEntriesWithBackend();
+    void syncSleepEntriesWithBackend();
     void syncHabitEntriesWithBackend();
 })();

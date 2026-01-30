@@ -480,49 +480,35 @@ function renderNutritionRings() {
     };
     const resolveEntryTotals = (entry) => {
         if (!entry) {
-            return { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0, water_l: 0 };
+            return { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0 };
         }
-        if (entry.mode === 'products') {
-            if (entry.totals) {
-                const resolved = resolveCarbTotals(
-                    entry.totals.carbs_g,
-                    entry.totals.carbs_simple_g,
-                    entry.totals.carbs_complex_g
-                );
-                return { ...entry.totals, carbs_g: resolved.total, water_l: Number(entry.water_l) || 0 };
-            }
-            if (Array.isArray(entry.items)) {
-                return entry.items.reduce(
-                    (acc, item) => {
-                        const resolved = resolveCarbTotals(
-                            item?.carbs ?? item?.carbs_g ?? 0,
-                            item?.carbs_simple ?? item?.carbs_simple_g ?? 0,
-                            item?.carbs_complex ?? item?.carbs_complex_g ?? 0
-                        );
-                        acc.calories += Number(item?.calories) || 0;
-                        acc.protein_g += Number(item?.protein) || Number(item?.protein_g) || 0;
-                        acc.fat_g += Number(item?.fat) || Number(item?.fat_g) || 0;
-                        acc.carbs_g += resolved.total;
-                        acc.fiber_g += Number(item?.fiber) || Number(item?.fiber_g) || 0;
-                        return acc;
-                    },
-                    { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0, water_l: 0 }
-                );
-            }
+        if (entry.totals) {
+            const resolved = resolveCarbTotals(
+                entry.totals.carbs_g,
+                entry.totals.carbs_simple_g,
+                entry.totals.carbs_complex_g
+            );
+            return { ...entry.totals, carbs_g: resolved.total };
         }
-        const resolved = resolveCarbTotals(
-            entry.carbs_g ?? 0,
-            entry.carbs_simple_g ?? 0,
-            entry.carbs_complex_g ?? 0
-        );
-        return {
-            calories: Number(entry.calories) || 0,
-            protein_g: Number(entry.protein_g) || 0,
-            fat_g: Number(entry.fat_g) || 0,
-            carbs_g: resolved.total,
-            fiber_g: Number(entry.fiber_g) || 0,
-            water_l: Number(entry.water_l) || 0
-        };
+        if (Array.isArray(entry.items)) {
+            return entry.items.reduce(
+                (acc, item) => {
+                    const resolved = resolveCarbTotals(
+                        item?.carbs ?? item?.carbs_g ?? 0,
+                        item?.carbs_simple ?? item?.carbs_simple_g ?? 0,
+                        item?.carbs_complex ?? item?.carbs_complex_g ?? 0
+                    );
+                    acc.calories += Number(item?.calories) || 0;
+                    acc.protein_g += Number(item?.protein) || Number(item?.protein_g) || 0;
+                    acc.fat_g += Number(item?.fat) || Number(item?.fat_g) || 0;
+                    acc.carbs_g += resolved.total;
+                    acc.fiber_g += Number(item?.fiber) || Number(item?.fiber_g) || 0;
+                    return acc;
+                },
+                { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0 }
+            );
+        }
+        return { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0 };
     };
     const today = typeof window.normalizeLocalDate === 'function'
         ? window.normalizeLocalDate(new Date())
@@ -530,8 +516,10 @@ function renderNutritionRings() {
     const diaryEntries = typeof window.getDiaryEntries === 'function'
         ? window.getDiaryEntries()
         : [];
-
-    let waterMax = 0;
+    const dayMetaEntries = typeof window.getDayMetaEntries === 'function'
+        ? window.getDayMetaEntries()
+        : [];
+    const dayMetaMap = new Map(dayMetaEntries.map((entry) => [entry?.date, entry]));
     const totals = diaryEntries.reduce(
         (acc, entry) => {
             if (!today || entry?.date !== today) {
@@ -543,12 +531,12 @@ function renderNutritionRings() {
             acc.fat += totals.fat_g;
             acc.carbs += totals.carbs_g;
             acc.fiber += totals.fiber_g;
-            waterMax = Math.max(waterMax, Number(entry?.water_l) || 0);
             return acc;
         },
         { calories: 0, protein: 0, fat: 0, carbs: 0, fiber: 0, water: 0 }
     );
-    totals.water = waterMax;
+    const todayMeta = today ? dayMetaMap.get(today) : null;
+    totals.water = todayMeta?.water_ml ? Number(todayMeta.water_ml) / 1000 : 0;
 
     const hasEntriesToday = totals.calories > 0 || totals.protein > 0 || totals.fat > 0 || totals.carbs > 0 || totals.fiber > 0 || totals.water > 0;
 

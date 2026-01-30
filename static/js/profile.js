@@ -132,6 +132,13 @@ function readDiaryEntries() {
     return Array.isArray(diaryEntriesMemory) ? diaryEntriesMemory : [];
 }
 
+function readDayMetaEntries() {
+    if (typeof window.getDayMetaEntries === 'function') {
+        return window.getDayMetaEntries();
+    }
+    return [];
+}
+
 function normalizeDateKey(value) {
     if (typeof window.normalizeLocalDate === 'function') {
         return window.normalizeLocalDate(value);
@@ -180,6 +187,19 @@ function buildDateRange(days) {
         range.push({ date, dateKey });
     }
     return range;
+}
+
+function buildDayMetaMap(entries) {
+    return new Map((entries || []).map((entry) => [entry.date, entry]));
+}
+
+function getDayMetaForDate(dayMetaMap, dateKey) {
+    const entry = dayMetaMap.get(dateKey);
+    return {
+        water_ml: Number(entry?.water_ml) || 0,
+        sleep_hours: Number.isFinite(entry?.sleep_hours) ? entry.sleep_hours : null,
+        activity_flag: Boolean(entry?.activity_flag)
+    };
 }
 
 function readHabitEntries() {
@@ -499,7 +519,7 @@ function renderWaterHistory(rangeDays = 7) {
         return;
     }
 
-    const entries = readDiaryEntries();
+    const dayMetaEntries = readDayMetaEntries();
     const waterByDate = new Map();
     const range = buildDateRange(rangeDays);
     range.forEach(({ dateKey }) => {
@@ -508,12 +528,12 @@ function renderWaterHistory(rangeDays = 7) {
         }
     });
 
-    entries.forEach((entry) => {
+    dayMetaEntries.forEach((entry) => {
         const dateKey = normalizeDateKey(entry?.date);
         if (!dateKey || !waterByDate.has(dateKey)) {
             return;
         }
-        const waterValue = Number(entry?.water_l) || 0;
+        const waterValue = Number(entry?.water_ml) ? Number(entry.water_ml) / 1000 : 0;
         const current = waterByDate.get(dateKey) || 0;
         waterByDate.set(dateKey, Math.max(current, waterValue));
     });
@@ -863,8 +883,7 @@ function resolveEntryTotals(entry) {
             carbs_g: 0,
             carbs_simple_g: 0,
             carbs_complex_g: 0,
-            fiber_g: 0,
-            water_l: 0
+            fiber_g: 0
         };
     }
     if (entry.mode === 'products') {
@@ -878,8 +897,7 @@ function resolveEntryTotals(entry) {
                 ...entry.totals,
                 carbs_g: resolved.total,
                 carbs_simple_g: resolved.simple,
-                carbs_complex_g: resolved.complex,
-                water_l: Number(entry.water_l) || 0
+                carbs_complex_g: resolved.complex
             };
         }
         if (Array.isArray(entry.items)) {
@@ -906,8 +924,7 @@ function resolveEntryTotals(entry) {
                     carbs_g: 0,
                     carbs_simple_g: 0,
                     carbs_complex_g: 0,
-                    fiber_g: 0,
-                    water_l: 0
+                    fiber_g: 0
                 }
             );
         }
@@ -924,8 +941,7 @@ function resolveEntryTotals(entry) {
         carbs_g: resolved.total,
         carbs_simple_g: resolved.simple,
         carbs_complex_g: resolved.complex,
-        fiber_g: Number(entry.fiber_g) || 0,
-        water_l: Number(entry.water_l) || 0
+        fiber_g: Number(entry.fiber_g) || 0
     };
 }
 
@@ -978,7 +994,7 @@ function getTodayDiaryTotals() {
         ? window.normalizeLocalDate(new Date())
         : null;
     const entries = readDiaryEntries();
-    let waterMax = 0;
+    const dayMetaMap = buildDayMetaMap(readDayMetaEntries());
     const totals = entries.reduce(
         (acc, entry) => {
             if (!today || entry?.date !== today) {
@@ -990,41 +1006,34 @@ function getTodayDiaryTotals() {
             acc.fat_g += resolved.fat_g;
             acc.carbs_g += resolved.carbs_g;
             acc.fiber_g += resolved.fiber_g;
-            waterMax = Math.max(waterMax, Number(entry?.water_l) || 0);
             return acc;
         },
-        { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0, water_l: 0 }
+        { calories: 0, protein_g: 0, fat_g: 0, carbs_g: 0, fiber_g: 0 }
     );
 
-    const hasEntries = totals.calories > 0 || totals.protein_g > 0 || totals.fat_g > 0 || totals.carbs_g > 0 || totals.fiber_g > 0 || waterMax > 0;
-    return { ...totals, water_l: waterMax, hasEntries };
+    const todayMeta = today ? getDayMetaForDate(dayMetaMap, today) : { water_ml: 0 };
+    const waterLiters = todayMeta.water_ml > 0 ? todayMeta.water_ml / 1000 : 0;
+    const hasEntries = totals.calories > 0 || totals.protein_g > 0 || totals.fat_g > 0 || totals.carbs_g > 0 || totals.fiber_g > 0 || waterLiters > 0;
+    return { ...totals, water_l: waterLiters, hasEntries };
 }
 
-function getSleepMinutesForDate(entries, dateKey) {
+function getSleepMinutesForDate(dayMetaMap, dateKey) {
     if (!dateKey) {
         return null;
     }
-    let best = null;
-    entries.forEach((entry) => {
-        if (entry?.date !== dateKey) {
-            return;
-        }
-        const minutes = parseSleepMinutes(entry.sleep_time);
-        if (minutes === null) {
-            return;
-        }
-        if (best === null || minutes < best) {
-            best = minutes;
-        }
-    });
-    return best;
+    const meta = getDayMetaForDate(dayMetaMap, dateKey);
+    if (!Number.isFinite(meta.sleep_hours)) {
+        return null;
+    }
+    return Math.round(meta.sleep_hours * 60);
 }
 
-function getActivityForDate(entries, dateKey) {
+function getActivityForDate(dayMetaMap, dateKey) {
     if (!dateKey) {
         return false;
     }
-    return entries.some((entry) => entry?.date === dateKey && entry?.activity === true);
+    const meta = getDayMetaForDate(dayMetaMap, dateKey);
+    return meta.activity_flag === true;
 }
 
 function renderProfileRings() {
@@ -1040,13 +1049,13 @@ function renderProfileRings() {
 
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
     const tdee = Number(profile?.tdee_calories);
-    const entries = readDiaryEntries();
+    const dayMetaMap = buildDayMetaMap(readDayMetaEntries());
     const todayTotals = getTodayDiaryTotals();
     const todayKey = typeof window.normalizeLocalDate === 'function'
         ? window.normalizeLocalDate(new Date())
         : null;
-    const sleepMinutes = getSleepMinutesForDate(entries, todayKey);
-    const activityToday = getActivityForDate(entries, todayKey);
+    const sleepMinutes = getSleepMinutesForDate(dayMetaMap, todayKey);
+    const activityToday = getActivityForDate(dayMetaMap, todayKey);
     const sleepTargetRaw = window.adminConfig?.reminders?.sleep_target;
     const sleepTargetMinutes = parseSleepMinutes(sleepTargetRaw);
     const caloriesPercent = todayTotals.hasEntries && Number.isFinite(tdee) && tdee > 0
@@ -1225,10 +1234,8 @@ function renderMonthGrid() {
 
     container.innerHTML = '';
     const diaryEntries = readDiaryEntries();
+    const dayMetaMap = buildDayMetaMap(readDayMetaEntries());
     const caloriesByDate = new Map();
-    const waterByDate = new Map();
-    const sleepByDate = new Map();
-    const activityByDate = new Map();
     diaryEntries.forEach((entry) => {
         const dateKey = normalizeDateKey(entry?.date);
         if (!dateKey) {
@@ -1237,19 +1244,6 @@ function renderMonthGrid() {
         const totals = resolveEntryTotals(entry);
         const currentCalories = caloriesByDate.get(dateKey) || 0;
         caloriesByDate.set(dateKey, currentCalories + (Number(totals.calories) || 0));
-        const waterValue = Number(entry?.water_l) || 0;
-        const currentWater = waterByDate.get(dateKey) || 0;
-        waterByDate.set(dateKey, Math.max(currentWater, waterValue));
-        const sleepMinutes = parseSleepMinutes(entry?.sleep_time);
-        if (sleepMinutes !== null) {
-            const currentSleep = sleepByDate.get(dateKey);
-            if (currentSleep === undefined || sleepMinutes < currentSleep) {
-                sleepByDate.set(dateKey, sleepMinutes);
-            }
-        }
-        if (entry?.activity === true) {
-            activityByDate.set(dateKey, true);
-        }
     });
     const days = 30;
     const today = new Date();
@@ -1268,16 +1262,17 @@ function renderMonthGrid() {
         const dateKey = normalizeDateKey(date);
         const day = document.createElement('a');
         day.className = 'month-day';
-        day.href = dateKey ? `/diary?date=${dateKey}&mode=day` : '/diary?mode=day';
+        day.href = dateKey ? `/diary?date=${dateKey}` : '/diary';
         if (todayDate && dateKey === todayDate) {
             day.classList.add('month-day--today');
         }
         const dayCalories = dateKey ? (caloriesByDate.get(dateKey) || 0) : 0;
-        const dayWater = dateKey ? (waterByDate.get(dateKey) || 0) : 0;
-        const daySleep = dateKey ? sleepByDate.get(dateKey) : undefined;
-        const dayActivity = dateKey ? activityByDate.get(dateKey) === true : false;
+        const meta = dateKey ? getDayMetaForDate(dayMetaMap, dateKey) : { water_ml: 0, sleep_hours: null, activity_flag: false };
+        const dayWater = meta.water_ml ? meta.water_ml / 1000 : 0;
+        const daySleep = Number.isFinite(meta.sleep_hours) ? Math.round(meta.sleep_hours * 60) : undefined;
+        const dayActivity = meta.activity_flag === true;
         const hasData = dateKey
-            ? (caloriesByDate.has(dateKey) || waterByDate.has(dateKey) || sleepByDate.has(dateKey) || activityByDate.has(dateKey))
+            ? (caloriesByDate.has(dateKey) || meta.water_ml > 0 || Number.isFinite(meta.sleep_hours) || meta.activity_flag)
             : false;
         if (hasData) {
             daysWithData += 1;
@@ -1412,9 +1407,9 @@ function renderWeeklyProgress() {
         const item = document.createElement('a');
         item.className = 'weekly-day flex flex-col items-center gap-1 p-2';
         if (dateKey) {
-            item.href = `/diary?date=${dateKey}&mode=day`;
+            item.href = `/diary?date=${dateKey}`;
         } else {
-            item.href = '/diary?mode=day';
+            item.href = '/diary';
         }
         if (todayKey && dateKey === todayKey) {
             item.classList.add('is-today');

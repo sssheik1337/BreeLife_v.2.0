@@ -764,7 +764,7 @@ async def diary(request: Request, telegram_user_id: int | None = Depends(optiona
 
 @app.get("/food-diary")
 async def food_diary():
-    return RedirectResponse(url="/diary?mode=products")
+    return RedirectResponse(url="/diary")
 
 
 @app.get("/foods", response_class=HTMLResponse)
