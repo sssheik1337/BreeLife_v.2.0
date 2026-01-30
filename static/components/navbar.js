@@ -209,8 +209,6 @@ class CustomNavbar extends HTMLElement {
               <span class="nav-emoji" aria-hidden="true">📋</span>
             </button>
             <div class="menu-panel" id="menu-panel">
-              <div class="menu-section">Дневник</div>
-              <a href="/diary" class="menu-link">Дневник</a>
               <a href="/foods" class="menu-link">Список продуктов</a>
               <a href="/my-products" class="menu-link">Мои продукты</a>
               <div class="menu-section">Разделы</div>
