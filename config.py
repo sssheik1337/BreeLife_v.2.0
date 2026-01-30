@@ -37,3 +37,7 @@ if not DB_PATH:
 # Данные доступа в админку.
 ADMIN_LOGIN = os.getenv("ADMIN_LOGIN", "")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+
+# Пути к данным админки.
+ADMIN_CONFIG_PATH = os.getenv("ADMIN_CONFIG_PATH", "config/admin_config.json")
+ADMIN_PRODUCTS_PATH = os.getenv("ADMIN_PRODUCTS_PATH", "static/data/products.json")

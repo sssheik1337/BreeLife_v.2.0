@@ -38,6 +38,8 @@ from config import (
     PUBLIC_BASE_URL,
     ADMIN_LOGIN,
     ADMIN_PASSWORD,
+    ADMIN_CONFIG_PATH as ADMIN_CONFIG_PATH_VALUE,
+    ADMIN_PRODUCTS_PATH as ADMIN_PRODUCTS_PATH_VALUE,
 )
 from services.ai_profile import (
     calculate_deviation_risk,
@@ -135,8 +137,8 @@ templates.env.globals["APP_NAME"] = APP_NAME
 
 init_db()
 
-ADMIN_CONFIG_PATH = Path("config/admin_config.json")
-ADMIN_PRODUCTS_PATH = Path("static/data/products.json")
+ADMIN_CONFIG_PATH = Path(ADMIN_CONFIG_PATH_VALUE)
+ADMIN_PRODUCTS_PATH = Path(ADMIN_PRODUCTS_PATH_VALUE)
 ADMIN_CONFIG_CACHE: dict[str, object] | None = None
 ADMIN_CONFIG_MTIME: float | None = None
 ADMIN_SESSION_COOKIE = "admin_session"
