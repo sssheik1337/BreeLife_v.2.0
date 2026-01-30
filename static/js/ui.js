@@ -356,6 +356,9 @@ async function showTelegramRequiredOverlay() {
 async function initTelegramAuth(appConfig) {
     if (appConfig?.is_dev) {
         showDevModeBadge();
+        // В DEV режиме фиксируем тестовый telegram_user_id сразу,
+        // чтобы синхронизация дневника и статистики работала до запросов к API.
+        window.telegramAuthUserId = appConfig.dev_telegram_user_id ?? null;
         return true;
     }
     const tg = window.Telegram?.WebApp;
