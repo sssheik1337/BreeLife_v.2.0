@@ -105,14 +105,17 @@ async def lifespan(app: FastAPI):
             ]
         )
         logger.info("INFO: Отправлена кнопка WebApp с URL: %s", PUBLIC_APP_URL)
-        await message.answer(
-            "Добро пожаловать! Откройте приложение 👇",
-            reply_markup=keyboard,
-        )
+        try:
+            await message.answer(
+                "Добро пожаловать! Откройте приложение 👇",
+                reply_markup=keyboard,
+            )
+        except Exception as exc:
+            logger.error("Не удалось отправить ответ на /start: %s", exc)
 
     webhook_url = f"{PUBLIC_BASE_URL.rstrip('/')}/telegram/webhook"
     try:
-        result = await bot.set_webhook(webhook_url)
+        result = await bot.set_webhook(webhook_url, drop_pending_updates=True)
         logger.info("INFO: Webhook установлен: %s (result=%s)", webhook_url, result)
     except Exception as exc:
         logger.error("Не удалось установить webhook: %s", exc)
