@@ -550,9 +550,9 @@ async function saveProfileToServer(profile) {
         return;
     }
     try {
-        await fetch('/api/profile/save', {
+        const apiFetch = window.apiFetch || fetch;
+        await apiFetch('/api/profile/save', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 user_profile: profile
             })

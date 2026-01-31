@@ -409,7 +409,7 @@ reminder_scheduler = ReminderScheduler(REMINDERS_ENABLED, reminders_store)
 
 
 class ReminderScheduleRequest(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     type: Literal[
         "food_diary",
         "water",
@@ -423,24 +423,24 @@ class ReminderScheduleRequest(BaseModel):
 
 
 class ReminderGenerateRequest(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     user_profile: dict[str, object] = Field(default_factory=dict)
 
 
 class ReminderAutoGenerateRequest(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     user_profile: dict[str, object] = Field(default_factory=dict)
     weekly_review: dict[str, object] = Field(default_factory=dict)
 
 
 class SubscriptionRequest(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     subscription_started_at: str | None = None
     trial_started_at: str | None = None
 
 
 class PaymentRequest(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     days: int = Field(30, description="Срок продления подписки в днях")
 
 
@@ -450,27 +450,27 @@ class ProfileSaveRequest(BaseModel):
 
 
 class DiaryEntriesPayload(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     entries: list[dict[str, object]] = Field(default_factory=list)
 
 
 class WaterEntriesPayload(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     entries: list[dict[str, object]] = Field(default_factory=list)
 
 
 class SleepEntriesPayload(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     entries: list[dict[str, object]] = Field(default_factory=list)
 
 
 class HabitEntriesPayload(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     habits: dict[str, object] = Field(default_factory=dict)
 
 
 class FoodDiaryEntry(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     date: str
     calories: float
     protein_g: float
@@ -568,6 +568,14 @@ def get_current_user(request: Request, response: Response) -> int:
 def optional_current_user(request: Request, response: Response) -> int | None:
     """Получить telegram_user_id из cookie или вернуть None."""
     return resolve_telegram_user_id(request, required=False, response=response)
+
+
+def require_telegram_user_id(request: Request, response: Response) -> int:
+    """Получить telegram_user_id из Telegram initData или сессии."""
+    telegram_user_id = resolve_telegram_user_id(request, required=True, response=response)
+    if telegram_user_id is None:
+        raise HTTPException(status_code=401, detail="Telegram не авторизован.")
+    return telegram_user_id
 
 
 def is_profile_completed(telegram_user_id: int) -> bool:
@@ -1536,13 +1544,14 @@ def ensure_entry_ids(entries: list[dict[str, object]]) -> list[dict[str, object]
 
 
 @app.get("/api/subscription/status")
-async def subscription_status(telegram_user_id: int):
+async def subscription_status(request: Request, response: Response):
     if IS_DEV:
         return {
             "subscription_status": "disabled",
             "subscription_until": None,
             "subscription_started_at": None,
         }
+    telegram_user_id = require_telegram_user_id(request, response)
     stored = load_subscription(telegram_user_id)
     return compute_subscription_status(stored)
 
@@ -1577,10 +1586,11 @@ async def products_search(q: str):
 
 
 @app.post("/api/subscription/start_trial")
-async def start_trial(payload: SubscriptionRequest):
+async def start_trial(request: Request, response: Response, payload: SubscriptionRequest):
     if IS_DEV:
         raise HTTPException(status_code=403, detail="DEV_MODE_DISABLED")
-    stored = load_subscription(payload.telegram_user_id)
+    telegram_user_id = require_telegram_user_id(request, response)
+    stored = load_subscription(telegram_user_id)
     if stored and stored.get("subscription_until"):
         return compute_subscription_status(stored)
 
@@ -1607,19 +1617,20 @@ async def start_trial(payload: SubscriptionRequest):
         "trial_started_at": started_at.isoformat(),
         "started_at": now.isoformat(),
     }
-    save_subscription(payload.telegram_user_id, subscription_payload)
+    save_subscription(telegram_user_id, subscription_payload)
     return compute_subscription_status(subscription_payload)
 
 
 @app.post("/api/payments/start")
-async def start_payment(payload: PaymentRequest):
+async def start_payment(request: Request, response: Response, payload: PaymentRequest):
     if IS_DEV:
         raise HTTPException(status_code=403, detail="DEV_MODE_DISABLED")
     if payload.days <= 0:
         raise HTTPException(status_code=400, detail="Срок продления должен быть больше нуля.")
+    telegram_user_id = require_telegram_user_id(request, response)
 
     now = datetime.now(timezone.utc)
-    stored = load_subscription(payload.telegram_user_id)
+    stored = load_subscription(telegram_user_id)
     current_until_raw = stored.get("subscription_until")
     if current_until_raw:
         try:
@@ -1638,7 +1649,7 @@ async def start_payment(payload: PaymentRequest):
         "trial_started_at": stored.get("trial_started_at"),
         "started_at": stored.get("started_at") or now.isoformat(),
     }
-    save_subscription(payload.telegram_user_id, subscription_payload)
+    save_subscription(telegram_user_id, subscription_payload)
 
     return {
         "status": "success",
@@ -1695,7 +1706,8 @@ async def get_profile_legacy(request: Request, response: Response):
 
 
 @app.get("/api/diary")
-async def get_diary(telegram_user_id: int):
+async def get_diary(request: Request, response: Response):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = load_diary_entries(telegram_user_id)
     if not entries:
         return {"status": "not_found", "entries": []}
@@ -1703,15 +1715,17 @@ async def get_diary(telegram_user_id: int):
 
 
 @app.post("/api/diary")
-async def save_diary(payload: DiaryEntriesPayload):
+async def save_diary(request: Request, response: Response, payload: DiaryEntriesPayload):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = payload.entries if isinstance(payload.entries, list) else []
     normalized = ensure_entry_ids(entries)
-    save_diary_entries(payload.telegram_user_id, normalized)
+    save_diary_entries(telegram_user_id, normalized)
     return {"status": "ok", "entries": normalized}
 
 
 @app.delete("/api/diary/{entry_id}")
-async def delete_diary_entry(entry_id: str, telegram_user_id: int):
+async def delete_diary_entry(request: Request, response: Response, entry_id: str):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = load_diary_entries(telegram_user_id)
     updated = [entry for entry in entries if entry.get("id") != entry_id]
     save_diary_entries(telegram_user_id, updated)
@@ -1719,7 +1733,8 @@ async def delete_diary_entry(entry_id: str, telegram_user_id: int):
 
 
 @app.get("/api/water")
-async def get_water_entries(telegram_user_id: int):
+async def get_water_entries(request: Request, response: Response):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = load_water_entries(telegram_user_id)
     if not entries:
         return {"status": "not_found", "entries": []}
@@ -1727,11 +1742,12 @@ async def get_water_entries(telegram_user_id: int):
 
 
 @app.post("/api/water")
-async def save_water_entries_endpoint(payload: WaterEntriesPayload):
+async def save_water_entries_endpoint(request: Request, response: Response, payload: WaterEntriesPayload):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = payload.entries if isinstance(payload.entries, list) else []
     normalized = ensure_entry_ids(entries)
-    save_water_entries(payload.telegram_user_id, normalized)
-    diary_entries = load_diary_entries(payload.telegram_user_id)
+    save_water_entries(telegram_user_id, normalized)
+    diary_entries = load_diary_entries(telegram_user_id)
     updated_diary = list(diary_entries)
     for entry in normalized:
         date_value = entry.get("date")
@@ -1747,12 +1763,13 @@ async def save_water_entries_endpoint(payload: WaterEntriesPayload):
                 "water_l": water_value
             })
     if updated_diary != diary_entries:
-        save_diary_entries(payload.telegram_user_id, ensure_entry_ids(updated_diary))
+        save_diary_entries(telegram_user_id, ensure_entry_ids(updated_diary))
     return {"status": "ok", "entries": normalized}
 
 
 @app.delete("/api/water/{entry_id}")
-async def delete_water_entry(entry_id: str, telegram_user_id: int):
+async def delete_water_entry(request: Request, response: Response, entry_id: str):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = load_water_entries(telegram_user_id)
     updated = [entry for entry in entries if entry.get("id") != entry_id]
     save_water_entries(telegram_user_id, updated)
@@ -1760,7 +1777,8 @@ async def delete_water_entry(entry_id: str, telegram_user_id: int):
 
 
 @app.get("/api/sleep")
-async def get_sleep_entries(telegram_user_id: int):
+async def get_sleep_entries(request: Request, response: Response):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = load_sleep_entries(telegram_user_id)
     if not entries:
         return {"status": "not_found", "entries": []}
@@ -1768,15 +1786,17 @@ async def get_sleep_entries(telegram_user_id: int):
 
 
 @app.post("/api/sleep")
-async def save_sleep_entries_endpoint(payload: SleepEntriesPayload):
+async def save_sleep_entries_endpoint(request: Request, response: Response, payload: SleepEntriesPayload):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = payload.entries if isinstance(payload.entries, list) else []
     normalized = ensure_entry_ids(entries)
-    save_sleep_entries(payload.telegram_user_id, normalized)
+    save_sleep_entries(telegram_user_id, normalized)
     return {"status": "ok", "entries": normalized}
 
 
 @app.delete("/api/sleep/{entry_id}")
-async def delete_sleep_entry(entry_id: str, telegram_user_id: int):
+async def delete_sleep_entry(request: Request, response: Response, entry_id: str):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = load_sleep_entries(telegram_user_id)
     updated = [entry for entry in entries if entry.get("id") != entry_id]
     save_sleep_entries(telegram_user_id, updated)
@@ -1784,7 +1804,8 @@ async def delete_sleep_entry(entry_id: str, telegram_user_id: int):
 
 
 @app.get("/api/habits")
-async def get_habits(telegram_user_id: int):
+async def get_habits(request: Request, response: Response):
+    telegram_user_id = require_telegram_user_id(request, response)
     habits = load_habit_entries(telegram_user_id)
     if not habits:
         return {"status": "not_found", "habits": {}}
@@ -1792,30 +1813,31 @@ async def get_habits(telegram_user_id: int):
 
 
 @app.post("/api/habits")
-async def save_habits(payload: HabitEntriesPayload):
+async def save_habits(request: Request, response: Response, payload: HabitEntriesPayload):
+    telegram_user_id = require_telegram_user_id(request, response)
     habits = payload.habits if isinstance(payload.habits, dict) else {}
-    save_habit_entries(payload.telegram_user_id, habits)
+    save_habit_entries(telegram_user_id, habits)
     return {"status": "ok"}
 
 
 @app.get("/api/diary/get")
-async def get_diary_legacy(telegram_user_id: int):
-    return await get_diary(telegram_user_id)
+async def get_diary_legacy(request: Request, response: Response):
+    return await get_diary(request, response)
 
 
 @app.post("/api/diary/save")
-async def save_diary_legacy(payload: DiaryEntriesPayload):
-    return await save_diary(payload)
+async def save_diary_legacy(request: Request, response: Response, payload: DiaryEntriesPayload):
+    return await save_diary(request, response, payload)
 
 
 @app.get("/api/habits/get")
-async def get_habits_legacy(telegram_user_id: int):
-    return await get_habits(telegram_user_id)
+async def get_habits_legacy(request: Request, response: Response):
+    return await get_habits(request, response)
 
 
 @app.post("/api/habits/save")
-async def save_habits_legacy(payload: HabitEntriesPayload):
-    return await save_habits(payload)
+async def save_habits_legacy(request: Request, response: Response, payload: HabitEntriesPayload):
+    return await save_habits(request, response, payload)
 
 
 @app.post("/api/ai/recommendation")
@@ -1850,13 +1872,14 @@ async def ai_recommendation(request: Request):
 
 
 @app.post("/api/reminders/schedule")
-async def schedule_reminder(payload: ReminderScheduleRequest):
-    stored = load_reminder_entries(payload.telegram_user_id)
+async def schedule_reminder(request: Request, response: Response, payload: ReminderScheduleRequest):
+    telegram_user_id = require_telegram_user_id(request, response)
+    stored = load_reminder_entries(telegram_user_id)
     stored.append({"type": payload.type, "when_iso": payload.when_iso})
-    save_reminder_entries(payload.telegram_user_id, stored)
+    save_reminder_entries(telegram_user_id, stored)
     return reminder_scheduler.schedule(
         ReminderPayload(
-            telegram_user_id=payload.telegram_user_id,
+            telegram_user_id=telegram_user_id,
             type=payload.type,
             when_iso=payload.when_iso,
         )
@@ -1864,7 +1887,8 @@ async def schedule_reminder(payload: ReminderScheduleRequest):
 
 
 @app.get("/api/reminders/list")
-async def list_reminders(telegram_user_id: int):
+async def list_reminders(request: Request, response: Response):
+    telegram_user_id = require_telegram_user_id(request, response)
     stored = load_reminder_entries(telegram_user_id)
     if stored:
         return stored
@@ -1872,21 +1896,23 @@ async def list_reminders(telegram_user_id: int):
 
 
 @app.post("/api/reminders/generate")
-async def generate_reminders(payload: ReminderGenerateRequest):
+async def generate_reminders(request: Request, response: Response, payload: ReminderGenerateRequest):
+    telegram_user_id = require_telegram_user_id(request, response)
     profile = payload.user_profile if isinstance(payload.user_profile, dict) else {}
-    reminders = generate_reminders_payload(profile, payload.telegram_user_id)
+    reminders = generate_reminders_payload(profile, telegram_user_id)
     return {"reminders": reminders}
 
 
 @app.post("/api/reminders/auto-generate")
-async def auto_generate_reminders(payload: ReminderAutoGenerateRequest):
+async def auto_generate_reminders(request: Request, response: Response, payload: ReminderAutoGenerateRequest):
+    telegram_user_id = require_telegram_user_id(request, response)
     profile = payload.user_profile if isinstance(payload.user_profile, dict) else {}
     weekly_review = payload.weekly_review if isinstance(payload.weekly_review, dict) else {}
     try:
         reminders = generate_auto_reminders_payload(
             profile,
             weekly_review,
-            payload.telegram_user_id,
+            telegram_user_id,
         )
     except Exception as exc:
         logger.warning("Ошибка при генерации авто-напоминаний: %s", exc, exc_info=True)
@@ -1895,15 +1921,19 @@ async def auto_generate_reminders(payload: ReminderAutoGenerateRequest):
 
 
 @app.post("/api/food-diary/add")
-async def add_food_diary_entry(entry: FoodDiaryEntry):
-    entries = load_food_diary_entries(entry.telegram_user_id)
-    entries.append(entry.model_dump())
-    save_food_diary_entries(entry.telegram_user_id, entries)
+async def add_food_diary_entry(request: Request, response: Response, entry: FoodDiaryEntry):
+    telegram_user_id = require_telegram_user_id(request, response)
+    entries = load_food_diary_entries(telegram_user_id)
+    entry_payload = entry.model_dump()
+    entry_payload["telegram_user_id"] = telegram_user_id
+    entries.append(entry_payload)
+    save_food_diary_entries(telegram_user_id, entries)
     return {"status": "saved"}
 
 
 @app.get("/api/food-diary/list")
-async def list_food_diary_entries(telegram_user_id: int):
+async def list_food_diary_entries(request: Request, response: Response):
+    telegram_user_id = require_telegram_user_id(request, response)
     return load_food_diary_entries(telegram_user_id)
 
 

@@ -1,6 +1,7 @@
 // Хранилище профиля пользователя и нормализация данных
 
 (function() {
+    window.telegramInitData = window.Telegram?.WebApp?.initData || null;
     const memoryStore = new Map();
     const migrationFlags = new Set();
     const STORAGE_KEY = 'user_profile';
@@ -18,6 +19,17 @@
     let cachedProfile = null;
     let cachedDiaryEntries = null;
     let cachedHabitEntries = null;
+
+    function apiFetch(url, options = {}) {
+        return fetch(url, {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': window.telegramInitData,
+                ...(options.headers || {})
+            }
+        });
+    }
 
     function memoryGet(key) {
         return memoryStore.has(key) ? memoryStore.get(key) : null;
@@ -627,11 +639,9 @@
 
     async function notifyTrialStart(telegramUserId, startedAt) {
         try {
-            const response = await fetch('/api/subscription/start_trial', {
+            const response = await apiFetch('/api/subscription/start_trial', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    telegram_user_id: telegramUserId,
                     trial_started_at: startedAt,
                     subscription_started_at: startedAt
                 })
@@ -754,9 +764,8 @@
 
     async function saveProfileToBackend(profile) {
         try {
-            await fetch('/api/profile', {
+            await apiFetch('/api/profile', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     user_profile: profile
                 })
@@ -771,7 +780,7 @@
             return getUserProfile();
         }
         try {
-            const response = await fetch('/api/profile');
+            const response = await apiFetch('/api/profile');
             if (!response.ok) {
                 return getUserProfile();
             }
@@ -840,16 +849,13 @@
     }
 
     async function saveDiaryEntriesToBackend(entries) {
-        const telegramUserId = getTelegramUserId();
-        if (!telegramUserId) {
+        if (!window.telegramInitData) {
             return;
         }
         try {
-            await fetch('/api/diary', {
+            await apiFetch('/api/diary', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    telegram_user_id: telegramUserId,
                     entries: Array.isArray(entries) ? entries : []
                 })
             });
@@ -858,9 +864,9 @@
         }
     }
 
-    async function fetchDiaryEntriesFromBackend(telegramUserId) {
+    async function fetchDiaryEntriesFromBackend() {
         try {
-            const response = await fetch(`/api/diary?telegram_user_id=${telegramUserId}`);
+            const response = await apiFetch('/api/diary');
             if (!response.ok) {
                 return null;
             }
@@ -878,16 +884,13 @@
     }
 
     async function saveWaterEntriesToBackend(entries) {
-        const telegramUserId = getTelegramUserId();
-        if (!telegramUserId) {
+        if (!window.telegramInitData) {
             return;
         }
         try {
-            await fetch('/api/water', {
+            await apiFetch('/api/water', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    telegram_user_id: telegramUserId,
                     entries: Array.isArray(entries) ? entries : []
                 })
             });
@@ -896,9 +899,9 @@
         }
     }
 
-    async function fetchWaterEntriesFromBackend(telegramUserId) {
+    async function fetchWaterEntriesFromBackend() {
         try {
-            const response = await fetch(`/api/water?telegram_user_id=${telegramUserId}`);
+            const response = await apiFetch('/api/water');
             if (!response.ok) {
                 return null;
             }
@@ -916,16 +919,13 @@
     }
 
     async function saveSleepEntriesToBackend(entries) {
-        const telegramUserId = getTelegramUserId();
-        if (!telegramUserId) {
+        if (!window.telegramInitData) {
             return;
         }
         try {
-            await fetch('/api/sleep', {
+            await apiFetch('/api/sleep', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    telegram_user_id: telegramUserId,
                     entries: Array.isArray(entries) ? entries : []
                 })
             });
@@ -934,9 +934,9 @@
         }
     }
 
-    async function fetchSleepEntriesFromBackend(telegramUserId) {
+    async function fetchSleepEntriesFromBackend() {
         try {
-            const response = await fetch(`/api/sleep?telegram_user_id=${telegramUserId}`);
+            const response = await apiFetch('/api/sleep');
             if (!response.ok) {
                 return null;
             }
@@ -954,11 +954,10 @@
     }
 
     async function syncDiaryEntriesWithBackend() {
-        const telegramUserId = getTelegramUserId();
-        if (!telegramUserId) {
+        if (!window.telegramInitData) {
             return getDiaryEntries();
         }
-        const remoteEntries = await fetchDiaryEntriesFromBackend(telegramUserId);
+        const remoteEntries = await fetchDiaryEntriesFromBackend();
         if (Array.isArray(remoteEntries) && remoteEntries.length) {
             const merged = setDiaryEntries(remoteEntries, { skipBackend: true });
             return merged;
@@ -972,11 +971,10 @@
     }
 
     async function syncWaterEntriesWithBackend(entries) {
-        const telegramUserId = getTelegramUserId();
-        if (!telegramUserId) {
+        if (!window.telegramInitData) {
             return [];
         }
-        const remoteEntries = await fetchWaterEntriesFromBackend(telegramUserId);
+        const remoteEntries = await fetchWaterEntriesFromBackend();
         if (Array.isArray(remoteEntries) && remoteEntries.length) {
             return remoteEntries;
         }
@@ -989,11 +987,10 @@
     }
 
     async function syncSleepEntriesWithBackend(entries) {
-        const telegramUserId = getTelegramUserId();
-        if (!telegramUserId) {
+        if (!window.telegramInitData) {
             return [];
         }
-        const remoteEntries = await fetchSleepEntriesFromBackend(telegramUserId);
+        const remoteEntries = await fetchSleepEntriesFromBackend();
         if (Array.isArray(remoteEntries) && remoteEntries.length) {
             return remoteEntries;
         }
@@ -1006,16 +1003,13 @@
     }
 
     async function saveHabitEntriesToBackend(habits) {
-        const telegramUserId = getTelegramUserId();
-        if (!telegramUserId) {
+        if (!window.telegramInitData) {
             return;
         }
         try {
-            await fetch('/api/habits', {
+            await apiFetch('/api/habits', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    telegram_user_id: telegramUserId,
                     habits: habits && typeof habits === 'object' ? habits : {}
                 })
             });
@@ -1024,9 +1018,9 @@
         }
     }
 
-    async function fetchHabitEntriesFromBackend(telegramUserId) {
+    async function fetchHabitEntriesFromBackend() {
         try {
-            const response = await fetch(`/api/habits?telegram_user_id=${telegramUserId}`);
+            const response = await apiFetch('/api/habits');
             if (!response.ok) {
                 return null;
             }
@@ -1044,11 +1038,10 @@
     }
 
     async function syncHabitEntriesWithBackend() {
-        const telegramUserId = getTelegramUserId();
-        if (!telegramUserId) {
+        if (!window.telegramInitData) {
             return getHabitEntries();
         }
-        const remoteHabits = await fetchHabitEntriesFromBackend(telegramUserId);
+        const remoteHabits = await fetchHabitEntriesFromBackend();
         if (remoteHabits && Object.keys(remoteHabits).length) {
             return setHabitEntries(remoteHabits, { skipBackend: true });
         }
@@ -1074,5 +1067,6 @@
     window.syncSleepEntriesWithBackend = syncSleepEntriesWithBackend;
     window.syncHabitEntriesWithBackend = syncHabitEntriesWithBackend;
     window.DIARY_STORAGE_KEY = DIARY_STORAGE_KEY;
+    window.apiFetch = apiFetch;
 
 })();

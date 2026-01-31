@@ -1,5 +1,7 @@
 // Resume/Summary Page Logic for Health Bloom App
 
+const apiFetch = window.apiFetch || fetch;
+
 // Initialize summary page
 function generateSummary() {
     const cardsContainer = document.getElementById('data-cards');
@@ -287,9 +289,8 @@ async function applyAiRecommendationToResume() {
     }
 
     try {
-        const response = await fetch('/api/ai/recommendation', {
+        const response = await apiFetch('/api/ai/recommendation', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(profile)
         });
         if (!response.ok) {
@@ -780,7 +781,7 @@ async function renderTrialStatus() {
     };
 
     const fetchSubscriptionStatus = async () => {
-        const response = await fetch(`/api/subscription/status?telegram_user_id=${telegramUserId}`);
+        const response = await apiFetch('/api/subscription/status');
         if (!response.ok) {
             throw new Error('Не удалось получить статус подписки.');
         }
@@ -788,10 +789,9 @@ async function renderTrialStatus() {
     };
 
     const startTrial = async () => {
-        const response = await fetch('/api/subscription/start_trial', {
+        const response = await apiFetch('/api/subscription/start_trial', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telegram_user_id: telegramUserId })
+            body: JSON.stringify({})
         });
         if (!response.ok) {
             throw new Error('Не удалось запустить пробный период.');
@@ -800,10 +800,9 @@ async function renderTrialStatus() {
     };
 
     const startPayment = async () => {
-        const response = await fetch('/api/payments/start', {
+        const response = await apiFetch('/api/payments/start', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telegram_user_id: telegramUserId, days: 30 })
+            body: JSON.stringify({ days: 30 })
         });
         if (!response.ok) {
             throw new Error('Не удалось выполнить оплату.');
@@ -970,8 +969,7 @@ function renderReminderActions() {
     actionsContainer.innerHTML = '';
     hintElement.textContent = '';
 
-    const telegramUserId = profile.telegram_user_id;
-    const isTelegramAvailable = telegramUserId !== null && telegramUserId !== undefined;
+    const isTelegramAvailable = Boolean(window.telegramInitData);
 
     if (!isTelegramAvailable) {
         hintElement.textContent = 'Telegram ID не найден. Откройте приложение в Telegram, чтобы включить напоминания.';
@@ -979,9 +977,8 @@ function renderReminderActions() {
 
     const scheduleReminder = async (payload) => {
         try {
-            const response = await fetch('/api/reminders/schedule', {
+            const response = await apiFetch('/api/reminders/schedule', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
             if (!response.ok) {
@@ -1040,7 +1037,6 @@ function renderReminderActions() {
                 return;
             }
             await scheduleReminder({
-                telegram_user_id: telegramUserId,
                 type: reminder.type,
                 when_iso: reminder.suggested_time_iso
             });
@@ -1061,11 +1057,9 @@ function renderReminderActions() {
 
     const fetchReminders = async () => {
         try {
-            const response = await fetch('/api/reminders/auto-generate', {
+            const response = await apiFetch('/api/reminders/auto-generate', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    telegram_user_id: telegramUserId ?? 0,
                     user_profile: profile,
                     weekly_review: profile.weekly_review || {}
                 })

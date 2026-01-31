@@ -274,9 +274,8 @@ async function getPaymentMotivation(profile, deviations) {
     }
 
     try {
-        const response = await fetch('/api/ai/recommendation', {
+        const response = await (window.apiFetch || fetch)('/api/ai/recommendation', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 ...profile,
                 source: 'payment_motivation',
