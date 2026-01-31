@@ -496,7 +496,12 @@ def verify_telegram_init_data(init_data: str, bot_token: str) -> dict[str, objec
     data_check_string = "\n".join(
         f"{key}={value}" for key, value in sorted(parsed.items())
     )
-    secret_key = hashlib.sha256(bot_token.encode("utf-8")).digest()
+    # Для WebApp используется секретный ключ HMAC_SHA256("WebAppData", bot_token).
+    secret_key = hmac.new(
+        b"WebAppData",
+        bot_token.encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
     calculated_hash = hmac.new(
         secret_key,
         data_check_string.encode("utf-8"),
