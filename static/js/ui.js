@@ -554,6 +554,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         console.log('platform:', window.Telegram?.WebApp?.platform);
         console.log('version:', window.Telegram?.WebApp?.version);
         console.groupEnd();
+        console.log(
+            window.Telegram,
+            window.Telegram?.WebApp,
+            window.Telegram?.WebApp?.initData?.length
+        );
         const isAuthorized = await initTelegramAuth(appConfig);
         if (!isAuthorized) {
             return;

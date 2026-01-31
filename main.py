@@ -626,6 +626,18 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(RequestLoggingMiddleware)
+
+
+class FrameOptionsMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        content_type = response.headers.get("content-type", "")
+        if "text/html" in content_type.lower():
+            response.headers.pop("x-frame-options", None)
+        return response
+
+
+app.add_middleware(FrameOptionsMiddleware)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 # HTTP 304 (Not Modified) для статики — это не ошибка, а корректный ответ кэша.
 
