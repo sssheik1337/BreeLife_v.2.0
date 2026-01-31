@@ -492,7 +492,7 @@ async function loadProfileStatus() {
 
 function redirectToQuestionnaireIfNeeded(profileCompleted) {
     const path = window.location.pathname || '/';
-    if (path.startsWith('/questionnaire')) {
+    if (path === '/' || path === '/index' || path.startsWith('/questionnaire')) {
         return;
     }
     if (!profileCompleted) {
