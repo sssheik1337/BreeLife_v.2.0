@@ -366,6 +366,7 @@ function showTelegramAuthErrorOverlay(message) {
 }
 
 async function showTelegramRequiredOverlay() {
+    console.warn('[TG_DEBUG_FRONT] showTelegramRequiredOverlay: показ заглушки "Откройте в Telegram"');
     let overlay = document.getElementById('telegram-auth-overlay');
     if (overlay) {
         overlay.classList.remove('hidden');
@@ -417,6 +418,7 @@ async function waitForTelegramInitData(tg, timeoutMs = 15000) {
 }
 
 async function initTelegramAuth(appConfig) {
+    console.warn('[TG_DEBUG_FRONT] initTelegramAuth: вызов инициализации');
     console.debug('initTelegramAuth: запуск инициализации Telegram авторизации');
     if (appConfig?.is_dev) {
         showDevModeBadge();
@@ -543,6 +545,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
     if (isEntryPoint) {
+        console.group('🔍 Telegram WebApp DEBUG');
+        console.log('window.Telegram:', window.Telegram);
+        console.log('Telegram.WebApp:', window.Telegram?.WebApp);
+        console.log('initData:', window.Telegram?.WebApp?.initData);
+        console.log('initData length:', window.Telegram?.WebApp?.initData?.length);
+        console.log('initDataUnsafe:', window.Telegram?.WebApp?.initDataUnsafe);
+        console.log('platform:', window.Telegram?.WebApp?.platform);
+        console.log('version:', window.Telegram?.WebApp?.version);
+        console.groupEnd();
         const isAuthorized = await initTelegramAuth(appConfig);
         if (!isAuthorized) {
             return;
