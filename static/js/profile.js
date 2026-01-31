@@ -1521,20 +1521,6 @@ async function applySubscriptionAccess() {
     }
 
     const profile = getUserProfile();
-    const telegramUserId = profile.telegram_user_id;
-    if (!telegramUserId) {
-        paywallElement.classList.add('hidden');
-        if (weeklyProgress) {
-            weeklyProgress.classList.remove('hidden');
-        }
-        if (dailyRings) {
-            dailyRings.classList.remove('hidden');
-        }
-        if (monthGrid) {
-            monthGrid.classList.remove('hidden');
-        }
-        return;
-    }
 
     const isDevMode = window.appIsDev === true || window.appMode === 'development';
     if (isDevMode) {
@@ -1613,7 +1599,7 @@ async function renderProfileRecommendations() {
     if (!list) {
         return;
     }
-    if (!window.telegramAuthUserId || window.profileCompleted !== true) {
+    if (window.profileCompleted !== true) {
         list.innerHTML = '';
         const empty = document.createElement('li');
         empty.className = 'text-sm text-slate-500';

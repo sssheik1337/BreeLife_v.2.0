@@ -65,7 +65,6 @@ function mapUserDataToUserProfile(data) {
     const age = calculateAge(birthDate);
 
     return {
-        telegram_user_id: window.telegramAuthUserId ?? null,
         sex: data.gender === 'male' || data.gender === 'female' ? data.gender : null,
         birth_date: birthDate,
         age: age ?? null,
@@ -422,9 +421,7 @@ async function initTelegramAuth(appConfig) {
     if (appConfig?.is_dev) {
         showDevModeBadge();
         setTelegramAccessLock(false);
-        // В DEV режиме фиксируем тестовый telegram_user_id сразу,
-        // чтобы синхронизация дневника и статистики работала до запросов к API.
-        window.telegramAuthUserId = appConfig.dev_telegram_user_id ?? null;
+        // В DEV режиме пропускаем проверку Telegram.
         return true;
     }
     setTelegramAccessLock(true);
@@ -466,7 +463,6 @@ async function initTelegramAuth(appConfig) {
             showTelegramAuthErrorOverlay('Ответ авторизации некорректен. Попробуйте открыть приложение через бота ещё раз.');
             return false;
         }
-        window.telegramAuthUserId = data.telegram_user_id ?? null;
         setTelegramAccessLock(false);
         return true;
     } catch (error) {
@@ -484,11 +480,10 @@ async function loadProfileStatus() {
         const data = await response.json();
         return {
             authorized: Boolean(data?.authorized),
-            profile_completed: Boolean(data?.profile_completed),
-            telegram_user_id: data?.telegram_user_id ?? null
+            profile_completed: Boolean(data?.profile_completed)
         };
     } catch (error) {
-        return { authorized: false, profile_completed: false, telegram_user_id: null };
+        return { authorized: false, profile_completed: false };
     }
 }
 
@@ -550,9 +545,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     const status = await loadProfileStatus();
     window.profileCompleted = status.profile_completed;
-    if (status.telegram_user_id) {
-        window.telegramAuthUserId = status.telegram_user_id;
-    }
     if (typeof window.syncProfileWithBackend === 'function') {
         await window.syncProfileWithBackend();
     }

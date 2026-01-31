@@ -275,7 +275,7 @@ async function applyAiRecommendationToResume() {
     if (typeof getUserProfile !== 'function') {
         return;
     }
-    if (!window.telegramAuthUserId || window.profileCompleted !== true) {
+    if (window.profileCompleted !== true) {
         return;
     }
 
@@ -750,10 +750,9 @@ async function renderTrialStatus() {
 
     const profile = getUserProfile();
     const isDevMode = window.appIsDev === true || window.appMode === 'development';
-    const telegramUserId = profile.telegram_user_id;
-    if (!telegramUserId) {
-        statusElement.textContent = 'Telegram ID не найден';
-        datesElement.textContent = 'Откройте приложение в Telegram, чтобы активировать пробный период.';
+    if (!window.telegramInitData) {
+        statusElement.textContent = 'Нет авторизации Telegram';
+        datesElement.textContent = 'Откройте приложение через кнопку бота.';
         badgeElement.textContent = 'Пробный период до --';
         if (warningElement) {
             warningElement.textContent = '';

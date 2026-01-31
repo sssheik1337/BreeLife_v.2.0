@@ -43,21 +43,8 @@
         memoryStore.delete(key);
     }
 
-    function getTelegramUserId() {
-        const authId = window.telegramAuthUserId;
-        if (typeof authId === 'number') {
-            return authId;
-        }
-        if (typeof authId === 'string') {
-            const parsed = Number(authId);
-            return Number.isFinite(parsed) ? parsed : null;
-        }
-        return null;
-    }
-
     function getDefaultUserProfile() {
         return {
-            telegram_user_id: null,
             sex: null,
             birth_date: null,
             age: null,
@@ -220,12 +207,6 @@
         const base = getDefaultUserProfile();
         const merged = { ...base, ...(profile || {}) };
 
-        const telegramId = getTelegramUserId();
-        merged.telegram_user_id = parseNumber(merged.telegram_user_id) ?? telegramId;
-        if (merged.telegram_user_id === null && telegramId !== null) {
-            merged.telegram_user_id = telegramId;
-        }
-
         merged.sex = normalizeSex(merged.sex);
         merged.birth_date = merged.birth_date || null;
         merged.age = parseNumber(merged.age);
@@ -285,7 +266,6 @@
         const sex = legacy.gender === 'male' || legacy.gender === 'female' ? legacy.gender : null;
         const birthDate = legacy.birthDate || null;
         const profile = {
-            telegram_user_id: null,
             sex,
             birth_date: birthDate,
             age: getAgeFromBirthDate(birthDate),
@@ -600,15 +580,14 @@
     }
 
     function applyTrialStartIfNeeded(current, merged) {
-        const hasTelegramId = merged.telegram_user_id !== null && merged.telegram_user_id !== undefined;
-        const isFirstTelegramId = !current.telegram_user_id && hasTelegramId;
+        const isAuthorized = Boolean(window.telegramInitData);
         const hasSubscriptionStatus = merged.subscription_status !== null && merged.subscription_status !== undefined;
         const hasSubscriptionUntil = merged.subscription_until !== null && merged.subscription_until !== undefined;
         const hasSubscriptionStartedAt = merged.subscription_started_at !== null && merged.subscription_started_at !== undefined;
         const hasTrialStartedAt = merged.trial_started_at !== null && merged.trial_started_at !== undefined;
 
         if (
-            !isFirstTelegramId ||
+            !isAuthorized ||
             hasSubscriptionStatus ||
             hasSubscriptionUntil ||
             hasSubscriptionStartedAt ||
@@ -637,7 +616,7 @@
         };
     }
 
-    async function notifyTrialStart(telegramUserId, startedAt) {
+    async function notifyTrialStart(startedAt) {
         try {
             const response = await apiFetch('/api/subscription/start_trial', {
                 method: 'POST',
@@ -667,7 +646,7 @@
             // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
         if (trialResult.shouldNotifyBackend) {
-            void notifyTrialStart(normalized.telegram_user_id, normalized.subscription_started_at);
+            void notifyTrialStart(normalized.subscription_started_at);
         }
         void saveProfileToBackend(normalized);
         return normalized;
@@ -688,7 +667,7 @@
             // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
         if (trialResult.shouldNotifyBackend) {
-            void notifyTrialStart(normalized.telegram_user_id, normalized.subscription_started_at);
+            void notifyTrialStart(normalized.subscription_started_at);
         }
         void saveProfileToBackend(normalized);
         return normalized;
@@ -776,7 +755,7 @@
     }
 
     async function syncProfileWithBackend() {
-        if (!window.telegramAuthUserId && !window.telegramInitData) {
+        if (!window.telegramInitData) {
             return getUserProfile();
         }
         try {
