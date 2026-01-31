@@ -445,7 +445,7 @@ async function initTelegramAuth(appConfig) {
     });
     if (!initData) {
         console.warn('INITDATA_EMPTY');
-        showTelegramAuthErrorOverlay('Telegram не передал данные авторизации. Попробуйте открыть приложение через кнопку бота ещё раз.');
+        await showTelegramRequiredOverlay();
         return false;
     }
     window.telegramInitData = initData;
