@@ -556,6 +556,19 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (typeof window.syncProfileWithBackend === 'function') {
         await window.syncProfileWithBackend();
     }
+    if (typeof window.syncDiaryEntriesWithBackend === 'function') {
+        await window.syncDiaryEntriesWithBackend();
+    }
+    const diaryEntries = typeof getDiaryEntries === 'function' ? getDiaryEntries() : [];
+    if (typeof window.syncWaterEntriesWithBackend === 'function') {
+        await window.syncWaterEntriesWithBackend(diaryEntries);
+    }
+    if (typeof window.syncSleepEntriesWithBackend === 'function') {
+        await window.syncSleepEntriesWithBackend(diaryEntries);
+    }
+    if (typeof window.syncHabitEntriesWithBackend === 'function') {
+        await window.syncHabitEntriesWithBackend();
+    }
     syncLocalProfileCompletion(status.profile_completed);
     redirectToQuestionnaireIfNeeded(status.profile_completed);
     notifyProfileStatus();

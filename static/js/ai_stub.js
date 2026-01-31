@@ -268,6 +268,10 @@ async function getPaymentMotivation(profile, deviations) {
     if (window.aiEnabled !== true) {
         return fallback;
     }
+    if (!window.telegramAuthUserId || window.profileCompleted !== true) {
+        // Запрос к AI выполняем только после авторизации и завершения анкеты.
+        return fallback;
+    }
 
     try {
         const response = await fetch('/api/ai/recommendation', {
