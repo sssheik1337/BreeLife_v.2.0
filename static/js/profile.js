@@ -1614,6 +1614,15 @@ async function renderProfileRecommendations() {
     if (!list) {
         return;
     }
+    if (!window.telegramAuthUserId || window.profileCompleted !== true) {
+        list.innerHTML = '';
+        const empty = document.createElement('li');
+        empty.className = 'text-sm text-slate-500';
+        // Подсказки от AI показываем только после успешной авторизации и завершения анкеты.
+        empty.textContent = 'Подсказки появятся после авторизации и заполнения анкеты.';
+        list.appendChild(empty);
+        return;
+    }
     if (typeof getUserProfile !== 'function') {
         return;
     }

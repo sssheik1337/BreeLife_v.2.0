@@ -273,6 +273,9 @@ async function applyAiRecommendationToResume() {
     if (typeof getUserProfile !== 'function') {
         return;
     }
+    if (!window.telegramAuthUserId || window.profileCompleted !== true) {
+        return;
+    }
 
     const profile = getUserProfile();
     const caloriesElement = document.getElementById('calories-explanation');
