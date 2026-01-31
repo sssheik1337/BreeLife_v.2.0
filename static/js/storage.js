@@ -767,6 +767,9 @@
     }
 
     async function syncProfileWithBackend() {
+        if (!window.telegramAuthUserId && !window.telegramInitData) {
+            return getUserProfile();
+        }
         try {
             const response = await fetch('/api/profile');
             if (!response.ok) {

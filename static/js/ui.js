@@ -439,12 +439,11 @@ async function initTelegramAuth(appConfig) {
     let initData = await waitForTelegramInitData(tg, 5000);
     console.debug('TELEGRAM_WEBAPP_READY', {
         hasWebApp: Boolean(tg),
-        initDataLength: initData ? initData.length : 0,
-        hasUser: Boolean(tg.initDataUnsafe?.user)
+        initDataLength: initData ? initData.length : 0
     });
     if (!initData) {
         console.warn('INITDATA_EMPTY');
-        showTelegramAuthErrorOverlay('Telegram не передал данные авторизации. Откройте приложение через кнопку бота.');
+        await showTelegramRequiredOverlay();
         return false;
     }
     window.telegramInitData = initData;

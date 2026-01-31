@@ -13,6 +13,7 @@ from pathlib import Path
 import requests
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
+from aiogram.utils.web_app import safe_parse_webapp_init_data
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -530,33 +531,27 @@ def resolve_telegram_user_id(
     if init_data:
         logger.info("INFO: initData получена из заголовка (len=%s)", len(init_data))
         try:
-            parsed = verify_telegram_init_data(init_data, TELEGRAM_BOT_TOKEN)
+            parsed = safe_parse_webapp_init_data(token=TELEGRAM_BOT_TOKEN, init_data=init_data)
         except ValueError as exc:
             logger.info("INFO: initData невалидна: %s", exc)
         else:
-            user_raw = parsed.get("user")
-            if user_raw:
-                try:
-                    user_data = json.loads(user_raw)
-                except json.JSONDecodeError:
-                    user_data = {}
-                telegram_user_id = user_data.get("id")
-                if telegram_user_id:
-                    session_id = create_session(int(telegram_user_id))
-                    if response is not None:
-                        response.set_cookie(
-                            TELEGRAM_SESSION_COOKIE,
-                            session_id,
-                            httponly=True,
-                            samesite="lax",
-                            secure=IS_PROD,
-                        )
-                    logger.info(
-                        "INFO: Создана сессия по initData (user_id=%s, session_id=%s)",
-                        telegram_user_id,
+            if parsed.user and parsed.user.id:
+                telegram_user_id = parsed.user.id
+                session_id = create_session(int(telegram_user_id))
+                if response is not None:
+                    response.set_cookie(
+                        TELEGRAM_SESSION_COOKIE,
                         session_id,
+                        httponly=True,
+                        samesite="lax",
+                        secure=IS_PROD,
                     )
-                    return int(telegram_user_id)
+                logger.info(
+                    "INFO: Создана сессия по initData (user_id=%s, session_id=%s)",
+                    telegram_user_id,
+                    session_id,
+                )
+                return int(telegram_user_id)
     if required:
         raise HTTPException(status_code=401, detail="Telegram не авторизован.")
     return None
@@ -693,20 +688,13 @@ async def auth_telegram(payload: TelegramAuthRequest):
     if payload.initData:
         logger.info("INFO: /api/auth/telegram initData получена (len=%s)", len(payload.initData))
     try:
-        parsed = verify_telegram_init_data(payload.initData, TELEGRAM_BOT_TOKEN)
+        parsed = safe_parse_webapp_init_data(token=TELEGRAM_BOT_TOKEN, init_data=payload.initData)
     except ValueError as exc:
         logger.info("INFO: initData невалидна: %s", exc)
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
-    user_raw = parsed.get("user")
-    if not user_raw:
+        raise HTTPException(status_code=401, detail="initData не прошёл проверку.") from exc
+    if not parsed.user or not parsed.user.id:
         raise HTTPException(status_code=400, detail="Пользователь не найден в initData.")
-    try:
-        user_data = json.loads(user_raw)
-    except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=400, detail="Некорректный формат пользователя.") from exc
-    telegram_user_id = user_data.get("id")
-    if not telegram_user_id:
-        raise HTTPException(status_code=400, detail="telegram_user_id отсутствует.")
+    telegram_user_id = parsed.user.id
     logger.info("INFO: initData валидна для user_id=%s", telegram_user_id)
     session_id = create_session(int(telegram_user_id))
     logger.info("INFO: Создана сессия (user_id=%s, session_id=%s)", telegram_user_id, session_id)
@@ -714,7 +702,7 @@ async def auth_telegram(payload: TelegramAuthRequest):
         {
             "ok": True,
             "telegram_user_id": telegram_user_id,
-            "username": user_data.get("username"),
+            "username": parsed.user.username if parsed.user else None,
         }
     )
     response.set_cookie(
