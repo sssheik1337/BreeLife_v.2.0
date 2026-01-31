@@ -633,7 +633,7 @@ class FrameOptionsMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         content_type = response.headers.get("content-type", "")
         if "text/html" in content_type.lower():
-            response.headers.pop("x-frame-options", None)
+            del response.headers["x-frame-options"]
         return response
 
 
