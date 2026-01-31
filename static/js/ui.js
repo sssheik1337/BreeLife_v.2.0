@@ -519,6 +519,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     const appConfig = await loadAppConfig();
     window.appMode = appConfig?.mode || 'production';
     window.appIsDev = Boolean(appConfig?.is_dev);
+    const currentPath = window.location.pathname || '/';
+    const isEntryPoint = currentPath === '/' || currentPath === '/index';
     const tg = window.Telegram?.WebApp;
     if (tg) {
         tg.expand();
@@ -540,9 +542,11 @@ document.addEventListener('DOMContentLoaded', async function() {
             root.style.setProperty('--tg-hint-color', theme.hint_color);
         }
     }
-    const isAuthorized = await initTelegramAuth(appConfig);
-    if (!isAuthorized) {
-        return;
+    if (isEntryPoint) {
+        const isAuthorized = await initTelegramAuth(appConfig);
+        if (!isAuthorized) {
+            return;
+        }
     }
     const status = await loadProfileStatus();
     window.serverUser = {

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+from urllib.parse import urlsplit, urlunsplit
 from dataclasses import dataclass
 from typing import Final
 
@@ -14,7 +15,22 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 TOKEN: Final[str] = os.getenv("TELEGRAM_BOT_TOKEN", "")
-WEBAPP_URL: Final[str] = os.getenv("TELEGRAM_WEBAPP_URL", "")
+DEFAULT_WEBAPP_URL: Final[str] = "https://breevafit-breevafit.amvera.io/"
+
+
+def normalize_webapp_url(raw_url: str) -> str:
+    if not raw_url:
+        return DEFAULT_WEBAPP_URL
+    parsed = urlsplit(raw_url)
+    if not parsed.scheme or not parsed.netloc:
+        return raw_url
+    normalized = parsed._replace(path="/", query="", fragment="")
+    return urlunsplit(normalized)
+
+
+WEBAPP_URL: Final[str] = normalize_webapp_url(
+    os.getenv("TELEGRAM_WEBAPP_URL", DEFAULT_WEBAPP_URL)
+)
 APP_NAME: Final[str] = os.getenv("APP_NAME", "BreeLife")
 
 

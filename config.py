@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlsplit, urlunsplit
 
 from dotenv import load_dotenv
 
@@ -17,8 +18,25 @@ AI_ENABLED = os.getenv("AI_ENABLED", "false").lower() in {"1", "true", "yes"}
 REMINDERS_ENABLED = os.getenv("REMINDERS_ENABLED", "false").lower() in {"1", "true", "yes"}
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_WEBAPP_URL = os.getenv("TELEGRAM_WEBAPP_URL", "")
-PUBLIC_APP_URL = os.getenv("PUBLIC_APP_URL", TELEGRAM_WEBAPP_URL)
+DEFAULT_WEBAPP_URL = "https://breevafit-breevafit.amvera.io/"
+
+
+def normalize_webapp_url(raw_url: str) -> str:
+    if not raw_url:
+        return DEFAULT_WEBAPP_URL
+    parsed = urlsplit(raw_url)
+    if not parsed.scheme or not parsed.netloc:
+        return raw_url
+    normalized = parsed._replace(path="/", query="", fragment="")
+    return urlunsplit(normalized)
+
+
+TELEGRAM_WEBAPP_URL = normalize_webapp_url(
+    os.getenv("TELEGRAM_WEBAPP_URL", DEFAULT_WEBAPP_URL)
+)
+PUBLIC_APP_URL = normalize_webapp_url(
+    os.getenv("PUBLIC_APP_URL", TELEGRAM_WEBAPP_URL)
+)
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "")
 
 PAYMENT_PROVIDER = os.getenv("PAYMENT_PROVIDER", "")
