@@ -109,18 +109,6 @@
     <script src="/static/js/storage.js"></script>
     <script src="/static/js/ui.js"></script>
     <script>
-        fetch('/api/me/status')
-            .then((response) => response.json())
-            .then((data) => {
-                if (data?.profile_completed) {
-                    window.location.replace('/profile');
-                } else {
-                    window.location.replace('/questionnaire');
-                }
-            })
-            .catch(() => {
-                window.location.replace('/questionnaire');
-            });
         feather.replace();
     </script>
 </body>
