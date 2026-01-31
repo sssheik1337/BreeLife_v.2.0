@@ -1075,9 +1075,4 @@
     window.syncHabitEntriesWithBackend = syncHabitEntriesWithBackend;
     window.DIARY_STORAGE_KEY = DIARY_STORAGE_KEY;
 
-    void syncProfileWithBackend();
-    void syncDiaryEntriesWithBackend();
-    void syncWaterEntriesWithBackend(getDiaryEntries());
-    void syncSleepEntriesWithBackend(getDiaryEntries());
-    void syncHabitEntriesWithBackend();
 })();
