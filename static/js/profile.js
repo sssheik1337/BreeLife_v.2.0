@@ -333,7 +333,7 @@ function buildReminderIso(timeValue, frequency) {
 
 async function scheduleReminder(type, timeValue, frequency) {
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
-    if (!window.telegramInitData) {
+    if (window.serverUser?.authorized !== true) {
         return;
     }
     const whenIso = buildReminderIso(timeValue, frequency);

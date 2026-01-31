@@ -580,7 +580,7 @@
     }
 
     function applyTrialStartIfNeeded(current, merged) {
-        const isAuthorized = Boolean(window.telegramInitData);
+        const isAuthorized = window.serverUser?.authorized === true;
         const hasSubscriptionStatus = merged.subscription_status !== null && merged.subscription_status !== undefined;
         const hasSubscriptionUntil = merged.subscription_until !== null && merged.subscription_until !== undefined;
         const hasSubscriptionStartedAt = merged.subscription_started_at !== null && merged.subscription_started_at !== undefined;
@@ -755,7 +755,7 @@
     }
 
     async function syncProfileWithBackend() {
-        if (!window.telegramInitData) {
+        if (window.serverUser?.authorized !== true) {
             return getUserProfile();
         }
         try {
@@ -828,7 +828,7 @@
     }
 
     async function saveDiaryEntriesToBackend(entries) {
-        if (!window.telegramInitData) {
+        if (window.serverUser?.authorized !== true) {
             return;
         }
         try {
@@ -863,7 +863,7 @@
     }
 
     async function saveWaterEntriesToBackend(entries) {
-        if (!window.telegramInitData) {
+        if (window.serverUser?.authorized !== true) {
             return;
         }
         try {
@@ -898,7 +898,7 @@
     }
 
     async function saveSleepEntriesToBackend(entries) {
-        if (!window.telegramInitData) {
+        if (window.serverUser?.authorized !== true) {
             return;
         }
         try {
@@ -933,7 +933,7 @@
     }
 
     async function syncDiaryEntriesWithBackend() {
-        if (!window.telegramInitData) {
+        if (window.serverUser?.authorized !== true) {
             return getDiaryEntries();
         }
         const remoteEntries = await fetchDiaryEntriesFromBackend();
@@ -950,7 +950,7 @@
     }
 
     async function syncWaterEntriesWithBackend(entries) {
-        if (!window.telegramInitData) {
+        if (window.serverUser?.authorized !== true) {
             return [];
         }
         const remoteEntries = await fetchWaterEntriesFromBackend();
@@ -966,7 +966,7 @@
     }
 
     async function syncSleepEntriesWithBackend(entries) {
-        if (!window.telegramInitData) {
+        if (window.serverUser?.authorized !== true) {
             return [];
         }
         const remoteEntries = await fetchSleepEntriesFromBackend();
@@ -982,7 +982,7 @@
     }
 
     async function saveHabitEntriesToBackend(habits) {
-        if (!window.telegramInitData) {
+        if (window.serverUser?.authorized !== true) {
             return;
         }
         try {
@@ -1017,7 +1017,7 @@
     }
 
     async function syncHabitEntriesWithBackend() {
-        if (!window.telegramInitData) {
+        if (window.serverUser?.authorized !== true) {
             return getHabitEntries();
         }
         const remoteHabits = await fetchHabitEntriesFromBackend();

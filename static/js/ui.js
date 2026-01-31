@@ -475,15 +475,16 @@ async function loadProfileStatus() {
     try {
         const response = await fetch('/api/me/status');
         if (!response.ok) {
-            return { authorized: false, profile_completed: false };
+            return { authorized: false, profile_completed: false, telegram_user_id: null };
         }
         const data = await response.json();
         return {
             authorized: Boolean(data?.authorized),
-            profile_completed: Boolean(data?.profile_completed)
+            profile_completed: Boolean(data?.profile_completed),
+            telegram_user_id: data?.telegram_user_id ?? null
         };
     } catch (error) {
-        return { authorized: false, profile_completed: false };
+        return { authorized: false, profile_completed: false, telegram_user_id: null };
     }
 }
 
@@ -544,6 +545,11 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
     const status = await loadProfileStatus();
+    window.serverUser = {
+        authorized: status.authorized === true,
+        telegram_user_id: status.telegram_user_id ?? null,
+        profile_completed: status.profile_completed === true
+    };
     window.profileCompleted = status.profile_completed;
     if (typeof window.syncProfileWithBackend === 'function') {
         await window.syncProfileWithBackend();

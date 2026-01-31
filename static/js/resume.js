@@ -750,7 +750,7 @@ async function renderTrialStatus() {
 
     const profile = getUserProfile();
     const isDevMode = window.appIsDev === true || window.appMode === 'development';
-    if (!window.telegramInitData) {
+    if (window.serverUser?.authorized !== true) {
         statusElement.textContent = 'Нет авторизации Telegram';
         datesElement.textContent = 'Откройте приложение через кнопку бота.';
         badgeElement.textContent = 'Пробный период до --';
@@ -968,7 +968,7 @@ function renderReminderActions() {
     actionsContainer.innerHTML = '';
     hintElement.textContent = '';
 
-    const isTelegramAvailable = Boolean(window.telegramInitData);
+    const isTelegramAvailable = window.serverUser?.authorized === true;
 
     if (!isTelegramAvailable) {
         hintElement.textContent = 'Telegram ID не найден. Откройте приложение в Telegram, чтобы включить напоминания.';
