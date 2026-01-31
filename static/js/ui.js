@@ -404,19 +404,6 @@ async function waitForTelegramWebApp(timeoutMs = 2000) {
     return window.Telegram?.WebApp || null;
 }
 
-async function waitForTelegramUser(tg, timeoutMs = 2000) {
-    if (!tg) {
-        return null;
-    }
-    const startedAt = Date.now();
-    let user = tg.initDataUnsafe?.user ?? null;
-    while (!user && Date.now() - startedAt < timeoutMs) {
-        await wait(100);
-        user = tg.initDataUnsafe?.user ?? null;
-    }
-    return user;
-}
-
 async function waitForTelegramInitData(tg, timeoutMs = 2000) {
     if (!tg) {
         return '';
@@ -449,17 +436,12 @@ async function initTelegramAuth(appConfig) {
     if (typeof tg.ready === 'function') {
         tg.ready();
     }
-    const tgUser = await waitForTelegramUser(tg);
-    console.debug('TELEGRAM_WEBAPP_READY', {
-        initDataLength: tg.initData ? tg.initData.length : 0,
-        hasUser: Boolean(tgUser)
-    });
-    if (!tgUser) {
-        console.warn('TELEGRAM_USER_MISSING');
-        showTelegramAuthErrorOverlay('Telegram не передал данные пользователя. Откройте приложение через кнопку бота.');
-        return false;
-    }
     let initData = await waitForTelegramInitData(tg, 5000);
+    console.debug('TELEGRAM_WEBAPP_READY', {
+        hasWebApp: Boolean(tg),
+        initDataLength: initData ? initData.length : 0,
+        hasUser: Boolean(tg.initDataUnsafe?.user)
+    });
     if (!initData) {
         console.warn('INITDATA_EMPTY');
         showTelegramAuthErrorOverlay('Telegram не передал данные авторизации. Откройте приложение через кнопку бота.');
