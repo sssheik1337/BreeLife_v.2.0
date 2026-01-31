@@ -418,6 +418,7 @@ async function waitForTelegramInitData(tg, timeoutMs = 2000) {
 }
 
 async function initTelegramAuth(appConfig) {
+    console.debug('initTelegramAuth: запуск инициализации Telegram авторизации');
     if (appConfig?.is_dev) {
         showDevModeBadge();
         setTelegramAccessLock(false);
@@ -428,6 +429,7 @@ async function initTelegramAuth(appConfig) {
     }
     setTelegramAccessLock(true);
     const tg = await waitForTelegramWebApp();
+    console.debug('initTelegramAuth: tg =', tg);
     if (!tg) {
         console.warn('NOT_IN_TELEGRAM');
         await showTelegramRequiredOverlay();
@@ -437,6 +439,7 @@ async function initTelegramAuth(appConfig) {
         tg.ready();
     }
     let initData = await waitForTelegramInitData(tg, 5000);
+    console.debug('initTelegramAuth: initData =', initData);
     console.debug('TELEGRAM_WEBAPP_READY', {
         hasWebApp: Boolean(tg),
         initDataLength: initData ? initData.length : 0
