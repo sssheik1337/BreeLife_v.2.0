@@ -614,6 +614,11 @@ function setupEventListeners() {
                 profile = getUserProfile();
             }
             await saveProfileToServer(profile);
+            try {
+                sessionStorage.setItem('bree_preview_user_data', JSON.stringify(window.userData || {}));
+            } catch (error) {
+                // Не удалось сохранить предпросмотр.
+            }
             // Все вопросы заполнены, переходим на страницу сводки.
             window.location.href = isEditMode ? '/profile' : '/resume';
         }
