@@ -575,6 +575,19 @@ function setupEventListeners() {
             displayQuestion();
         } else {
             // Сохраняем профиль и отправляем на сервер (если доступен Telegram ID).
+            const criticalKeys = ['gender', 'birthDate', 'height', 'currentWeight', 'targetWeight', 'activityLevel', 'goalType'];
+            const hasUserData = window.userData && typeof window.userData === 'object';
+            const missingCritical = hasUserData
+                ? criticalKeys.filter((key) => window.userData[key] === null || window.userData[key] === undefined || window.userData[key] === '')
+                : criticalKeys;
+            if (!hasUserData || missingCritical.length > 0) {
+                console.error('[QUESTIONNAIRE_TRACE] Ошибка сохранения профиля: отсутствуют критические поля', {
+                    hasUserData,
+                    missingCritical,
+                    userData: window.userData
+                });
+                return;
+            }
             let profile = null;
             if (typeof patchUserProfile === 'function' && typeof mapUserDataToUserProfile === 'function') {
                 console.log('[QUESTIONNAIRE_TRACE] перед mapUserDataToUserProfile:', window.userData);
