@@ -21,13 +21,6 @@ function mapUserProfileToUserData(profile) {
     if (!profile) {
         return {};
     }
-    const goalMap = {
-        lose: 'lose',
-        maintain: 'maintain',
-        gain: 'gain',
-        muscle: 'gain'
-    };
-
     return {
         gender: profile.sex ?? null,
         birthDate: profile.birth_date ?? null,
@@ -35,11 +28,9 @@ function mapUserProfileToUserData(profile) {
         currentWeight: profile.weight_kg ?? null,
         targetWeight: profile.target_weight_kg ?? null,
         activityLevel: profile.activity_factor ?? null,
-        goalType: goalMap[profile.goal] ?? null,
+        goalType: profile.goal ?? null,
         deadline: profile.goal_deadline ?? null,
-        foodDiary: profile.food_diary === null || profile.food_diary === undefined
-            ? null
-            : profile.food_diary
+        foodDiary: profile.food_diary ?? null
     };
 }
 
