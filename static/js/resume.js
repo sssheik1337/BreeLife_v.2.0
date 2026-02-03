@@ -1112,6 +1112,15 @@ function saveAndContinue() {
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', async function() {
+    if (window.serverUser?.authorized !== true && typeof loadProfileStatus === 'function') {
+        const status = await loadProfileStatus();
+        window.serverUser = {
+            authorized: status.authorized === true,
+            telegram_user_id: status.telegram_user_id ?? null,
+            profile_completed: status.profile_completed === true
+        };
+        window.profileCompleted = status.profile_completed;
+    }
     if (typeof syncProfileWithBackend === 'function') {
         await syncProfileWithBackend();
     }
