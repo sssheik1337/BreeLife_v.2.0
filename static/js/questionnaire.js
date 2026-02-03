@@ -590,6 +590,14 @@ function setupEventListeners() {
                 const mappedProfile = mapUserDataToUserProfile(window.userData);
                 console.log('[QUESTIONNAIRE_TRACE] результат mapUserDataToUserProfile:', mappedProfile);
                 const criticalKeys = ['sex', 'birth_date', 'height_cm', 'weight_kg', 'target_weight_kg', 'activity_factor', 'goal'];
+                if (window.appDebug) {
+                    const nullFields = Object.keys(mappedProfile).filter((key) => mappedProfile[key] === null);
+                    console.log('[QUESTIONNAIRE_DEBUG] payload перед /api/profile:', {
+                        mappedProfile,
+                        nullFields,
+                        profile_completed: mappedProfile.profile_completed ?? mappedProfile.completed ?? null
+                    });
+                }
                 const missingCritical = criticalKeys.filter((key) => mappedProfile[key] === null || mappedProfile[key] === undefined || mappedProfile[key] === '');
                 if (missingCritical.length > 0) {
                     console.error('[QUESTIONNAIRE_TRACE] Ошибка сохранения профиля: отсутствуют критические поля', {
