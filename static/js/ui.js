@@ -543,6 +543,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         tg.expand();
         const theme = tg.themeParams || {};
         const root = document.documentElement;
+        if (tg.initData) {
+            window.telegramInitData = tg.initData;
+            installTelegramInitDataInterceptor(tg.initData);
+        }
         if (theme.bg_color) {
             root.style.setProperty('--tg-bg-color', theme.bg_color);
             root.style.setProperty('--tg-bg-gradient', 'none');
