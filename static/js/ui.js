@@ -48,18 +48,98 @@ function mapUserDataToUserProfile(data) {
     if (!data) {
         return {};
     }
-    const goalMap = {
-        lose: 'lose',
-        maintain: 'maintain',
-        gain: 'gain',
-        muscle: 'gain'
-    };
     const parseNumber = (value) => {
         if (value === null || value === undefined || value === '') {
             return null;
         }
         const parsed = Number(value);
         return Number.isFinite(parsed) ? parsed : null;
+    };
+    const normalizeSex = (value) => {
+        if (!value) {
+            return null;
+        }
+        const normalized = String(value).trim().toLowerCase();
+        const map = {
+            male: 'male',
+            man: 'male',
+            мужской: 'male',
+            муж: 'male',
+            female: 'female',
+            woman: 'female',
+            женский: 'female',
+            жен: 'female'
+        };
+        return map[normalized] || null;
+    };
+    const normalizeActivity = (value) => {
+        const numeric = parseNumber(value);
+        if (numeric !== null) {
+            return numeric;
+        }
+        if (!value) {
+            return null;
+        }
+        const normalized = String(value).trim().toLowerCase();
+        const directMap = {
+            low: 1.2,
+            minimal: 1.2,
+            sedentary: 1.2,
+            medium: 1.55,
+            moderate: 1.55,
+            high: 1.725,
+            very_high: 1.9
+        };
+        if (directMap[normalized]) {
+            return directMap[normalized];
+        }
+        if (normalized.includes('1.2')) {
+            return 1.2;
+        }
+        if (normalized.includes('1.375')) {
+            return 1.375;
+        }
+        if (normalized.includes('1.55')) {
+            return 1.55;
+        }
+        if (normalized.includes('1.725')) {
+            return 1.725;
+        }
+        if (normalized.includes('1.9')) {
+            return 1.9;
+        }
+        if (normalized.includes('миним') || normalized.includes('низк') || normalized.includes('сидяч') || normalized.includes('мало')) {
+            return 1.2;
+        }
+        if (normalized.includes('прогул') || normalized.includes('1-3') || normalized.includes('1–3')) {
+            return 1.375;
+        }
+        if (normalized.includes('регуляр') || normalized.includes('умерен') || normalized.includes('3-5') || normalized.includes('3–5')) {
+            return 1.55;
+        }
+        if (normalized.includes('высок') || normalized.includes('каждый день')) {
+            return 1.725;
+        }
+        if (normalized.includes('очень') || normalized.includes('интенсив')) {
+            return 1.9;
+        }
+        return null;
+    };
+    const normalizeGoal = (value) => {
+        if (!value) {
+            return null;
+        }
+        const normalized = String(value).trim().toLowerCase();
+        if (['lose', 'loss', 'weight_loss', 'slim'].includes(normalized) || normalized.includes('сниж') || normalized.includes('похуд')) {
+            return 'lose';
+        }
+        if (['maintain', 'keep', 'maintenance', 'balance'].includes(normalized) || normalized.includes('поддерж')) {
+            return 'maintain';
+        }
+        if (['gain', 'bulk', 'mass', 'muscle', 'build'].includes(normalized) || normalized.includes('набор') || normalized.includes('масса') || normalized.includes('мышц')) {
+            return 'gain';
+        }
+        return null;
     };
     const rawGender = data.gender ?? data.sex ?? null;
     const birthDate = data.birthDate ?? data.birth_date ?? null;
@@ -73,14 +153,14 @@ function mapUserDataToUserProfile(data) {
     const age = calculateAge(birthDate);
 
     return {
-        sex: rawGender === 'male' || rawGender === 'female' ? rawGender : null,
+        sex: normalizeSex(rawGender),
         birth_date: birthDate,
         age: age ?? null,
         height_cm: parseNumber(heightValue),
         weight_kg: parseNumber(weightValue),
         target_weight_kg: parseNumber(targetWeightValue),
-        goal: goalMap[goalValue] ?? null,
-        activity_factor: parseNumber(activityValue),
+        goal: normalizeGoal(goalValue),
+        activity_factor: normalizeActivity(activityValue),
         goal_deadline: deadlineValue || null,
         food_diary: foodDiaryValue === true || foodDiaryValue === false
             ? foodDiaryValue
