@@ -390,6 +390,7 @@ function displayInput(question) {
                 }
                 saveUserData();
                 updateButtonStates();
+                console.log('[QUESTIONNAIRE_TRACE] шаг обновлён (birthDate):', window.userData);
                 return;
             };
 
@@ -449,12 +450,14 @@ function displayInput(question) {
                 window.userData[getDataKey(currentQuestionIndex)] = value;
                 saveUserData();
                 updateButtonStates();
+                console.log('[QUESTIONNAIRE_TRACE] шаг обновлён (number input):', window.userData);
             });
             input.addEventListener('change', () => {
                 const value = input.value;
                 window.userData[getDataKey(currentQuestionIndex)] = value;
                 saveUserData();
                 updateButtonStates();
+                console.log('[QUESTIONNAIRE_TRACE] шаг обновлён (number change):', window.userData);
             });
         }
     }
@@ -481,6 +484,7 @@ function selectOption(optionElement, value) {
     window.userData[getDataKey(currentQuestionIndex)] = value;
     saveUserData();
     updateButtonStates();
+    console.log('[QUESTIONNAIRE_TRACE] шаг обновлён (select option):', window.userData);
     
     // Update feather icons
     if (window.feather) {
@@ -550,9 +554,9 @@ async function saveProfileToServer(profile) {
         return;
     }
     try {
-        await fetch('/api/profile/save', {
+        const apiFetch = window.apiFetch || fetch;
+        await apiFetch('/api/profile/save', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 user_profile: profile
             })
@@ -573,7 +577,9 @@ function setupEventListeners() {
             // Сохраняем профиль и отправляем на сервер (если доступен Telegram ID).
             let profile = null;
             if (typeof patchUserProfile === 'function' && typeof mapUserDataToUserProfile === 'function') {
+                console.log('[QUESTIONNAIRE_TRACE] перед mapUserDataToUserProfile:', window.userData);
                 const mappedProfile = mapUserDataToUserProfile(window.userData);
+                console.log('[QUESTIONNAIRE_TRACE] результат mapUserDataToUserProfile:', mappedProfile);
                 mappedProfile.completed = true;
                 profile = patchUserProfile(mappedProfile);
             }
