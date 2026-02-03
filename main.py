@@ -1902,7 +1902,8 @@ async def save_habits_legacy(request: Request, response: Response, payload: Habi
 
 
 @app.post("/api/ai/recommendation")
-async def ai_recommendation(request: Request):
+async def ai_recommendation(request: Request, response: Response):
+    require_telegram_user_id(request, response)
     try:
         profile = await request.json()
     except Exception as exc:
@@ -1999,7 +2000,8 @@ async def list_food_diary_entries(request: Request, response: Response):
 
 
 @app.post("/api/food-diary/analyze")
-async def analyze_food_diary(request: Request):
+async def analyze_food_diary(request: Request, response: Response):
+    require_telegram_user_id(request, response)
     try:
         payload = await request.json()
     except Exception as exc:
