@@ -520,11 +520,12 @@ def resolve_telegram_user_id(
     response: Response | None = None,
 ) -> int | None:
     """Определить telegram_user_id через сессию или DEV-режим."""
-    logging.warning(
-        "[TG_DEBUG_BACK] resolve_telegram_user_id headers=%s cookies=%s",
-        dict(request.headers),
-        request.cookies,
-    )
+    if DEBUG:
+        logging.warning(
+            "[TG_DEBUG_BACK] resolve_telegram_user_id headers=%s cookies=%s",
+            dict(request.headers),
+            request.cookies,
+        )
     session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
     telegram_user_id = get_session_user(session_id) if session_id else None
     if telegram_user_id:
@@ -534,20 +535,25 @@ def resolve_telegram_user_id(
         return DEV_TELEGRAM_USER_ID
     init_data = request.headers.get("x-telegram-init-data")
     if init_data:
-        logger.info("INFO: initData получена из заголовка (len=%s)", len(init_data))
+        if DEBUG:
+            logger.info("INFO: initData получена из заголовка (len=%s)", len(init_data))
         try:
-            logging.warning(
-                "[TG_DEBUG_AUTH] safe_parse_webapp_init_data: запуск (source=header, len=%s)",
-                len(init_data),
-            )
+            if DEBUG:
+                logging.warning(
+                    "[TG_DEBUG_AUTH] safe_parse_webapp_init_data: запуск (source=header, len=%s)",
+                    len(init_data),
+                )
             parsed = safe_parse_webapp_init_data(token=TELEGRAM_BOT_TOKEN, init_data=init_data)
-            logging.warning("[TG_DEBUG_AUTH] safe_parse_webapp_init_data: SUCCESS")
+            if DEBUG:
+                logging.warning("[TG_DEBUG_AUTH] safe_parse_webapp_init_data: SUCCESS")
         except ValueError as exc:
-            logging.error(
-                "[TG_DEBUG_AUTH] safe_parse_webapp_init_data: FAIL (%s)",
-                exc,
-            )
-            logger.info("INFO: initData невалидна: %s", exc)
+            if DEBUG:
+                logging.error(
+                    "[TG_DEBUG_AUTH] safe_parse_webapp_init_data: FAIL (%s)",
+                    exc,
+                )
+            if DEBUG:
+                logger.info("INFO: initData невалидна: %s", exc)
         else:
             if parsed.user and parsed.user.id:
                 telegram_user_id = parsed.user.id
@@ -590,12 +596,13 @@ def require_telegram_user_id(request: Request, response: Response) -> int:
     init_data_len = len(init_data) if init_data else 0
     has_cookie = bool(request.cookies.get(TELEGRAM_SESSION_COOKIE))
     source = "header" if init_data else "cookie" if has_cookie else "none"
-    logging.warning(
-        "[TG_DEBUG_AUTH] require_telegram_user_id initData_present=%s initData_len=%s source=%s",
-        bool(init_data),
-        init_data_len,
-        source,
-    )
+    if DEBUG:
+        logging.warning(
+            "[TG_DEBUG_AUTH] require_telegram_user_id initData_present=%s initData_len=%s source=%s",
+            bool(init_data),
+            init_data_len,
+            source,
+        )
     telegram_user_id = resolve_telegram_user_id(request, required=True, response=response)
     if telegram_user_id is None:
         raise HTTPException(status_code=401, detail="Telegram не авторизован.")
@@ -719,6 +726,7 @@ async def app_config():
         "mode": APP_ENV,
         "is_dev": IS_DEV,
         "is_prod": IS_PROD,
+        "debug": DEBUG,
         "dev_user": {"id": "dev-user", "first_name": "Developer"},
         "dev_telegram_user_id": DEV_TELEGRAM_USER_ID,
     }
@@ -726,31 +734,37 @@ async def app_config():
 
 @app.post("/api/auth/telegram")
 async def auth_telegram(request: Request, payload: TelegramAuthRequest):
-    logging.warning(
-        "[TG_DEBUG_BACK] /api/auth/telegram headers=%s cookies=%s",
-        dict(request.headers),
-        request.cookies,
-    )
+    if DEBUG:
+        logging.warning(
+            "[TG_DEBUG_BACK] /api/auth/telegram headers=%s cookies=%s",
+            dict(request.headers),
+            request.cookies,
+        )
     if IS_DEV:
         logger.info("DEV MODE: Telegram validation skipped")
         return {"ok": True, "telegram_user_id": DEV_TELEGRAM_USER_ID}
-    if payload.initData:
+    if payload.initData and DEBUG:
         logger.info("INFO: /api/auth/telegram initData получена (len=%s)", len(payload.initData))
     try:
-        logging.warning(
-            "[TG_DEBUG_AUTH] safe_parse_webapp_init_data: запуск (source=body, len=%s)",
-            len(payload.initData or ""),
-        )
+        if DEBUG:
+            logging.warning(
+                "[TG_DEBUG_AUTH] safe_parse_webapp_init_data: запуск (source=body, len=%s)",
+                len(payload.initData or ""),
+            )
         parsed = safe_parse_webapp_init_data(token=TELEGRAM_BOT_TOKEN, init_data=payload.initData)
-        logging.warning("[TG_DEBUG_AUTH] safe_parse_webapp_init_data: SUCCESS")
+        if DEBUG:
+            logging.warning("[TG_DEBUG_AUTH] safe_parse_webapp_init_data: SUCCESS")
     except ValueError as exc:
-        logging.error("[TG_DEBUG_AUTH] safe_parse_webapp_init_data: FAIL (%s)", exc)
-        logger.info("INFO: initData невалидна: %s", exc)
+        if DEBUG:
+            logging.error("[TG_DEBUG_AUTH] safe_parse_webapp_init_data: FAIL (%s)", exc)
+        if DEBUG:
+            logger.info("INFO: initData невалидна: %s", exc)
         raise HTTPException(status_code=401, detail="initData не прошёл проверку.") from exc
     if not parsed.user or not parsed.user.id:
         raise HTTPException(status_code=400, detail="Пользователь не найден в initData.")
     telegram_user_id = parsed.user.id
-    logger.info("INFO: initData валидна для user_id=%s", telegram_user_id)
+    if DEBUG:
+        logger.info("INFO: initData валидна для user_id=%s", telegram_user_id)
     session_id = create_session(int(telegram_user_id))
     logger.info("INFO: Создана сессия (user_id=%s, session_id=%s)", telegram_user_id, session_id)
     response = JSONResponse(

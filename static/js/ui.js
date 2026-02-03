@@ -366,7 +366,9 @@ function showTelegramAuthErrorOverlay(message) {
 }
 
 async function showTelegramRequiredOverlay() {
-    console.warn('[TG_DEBUG_FRONT] showTelegramRequiredOverlay: показ заглушки "Откройте в Telegram"');
+    if (window.appDebug) {
+        console.warn('[TG_DEBUG_FRONT] showTelegramRequiredOverlay: показ заглушки "Откройте в Telegram"');
+    }
     let overlay = document.getElementById('telegram-auth-overlay');
     if (overlay) {
         overlay.classList.remove('hidden');
@@ -418,8 +420,12 @@ async function waitForTelegramInitData(tg, timeoutMs = 15000) {
 }
 
 async function initTelegramAuth(appConfig) {
-    console.warn('[TG_DEBUG_FRONT] initTelegramAuth: вызов инициализации');
-    console.debug('initTelegramAuth: запуск инициализации Telegram авторизации');
+    if (window.appDebug) {
+        console.warn('[TG_DEBUG_FRONT] initTelegramAuth: вызов инициализации');
+    }
+    if (window.appDebug) {
+        console.debug('initTelegramAuth: запуск инициализации Telegram авторизации');
+    }
     if (appConfig?.is_dev) {
         showDevModeBadge();
         setTelegramAccessLock(false);
@@ -428,9 +434,13 @@ async function initTelegramAuth(appConfig) {
     }
     setTelegramAccessLock(true);
     const tg = await waitForTelegramWebApp();
-    console.debug('initTelegramAuth: tg =', tg);
+    if (window.appDebug) {
+        console.debug('initTelegramAuth: tg =', tg);
+    }
     if (!tg) {
-        console.warn('NOT_IN_TELEGRAM');
+        if (window.appDebug) {
+            console.warn('NOT_IN_TELEGRAM');
+        }
         await showTelegramRequiredOverlay();
         return false;
     }
@@ -438,13 +448,17 @@ async function initTelegramAuth(appConfig) {
         tg.ready();
     }
     let initData = await waitForTelegramInitData(tg, 15000);
-    console.debug('initTelegramAuth: initData =', initData);
-    console.debug('TELEGRAM_WEBAPP_READY', {
-        hasWebApp: Boolean(tg),
-        initDataLength: initData ? initData.length : 0
-    });
+    if (window.appDebug) {
+        console.debug('initTelegramAuth: initData =', initData);
+        console.debug('TELEGRAM_WEBAPP_READY', {
+            hasWebApp: Boolean(tg),
+            initDataLength: initData ? initData.length : 0
+        });
+    }
     if (!initData) {
-        console.warn('INITDATA_EMPTY');
+        if (window.appDebug) {
+            console.warn('INITDATA_EMPTY');
+        }
         await showTelegramRequiredOverlay();
         return false;
     }
@@ -521,6 +535,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     const appConfig = await loadAppConfig();
     window.appMode = appConfig?.mode || 'production';
     window.appIsDev = Boolean(appConfig?.is_dev);
+    window.appDebug = Boolean(appConfig?.debug);
     const currentPath = window.location.pathname || '/';
     const isEntryPoint = currentPath === '/' || currentPath === '/index';
     const tg = window.Telegram?.WebApp;
@@ -544,7 +559,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             root.style.setProperty('--tg-hint-color', theme.hint_color);
         }
     }
-    if (isEntryPoint) {
+    if (isEntryPoint && window.appDebug) {
         console.group('🔍 Telegram WebApp DEBUG');
         console.log('window.Telegram:', window.Telegram);
         console.log('Telegram.WebApp:', window.Telegram?.WebApp);
