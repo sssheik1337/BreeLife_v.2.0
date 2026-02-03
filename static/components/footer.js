@@ -174,6 +174,8 @@ class CustomFooter extends HTMLElement {
       progress: this.shadowRoot.querySelector('[data-bottom-link="progress"]'),
     };
     const bottomFab = this.shadowRoot.querySelector('.bottom-fab');
+    const bottomNav = this.shadowRoot.querySelector('.bottom-nav');
+    const bottomSpacer = this.shadowRoot.querySelector('.bottom-spacer');
 
     const applyBottomNavState = (profileCompleted) => {
       const shouldDisable = !profileCompleted;
@@ -227,6 +229,14 @@ class CustomFooter extends HTMLElement {
 
     const currentPath = window.location.pathname || '/';
     const currentHash = window.location.hash || '';
+    if (!hasCompletedProfile && currentPath.startsWith('/questionnaire')) {
+      if (bottomNav) {
+        bottomNav.style.display = 'none';
+      }
+      if (bottomSpacer) {
+        bottomSpacer.style.height = '0';
+      }
+    }
     let activeKey = 'profile';
     if (currentPath.startsWith('/diary')) {
       activeKey = 'diary';
