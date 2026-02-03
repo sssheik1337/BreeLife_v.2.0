@@ -1,5 +1,7 @@
 // Скрипты визуальных блоков профиля
 
+const apiFetch = window.apiFetch || fetch;
+
 const HABITS_STORAGE_KEY = 'bree_habits';
 const REMINDER_DEFAULTS = {
     water: { enabled: false, time: '10:00', frequency: 'daily' },
@@ -331,7 +333,7 @@ function buildReminderIso(timeValue, frequency) {
 
 async function scheduleReminder(type, timeValue, frequency) {
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
-    if (!profile?.telegram_user_id) {
+    if (window.serverUser?.authorized !== true) {
         return;
     }
     const whenIso = buildReminderIso(timeValue, frequency);
@@ -339,11 +341,9 @@ async function scheduleReminder(type, timeValue, frequency) {
         return;
     }
     try {
-        await fetch('/api/reminders/schedule', {
+        await apiFetch('/api/reminders/schedule', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                telegram_user_id: profile.telegram_user_id,
                 type,
                 when_iso: whenIso
             })
@@ -1521,20 +1521,6 @@ async function applySubscriptionAccess() {
     }
 
     const profile = getUserProfile();
-    const telegramUserId = profile.telegram_user_id;
-    if (!telegramUserId) {
-        paywallElement.classList.add('hidden');
-        if (weeklyProgress) {
-            weeklyProgress.classList.remove('hidden');
-        }
-        if (dailyRings) {
-            dailyRings.classList.remove('hidden');
-        }
-        if (monthGrid) {
-            monthGrid.classList.remove('hidden');
-        }
-        return;
-    }
 
     const isDevMode = window.appIsDev === true || window.appMode === 'development';
     if (isDevMode) {
@@ -1556,7 +1542,7 @@ async function applySubscriptionAccess() {
     }
 
     try {
-        const response = await fetch(`/api/subscription/status?telegram_user_id=${telegramUserId}`);
+        const response = await apiFetch('/api/subscription/status');
         if (!response.ok) {
             throw new Error('Не удалось получить статус подписки.');
         }
@@ -1585,10 +1571,9 @@ async function applySubscriptionAccess() {
 
     payButton.onclick = async () => {
         try {
-            const response = await fetch('/api/payments/start', {
+            const response = await apiFetch('/api/payments/start', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ telegram_user_id: telegramUserId, days: 30 })
+                body: JSON.stringify({ days: 30 })
             });
             if (!response.ok) {
                 throw new Error('Не удалось выполнить оплату.');
@@ -1614,6 +1599,15 @@ async function renderProfileRecommendations() {
     if (!list) {
         return;
     }
+    if (window.profileCompleted !== true) {
+        list.innerHTML = '';
+        const empty = document.createElement('li');
+        empty.className = 'text-sm text-slate-500';
+        // Подсказки от AI показываем только после успешной авторизации и завершения анкеты.
+        empty.textContent = 'Подсказки появятся после авторизации и заполнения анкеты.';
+        list.appendChild(empty);
+        return;
+    }
     if (typeof getUserProfile !== 'function') {
         return;
     }
@@ -1627,9 +1621,8 @@ async function renderProfileRecommendations() {
     });
     skeletonItems.forEach((item) => list.appendChild(item));
     try {
-        const response = await fetch('/api/ai/recommendation', {
+        const response = await apiFetch('/api/ai/recommendation', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(profile)
         });
         if (!response.ok) {
@@ -1743,7 +1736,7 @@ async function loadProfileFromServer() {
         return;
     }
     try {
-        const response = await fetch('/api/profile/get');
+        const response = await apiFetch('/api/profile/get');
         if (!response.ok) {
             return;
         }

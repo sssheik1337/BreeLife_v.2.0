@@ -12,7 +12,8 @@ from pathlib import Path
 
 import requests
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
+from aiogram.filters import CommandStart
+from aiogram.utils.web_app import safe_parse_webapp_init_data
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -65,35 +66,15 @@ bot = None
 dispatcher = None
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger.info("🚀 FastAPI started")
-    global bot, dispatcher
-    if not TELEGRAM_BOT_TOKEN:
-        logger.error("TELEGRAM_BOT_TOKEN не задан. Бот не будет запущен.")
-        yield
-        return
-    if not PUBLIC_BASE_URL:
-        logger.error("PUBLIC_BASE_URL не задан. Вебхук не будет установлен.")
-        yield
-        return
-    bot = Bot(token=TELEGRAM_BOT_TOKEN)
-    dispatcher = Dispatcher()
-    try:
-        await bot.set_chat_menu_button(
-            menu_button=types.MenuButtonWebApp(
-                text=APP_NAME,
-                web_app=types.WebAppInfo(url=PUBLIC_APP_URL),
-            )
-        )
-        logger.info("INFO: Кнопка приложения установлена в меню чата")
-    except Exception as exc:
-        logger.error("Не удалось установить кнопку приложения в меню чата: %s", exc)
-
-    @dispatcher.message(Command("start"))
+def register_telegram_handlers(dispatcher: Dispatcher) -> None:
+    @dispatcher.message(CommandStart())
     async def handle_start(message: types.Message) -> None:
         user_id = message.from_user.id if message.from_user else "unknown"
-        logger.info("INFO: /start получен от пользователя %s", user_id)
+        logger.info(
+            "INFO: /start получен от пользователя %s (text=%s)",
+            user_id,
+            message.text,
+        )
         keyboard = types.InlineKeyboardMarkup(
             inline_keyboard=[
                 [
@@ -113,13 +94,42 @@ async def lifespan(app: FastAPI):
         except Exception as exc:
             logger.error("Не удалось отправить ответ на /start: %s", exc)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("🚀 FastAPI started")
+    global bot, dispatcher
+    if not TELEGRAM_BOT_TOKEN:
+        logger.error("TELEGRAM_BOT_TOKEN не задан. Бот не будет запущен.")
+        yield
+        return
+    if not PUBLIC_BASE_URL:
+        logger.error("PUBLIC_BASE_URL не задан. Вебхук не будет установлен.")
+        yield
+        return
+    bot = Bot(token=TELEGRAM_BOT_TOKEN)
+    dispatcher = Dispatcher()
+    register_telegram_handlers(dispatcher)
+    allowed_updates = dispatcher.resolve_used_update_types()
+    logger.info("INFO: Разрешённые типы обновлений: %s", allowed_updates)
+    try:
+        await bot.set_chat_menu_button(
+            menu_button=types.MenuButtonWebApp(
+                text=APP_NAME,
+                web_app=types.WebAppInfo(url=PUBLIC_APP_URL),
+            )
+        )
+        logger.info("INFO: Кнопка приложения установлена в меню чата")
+    except Exception as exc:
+        logger.error("Не удалось установить кнопку приложения в меню чата: %s", exc)
+
     webhook_url = f"{PUBLIC_BASE_URL.rstrip('/')}/telegram/webhook"
     try:
         # В DEBUG режиме не сбрасываем апдейты, чтобы /start не терялся при перезапусках.
         result = await bot.set_webhook(
             webhook_url,
             drop_pending_updates=not DEBUG,
-            allowed_updates=["message", "callback_query"],
+            allowed_updates=allowed_updates,
         )
         logger.info("INFO: Webhook установлен: %s (result=%s)", webhook_url, result)
     except Exception as exc:
@@ -399,7 +409,7 @@ reminder_scheduler = ReminderScheduler(REMINDERS_ENABLED, reminders_store)
 
 
 class ReminderScheduleRequest(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     type: Literal[
         "food_diary",
         "water",
@@ -413,24 +423,24 @@ class ReminderScheduleRequest(BaseModel):
 
 
 class ReminderGenerateRequest(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     user_profile: dict[str, object] = Field(default_factory=dict)
 
 
 class ReminderAutoGenerateRequest(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     user_profile: dict[str, object] = Field(default_factory=dict)
     weekly_review: dict[str, object] = Field(default_factory=dict)
 
 
 class SubscriptionRequest(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     subscription_started_at: str | None = None
     trial_started_at: str | None = None
 
 
 class PaymentRequest(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     days: int = Field(30, description="Срок продления подписки в днях")
 
 
@@ -440,27 +450,27 @@ class ProfileSaveRequest(BaseModel):
 
 
 class DiaryEntriesPayload(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     entries: list[dict[str, object]] = Field(default_factory=list)
 
 
 class WaterEntriesPayload(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     entries: list[dict[str, object]] = Field(default_factory=list)
 
 
 class SleepEntriesPayload(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     entries: list[dict[str, object]] = Field(default_factory=list)
 
 
 class HabitEntriesPayload(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     habits: dict[str, object] = Field(default_factory=dict)
 
 
 class FoodDiaryEntry(BaseModel):
-    telegram_user_id: int = Field(..., description="Telegram user id")
+    telegram_user_id: int | None = Field(default=None, description="Telegram user id")
     date: str
     calories: float
     protein_g: float
@@ -487,7 +497,12 @@ def verify_telegram_init_data(init_data: str, bot_token: str) -> dict[str, objec
     data_check_string = "\n".join(
         f"{key}={value}" for key, value in sorted(parsed.items())
     )
-    secret_key = hashlib.sha256(bot_token.encode("utf-8")).digest()
+    # Для WebApp используется секретный ключ HMAC_SHA256("WebAppData", bot_token).
+    secret_key = hmac.new(
+        b"WebAppData",
+        bot_token.encode("utf-8"),
+        hashlib.sha256,
+    ).digest()
     calculated_hash = hmac.new(
         secret_key,
         data_check_string.encode("utf-8"),
@@ -505,6 +520,12 @@ def resolve_telegram_user_id(
     response: Response | None = None,
 ) -> int | None:
     """Определить telegram_user_id через сессию или DEV-режим."""
+    if DEBUG:
+        logging.warning(
+            "[TG_DEBUG_BACK] resolve_telegram_user_id headers=%s cookies=%s",
+            dict(request.headers),
+            request.cookies,
+        )
     session_id = request.cookies.get(TELEGRAM_SESSION_COOKIE)
     telegram_user_id = get_session_user(session_id) if session_id else None
     if telegram_user_id:
@@ -514,35 +535,43 @@ def resolve_telegram_user_id(
         return DEV_TELEGRAM_USER_ID
     init_data = request.headers.get("x-telegram-init-data")
     if init_data:
-        logger.info("INFO: initData получена из заголовка (len=%s)", len(init_data))
+        if DEBUG:
+            logger.info("INFO: initData получена из заголовка (len=%s)", len(init_data))
         try:
-            parsed = verify_telegram_init_data(init_data, TELEGRAM_BOT_TOKEN)
+            if DEBUG:
+                logging.warning(
+                    "[TG_DEBUG_AUTH] safe_parse_webapp_init_data: запуск (source=header, len=%s)",
+                    len(init_data),
+                )
+            parsed = safe_parse_webapp_init_data(token=TELEGRAM_BOT_TOKEN, init_data=init_data)
+            if DEBUG:
+                logging.warning("[TG_DEBUG_AUTH] safe_parse_webapp_init_data: SUCCESS")
         except ValueError as exc:
-            logger.info("INFO: initData невалидна: %s", exc)
+            if DEBUG:
+                logging.error(
+                    "[TG_DEBUG_AUTH] safe_parse_webapp_init_data: FAIL (%s)",
+                    exc,
+                )
+            if DEBUG:
+                logger.info("INFO: initData невалидна: %s", exc)
         else:
-            user_raw = parsed.get("user")
-            if user_raw:
-                try:
-                    user_data = json.loads(user_raw)
-                except json.JSONDecodeError:
-                    user_data = {}
-                telegram_user_id = user_data.get("id")
-                if telegram_user_id:
-                    session_id = create_session(int(telegram_user_id))
-                    if response is not None:
-                        response.set_cookie(
-                            TELEGRAM_SESSION_COOKIE,
-                            session_id,
-                            httponly=True,
-                            samesite="lax",
-                            secure=IS_PROD,
-                        )
-                    logger.info(
-                        "INFO: Создана сессия по initData (user_id=%s, session_id=%s)",
-                        telegram_user_id,
+            if parsed.user and parsed.user.id:
+                telegram_user_id = parsed.user.id
+                session_id = create_session(int(telegram_user_id))
+                if response is not None:
+                    response.set_cookie(
+                        TELEGRAM_SESSION_COOKIE,
                         session_id,
+                        httponly=True,
+                        samesite="lax",
+                        secure=IS_PROD,
                     )
-                    return int(telegram_user_id)
+                logger.info(
+                    "INFO: Создана сессия по initData (user_id=%s, session_id=%s)",
+                    telegram_user_id,
+                    session_id,
+                )
+                return int(telegram_user_id)
     if required:
         raise HTTPException(status_code=401, detail="Telegram не авторизован.")
     return None
@@ -559,6 +588,25 @@ def get_current_user(request: Request, response: Response) -> int:
 def optional_current_user(request: Request, response: Response) -> int | None:
     """Получить telegram_user_id из cookie или вернуть None."""
     return resolve_telegram_user_id(request, required=False, response=response)
+
+
+def require_telegram_user_id(request: Request, response: Response) -> int:
+    """Получить telegram_user_id из Telegram initData или сессии."""
+    init_data = request.headers.get("x-telegram-init-data")
+    init_data_len = len(init_data) if init_data else 0
+    has_cookie = bool(request.cookies.get(TELEGRAM_SESSION_COOKIE))
+    source = "header" if init_data else "cookie" if has_cookie else "none"
+    if DEBUG:
+        logging.warning(
+            "[TG_DEBUG_AUTH] require_telegram_user_id initData_present=%s initData_len=%s source=%s",
+            bool(init_data),
+            init_data_len,
+            source,
+        )
+    telegram_user_id = resolve_telegram_user_id(request, required=True, response=response)
+    if telegram_user_id is None:
+        raise HTTPException(status_code=401, detail="Telegram не авторизован.")
+    return telegram_user_id
 
 
 def is_profile_completed(telegram_user_id: int) -> bool:
@@ -585,6 +633,18 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(RequestLoggingMiddleware)
+
+
+class FrameOptionsMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        content_type = response.headers.get("content-type", "")
+        if "text/html" in content_type.lower():
+            del response.headers["x-frame-options"]
+        return response
+
+
+app.add_middleware(FrameOptionsMiddleware)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 # HTTP 304 (Not Modified) для статики — это не ошибка, а корректный ответ кэша.
 
@@ -614,11 +674,10 @@ async def healthz():
 async def me_status(request: Request, response: Response):
     telegram_user_id = resolve_telegram_user_id(request, required=False, response=response)
     if not telegram_user_id:
-        return {"authorized": False, "profile_completed": False, "telegram_user_id": None}
+        return {"authorized": False, "profile_completed": False}
     return {
         "authorized": True,
         "profile_completed": is_profile_completed(telegram_user_id),
-        "telegram_user_id": telegram_user_id,
     }
 
 
@@ -626,9 +685,8 @@ async def me_status(request: Request, response: Response):
 async def session_status(request: Request, response: Response):
     telegram_user_id = resolve_telegram_user_id(request, required=False, response=response)
     if not telegram_user_id:
-        return {"telegram_user_id": None, "profile_completed": False}
+        return {"profile_completed": False}
     return {
-        "telegram_user_id": telegram_user_id,
         "profile_completed": is_profile_completed(telegram_user_id),
     }
 
@@ -666,41 +724,52 @@ async def app_config():
         "mode": APP_ENV,
         "is_dev": IS_DEV,
         "is_prod": IS_PROD,
+        "debug": DEBUG,
         "dev_user": {"id": "dev-user", "first_name": "Developer"},
         "dev_telegram_user_id": DEV_TELEGRAM_USER_ID,
     }
 
 
 @app.post("/api/auth/telegram")
-async def auth_telegram(payload: TelegramAuthRequest):
+async def auth_telegram(request: Request, payload: TelegramAuthRequest):
+    if DEBUG:
+        logging.warning(
+            "[TG_DEBUG_BACK] /api/auth/telegram headers=%s cookies=%s",
+            dict(request.headers),
+            request.cookies,
+        )
     if IS_DEV:
         logger.info("DEV MODE: Telegram validation skipped")
         return {"ok": True, "telegram_user_id": DEV_TELEGRAM_USER_ID}
-    if payload.initData:
+    if payload.initData and DEBUG:
         logger.info("INFO: /api/auth/telegram initData получена (len=%s)", len(payload.initData))
     try:
-        parsed = verify_telegram_init_data(payload.initData, TELEGRAM_BOT_TOKEN)
+        if DEBUG:
+            logging.warning(
+                "[TG_DEBUG_AUTH] safe_parse_webapp_init_data: запуск (source=body, len=%s)",
+                len(payload.initData or ""),
+            )
+        parsed = safe_parse_webapp_init_data(token=TELEGRAM_BOT_TOKEN, init_data=payload.initData)
+        if DEBUG:
+            logging.warning("[TG_DEBUG_AUTH] safe_parse_webapp_init_data: SUCCESS")
     except ValueError as exc:
-        logger.info("INFO: initData невалидна: %s", exc)
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
-    user_raw = parsed.get("user")
-    if not user_raw:
+        if DEBUG:
+            logging.error("[TG_DEBUG_AUTH] safe_parse_webapp_init_data: FAIL (%s)", exc)
+        if DEBUG:
+            logger.info("INFO: initData невалидна: %s", exc)
+        raise HTTPException(status_code=401, detail="initData не прошёл проверку.") from exc
+    if not parsed.user or not parsed.user.id:
         raise HTTPException(status_code=400, detail="Пользователь не найден в initData.")
-    try:
-        user_data = json.loads(user_raw)
-    except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=400, detail="Некорректный формат пользователя.") from exc
-    telegram_user_id = user_data.get("id")
-    if not telegram_user_id:
-        raise HTTPException(status_code=400, detail="telegram_user_id отсутствует.")
-    logger.info("INFO: initData валидна для user_id=%s", telegram_user_id)
+    telegram_user_id = parsed.user.id
+    if DEBUG:
+        logger.info("INFO: initData валидна для user_id=%s", telegram_user_id)
     session_id = create_session(int(telegram_user_id))
     logger.info("INFO: Создана сессия (user_id=%s, session_id=%s)", telegram_user_id, session_id)
     response = JSONResponse(
         {
             "ok": True,
             "telegram_user_id": telegram_user_id,
-            "username": user_data.get("username"),
+            "username": parsed.user.username if parsed.user else None,
         }
     )
     response.set_cookie(
@@ -725,11 +794,22 @@ async def telegram_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Некорректный webhook payload.") from exc
     update_type = update.get("message") and "message" or update.get("callback_query") and "callback_query" or "unknown"
     from_user = None
+    message_text = None
     if update.get("message") and isinstance(update["message"], dict):
         from_user = update["message"].get("from", {}).get("id")
-    logger.info("INFO: Получен webhook update (type=%s, from=%s)", update_type, from_user)
+        message_text = update["message"].get("text")
+    logger.info(
+        "INFO: Получен webhook update (type=%s, from=%s, text=%s)",
+        update_type,
+        from_user,
+        message_text,
+    )
     update_obj = types.Update.model_validate(update)
-    await dispatcher.feed_update(bot, update_obj)
+    try:
+        await dispatcher.feed_update(bot, update_obj)
+    except Exception as exc:
+        logger.error("Ошибка при обработке webhook update: %s", exc)
+        raise HTTPException(status_code=500, detail="Не удалось обработать webhook update.") from exc
     return {"ok": True}
 
 
@@ -1523,13 +1603,14 @@ def ensure_entry_ids(entries: list[dict[str, object]]) -> list[dict[str, object]
 
 
 @app.get("/api/subscription/status")
-async def subscription_status(telegram_user_id: int):
+async def subscription_status(request: Request, response: Response):
     if IS_DEV:
         return {
             "subscription_status": "disabled",
             "subscription_until": None,
             "subscription_started_at": None,
         }
+    telegram_user_id = require_telegram_user_id(request, response)
     stored = load_subscription(telegram_user_id)
     return compute_subscription_status(stored)
 
@@ -1564,10 +1645,11 @@ async def products_search(q: str):
 
 
 @app.post("/api/subscription/start_trial")
-async def start_trial(payload: SubscriptionRequest):
+async def start_trial(request: Request, response: Response, payload: SubscriptionRequest):
     if IS_DEV:
         raise HTTPException(status_code=403, detail="DEV_MODE_DISABLED")
-    stored = load_subscription(payload.telegram_user_id)
+    telegram_user_id = require_telegram_user_id(request, response)
+    stored = load_subscription(telegram_user_id)
     if stored and stored.get("subscription_until"):
         return compute_subscription_status(stored)
 
@@ -1594,19 +1676,20 @@ async def start_trial(payload: SubscriptionRequest):
         "trial_started_at": started_at.isoformat(),
         "started_at": now.isoformat(),
     }
-    save_subscription(payload.telegram_user_id, subscription_payload)
+    save_subscription(telegram_user_id, subscription_payload)
     return compute_subscription_status(subscription_payload)
 
 
 @app.post("/api/payments/start")
-async def start_payment(payload: PaymentRequest):
+async def start_payment(request: Request, response: Response, payload: PaymentRequest):
     if IS_DEV:
         raise HTTPException(status_code=403, detail="DEV_MODE_DISABLED")
     if payload.days <= 0:
         raise HTTPException(status_code=400, detail="Срок продления должен быть больше нуля.")
+    telegram_user_id = require_telegram_user_id(request, response)
 
     now = datetime.now(timezone.utc)
-    stored = load_subscription(payload.telegram_user_id)
+    stored = load_subscription(telegram_user_id)
     current_until_raw = stored.get("subscription_until")
     if current_until_raw:
         try:
@@ -1625,7 +1708,7 @@ async def start_payment(payload: PaymentRequest):
         "trial_started_at": stored.get("trial_started_at"),
         "started_at": stored.get("started_at") or now.isoformat(),
     }
-    save_subscription(payload.telegram_user_id, subscription_payload)
+    save_subscription(telegram_user_id, subscription_payload)
 
     return {
         "status": "success",
@@ -1682,7 +1765,8 @@ async def get_profile_legacy(request: Request, response: Response):
 
 
 @app.get("/api/diary")
-async def get_diary(telegram_user_id: int):
+async def get_diary(request: Request, response: Response):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = load_diary_entries(telegram_user_id)
     if not entries:
         return {"status": "not_found", "entries": []}
@@ -1690,15 +1774,17 @@ async def get_diary(telegram_user_id: int):
 
 
 @app.post("/api/diary")
-async def save_diary(payload: DiaryEntriesPayload):
+async def save_diary(request: Request, response: Response, payload: DiaryEntriesPayload):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = payload.entries if isinstance(payload.entries, list) else []
     normalized = ensure_entry_ids(entries)
-    save_diary_entries(payload.telegram_user_id, normalized)
+    save_diary_entries(telegram_user_id, normalized)
     return {"status": "ok", "entries": normalized}
 
 
 @app.delete("/api/diary/{entry_id}")
-async def delete_diary_entry(entry_id: str, telegram_user_id: int):
+async def delete_diary_entry(request: Request, response: Response, entry_id: str):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = load_diary_entries(telegram_user_id)
     updated = [entry for entry in entries if entry.get("id") != entry_id]
     save_diary_entries(telegram_user_id, updated)
@@ -1706,7 +1792,8 @@ async def delete_diary_entry(entry_id: str, telegram_user_id: int):
 
 
 @app.get("/api/water")
-async def get_water_entries(telegram_user_id: int):
+async def get_water_entries(request: Request, response: Response):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = load_water_entries(telegram_user_id)
     if not entries:
         return {"status": "not_found", "entries": []}
@@ -1714,11 +1801,12 @@ async def get_water_entries(telegram_user_id: int):
 
 
 @app.post("/api/water")
-async def save_water_entries_endpoint(payload: WaterEntriesPayload):
+async def save_water_entries_endpoint(request: Request, response: Response, payload: WaterEntriesPayload):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = payload.entries if isinstance(payload.entries, list) else []
     normalized = ensure_entry_ids(entries)
-    save_water_entries(payload.telegram_user_id, normalized)
-    diary_entries = load_diary_entries(payload.telegram_user_id)
+    save_water_entries(telegram_user_id, normalized)
+    diary_entries = load_diary_entries(telegram_user_id)
     updated_diary = list(diary_entries)
     for entry in normalized:
         date_value = entry.get("date")
@@ -1734,12 +1822,13 @@ async def save_water_entries_endpoint(payload: WaterEntriesPayload):
                 "water_l": water_value
             })
     if updated_diary != diary_entries:
-        save_diary_entries(payload.telegram_user_id, ensure_entry_ids(updated_diary))
+        save_diary_entries(telegram_user_id, ensure_entry_ids(updated_diary))
     return {"status": "ok", "entries": normalized}
 
 
 @app.delete("/api/water/{entry_id}")
-async def delete_water_entry(entry_id: str, telegram_user_id: int):
+async def delete_water_entry(request: Request, response: Response, entry_id: str):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = load_water_entries(telegram_user_id)
     updated = [entry for entry in entries if entry.get("id") != entry_id]
     save_water_entries(telegram_user_id, updated)
@@ -1747,7 +1836,8 @@ async def delete_water_entry(entry_id: str, telegram_user_id: int):
 
 
 @app.get("/api/sleep")
-async def get_sleep_entries(telegram_user_id: int):
+async def get_sleep_entries(request: Request, response: Response):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = load_sleep_entries(telegram_user_id)
     if not entries:
         return {"status": "not_found", "entries": []}
@@ -1755,15 +1845,17 @@ async def get_sleep_entries(telegram_user_id: int):
 
 
 @app.post("/api/sleep")
-async def save_sleep_entries_endpoint(payload: SleepEntriesPayload):
+async def save_sleep_entries_endpoint(request: Request, response: Response, payload: SleepEntriesPayload):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = payload.entries if isinstance(payload.entries, list) else []
     normalized = ensure_entry_ids(entries)
-    save_sleep_entries(payload.telegram_user_id, normalized)
+    save_sleep_entries(telegram_user_id, normalized)
     return {"status": "ok", "entries": normalized}
 
 
 @app.delete("/api/sleep/{entry_id}")
-async def delete_sleep_entry(entry_id: str, telegram_user_id: int):
+async def delete_sleep_entry(request: Request, response: Response, entry_id: str):
+    telegram_user_id = require_telegram_user_id(request, response)
     entries = load_sleep_entries(telegram_user_id)
     updated = [entry for entry in entries if entry.get("id") != entry_id]
     save_sleep_entries(telegram_user_id, updated)
@@ -1771,7 +1863,8 @@ async def delete_sleep_entry(entry_id: str, telegram_user_id: int):
 
 
 @app.get("/api/habits")
-async def get_habits(telegram_user_id: int):
+async def get_habits(request: Request, response: Response):
+    telegram_user_id = require_telegram_user_id(request, response)
     habits = load_habit_entries(telegram_user_id)
     if not habits:
         return {"status": "not_found", "habits": {}}
@@ -1779,34 +1872,36 @@ async def get_habits(telegram_user_id: int):
 
 
 @app.post("/api/habits")
-async def save_habits(payload: HabitEntriesPayload):
+async def save_habits(request: Request, response: Response, payload: HabitEntriesPayload):
+    telegram_user_id = require_telegram_user_id(request, response)
     habits = payload.habits if isinstance(payload.habits, dict) else {}
-    save_habit_entries(payload.telegram_user_id, habits)
+    save_habit_entries(telegram_user_id, habits)
     return {"status": "ok"}
 
 
 @app.get("/api/diary/get")
-async def get_diary_legacy(telegram_user_id: int):
-    return await get_diary(telegram_user_id)
+async def get_diary_legacy(request: Request, response: Response):
+    return await get_diary(request, response)
 
 
 @app.post("/api/diary/save")
-async def save_diary_legacy(payload: DiaryEntriesPayload):
-    return await save_diary(payload)
+async def save_diary_legacy(request: Request, response: Response, payload: DiaryEntriesPayload):
+    return await save_diary(request, response, payload)
 
 
 @app.get("/api/habits/get")
-async def get_habits_legacy(telegram_user_id: int):
-    return await get_habits(telegram_user_id)
+async def get_habits_legacy(request: Request, response: Response):
+    return await get_habits(request, response)
 
 
 @app.post("/api/habits/save")
-async def save_habits_legacy(payload: HabitEntriesPayload):
-    return await save_habits(payload)
+async def save_habits_legacy(request: Request, response: Response, payload: HabitEntriesPayload):
+    return await save_habits(request, response, payload)
 
 
 @app.post("/api/ai/recommendation")
-async def ai_recommendation(request: Request):
+async def ai_recommendation(request: Request, response: Response):
+    require_telegram_user_id(request, response)
     try:
         profile = await request.json()
     except Exception as exc:
@@ -1837,13 +1932,14 @@ async def ai_recommendation(request: Request):
 
 
 @app.post("/api/reminders/schedule")
-async def schedule_reminder(payload: ReminderScheduleRequest):
-    stored = load_reminder_entries(payload.telegram_user_id)
+async def schedule_reminder(request: Request, response: Response, payload: ReminderScheduleRequest):
+    telegram_user_id = require_telegram_user_id(request, response)
+    stored = load_reminder_entries(telegram_user_id)
     stored.append({"type": payload.type, "when_iso": payload.when_iso})
-    save_reminder_entries(payload.telegram_user_id, stored)
+    save_reminder_entries(telegram_user_id, stored)
     return reminder_scheduler.schedule(
         ReminderPayload(
-            telegram_user_id=payload.telegram_user_id,
+            telegram_user_id=telegram_user_id,
             type=payload.type,
             when_iso=payload.when_iso,
         )
@@ -1851,7 +1947,8 @@ async def schedule_reminder(payload: ReminderScheduleRequest):
 
 
 @app.get("/api/reminders/list")
-async def list_reminders(telegram_user_id: int):
+async def list_reminders(request: Request, response: Response):
+    telegram_user_id = require_telegram_user_id(request, response)
     stored = load_reminder_entries(telegram_user_id)
     if stored:
         return stored
@@ -1859,21 +1956,23 @@ async def list_reminders(telegram_user_id: int):
 
 
 @app.post("/api/reminders/generate")
-async def generate_reminders(payload: ReminderGenerateRequest):
+async def generate_reminders(request: Request, response: Response, payload: ReminderGenerateRequest):
+    telegram_user_id = require_telegram_user_id(request, response)
     profile = payload.user_profile if isinstance(payload.user_profile, dict) else {}
-    reminders = generate_reminders_payload(profile, payload.telegram_user_id)
+    reminders = generate_reminders_payload(profile, telegram_user_id)
     return {"reminders": reminders}
 
 
 @app.post("/api/reminders/auto-generate")
-async def auto_generate_reminders(payload: ReminderAutoGenerateRequest):
+async def auto_generate_reminders(request: Request, response: Response, payload: ReminderAutoGenerateRequest):
+    telegram_user_id = require_telegram_user_id(request, response)
     profile = payload.user_profile if isinstance(payload.user_profile, dict) else {}
     weekly_review = payload.weekly_review if isinstance(payload.weekly_review, dict) else {}
     try:
         reminders = generate_auto_reminders_payload(
             profile,
             weekly_review,
-            payload.telegram_user_id,
+            telegram_user_id,
         )
     except Exception as exc:
         logger.warning("Ошибка при генерации авто-напоминаний: %s", exc, exc_info=True)
@@ -1882,20 +1981,25 @@ async def auto_generate_reminders(payload: ReminderAutoGenerateRequest):
 
 
 @app.post("/api/food-diary/add")
-async def add_food_diary_entry(entry: FoodDiaryEntry):
-    entries = load_food_diary_entries(entry.telegram_user_id)
-    entries.append(entry.model_dump())
-    save_food_diary_entries(entry.telegram_user_id, entries)
+async def add_food_diary_entry(request: Request, response: Response, entry: FoodDiaryEntry):
+    telegram_user_id = require_telegram_user_id(request, response)
+    entries = load_food_diary_entries(telegram_user_id)
+    entry_payload = entry.model_dump()
+    entry_payload["telegram_user_id"] = telegram_user_id
+    entries.append(entry_payload)
+    save_food_diary_entries(telegram_user_id, entries)
     return {"status": "saved"}
 
 
 @app.get("/api/food-diary/list")
-async def list_food_diary_entries(telegram_user_id: int):
+async def list_food_diary_entries(request: Request, response: Response):
+    telegram_user_id = require_telegram_user_id(request, response)
     return load_food_diary_entries(telegram_user_id)
 
 
 @app.post("/api/food-diary/analyze")
-async def analyze_food_diary(request: Request):
+async def analyze_food_diary(request: Request, response: Response):
+    require_telegram_user_id(request, response)
     try:
         payload = await request.json()
     except Exception as exc:

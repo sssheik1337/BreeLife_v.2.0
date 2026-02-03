@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ APP_NAME }}</title>
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
     <link rel="stylesheet" href="/static/css/style.css">
@@ -109,18 +110,6 @@
     <script src="/static/js/storage.js"></script>
     <script src="/static/js/ui.js"></script>
     <script>
-        fetch('/api/me/status')
-            .then((response) => response.json())
-            .then((data) => {
-                if (data?.profile_completed) {
-                    window.location.replace('/profile');
-                } else {
-                    window.location.replace('/questionnaire');
-                }
-            })
-            .catch(() => {
-                window.location.replace('/questionnaire');
-            });
         feather.replace();
     </script>
 </body>

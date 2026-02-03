@@ -160,7 +160,7 @@ let currentStep;
 let progressPercent;
 
 // Initialize questionnaire
-function initQuestionnaire() {
+async function initQuestionnaire() {
     const urlParams = new URLSearchParams(window.location.search);
     isEditMode = urlParams.get('edit') === '1';
 
@@ -186,18 +186,27 @@ function initQuestionnaire() {
         totalSteps.textContent = questions.length.toString();
     }
     
-    // Load saved answers
-    loadSavedAnswers();
-    
+    // Загружаем сохранённые ответы перед отображением первого шага.
+    await loadSavedAnswers();
+
     // Display first question
     displayQuestion();
-    
+
     // Setup event listeners
     setupEventListeners();
 }
 
 // Загружаем сохранённые ответы из профиля
-function loadSavedAnswers() {
+async function loadSavedAnswers() {
+    if (typeof window.syncProfileWithBackend === 'function') {
+        // Сначала синхронизируем профиль с сервером, чтобы анкета заполнялась актуальными данными.
+        try {
+            await window.syncProfileWithBackend();
+        } catch (error) {
+            // Ошибки синхронизации игнорируем, продолжим с локальными данными.
+        }
+    }
+
     if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
         const profile = getUserProfile();
         Object.assign(window.userData, mapUserProfileToUserData(profile));
@@ -390,6 +399,7 @@ function displayInput(question) {
                 }
                 saveUserData();
                 updateButtonStates();
+                console.log('[QUESTIONNAIRE_TRACE] шаг обновлён (birthDate):', window.userData);
                 return;
             };
 
@@ -449,12 +459,14 @@ function displayInput(question) {
                 window.userData[getDataKey(currentQuestionIndex)] = value;
                 saveUserData();
                 updateButtonStates();
+                console.log('[QUESTIONNAIRE_TRACE] шаг обновлён (number input):', window.userData);
             });
             input.addEventListener('change', () => {
                 const value = input.value;
                 window.userData[getDataKey(currentQuestionIndex)] = value;
                 saveUserData();
                 updateButtonStates();
+                console.log('[QUESTIONNAIRE_TRACE] шаг обновлён (number change):', window.userData);
             });
         }
     }
@@ -481,6 +493,7 @@ function selectOption(optionElement, value) {
     window.userData[getDataKey(currentQuestionIndex)] = value;
     saveUserData();
     updateButtonStates();
+    console.log('[QUESTIONNAIRE_TRACE] шаг обновлён (select option):', window.userData);
     
     // Update feather icons
     if (window.feather) {
@@ -540,9 +553,17 @@ if (window.feather) {
     }
 }
 
+function persistUserData() {
+    try {
+        localStorage.setItem('userData', JSON.stringify(window.userData));
+    } catch (error) {
+        console.warn('Не удалось сохранить userData', error);
+    }
+}
+
 // Сохраняем данные анкеты локально до завершения
 function saveUserData() {
-    return;
+    persistUserData();
 }
 
 async function saveProfileToServer(profile) {
@@ -550,9 +571,9 @@ async function saveProfileToServer(profile) {
         return;
     }
     try {
-        await fetch('/api/profile/save', {
+        const apiFetch = window.apiFetch || fetch;
+        await apiFetch('/api/profile/save', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 user_profile: profile
             })
@@ -573,13 +594,34 @@ function setupEventListeners() {
             // Сохраняем профиль и отправляем на сервер (если доступен Telegram ID).
             let profile = null;
             if (typeof patchUserProfile === 'function' && typeof mapUserDataToUserProfile === 'function') {
+                console.log('[QUESTIONNAIRE_TRACE] перед mapUserDataToUserProfile:', window.userData);
                 const mappedProfile = mapUserDataToUserProfile(window.userData);
+                console.log('[QUESTIONNAIRE_TRACE] результат mapUserDataToUserProfile:', mappedProfile);
+                const criticalKeys = ['sex', 'birth_date', 'height_cm', 'weight_kg', 'target_weight_kg', 'activity_factor', 'goal'];
+                if (window.appDebug) {
+                    const nullFields = Object.keys(mappedProfile).filter((key) => mappedProfile[key] === null);
+                    console.log('[QUESTIONNAIRE_DEBUG] payload перед /api/profile:', {
+                        mappedProfile,
+                        nullFields,
+                        profile_completed: mappedProfile.profile_completed ?? mappedProfile.completed ?? null
+                    });
+                }
+                const missingCritical = criticalKeys.filter((key) => mappedProfile[key] === null || mappedProfile[key] === undefined || mappedProfile[key] === '');
+                if (missingCritical.length > 0) {
+                    console.error('[QUESTIONNAIRE_TRACE] Ошибка сохранения профиля: отсутствуют критические поля', {
+                        missingCritical,
+                        userData: window.userData,
+                        mappedProfile
+                    });
+                    return;
+                }
                 mappedProfile.completed = true;
                 profile = patchUserProfile(mappedProfile);
             }
             if (!profile && typeof getUserProfile === 'function') {
                 profile = getUserProfile();
             }
+            persistUserData();
             await saveProfileToServer(profile);
             // Все вопросы заполнены, переходим на страницу сводки.
             window.location.href = isEditMode ? '/profile' : '/resume';

@@ -1,5 +1,7 @@
 // Resume/Summary Page Logic for Health Bloom App
 
+const apiFetch = window.apiFetch || fetch;
+
 // Initialize summary page
 function generateSummary() {
     const cardsContainer = document.getElementById('data-cards');
@@ -8,7 +10,7 @@ function generateSummary() {
     cardsContainer.innerHTML = '';
     
     // Get user data
-    const data = window.userData || {};
+    const data = {};
     if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
         const profile = getUserProfile();
         Object.assign(data, mapUserProfileToUserData(profile));
@@ -273,6 +275,9 @@ async function applyAiRecommendationToResume() {
     if (typeof getUserProfile !== 'function') {
         return;
     }
+    if (window.profileCompleted !== true) {
+        return;
+    }
 
     const profile = getUserProfile();
     const caloriesElement = document.getElementById('calories-explanation');
@@ -284,9 +289,8 @@ async function applyAiRecommendationToResume() {
     }
 
     try {
-        const response = await fetch('/api/ai/recommendation', {
+        const response = await apiFetch('/api/ai/recommendation', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(profile)
         });
         if (!response.ok) {
@@ -746,10 +750,9 @@ async function renderTrialStatus() {
 
     const profile = getUserProfile();
     const isDevMode = window.appIsDev === true || window.appMode === 'development';
-    const telegramUserId = profile.telegram_user_id;
-    if (!telegramUserId) {
-        statusElement.textContent = 'Telegram ID не найден';
-        datesElement.textContent = 'Откройте приложение в Telegram, чтобы активировать пробный период.';
+    if (window.serverUser?.authorized !== true) {
+        statusElement.textContent = 'Нет авторизации Telegram';
+        datesElement.textContent = 'Откройте приложение через кнопку бота.';
         badgeElement.textContent = 'Пробный период до --';
         if (warningElement) {
             warningElement.textContent = '';
@@ -777,7 +780,7 @@ async function renderTrialStatus() {
     };
 
     const fetchSubscriptionStatus = async () => {
-        const response = await fetch(`/api/subscription/status?telegram_user_id=${telegramUserId}`);
+        const response = await apiFetch('/api/subscription/status');
         if (!response.ok) {
             throw new Error('Не удалось получить статус подписки.');
         }
@@ -785,10 +788,9 @@ async function renderTrialStatus() {
     };
 
     const startTrial = async () => {
-        const response = await fetch('/api/subscription/start_trial', {
+        const response = await apiFetch('/api/subscription/start_trial', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telegram_user_id: telegramUserId })
+            body: JSON.stringify({})
         });
         if (!response.ok) {
             throw new Error('Не удалось запустить пробный период.');
@@ -797,10 +799,9 @@ async function renderTrialStatus() {
     };
 
     const startPayment = async () => {
-        const response = await fetch('/api/payments/start', {
+        const response = await apiFetch('/api/payments/start', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telegram_user_id: telegramUserId, days: 30 })
+            body: JSON.stringify({ days: 30 })
         });
         if (!response.ok) {
             throw new Error('Не удалось выполнить оплату.');
@@ -967,8 +968,7 @@ function renderReminderActions() {
     actionsContainer.innerHTML = '';
     hintElement.textContent = '';
 
-    const telegramUserId = profile.telegram_user_id;
-    const isTelegramAvailable = telegramUserId !== null && telegramUserId !== undefined;
+    const isTelegramAvailable = window.serverUser?.authorized === true;
 
     if (!isTelegramAvailable) {
         hintElement.textContent = 'Telegram ID не найден. Откройте приложение в Telegram, чтобы включить напоминания.';
@@ -976,9 +976,8 @@ function renderReminderActions() {
 
     const scheduleReminder = async (payload) => {
         try {
-            const response = await fetch('/api/reminders/schedule', {
+            const response = await apiFetch('/api/reminders/schedule', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
             if (!response.ok) {
@@ -1037,7 +1036,6 @@ function renderReminderActions() {
                 return;
             }
             await scheduleReminder({
-                telegram_user_id: telegramUserId,
                 type: reminder.type,
                 when_iso: reminder.suggested_time_iso
             });
@@ -1058,11 +1056,9 @@ function renderReminderActions() {
 
     const fetchReminders = async () => {
         try {
-            const response = await fetch('/api/reminders/auto-generate', {
+            const response = await apiFetch('/api/reminders/auto-generate', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    telegram_user_id: telegramUserId ?? 0,
                     user_profile: profile,
                     weekly_review: profile.weekly_review || {}
                 })
@@ -1116,6 +1112,15 @@ function saveAndContinue() {
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', async function() {
+    if (window.serverUser?.authorized !== true && typeof loadProfileStatus === 'function') {
+        const status = await loadProfileStatus();
+        window.serverUser = {
+            authorized: status.authorized === true,
+            telegram_user_id: status.telegram_user_id ?? null,
+            profile_completed: status.profile_completed === true
+        };
+        window.profileCompleted = status.profile_completed;
+    }
     if (typeof syncProfileWithBackend === 'function') {
         await syncProfileWithBackend();
     }
