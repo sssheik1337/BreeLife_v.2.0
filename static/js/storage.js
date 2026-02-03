@@ -21,13 +21,17 @@
     let cachedHabitEntries = null;
 
     function apiFetch(url, options = {}) {
+        const headers = {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+        };
+        const initData = typeof window.telegramInitData === 'string' ? window.telegramInitData : '';
+        if (initData) {
+            headers['X-Telegram-Init-Data'] = initData;
+        }
         return fetch(url, {
             ...options,
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Telegram-Init-Data': window.telegramInitData,
-                ...(options.headers || {})
-            }
+            headers
         });
     }
 
