@@ -1,7 +1,22 @@
 // Хранилище профиля пользователя и нормализация данных
 
 (function() {
-    window.telegramInitData = window.Telegram?.WebApp?.initData || null;
+    const normalizeTelegramInitData = (value) => {
+        if (typeof value !== 'string') {
+            return '';
+        }
+        const trimmed = value.trim();
+        if (!trimmed) {
+            return '';
+        }
+        const lowered = trimmed.toLowerCase();
+        if (lowered === 'null' || lowered === 'undefined') {
+            return '';
+        }
+        return trimmed;
+    };
+
+    window.telegramInitData = normalizeTelegramInitData(window.Telegram?.WebApp?.initData);
     const memoryStore = new Map();
     const migrationFlags = new Set();
     const STORAGE_KEY = 'user_profile';
@@ -25,7 +40,7 @@
             'Content-Type': 'application/json',
             ...(options.headers || {})
         };
-        const initData = typeof window.telegramInitData === 'string' ? window.telegramInitData : '';
+        const initData = normalizeTelegramInitData(window.telegramInitData);
         if (initData) {
             headers['X-Telegram-Init-Data'] = initData;
         }

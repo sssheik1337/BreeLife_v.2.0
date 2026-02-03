@@ -381,8 +381,24 @@ function isSameOriginRequest(input) {
     return false;
 }
 
+function normalizeTelegramInitData(value) {
+    if (typeof value !== 'string') {
+        return '';
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return '';
+    }
+    const lowered = trimmed.toLowerCase();
+    if (lowered === 'null' || lowered === 'undefined') {
+        return '';
+    }
+    return trimmed;
+}
+
 function installTelegramInitDataInterceptor(initData) {
-    if (!initData || window.__telegramInitDataInterceptorInstalled) {
+    const normalized = normalizeTelegramInitData(initData);
+    if (!normalized || window.__telegramInitDataInterceptorInstalled) {
         return;
     }
     window.__telegramInitDataInterceptorInstalled = true;
@@ -391,7 +407,7 @@ function installTelegramInitDataInterceptor(initData) {
         if (isSameOriginRequest(input)) {
             const headers = new Headers(init.headers || {});
             if (!headers.has('X-Telegram-Init-Data')) {
-                headers.set('X-Telegram-Init-Data', initData);
+                headers.set('X-Telegram-Init-Data', normalized);
             }
             return originalFetch(input, { ...init, headers });
         }
@@ -536,6 +552,7 @@ async function initTelegramAuth(appConfig) {
         tg.ready();
     }
     let initData = await waitForTelegramInitData(tg, 15000);
+    initData = normalizeTelegramInitData(initData);
     if (window.appDebug) {
         console.debug('initTelegramAuth: initData =', initData);
         console.debug('TELEGRAM_WEBAPP_READY', {
