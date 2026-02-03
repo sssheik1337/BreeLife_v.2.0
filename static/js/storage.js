@@ -783,6 +783,9 @@
                 return getUserProfile();
             }
             const data = await response.json();
+            if (!data || typeof data !== 'object') {
+                throw new Error('Profile payload invalid');
+            }
             if (data?.status === 'not_found') {
                 const localProfile = getUserProfile();
                 if (localProfile && !isMigrationDone(PROFILE_MIGRATION_KEY)) {
