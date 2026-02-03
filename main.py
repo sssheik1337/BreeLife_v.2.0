@@ -674,11 +674,10 @@ async def healthz():
 async def me_status(request: Request, response: Response):
     telegram_user_id = resolve_telegram_user_id(request, required=False, response=response)
     if not telegram_user_id:
-        return {"authorized": False, "profile_completed": False, "telegram_user_id": None}
+        return {"authorized": False, "profile_completed": False}
     return {
         "authorized": True,
         "profile_completed": is_profile_completed(telegram_user_id),
-        "telegram_user_id": telegram_user_id,
     }
 
 
@@ -686,9 +685,8 @@ async def me_status(request: Request, response: Response):
 async def session_status(request: Request, response: Response):
     telegram_user_id = resolve_telegram_user_id(request, required=False, response=response)
     if not telegram_user_id:
-        return {"telegram_user_id": None, "profile_completed": False}
+        return {"profile_completed": False}
     return {
-        "telegram_user_id": telegram_user_id,
         "profile_completed": is_profile_completed(telegram_user_id),
     }
 
