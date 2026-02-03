@@ -8,7 +8,7 @@ class CustomLayout extends HTMLElement {
           display: flex;
           flex-direction: column;
           background-color: var(--tg-bg-color, #f8fafc);
-          background-image: linear-gradient(135deg, #f8fafc 0%, #f0f9ff 50%, #f0fdf4 100%);
+          background-image: var(--tg-bg-gradient, linear-gradient(135deg, #f8fafc 0%, #f0f9ff 50%, #f0fdf4 100%));
           color: var(--tg-text-color, #0f172a);
           overflow-y: auto;
           -webkit-overflow-scrolling: touch;

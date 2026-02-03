@@ -545,6 +545,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         const root = document.documentElement;
         if (theme.bg_color) {
             root.style.setProperty('--tg-bg-color', theme.bg_color);
+            root.style.setProperty('--tg-bg-gradient', 'none');
         }
         if (theme.text_color) {
             root.style.setProperty('--tg-text-color', theme.text_color);
