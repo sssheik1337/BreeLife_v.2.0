@@ -762,6 +762,23 @@
 
     async function saveProfileToBackend(profile) {
         try {
+            const requiredFields = [
+                profile?.sex,
+                profile?.birth_date,
+                profile?.height_cm,
+                profile?.weight_kg,
+                profile?.target_weight_kg,
+                profile?.goal,
+                profile?.activity_factor
+            ];
+            const missingFields = requiredFields.filter((value) => value === null || value === undefined || value === '');
+            if (missingFields.length > 0) {
+                console.error('Профиль не отправлен: отсутствуют обязательные поля', {
+                    profile,
+                    missingFieldsCount: missingFields.length
+                });
+                return;
+            }
             await apiFetch('/api/profile', {
                 method: 'POST',
                 body: JSON.stringify({
