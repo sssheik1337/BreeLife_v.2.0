@@ -10,18 +10,7 @@ function generateSummary() {
     cardsContainer.innerHTML = '';
     
     // Get user data
-    const data = window.userData || {};
-    try {
-        const previewRaw = sessionStorage.getItem('bree_preview_user_data');
-        if (previewRaw) {
-            const previewData = JSON.parse(previewRaw);
-            if (previewData && typeof previewData === 'object') {
-                Object.assign(data, previewData);
-            }
-        }
-    } catch (error) {
-        // Игнорируем ошибки чтения предпросмотра.
-    }
+    const data = {};
     if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
         const profile = getUserProfile();
         Object.assign(data, mapUserProfileToUserData(profile));
@@ -1114,11 +1103,6 @@ function saveAndContinue() {
     if (typeof showNotification === 'function') {
         showNotification('Профиль успешно сохранен!', 'success');
 }
-    try {
-        sessionStorage.removeItem('bree_preview_user_data');
-    } catch (error) {
-        // Игнорируем ошибки очистки предпросмотра.
-    }
     
     // Redirect after a short delay
     setTimeout(() => {

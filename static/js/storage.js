@@ -779,12 +779,33 @@
                 });
                 return;
             }
-            await apiFetch('/api/profile', {
+            const response = await apiFetch('/api/profile', {
                 method: 'POST',
                 body: JSON.stringify({
                     user_profile: profile
                 })
             });
+            if (!response.ok) {
+                return;
+            }
+            const refreshed = await apiFetch('/api/profile');
+            if (!refreshed.ok) {
+                return;
+            }
+            const data = await refreshed.json();
+            if (!data || typeof data !== 'object') {
+                throw new Error('Profile payload invalid');
+            }
+            if (data?.status === 'not_found') {
+                return;
+            }
+            const normalized = normalizeUserProfile(data);
+            cachedProfile = normalized;
+            try {
+                memorySet(STORAGE_KEY, JSON.stringify(normalized));
+            } catch (error) {
+                // Игнорируем ошибку сохранения, данные остаются в памяти.
+            }
         } catch (error) {
             // Ошибки синхронизации игнорируем, данные остаются локально.
         }
