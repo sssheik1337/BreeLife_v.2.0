@@ -160,7 +160,7 @@ let currentStep;
 let progressPercent;
 
 // Initialize questionnaire
-function initQuestionnaire() {
+async function initQuestionnaire() {
     const urlParams = new URLSearchParams(window.location.search);
     isEditMode = urlParams.get('edit') === '1';
 
@@ -186,18 +186,27 @@ function initQuestionnaire() {
         totalSteps.textContent = questions.length.toString();
     }
     
-    // Load saved answers
-    loadSavedAnswers();
-    
+    // Загружаем сохранённые ответы перед отображением первого шага.
+    await loadSavedAnswers();
+
     // Display first question
     displayQuestion();
-    
+
     // Setup event listeners
     setupEventListeners();
 }
 
 // Загружаем сохранённые ответы из профиля
-function loadSavedAnswers() {
+async function loadSavedAnswers() {
+    if (typeof window.syncProfileWithBackend === 'function') {
+        // Сначала синхронизируем профиль с сервером, чтобы анкета заполнялась актуальными данными.
+        try {
+            await window.syncProfileWithBackend();
+        } catch (error) {
+            // Ошибки синхронизации игнорируем, продолжим с локальными данными.
+        }
+    }
+
     if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
         const profile = getUserProfile();
         Object.assign(window.userData, mapUserProfileToUserData(profile));
