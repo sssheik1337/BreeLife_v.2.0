@@ -74,15 +74,6 @@ class CustomNavbar extends HTMLElement {
           color: #047857;
         }
 
-        .nav-button--disabled {
-          background: #f8fafc;
-          border-color: #e2e8f0;
-          color: #cbd5f5;
-          cursor: not-allowed;
-          opacity: 0.7;
-          pointer-events: none;
-        }
-
         .menu-wrapper {
           position: relative;
         }
@@ -136,15 +127,6 @@ class CustomNavbar extends HTMLElement {
 
         .menu-link:hover {
           background: #f1f5f9;
-        }
-
-        .menu-link--disabled {
-          color: #94a3b8;
-          cursor: not-allowed;
-        }
-
-        .menu-link--disabled:hover {
-          background: transparent;
         }
 
         .nav-emoji {
@@ -217,12 +199,9 @@ class CustomNavbar extends HTMLElement {
               <a href="/my-products" class="menu-link">Мои продукты</a>
               <a href="/meal-plan" class="menu-link">Рацион</a>
               <a href="/menu#plans" class="menu-link">Тарифы</a>
-              <span class="menu-link menu-link--disabled" title="Скоро">Настройки <span>Скоро</span></span>
+              
             </div>
           </div>
-          <button type="button" class="nav-button nav-button--disabled" aria-label="Настройки" title="Скоро" disabled>
-            <span class="nav-emoji" aria-hidden="true">⚙️</span>
-          </button>
         </div>
       </nav>
     `;

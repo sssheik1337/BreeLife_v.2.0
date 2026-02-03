@@ -21,13 +21,6 @@ function mapUserProfileToUserData(profile) {
     if (!profile) {
         return {};
     }
-    const goalMap = {
-        lose: 'lose',
-        maintain: 'maintain',
-        gain: 'gain',
-        muscle: 'gain'
-    };
-
     return {
         gender: profile.sex ?? null,
         birthDate: profile.birth_date ?? null,
@@ -35,11 +28,9 @@ function mapUserProfileToUserData(profile) {
         currentWeight: profile.weight_kg ?? null,
         targetWeight: profile.target_weight_kg ?? null,
         activityLevel: profile.activity_factor ?? null,
-        goalType: goalMap[profile.goal] ?? null,
+        goalType: profile.goal ?? null,
         deadline: profile.goal_deadline ?? null,
-        foodDiary: profile.food_diary === null || profile.food_diary === undefined
-            ? null
-            : profile.food_diary
+        foodDiary: profile.food_diary ?? null
     };
 }
 
@@ -48,12 +39,6 @@ function mapUserDataToUserProfile(data) {
     if (!data) {
         return {};
     }
-    const goalMap = {
-        lose: 'lose',
-        maintain: 'maintain',
-        gain: 'gain',
-        muscle: 'gain'
-    };
     const parseNumber = (value) => {
         if (value === null || value === undefined || value === '') {
             return null;
@@ -61,25 +46,118 @@ function mapUserDataToUserProfile(data) {
         const parsed = Number(value);
         return Number.isFinite(parsed) ? parsed : null;
     };
-    const birthDate = data.birthDate || null;
+    const normalizeSex = (value) => {
+        if (!value) {
+            return null;
+        }
+        const normalized = String(value).trim().toLowerCase();
+        const map = {
+            male: 'male',
+            man: 'male',
+            мужской: 'male',
+            муж: 'male',
+            female: 'female',
+            woman: 'female',
+            женский: 'female',
+            жен: 'female'
+        };
+        return map[normalized] || null;
+    };
+    const normalizeActivity = (value) => {
+        const numeric = parseNumber(value);
+        if (numeric !== null) {
+            return numeric;
+        }
+        if (!value) {
+            return null;
+        }
+        const normalized = String(value).trim().toLowerCase();
+        const directMap = {
+            low: 1.2,
+            minimal: 1.2,
+            sedentary: 1.2,
+            medium: 1.55,
+            moderate: 1.55,
+            high: 1.725,
+            very_high: 1.9
+        };
+        if (directMap[normalized]) {
+            return directMap[normalized];
+        }
+        if (normalized.includes('1.2')) {
+            return 1.2;
+        }
+        if (normalized.includes('1.375')) {
+            return 1.375;
+        }
+        if (normalized.includes('1.55')) {
+            return 1.55;
+        }
+        if (normalized.includes('1.725')) {
+            return 1.725;
+        }
+        if (normalized.includes('1.9')) {
+            return 1.9;
+        }
+        if (normalized.includes('миним') || normalized.includes('низк') || normalized.includes('сидяч') || normalized.includes('мало')) {
+            return 1.2;
+        }
+        if (normalized.includes('прогул') || normalized.includes('1-3') || normalized.includes('1–3')) {
+            return 1.375;
+        }
+        if (normalized.includes('регуляр') || normalized.includes('умерен') || normalized.includes('3-5') || normalized.includes('3–5')) {
+            return 1.55;
+        }
+        if (normalized.includes('высок') || normalized.includes('каждый день')) {
+            return 1.725;
+        }
+        if (normalized.includes('очень') || normalized.includes('интенсив')) {
+            return 1.9;
+        }
+        return null;
+    };
+    const normalizeGoal = (value) => {
+        if (!value) {
+            return null;
+        }
+        const normalized = String(value).trim().toLowerCase();
+        if (['lose', 'loss', 'weight_loss', 'slim'].includes(normalized) || normalized.includes('сниж') || normalized.includes('похуд')) {
+            return 'lose';
+        }
+        if (['maintain', 'keep', 'maintenance', 'balance'].includes(normalized) || normalized.includes('поддерж')) {
+            return 'maintain';
+        }
+        if (['gain', 'bulk', 'mass', 'muscle', 'build'].includes(normalized) || normalized.includes('набор') || normalized.includes('масса') || normalized.includes('мышц')) {
+            return 'gain';
+        }
+        return null;
+    };
+    const rawGender = data.gender ?? data.sex ?? null;
+    const birthDate = data.birthDate ?? data.birth_date ?? null;
+    const heightValue = data.height ?? data.height_cm ?? null;
+    const weightValue = data.currentWeight ?? data.weight_kg ?? null;
+    const targetWeightValue = data.targetWeight ?? data.target_weight_kg ?? null;
+    const activityValue = data.activityLevel ?? data.activity_factor ?? null;
+    const goalValue = data.goalType ?? data.goal ?? null;
+    const deadlineValue = data.deadline ?? data.goal_deadline ?? null;
+    const foodDiaryValue = data.foodDiary ?? data.food_diary ?? null;
     const age = calculateAge(birthDate);
 
     return {
-        telegram_user_id: window.telegramAuthUserId ?? null,
-        sex: data.gender === 'male' || data.gender === 'female' ? data.gender : null,
+        sex: normalizeSex(rawGender),
         birth_date: birthDate,
         age: age ?? null,
-        height_cm: parseNumber(data.height),
-        weight_kg: parseNumber(data.currentWeight),
-        target_weight_kg: parseNumber(data.targetWeight),
-        goal: goalMap[data.goalType] ?? null,
-        activity_factor: parseNumber(data.activityLevel),
-        goal_deadline: data.deadline || null,
-        food_diary: data.foodDiary === true || data.foodDiary === false
-            ? data.foodDiary
-            : data.foodDiary === 'yes'
+        height_cm: parseNumber(heightValue),
+        weight_kg: parseNumber(weightValue),
+        target_weight_kg: parseNumber(targetWeightValue),
+        goal: normalizeGoal(goalValue),
+        activity_factor: normalizeActivity(activityValue),
+        goal_deadline: deadlineValue || null,
+        food_diary: foodDiaryValue === true || foodDiaryValue === false
+            ? foodDiaryValue
+            : foodDiaryValue === 'yes'
                 ? true
-                : data.foodDiary === 'no'
+                : foodDiaryValue === 'no'
                     ? false
                     : null
     };
@@ -294,8 +372,24 @@ function isSameOriginRequest(input) {
     return false;
 }
 
+function normalizeTelegramInitData(value) {
+    if (typeof value !== 'string') {
+        return '';
+    }
+    const trimmed = value.trim();
+    if (!trimmed) {
+        return '';
+    }
+    const lowered = trimmed.toLowerCase();
+    if (lowered === 'null' || lowered === 'undefined') {
+        return '';
+    }
+    return trimmed;
+}
+
 function installTelegramInitDataInterceptor(initData) {
-    if (!initData || window.__telegramInitDataInterceptorInstalled) {
+    const normalized = normalizeTelegramInitData(initData);
+    if (!normalized || window.__telegramInitDataInterceptorInstalled) {
         return;
     }
     window.__telegramInitDataInterceptorInstalled = true;
@@ -304,7 +398,7 @@ function installTelegramInitDataInterceptor(initData) {
         if (isSameOriginRequest(input)) {
             const headers = new Headers(init.headers || {});
             if (!headers.has('X-Telegram-Init-Data')) {
-                headers.set('X-Telegram-Init-Data', initData);
+                headers.set('X-Telegram-Init-Data', normalized);
             }
             return originalFetch(input, { ...init, headers });
         }
@@ -367,6 +461,9 @@ function showTelegramAuthErrorOverlay(message) {
 }
 
 async function showTelegramRequiredOverlay() {
+    if (window.appDebug) {
+        console.warn('[TG_DEBUG_FRONT] showTelegramRequiredOverlay: показ заглушки "Откройте в Telegram"');
+    }
     let overlay = document.getElementById('telegram-auth-overlay');
     if (overlay) {
         overlay.classList.remove('hidden');
@@ -392,7 +489,7 @@ function wait(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function waitForTelegramWebApp(timeoutMs = 2000) {
+async function waitForTelegramWebApp(timeoutMs = 8000) {
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
         const tg = window.Telegram?.WebApp;
@@ -404,7 +501,7 @@ async function waitForTelegramWebApp(timeoutMs = 2000) {
     return window.Telegram?.WebApp || null;
 }
 
-async function waitForTelegramInitData(tg, timeoutMs = 2000) {
+async function waitForTelegramInitData(tg, timeoutMs = 15000) {
     if (!tg) {
         return '';
     }
@@ -418,37 +515,47 @@ async function waitForTelegramInitData(tg, timeoutMs = 2000) {
 }
 
 async function initTelegramAuth(appConfig) {
+    if (window.appDebug) {
+        console.warn('[TG_DEBUG_FRONT] initTelegramAuth: вызов инициализации');
+    }
+    if (window.appDebug) {
+        console.debug('initTelegramAuth: запуск инициализации Telegram авторизации');
+    }
     if (appConfig?.is_dev) {
         showDevModeBadge();
         setTelegramAccessLock(false);
-        // В DEV режиме фиксируем тестовый telegram_user_id сразу,
-        // чтобы синхронизация дневника и статистики работала до запросов к API.
-        window.telegramAuthUserId = appConfig.dev_telegram_user_id ?? null;
+        // В DEV режиме пропускаем проверку Telegram.
         return true;
     }
     setTelegramAccessLock(true);
     const tg = await waitForTelegramWebApp();
-    if (!tg) {
-        console.warn('NOT_IN_TELEGRAM');
-        await showTelegramRequiredOverlay();
-        return false;
+    if (window.appDebug) {
+        console.debug('initTelegramAuth: tg =', tg);
     }
-    console.debug('TELEGRAM_WEBAPP_READY', {
-        initDataLength: tg.initData ? tg.initData.length : 0,
-        hasUser: Boolean(tg.initDataUnsafe?.user)
-    });
-    if (!tg.initDataUnsafe?.user) {
-        console.warn('TELEGRAM_USER_MISSING');
+    if (!tg) {
+        if (window.appDebug) {
+            console.warn('NOT_IN_TELEGRAM');
+        }
         await showTelegramRequiredOverlay();
         return false;
     }
     if (typeof tg.ready === 'function') {
         tg.ready();
     }
-    let initData = await waitForTelegramInitData(tg);
+    let initData = await waitForTelegramInitData(tg, 15000);
+    initData = normalizeTelegramInitData(initData);
+    if (window.appDebug) {
+        console.debug('initTelegramAuth: initData =', initData);
+        console.debug('TELEGRAM_WEBAPP_READY', {
+            hasWebApp: Boolean(tg),
+            initDataLength: initData ? initData.length : 0
+        });
+    }
     if (!initData) {
-        console.warn('INITDATA_EMPTY');
-        showTelegramAuthErrorOverlay('Telegram не передал данные авторизации. Откройте приложение через кнопку бота.');
+        if (window.appDebug) {
+            console.warn('INITDATA_EMPTY');
+        }
+        await showTelegramRequiredOverlay();
         return false;
     }
     window.telegramInitData = initData;
@@ -468,7 +575,6 @@ async function initTelegramAuth(appConfig) {
             showTelegramAuthErrorOverlay('Ответ авторизации некорректен. Попробуйте открыть приложение через бота ещё раз.');
             return false;
         }
-        window.telegramAuthUserId = data.telegram_user_id ?? null;
         setTelegramAccessLock(false);
         return true;
     } catch (error) {
@@ -481,7 +587,7 @@ async function loadProfileStatus() {
     try {
         const response = await fetch('/api/me/status');
         if (!response.ok) {
-            return { authorized: false, profile_completed: false };
+            return { authorized: false, profile_completed: false, telegram_user_id: null };
         }
         const data = await response.json();
         return {
@@ -496,7 +602,7 @@ async function loadProfileStatus() {
 
 function redirectToQuestionnaireIfNeeded(profileCompleted) {
     const path = window.location.pathname || '/';
-    if (path.startsWith('/questionnaire')) {
+    if (path === '/' || path === '/index' || path.startsWith('/questionnaire')) {
         return;
     }
     if (!profileCompleted) {
@@ -519,12 +625,32 @@ function notifyProfileStatus() {
     window.dispatchEvent(new CustomEvent('profile-status-updated', { detail }));
 }
 
+function restoreUserDataFromLocalStorage() {
+    try {
+        const raw = localStorage.getItem('userData');
+        if (!raw) {
+            return;
+        }
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+            window.userData = parsed;
+            console.log('[USERDATA] восстановлено из localStorage');
+        }
+    } catch (error) {
+        console.warn('Не удалось восстановить userData', error);
+    }
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async function() {
     animatePageTransition();
+    restoreUserDataFromLocalStorage();
     const appConfig = await loadAppConfig();
     window.appMode = appConfig?.mode || 'production';
     window.appIsDev = Boolean(appConfig?.is_dev);
+    window.appDebug = Boolean(appConfig?.debug);
+    const currentPath = window.location.pathname || '/';
+    const isEntryPoint = currentPath === '/' || currentPath === '/index';
     const tg = window.Telegram?.WebApp;
     if (tg) {
         tg.expand();
@@ -546,17 +672,48 @@ document.addEventListener('DOMContentLoaded', async function() {
             root.style.setProperty('--tg-hint-color', theme.hint_color);
         }
     }
-    const isAuthorized = await initTelegramAuth(appConfig);
-    if (!isAuthorized) {
-        return;
+    if (isEntryPoint && window.appDebug) {
+        console.group('🔍 Telegram WebApp DEBUG');
+        console.log('window.Telegram:', window.Telegram);
+        console.log('Telegram.WebApp:', window.Telegram?.WebApp);
+        console.log('initData:', window.Telegram?.WebApp?.initData);
+        console.log('initData length:', window.Telegram?.WebApp?.initData?.length);
+        console.log('initDataUnsafe:', window.Telegram?.WebApp?.initDataUnsafe);
+        console.log('platform:', window.Telegram?.WebApp?.platform);
+        console.log('version:', window.Telegram?.WebApp?.version);
+        console.groupEnd();
+        console.log(
+            window.Telegram,
+            window.Telegram?.WebApp,
+            window.Telegram?.WebApp?.initData?.length
+        );
+        const isAuthorized = await initTelegramAuth(appConfig);
+        if (!isAuthorized) {
+            return;
+        }
     }
     const status = await loadProfileStatus();
+    window.serverUser = {
+        authorized: status.authorized === true,
+        telegram_user_id: status.telegram_user_id ?? null,
+        profile_completed: status.profile_completed === true
+    };
     window.profileCompleted = status.profile_completed;
-    if (status.telegram_user_id) {
-        window.telegramAuthUserId = status.telegram_user_id;
-    }
     if (typeof window.syncProfileWithBackend === 'function') {
         await window.syncProfileWithBackend();
+    }
+    if (typeof window.syncDiaryEntriesWithBackend === 'function') {
+        await window.syncDiaryEntriesWithBackend();
+    }
+    const diaryEntries = typeof getDiaryEntries === 'function' ? getDiaryEntries() : [];
+    if (typeof window.syncWaterEntriesWithBackend === 'function') {
+        await window.syncWaterEntriesWithBackend(diaryEntries);
+    }
+    if (typeof window.syncSleepEntriesWithBackend === 'function') {
+        await window.syncSleepEntriesWithBackend(diaryEntries);
+    }
+    if (typeof window.syncHabitEntriesWithBackend === 'function') {
+        await window.syncHabitEntriesWithBackend();
     }
     syncLocalProfileCompletion(status.profile_completed);
     redirectToQuestionnaireIfNeeded(status.profile_completed);
