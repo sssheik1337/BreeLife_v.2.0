@@ -575,24 +575,21 @@ function setupEventListeners() {
             displayQuestion();
         } else {
             // Сохраняем профиль и отправляем на сервер (если доступен Telegram ID).
-            const criticalKeys = ['gender', 'birthDate', 'height', 'currentWeight', 'targetWeight', 'activityLevel', 'goalType'];
-            const hasUserData = window.userData && typeof window.userData === 'object';
-            const missingCritical = hasUserData
-                ? criticalKeys.filter((key) => window.userData[key] === null || window.userData[key] === undefined || window.userData[key] === '')
-                : criticalKeys;
-            if (!hasUserData || missingCritical.length > 0) {
-                console.error('[QUESTIONNAIRE_TRACE] Ошибка сохранения профиля: отсутствуют критические поля', {
-                    hasUserData,
-                    missingCritical,
-                    userData: window.userData
-                });
-                return;
-            }
             let profile = null;
             if (typeof patchUserProfile === 'function' && typeof mapUserDataToUserProfile === 'function') {
                 console.log('[QUESTIONNAIRE_TRACE] перед mapUserDataToUserProfile:', window.userData);
                 const mappedProfile = mapUserDataToUserProfile(window.userData);
                 console.log('[QUESTIONNAIRE_TRACE] результат mapUserDataToUserProfile:', mappedProfile);
+                const criticalKeys = ['sex', 'birth_date', 'height_cm', 'weight_kg', 'target_weight_kg', 'activity_factor', 'goal'];
+                const missingCritical = criticalKeys.filter((key) => mappedProfile[key] === null || mappedProfile[key] === undefined || mappedProfile[key] === '');
+                if (missingCritical.length > 0) {
+                    console.error('[QUESTIONNAIRE_TRACE] Ошибка сохранения профиля: отсутствуют критические поля', {
+                        missingCritical,
+                        userData: window.userData,
+                        mappedProfile
+                    });
+                    return;
+                }
                 mappedProfile.completed = true;
                 profile = patchUserProfile(mappedProfile);
             }
