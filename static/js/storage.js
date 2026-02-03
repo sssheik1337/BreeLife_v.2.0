@@ -772,6 +772,17 @@
                 profile?.activity_factor
             ];
             const missingFields = requiredFields.filter((value) => value === null || value === undefined || value === '');
+            if (window.appDebug) {
+                const fieldNames = ['sex', 'birth_date', 'height_cm', 'weight_kg', 'target_weight_kg', 'goal', 'activity_factor'];
+                const missingFieldNames = fieldNames.filter((name, index) => {
+                    const value = requiredFields[index];
+                    return value === null || value === undefined || value === '';
+                });
+                console.log('Проверка payload перед /api/profile', {
+                    user_profile: profile,
+                    missing_required_fields: missingFieldNames
+                });
+            }
             if (missingFields.length > 0) {
                 console.error('Профиль не отправлен: отсутствуют обязательные поля', {
                     profile,
