@@ -1,5 +1,6 @@
 const DIARY_STORAGE_KEY = window.DIARY_STORAGE_KEY || 'bree_diary_entries';
 const HABITS_STORAGE_KEY = 'bree_habits';
+const apiFetch = window.apiFetch || fetch;
 
 let diaryInitialized = false;
 let diaryGlobalHandlersBound = false;
@@ -598,15 +599,10 @@ async function syncEntryWithBackend(entry) {
     if (typeof window.setDiaryEntries === 'function') {
         return;
     }
-    const profile = typeof getUserProfile === 'function' ? getUserProfile() : null;
-    if (!profile?.telegram_user_id) {
-        return;
-    }
-    await fetch('/api/diary', {
+    await apiFetch('/api/diary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            telegram_user_id: profile.telegram_user_id,
             entries: [entry]
         })
     });
@@ -617,11 +613,7 @@ async function loadEntriesFromBackend() {
         const entries = await window.syncDiaryEntriesWithBackend();
         return Array.isArray(entries) ? entries.map(normalizeEntry).filter(Boolean) : [];
     }
-    const profile = typeof getUserProfile === 'function' ? getUserProfile() : null;
-    if (!profile?.telegram_user_id) {
-        return [];
-    }
-    const response = await fetch(`/api/diary?telegram_user_id=${profile.telegram_user_id}`);
+    const response = await apiFetch('/api/diary');
     if (!response.ok) {
         return [];
     }
