@@ -1,5 +1,10 @@
 class CustomLayout extends HTMLElement {
   connectedCallback() {
+    if (!document.querySelector('script[src="https://telegram.org/js/telegram-web-app.js"]')) {
+      const script = document.createElement('script');
+      script.src = 'https://telegram.org/js/telegram-web-app.js';
+      document.head.prepend(script);
+    }
     this.attachShadow({ mode: 'open' });
     this.shadowRoot.innerHTML = `
       <style>
