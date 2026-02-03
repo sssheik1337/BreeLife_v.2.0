@@ -489,7 +489,8 @@ async function initTelegramAuth(appConfig) {
 
 async function loadProfileStatus() {
     try {
-        const response = await fetch('/api/me/status');
+        const apiFetch = window.apiFetch || fetch;
+        const response = await apiFetch('/api/me/status');
         if (!response.ok) {
             return { authorized: false, profile_completed: false, telegram_user_id: null };
         }
