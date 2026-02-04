@@ -1013,19 +1013,21 @@ function buildFoodItemRow(values = {}) {
             <div class="absolute left-0 right-0 top-full z-10 mt-1 hidden max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg" data-product-results></div>
         </div>
         <input type="number" class="form-input" placeholder="Граммы" min="1" step="1" value="${values.grams ?? ''}" required data-product-grams>
-        <div class="grid grid-cols-2 gap-2">
-            <input type="number" class="form-input" placeholder="Ккал" min="0" step="1" value="${values.calories ?? ''}" required readonly data-product-calories>
-            <input type="number" class="form-input" placeholder="Белки, г" min="0" step="0.1" value="${values.protein ?? ''}" required readonly data-product-protein>
+        <div class="rounded-xl border border-slate-100 bg-white/80 px-3 py-2 text-sm text-slate-600">
+            <div class="flex items-center justify-between">
+                <span>Белки</span>
+                <span class="font-medium text-slate-800" data-nutrition-protein>—</span>
+            </div>
+            <div class="flex items-center justify-between">
+                <span>Жиры</span>
+                <span class="font-medium text-slate-800" data-nutrition-fat>—</span>
+            </div>
+            <div class="flex items-center justify-between">
+                <span>Углеводы</span>
+                <span class="font-medium text-slate-800" data-nutrition-carbs>—</span>
+            </div>
         </div>
-        <div class="grid grid-cols-2 gap-2">
-            <input type="number" class="form-input" placeholder="Жиры, г" min="0" step="0.1" value="${values.fat ?? ''}" required readonly data-product-fat>
-            <input type="number" class="form-input" placeholder="Углеводы всего, г" min="0" step="0.1" value="${values.carbs ?? ''}" required readonly data-product-carbs>
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-            <input type="number" class="form-input" placeholder="Клетчатка, г" min="0" step="0.1" value="${values.fiber ?? ''}" readonly data-product-fiber>
-            <div class="hidden sm:block"></div>
-        </div>
-        <button type="button" class="text-sm text-rose-500 font-semibold">Удалить продукт</button>
+        <button type="button" class="self-end text-xs text-rose-500 font-semibold">Удалить продукт</button>
     `;
 
     const removeButton = wrapper.querySelector('button');
@@ -1171,6 +1173,20 @@ function updateItemNutritionFromGrams(wrapper) {
     }
     const grams = Number(gramsInput.value);
     if (!Number.isFinite(grams) || grams <= 0) {
+        const resetValue = (selector) => {
+            const element = wrapper.querySelector(selector);
+            if (element) {
+                element.textContent = '—';
+            }
+        };
+        wrapper.dataset.currentCalories = '';
+        wrapper.dataset.currentProtein = '';
+        wrapper.dataset.currentFat = '';
+        wrapper.dataset.currentCarbs = '';
+        wrapper.dataset.currentFiber = '';
+        resetValue('[data-nutrition-protein]');
+        resetValue('[data-nutrition-fat]');
+        resetValue('[data-nutrition-carbs]');
         return;
     }
     const per100 = {
@@ -1183,17 +1199,25 @@ function updateItemNutritionFromGrams(wrapper) {
         fiber: Number(wrapper.dataset.productFiber) || 0
     };
     const multiplier = grams / 100;
-    const setValue = (selector, value) => {
-        const input = wrapper.querySelector(selector);
-        if (input) {
-            input.value = value > 0 ? value.toFixed(1) : '';
+    const currentCalories = per100.calories * multiplier;
+    const currentProtein = per100.protein * multiplier;
+    const currentFat = per100.fat * multiplier;
+    const currentCarbs = per100.carbs * multiplier;
+    const currentFiber = per100.fiber * multiplier;
+    wrapper.dataset.currentCalories = currentCalories.toFixed(1);
+    wrapper.dataset.currentProtein = currentProtein.toFixed(1);
+    wrapper.dataset.currentFat = currentFat.toFixed(1);
+    wrapper.dataset.currentCarbs = currentCarbs.toFixed(1);
+    wrapper.dataset.currentFiber = currentFiber.toFixed(1);
+    const setDisplayValue = (selector, value, suffix) => {
+        const element = wrapper.querySelector(selector);
+        if (element) {
+            element.textContent = value > 0 ? `${value.toFixed(1)}${suffix}` : '—';
         }
     };
-    setValue('[data-product-calories]', per100.calories * multiplier);
-    setValue('[data-product-protein]', per100.protein * multiplier);
-    setValue('[data-product-fat]', per100.fat * multiplier);
-    setValue('[data-product-carbs]', per100.carbs * multiplier);
-    setValue('[data-product-fiber]', per100.fiber * multiplier);
+    setDisplayValue('[data-nutrition-protein]', currentProtein, ' г');
+    setDisplayValue('[data-nutrition-fat]', currentFat, ' г');
+    setDisplayValue('[data-nutrition-carbs]', currentCarbs, ' г');
 }
 
 function collectFoodItems(container) {
@@ -1202,25 +1226,20 @@ function collectFoodItems(container) {
     rows.forEach((row) => {
         const nameInput = row.querySelector('[data-product-search]');
         const gramsInput = row.querySelector('[data-product-grams]');
-        const caloriesInput = row.querySelector('[data-product-calories]');
-        const proteinInput = row.querySelector('[data-product-protein]');
-        const fatInput = row.querySelector('[data-product-fat]');
-        const carbsInput = row.querySelector('[data-product-carbs]');
-        const fiberInput = row.querySelector('[data-product-fiber]');
-        if (!nameInput || !gramsInput || !caloriesInput || !proteinInput || !fatInput || !carbsInput || !fiberInput) {
+        if (!nameInput || !gramsInput) {
             return;
         }
         const name = nameInput.value.trim();
         const grams = Number(gramsInput.value);
-        const calories = Number(caloriesInput.value);
-        const protein = Number(proteinInput.value);
-        const fat = Number(fatInput.value);
-        const carbs = Number(carbsInput.value);
+        const calories = Number(row.dataset.currentCalories);
+        const protein = Number(row.dataset.currentProtein);
+        const fat = Number(row.dataset.currentFat);
+        const carbs = Number(row.dataset.currentCarbs);
         const per100CarbsSimple = Number(row.dataset.productCarbsSimple) || 0;
         const per100CarbsComplex = Number(row.dataset.productCarbsComplex) || 0;
         const carbsSimple = grams > 0 ? (per100CarbsSimple * grams) / 100 : 0;
         const carbsComplex = grams > 0 ? (per100CarbsComplex * grams) / 100 : 0;
-        const fiber = Number(fiberInput.value);
+        const fiber = Number(row.dataset.currentFiber);
         if (!name) {
             return;
         }

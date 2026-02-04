@@ -610,6 +610,16 @@ function redirectToQuestionnaireIfNeeded(profileCompleted) {
     }
 }
 
+function redirectFromMenuIfCompleted(profileCompleted) {
+    if (!profileCompleted) {
+        return;
+    }
+    const path = window.location.pathname || '/';
+    if (path.startsWith('/menu')) {
+        window.location.replace('/profile');
+    }
+}
+
 function syncLocalProfileCompletion(profileCompleted) {
     if (profileCompleted) {
         return;
@@ -717,6 +727,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     syncLocalProfileCompletion(status.profile_completed);
     redirectToQuestionnaireIfNeeded(status.profile_completed);
+    redirectFromMenuIfCompleted(status.profile_completed);
     notifyProfileStatus();
 
     // Add ripple effect to all primary buttons

@@ -67,12 +67,12 @@ function getCaloriesExplanation(profile) {
     const activityLabel = getActivityLabel(activity);
     const goalLabel = getGoalLabel(profile?.goal);
     if (!tdee) {
-        return `Мы учтём активность и цель (${goalLabel}), чтобы подсказать, сколько энергии нужно в день.`;
+        return `Мы учтём активность и цель (${goalLabel}), чтобы подсказать, сколько калорий стоит потреблять в день.`;
     }
     if (activityLabel) {
-        return `При уровне «${activityLabel}» около ${Math.round(tdee)} ккал в день помогают держать стабильный вес.`;
+        return `При уровне «${activityLabel}» около ${Math.round(tdee)} ккал в день — это ориентир по потреблению, чтобы держать курс на цель.`;
     }
-    return `Примерно ${Math.round(tdee)} ккал в день помогают держать стабильный вес.`;
+    return `Примерно ${Math.round(tdee)} ккал в день — это ориентир по потреблению, чтобы держать курс на цель.`;
 }
 
 function getMacrosExplanation(profile) {
@@ -116,7 +116,7 @@ function getRecommendations(profile) {
     }
 
     if (tdee) {
-        recommendations.push(`В день примерно ${Math.round(tdee)} ккал — это подсказка по объёму еды.`);
+        recommendations.push(`В день примерно ${Math.round(tdee)} ккал — ориентир по потреблению, чтобы удерживать выбранный темп.`);
     }
 
     if (predictedDate) {

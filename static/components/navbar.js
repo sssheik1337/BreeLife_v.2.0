@@ -78,6 +78,10 @@ class CustomNavbar extends HTMLElement {
           position: relative;
         }
 
+        .menu-wrapper.is-hidden {
+          display: none;
+        }
+
         .menu-panel {
           position: absolute;
           right: 0;
@@ -187,18 +191,13 @@ class CustomNavbar extends HTMLElement {
             <span class="nav-emoji" aria-hidden="true">👤</span>
           </a>
           <div class="menu-wrapper">
-            <button type="button" class="nav-button" data-nav="menu" aria-label="Меню" title="Меню">
-              <span class="nav-emoji" aria-hidden="true">📋</span>
+            <button type="button" class="nav-button" data-nav="menu" aria-label="Настройки" title="Настройки">
+              <span class="nav-emoji" aria-hidden="true">⚙️</span>
             </button>
             <div class="menu-panel" id="menu-panel">
               <a href="/profile" class="menu-link">Профиль</a>
-              <div class="menu-section">Дневник</div>
-              <a href="/diary?mode=summary" class="menu-link">Итоги дня</a>
-              <a href="/diary?mode=products" class="menu-link">По продуктам</a>
-              <a href="/foods" class="menu-link">Список продуктов</a>
-              <a href="/my-products" class="menu-link">Мои продукты</a>
-              <a href="/meal-plan" class="menu-link">Рацион</a>
               <a href="/menu#plans" class="menu-link">Тарифы</a>
+              <a href="/menu#support" class="menu-link">Помощь</a>
               
             </div>
           </div>
@@ -211,9 +210,29 @@ class CustomNavbar extends HTMLElement {
       const profileLink = this.shadowRoot.querySelector('[data-nav="profile"]');
       const menuButton = this.shadowRoot.querySelector('[data-nav="menu"]');
       const menuPanel = this.shadowRoot.getElementById('menu-panel');
+      const menuWrapper = this.shadowRoot.querySelector('.menu-wrapper');
+
+      const applyMenuVisibility = (profileCompleted) => {
+        if (!menuWrapper) {
+          return;
+        }
+        const shouldShowMenu = profileCompleted === true;
+        menuWrapper.classList.toggle('is-hidden', !shouldShowMenu);
+        if (!shouldShowMenu) {
+          menuPanel?.classList.remove('is-open');
+        }
+      };
 
       if (profileLink && path.startsWith('/profile')) {
         profileLink.classList.add('nav-button--active');
+      }
+      if (menuWrapper) {
+        const initialProfileCompleted = window.profileCompleted === true
+          || (typeof window.getUserProfile === 'function' && window.getUserProfile()?.completed === true);
+        applyMenuVisibility(initialProfileCompleted);
+        window.addEventListener('profile-status-updated', (event) => {
+          applyMenuVisibility(event?.detail?.profileCompleted);
+        });
       }
       if (menuButton && menuPanel) {
         menuButton.addEventListener('click', () => {
