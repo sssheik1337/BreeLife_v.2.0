@@ -651,6 +651,31 @@ function restoreUserDataFromLocalStorage() {
     }
 }
 
+// Применение темы Telegram WebApp к CSS-переменным
+function applyTelegramTheme() {
+    const tg = window.Telegram?.WebApp;
+    if (!tg) {
+        return;
+    }
+    const theme = tg.themeParams || {};
+    const root = document.documentElement;
+    if (theme.bg_color) {
+        root.style.setProperty('--tg-bg-color', theme.bg_color);
+    }
+    if (theme.text_color) {
+        root.style.setProperty('--tg-text-color', theme.text_color);
+    }
+    if (theme.button_color) {
+        root.style.setProperty('--tg-button-color', theme.button_color);
+    }
+    if (theme.button_text_color) {
+        root.style.setProperty('--tg-button-text-color', theme.button_text_color);
+    }
+    if (theme.hint_color) {
+        root.style.setProperty('--tg-hint-color', theme.hint_color);
+    }
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async function() {
     animatePageTransition();
@@ -664,22 +689,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     const tg = window.Telegram?.WebApp;
     if (tg) {
         tg.expand();
-        const theme = tg.themeParams || {};
-        const root = document.documentElement;
-        if (theme.bg_color) {
-            root.style.setProperty('--tg-bg-color', theme.bg_color);
-        }
-        if (theme.text_color) {
-            root.style.setProperty('--tg-text-color', theme.text_color);
-        }
-        if (theme.button_color) {
-            root.style.setProperty('--tg-button-color', theme.button_color);
-        }
-        if (theme.button_text_color) {
-            root.style.setProperty('--tg-button-text-color', theme.button_text_color);
-        }
-        if (theme.hint_color) {
-            root.style.setProperty('--tg-hint-color', theme.hint_color);
+        applyTelegramTheme();
+        if (typeof tg.onEvent === 'function') {
+            tg.onEvent('themeChanged', () => {
+                applyTelegramTheme();
+            });
         }
     }
     if (isEntryPoint && window.appDebug) {
