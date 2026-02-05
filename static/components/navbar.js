@@ -181,13 +181,13 @@ class CustomNavbar extends HTMLElement {
       </style>
       
       <nav class="navbar">
-        <a href="/profile" class="logo">
+        <a href="/resume" class="logo">
           <div class="logo-icon">🌿</div>
           <div class="logo-text">${appName}</div>
 </a>
         
         <div class="nav-actions">
-          <a href="/profile" class="nav-button" data-nav="profile" aria-label="Профиль" title="Профиль">
+          <a href="/resume" class="nav-button" data-nav="profile" aria-label="Профиль" title="Профиль">
             <span class="nav-emoji" aria-hidden="true">👤</span>
           </a>
           <div class="menu-wrapper">
@@ -195,7 +195,7 @@ class CustomNavbar extends HTMLElement {
               <span class="nav-emoji" aria-hidden="true">⚙️</span>
             </button>
             <div class="menu-panel" id="menu-panel">
-              <a href="/profile" class="menu-link">Профиль</a>
+              <a href="/resume" class="menu-link">Профиль</a>
               <a href="/menu#plans" class="menu-link">Тарифы</a>
               <a href="/menu#support" class="menu-link">Помощь</a>
               
@@ -223,7 +223,7 @@ class CustomNavbar extends HTMLElement {
         }
       };
 
-      if (profileLink && path.startsWith('/profile')) {
+      if (profileLink && (path.startsWith('/profile') || path.startsWith('/resume'))) {
         profileLink.classList.add('nav-button--active');
       }
       if (menuWrapper) {

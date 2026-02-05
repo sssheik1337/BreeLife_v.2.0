@@ -143,7 +143,7 @@ class CustomFooter extends HTMLElement {
 
       <nav class="bottom-nav" aria-label="Основная навигация">
         <div class="bottom-nav__inner">
-          <a href="/profile" class="bottom-link" data-bottom-link="profile">
+          <a href="/resume" class="bottom-link" data-bottom-link="profile">
             <span class="bottom-link__icon" aria-hidden="true">👤</span>
             <span>Профиль</span>
           </a>
@@ -244,7 +244,7 @@ class CustomFooter extends HTMLElement {
       activeKey = 'meal-plan';
     } else if (currentHash.includes('progress') || currentHash.includes('month')) {
       activeKey = 'progress';
-    } else if (currentPath.startsWith('/profile')) {
+    } else if (currentPath.startsWith('/profile') || currentPath.startsWith('/resume')) {
       activeKey = 'profile';
     }
 

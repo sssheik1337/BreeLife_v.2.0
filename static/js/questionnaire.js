@@ -624,7 +624,7 @@ function setupEventListeners() {
             persistUserData();
             await saveProfileToServer(profile);
             // Все вопросы заполнены, переходим на страницу сводки.
-            window.location.href = isEditMode ? '/profile' : '/resume';
+            window.location.href = '/resume';
         }
     });
     

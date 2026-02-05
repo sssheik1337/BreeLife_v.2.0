@@ -616,7 +616,7 @@ function redirectFromMenuIfCompleted(profileCompleted) {
     }
     const path = window.location.pathname || '/';
     if (path.startsWith('/menu')) {
-        window.location.replace('/profile');
+        window.location.replace('/resume');
     }
 }
 
