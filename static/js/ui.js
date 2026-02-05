@@ -602,7 +602,13 @@ async function loadProfileStatus() {
 
 function redirectToQuestionnaireIfNeeded(profileCompleted) {
     const path = window.location.pathname || '/';
-    if (path === '/' || path === '/index' || path.startsWith('/questionnaire')) {
+    if (path === '/' || path === '/index') {
+        if (profileCompleted) {
+            window.location.replace('/resume');
+        }
+        return;
+    }
+    if (path.startsWith('/questionnaire')) {
         return;
     }
     if (!profileCompleted) {
@@ -624,7 +630,10 @@ function syncLocalProfileCompletion(profileCompleted) {
     if (profileCompleted) {
         return;
     }
-    window.profileCompleted = false;
+    const localProfileCompleted = typeof getUserProfile === 'function'
+        ? getUserProfile()?.completed === true
+        : false;
+    window.profileCompleted = localProfileCompleted;
 }
 
 function notifyProfileStatus() {
@@ -659,11 +668,19 @@ function applyTelegramTheme() {
     }
     const theme = tg.themeParams || {};
     const root = document.documentElement;
+    const body = document.body;
     if (theme.bg_color) {
         root.style.setProperty('--tg-bg-color', theme.bg_color);
+        if (body) {
+            body.style.backgroundColor = theme.bg_color;
+            body.style.backgroundImage = 'none';
+        }
     }
     if (theme.text_color) {
         root.style.setProperty('--tg-text-color', theme.text_color);
+        if (body) {
+            body.style.color = theme.text_color;
+        }
     }
     if (theme.button_color) {
         root.style.setProperty('--tg-button-color', theme.button_color);
