@@ -351,8 +351,8 @@ function createDataCard(point, index) {
                 <h3 class="font-semibold text-slate-800">${point.label}</h3>
             </div>
         </div>
-        <div class="text-3xl font-bold text-slate-800 mb-2">${point.value}</div>
-        ${point.details ? `<div class="text-sm text-slate-500">${point.details}</div>` : ''}
+        <div class="text-2xl font-semibold text-slate-800 mb-2">${point.value}</div>
+        ${point.details ? `<div class="text-xs text-slate-500">${point.details}</div>` : ''}
     `;
     
     return card;
