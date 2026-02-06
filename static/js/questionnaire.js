@@ -692,7 +692,7 @@ function updateButtonStates() {
     nextButton.disabled = !hasAnswer;
     
     // Enable/disable previous button
-    prevButton.disabled = !isEditMode || currentQuestionIndex === 0;
+    prevButton.disabled = currentQuestionIndex === 0;
     // Update next button text for last question
     if (currentQuestionIndex === questions.length - 1) {
         nextButton.innerHTML = `<span>Завершить</span><i data-feather="check" class="w-5 h-5"></i>`;
