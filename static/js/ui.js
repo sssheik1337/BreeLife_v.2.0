@@ -387,6 +387,20 @@ function normalizeTelegramInitData(value) {
     return trimmed;
 }
 
+function getTelegramInitDataFromUrl() {
+    const extractParam = (source, key) => {
+        if (!source) {
+            return '';
+        }
+        const params = new URLSearchParams(source);
+        const value = params.get(key);
+        return value ? decodeURIComponent(value) : '';
+    };
+    const hash = window.location.hash ? window.location.hash.replace(/^#/, '') : '';
+    const search = window.location.search ? window.location.search.replace(/^\?/, '') : '';
+    return extractParam(hash, 'tgWebAppData') || extractParam(search, 'tgWebAppData');
+}
+
 function installTelegramInitDataInterceptor(initData) {
     const normalized = normalizeTelegramInitData(initData);
     if (!normalized || window.__telegramInitDataInterceptorInstalled) {
@@ -511,7 +525,8 @@ async function waitForTelegramInitData(tg, timeoutMs = 15000) {
         await wait(100);
         initData = tg.initData;
     }
-    return initData || '';
+    const fallback = getTelegramInitDataFromUrl();
+    return initData || fallback || '';
 }
 
 async function initTelegramAuth(appConfig) {
