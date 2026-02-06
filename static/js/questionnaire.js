@@ -307,7 +307,7 @@ function displayOptions(options) {
 
 // Display input field for date/number questions
 function displayInput(question) {
-    const currentValue = window.userData[getDataKey(currentQuestionIndex)];
+    let currentValue = window.userData[getDataKey(currentQuestionIndex)];
 
     const unitLabels = {
         cm: 'см',
@@ -337,8 +337,12 @@ function displayInput(question) {
 
     if (question.type === 'date') {
         const today = new Date();
-        const minYear = 1900;
-        const maxYear = today.getFullYear();
+        const isDeadlinePicker = question.id === 8;
+        const deadlineMinDate = new Date(today);
+        const deadlineMaxDate = new Date(today);
+        deadlineMaxDate.setFullYear(deadlineMaxDate.getFullYear() + 2);
+        const minYear = isDeadlinePicker ? deadlineMinDate.getFullYear() : 1900;
+        const maxYear = isDeadlinePicker ? deadlineMaxDate.getFullYear() : today.getFullYear();
         const months = [
             'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
             'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
@@ -369,6 +373,42 @@ function displayInput(question) {
             yearSelect.innerHTML = `<option value="" class="wheel-placeholder">Год</option>${years.join('')}`;
             monthSelect.innerHTML = `<option value="" class="wheel-placeholder">Месяц</option>${months.map((label, index) => `<option value="${index + 1}">${label}</option>`).join('')}`;
 
+            const formatDateValue = (value) => {
+                if (!value) {
+                    return '';
+                }
+                const date = new Date(value);
+                if (Number.isNaN(date.getTime())) {
+                    return '';
+                }
+                const yearValue = date.getFullYear();
+                const monthValue = String(date.getMonth() + 1).padStart(2, '0');
+                const dayValue = String(date.getDate()).padStart(2, '0');
+                return `${yearValue}-${monthValue}-${dayValue}`;
+            };
+
+            const clampDeadlineDate = (year, month, day) => {
+                if (!isDeadlinePicker) {
+                    return { year, month, day };
+                }
+                const target = new Date(year, month - 1, day);
+                if (target < deadlineMinDate) {
+                    return {
+                        year: deadlineMinDate.getFullYear(),
+                        month: deadlineMinDate.getMonth() + 1,
+                        day: deadlineMinDate.getDate()
+                    };
+                }
+                if (target > deadlineMaxDate) {
+                    return {
+                        year: deadlineMaxDate.getFullYear(),
+                        month: deadlineMaxDate.getMonth() + 1,
+                        day: deadlineMaxDate.getDate()
+                    };
+                }
+                return { year, month, day };
+            };
+
             const setDayOptions = (year, month, preferredDay = '') => {
                 const safeYear = Number(year) || maxYear;
                 const safeMonth = Number(month) || 1;
@@ -377,8 +417,25 @@ function displayInput(question) {
                 const nextDay = Number.isFinite(numericPreferred) && numericPreferred > 0
                     ? Math.min(numericPreferred, daysInMonth)
                     : null;
+                let startDay = 1;
+                let endDay = daysInMonth;
+                if (isDeadlinePicker) {
+                    const isMinMonth = safeYear === deadlineMinDate.getFullYear()
+                        && safeMonth === deadlineMinDate.getMonth() + 1;
+                    const isMaxMonth = safeYear === deadlineMaxDate.getFullYear()
+                        && safeMonth === deadlineMaxDate.getMonth() + 1;
+                    if (isMinMonth) {
+                        startDay = deadlineMinDate.getDate();
+                    }
+                    if (isMaxMonth) {
+                        endDay = deadlineMaxDate.getDate();
+                    }
+                }
                 daySelect.innerHTML = `<option value="" class="wheel-placeholder">День</option>${Array.from({ length: daysInMonth }, (_, index) => {
                     const day = index + 1;
+                    if (day < startDay || day > endDay) {
+                        return '';
+                    }
                     return `<option value="${day}">${day}</option>`;
                 }).join('')}`;
                 if (nextDay) {
@@ -405,25 +462,41 @@ function displayInput(question) {
 
             const syncFromStored = () => {
                 if (!currentValue) {
-                    setDayOptions(null, null);
-                    daySelect.value = '';
-                    monthSelect.value = '';
-                    yearSelect.value = '';
-                    return;
+                    if (isDeadlinePicker) {
+                        const defaultDeadline = new Date(today);
+                        defaultDeadline.setMonth(defaultDeadline.getMonth() + 3);
+                        const defaultValue = formatDateValue(defaultDeadline);
+                        currentValue = defaultValue;
+                        window.userData[getDataKey(currentQuestionIndex)] = defaultValue;
+                        saveUserData();
+                    }
+                    if (!currentValue) {
+                        setDayOptions(null, null);
+                        daySelect.value = '';
+                        monthSelect.value = '';
+                        yearSelect.value = '';
+                        return;
+                    }
                 }
                 const [yearStr, monthStr, dayStr] = currentValue.split('-');
                 const year = Number(yearStr);
                 const month = Number(monthStr);
                 const day = Number(dayStr);
-                if (year) {
-                    yearSelect.value = String(year);
+                const clamped = clampDeadlineDate(year || maxYear, month || 1, day || 1);
+                if (clamped.year) {
+                    yearSelect.value = String(clamped.year);
                 }
-                if (month) {
-                    monthSelect.value = String(month);
+                if (clamped.month) {
+                    monthSelect.value = String(clamped.month);
                 }
-                setDayOptions(year || maxYear, month || 1, dayStr || '');
-                if (day) {
-                    daySelect.value = String(day);
+                setDayOptions(clamped.year || maxYear, clamped.month || 1, String(clamped.day));
+                if (clamped.day) {
+                    daySelect.value = String(clamped.day);
+                }
+                if (isDeadlinePicker) {
+                    const formatted = `${clamped.year}-${String(clamped.month).padStart(2, '0')}-${String(clamped.day).padStart(2, '0')}`;
+                    window.userData[getDataKey(currentQuestionIndex)] = formatted;
+                    saveUserData();
                 }
             };
 
@@ -440,7 +513,13 @@ function displayInput(question) {
             daySelect.addEventListener('change', applyBirthDate);
         }
     } else if (question.type === 'number') {
-        const options = buildNumberOptions(question, currentValue);
+        const resolved = resolveNumberPickerState(question, currentValue);
+        currentValue = resolved.value;
+        if (resolved.shouldPersist) {
+            window.userData[getDataKey(currentQuestionIndex)] = currentValue;
+            saveUserData();
+        }
+        const options = buildNumberOptions(question, currentValue, resolved.range);
         const labelText = question.unit ? `${question.unit}` : 'значение';
         inputContainer.innerHTML = renderPickerWrapper(`
             <div class="number-picker">
@@ -517,11 +596,83 @@ function getDataKey(index) {
     }
 }
 
-function buildNumberOptions(question, currentValue) {
+function formatNumberValue(value, step) {
+    if (!Number.isFinite(value)) {
+        return '';
+    }
+    return Number.isInteger(step) ? Math.round(value).toString() : value.toFixed(1);
+}
+
+function parseNumberValue(value) {
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+    const normalized = String(value).replace(',', '.');
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getNumberRangeForQuestion(question) {
+    if (question.id === 3) {
+        return { min: 140, max: 210, step: 1 };
+    }
+    if (question.id === 4 || question.id === 5) {
+        return { min: 40, max: 200, step: 0.5 };
+    }
+    return {
+        min: Number(question.min) || 0,
+        max: Number(question.max) || 0,
+        step: Number(question.step) || 1
+    };
+}
+
+function resolveNumberPickerState(question, currentValue) {
+    const range = getNumberRangeForQuestion(question);
+    const parsedValue = parseNumberValue(currentValue);
+    if (Number.isFinite(parsedValue)) {
+        return {
+            value: formatNumberValue(parsedValue, range.step),
+            range,
+            shouldPersist: false
+        };
+    }
+    let anchor = null;
+    if (question.id === 3) {
+        anchor = 165;
+    } else if (question.id === 4) {
+        anchor = 70;
+    } else if (question.id === 5) {
+        const currentWeight = parseNumberValue(window.userData?.currentWeight);
+        if (Number.isFinite(currentWeight)) {
+            const lowerAnchor = currentWeight - 5;
+            const upperAnchor = currentWeight + 5;
+            anchor = lowerAnchor >= range.min ? lowerAnchor : upperAnchor;
+        } else {
+            anchor = 65;
+        }
+    }
+    if (!Number.isFinite(anchor)) {
+        anchor = range.min;
+    }
+    if (anchor < range.min) {
+        anchor = range.min;
+    }
+    if (anchor > range.max) {
+        anchor = range.max;
+    }
+    return {
+        value: formatNumberValue(anchor, range.step),
+        range,
+        shouldPersist: true
+    };
+}
+
+function buildNumberOptions(question, currentValue, rangeOverride) {
     const options = [];
-    const step = Number(question.step) || 1;
-    const min = Number(question.min) || 0;
-    const max = Number(question.max) || 0;
+    const range = rangeOverride || getNumberRangeForQuestion(question);
+    const step = Number(range.step) || 1;
+    const min = Number(range.min) || 0;
+    const max = Number(range.max) || 0;
     for (let value = min; value <= max + step / 2; value += step) {
         const formatted = Number.isInteger(step) ? Math.round(value).toString() : value.toFixed(1);
         const label = question.unit ? `${formatted} ${question.unit}` : formatted;
