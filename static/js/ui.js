@@ -615,8 +615,23 @@ async function loadProfileStatus() {
     }
 }
 
-function redirectToQuestionnaireIfNeeded(profileCompleted) {
+function getLocalProfileCompletedFlag() {
+    if (typeof getUserProfile !== 'function') {
+        return false;
+    }
+    const profile = getUserProfile();
+    if (!profile || typeof profile !== 'object') {
+        return false;
+    }
+    return profile.profile_completed === true || profile.completed === true;
+}
+
+function redirectToQuestionnaireIfNeeded(status) {
     const path = window.location.pathname || '/';
+    const serverCompleted = status?.profile_completed === true;
+    const isAuthorized = status?.authorized === true;
+    const localCompleted = getLocalProfileCompletedFlag();
+    const profileCompleted = serverCompleted || localCompleted;
     if (path === '/' || path === '/index') {
         if (profileCompleted) {
             window.location.replace('/profile');
@@ -628,7 +643,7 @@ function redirectToQuestionnaireIfNeeded(profileCompleted) {
     if (path.startsWith('/questionnaire')) {
         return;
     }
-    if (!profileCompleted) {
+    if (isAuthorized && !profileCompleted) {
         window.location.replace('/questionnaire');
     }
 }
@@ -644,13 +659,18 @@ function redirectFromMenuIfCompleted(profileCompleted) {
     }
 }
 
-function syncLocalProfileCompletion(profileCompleted) {
-    const serverCompleted = profileCompleted === true;
-    window.profileCompleted = serverCompleted;
+function syncLocalProfileCompletion(status) {
+    const serverCompleted = status?.profile_completed === true;
+    const isAuthorized = status?.authorized === true;
+    const localCompleted = getLocalProfileCompletedFlag();
+    const mergedCompleted = serverCompleted || localCompleted;
+    window.profileCompleted = mergedCompleted;
     if (typeof patchUserProfile === 'function') {
+        // Если Telegram-сессия временно недоступна, не затираем локально подтверждённый профиль.
+        const safeCompleted = isAuthorized ? mergedCompleted : localCompleted;
         patchUserProfile({
-            completed: serverCompleted,
-            profile_completed: serverCompleted
+            completed: safeCompleted,
+            profile_completed: safeCompleted
         });
     }
 }
@@ -775,9 +795,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (typeof window.syncHabitEntriesWithBackend === 'function') {
         await window.syncHabitEntriesWithBackend();
     }
-    syncLocalProfileCompletion(status.profile_completed);
-    redirectToQuestionnaireIfNeeded(status.profile_completed);
-    redirectFromMenuIfCompleted(status.profile_completed);
+    syncLocalProfileCompletion(status);
+    redirectToQuestionnaireIfNeeded(status);
+    redirectFromMenuIfCompleted(window.profileCompleted === true);
     notifyProfileStatus();
 
     // Add ripple effect to all primary buttons
