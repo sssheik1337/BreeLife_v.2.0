@@ -336,12 +336,16 @@ function renderHeightRuler(currentValue) {
                 <div class="ruler__indicator" aria-hidden="true"></div>
                 <div class="ruler__track" id="height-ruler-track"></div>
             </div>
+            <div class="ruler-current">
+                <span id="height-ruler-current" class="ruler-current__number">${startHeight}</span>
+            </div>
         </div>
     `;
 
     const ruler = document.getElementById('height-ruler');
     const track = document.getElementById('height-ruler-track');
     const valueElement = document.getElementById('height-ruler-value');
+    const currentElement = document.getElementById('height-ruler-current');
     if (!ruler || !track || !valueElement) {
         return;
     }
@@ -387,6 +391,9 @@ function renderHeightRuler(currentValue) {
         const normalized = ((virtualIndex % rangeSteps) + rangeSteps) % rangeSteps;
         const value = minHeight + normalized * stepCm;
         valueElement.textContent = `${value}`;
+        if (currentElement) {
+            currentElement.textContent = `${value}`;
+        }
         ticks.forEach((tick) => {
             tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === virtualIndex);
         });
