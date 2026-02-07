@@ -305,6 +305,72 @@ function displayOptions(options) {
     }
 }
 
+
+function clampRulerValue(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+}
+
+function roundRulerValue(value, step) {
+    if (!Number.isFinite(value) || !Number.isFinite(step) || step <= 0) {
+        return value;
+    }
+    const precision = step.toString().includes('.')
+        ? step.toString().split('.')[1].length
+        : 0;
+    const rounded = Math.round(value / step) * step;
+    return Number(rounded.toFixed(precision));
+}
+
+function computeRulerValueFromScroll({ scrollOffset, centerOffset, pxPerUnit, step, min, max }) {
+    const raw = (scrollOffset + centerOffset) / pxPerUnit;
+    const rounded = roundRulerValue(raw, step);
+    return clampRulerValue(rounded, min, max);
+}
+
+function attachRulerScrollHandler({ viewport, axis, pxPerUnit, centerOffset, step, min, max, onValue }) {
+    let rafId = null;
+    let lastValue = null;
+
+    const readOffset = () => (axis === 'x' ? viewport.scrollLeft : viewport.scrollTop);
+
+    const emitValue = () => {
+        rafId = null;
+        const value = computeRulerValueFromScroll({
+            scrollOffset: readOffset(),
+            centerOffset,
+            pxPerUnit,
+            step,
+            min,
+            max
+        });
+        if (value === lastValue) {
+            return;
+        }
+        lastValue = value;
+        onValue(value);
+    };
+
+    const requestEmit = () => {
+        if (rafId !== null) {
+            return;
+        }
+        rafId = requestAnimationFrame(emitValue);
+    };
+
+    viewport.addEventListener('scroll', requestEmit, { passive: true });
+    requestEmit();
+
+    return {
+        syncNow: () => {
+            if (rafId !== null) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+            }
+            emitValue();
+        }
+    };
+}
+
 function renderHeightRuler(currentValue) {
     const minHeight = 120;
     const maxHeight = 220;
@@ -355,9 +421,7 @@ function renderHeightRuler(currentValue) {
     }
     viewport.appendChild(scale);
 
-    const updateHeightFromScroll = () => {
-        const rawIndex = Math.round(viewport.scrollTop / pixelsPerStep);
-        const value = Math.min(maxHeight, Math.max(minHeight, minHeight + rawIndex));
+    const applyHeightValue = (value) => {
         valueElement.textContent = `${value}`;
         window.userData[dataKey] = value;
         window.userData.height = value;
@@ -365,20 +429,25 @@ function renderHeightRuler(currentValue) {
         updateButtonStates();
     };
 
-    const alignToValue = (value) => {
-        const targetIndex = Math.min(maxHeight, Math.max(minHeight, value)) - minHeight;
-        viewport.scrollTop = targetIndex * pixelsPerStep;
-        updateHeightFromScroll();
-    };
-
     requestAnimationFrame(() => {
         const spacer = Math.max(0, (viewport.clientHeight - pixelsPerStep) / 2);
         scale.style.paddingTop = `${spacer}px`;
         scale.style.paddingBottom = `${spacer}px`;
-        alignToValue(startHeight);
-    });
+        const targetIndex = clampRulerValue(startHeight, minHeight, maxHeight) - minHeight;
+        viewport.scrollTop = targetIndex * pixelsPerStep;
 
-    viewport.addEventListener('scroll', updateHeightFromScroll, { passive: true });
+        const controller = attachRulerScrollHandler({
+            viewport,
+            axis: 'y',
+            pxPerUnit: pixelsPerStep,
+            centerOffset: minHeight * pixelsPerStep,
+            step: 1,
+            min: minHeight,
+            max: maxHeight,
+            onValue: applyHeightValue
+        });
+        controller.syncNow();
+    });
 }
 
 function renderWeightRuler(currentValue) {
@@ -434,32 +503,35 @@ function renderWeightRuler(currentValue) {
     }
     viewport.appendChild(scale);
 
-    const updateWeightFromScroll = () => {
-        const rawIndex = Math.round(viewport.scrollLeft / pixelsPerStep);
-        const value = Math.min(maxWeight, Math.max(minWeight, minWeight + rawIndex * stepKg));
-        const rounded = Math.round(value * 2) / 2;
-        const display = rounded.toFixed(1).replace('.0', '');
+    const applyWeightValue = (value) => {
+        const display = value.toFixed(1).replace('.0', '');
         valueElement.textContent = display;
-        window.userData[dataKey] = rounded;
-        window.userData.currentWeight = rounded;
+        window.userData[dataKey] = value;
+        window.userData.currentWeight = value;
         saveUserData();
         updateButtonStates();
-    };
-
-    const alignToValue = (value) => {
-        const targetIndex = Math.round((Math.min(maxWeight, Math.max(minWeight, value)) - minWeight) / stepKg);
-        viewport.scrollLeft = targetIndex * pixelsPerStep;
-        updateWeightFromScroll();
     };
 
     requestAnimationFrame(() => {
         const spacer = Math.max(0, (viewport.clientWidth - pixelsPerStep) / 2);
         scale.style.paddingLeft = `${spacer}px`;
         scale.style.paddingRight = `${spacer}px`;
-        alignToValue(startWeight);
-    });
+        const safeStart = clampRulerValue(startWeight, minWeight, maxWeight);
+        const targetIndex = Math.round((safeStart - minWeight) / stepKg);
+        viewport.scrollLeft = targetIndex * pixelsPerStep;
 
-    viewport.addEventListener('scroll', updateWeightFromScroll, { passive: true });
+        const controller = attachRulerScrollHandler({
+            viewport,
+            axis: 'x',
+            pxPerUnit: pixelsPerStep,
+            centerOffset: minWeight * pixelsPerStep,
+            step: stepKg,
+            min: minWeight,
+            max: maxWeight,
+            onValue: applyWeightValue
+        });
+        controller.syncNow();
+    });
 }
 
 
