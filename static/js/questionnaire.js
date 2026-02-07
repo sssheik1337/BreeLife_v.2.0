@@ -306,13 +306,9 @@ function displayOptions(options) {
 }
 
 
+/* Старая реализация выбора роста и веса отключена из-за ошибок.
 function renderHeightRuler(currentValue) {
-    const minHeight = 120;
-    const maxHeight = 220;
-    const stepCm = 1;
-    const pixelsPerStep = 12;
-    const loopCount = 7;
-    const rangeSteps = Math.round((maxHeight - minHeight) / stepCm) + 1;
+    const startHeight = 170;
     const totalVirtualSteps = rangeSteps * loopCount;
     const dataKey = getDataKey(currentQuestionIndex);
     const parsedCurrent = parseNumberValue(currentValue);
@@ -334,10 +330,70 @@ function renderHeightRuler(currentValue) {
                 <div class="ruler__fade ruler__fade--end" aria-hidden="true"></div>
                 <div class="ruler__indicator" aria-hidden="true"></div>
                 <div class="ruler__track" id="height-ruler-track"></div>
-            </div>
-        </div>
-    `;
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+    let lastActiveIndex = -1;
+    let lastStyledRange = { start: -1, end: -1 };
 
+        if (lastActiveIndex !== activeIndex) {
+            if (lastActiveIndex >= 0 && ticks[lastActiveIndex]) {
+                ticks[lastActiveIndex].classList.remove('ruler__tick--active');
+            }
+            if (ticks[activeIndex]) {
+                ticks[activeIndex].classList.add('ruler__tick--active');
+            }
+            lastActiveIndex = activeIndex;
+        }
+
+        const centerPx = getCenterOffsetPx();
+        const centerPosition = scrollOffset + centerPx;
+        const visibleRadius = Math.ceil(centerPx / pixelsPerStep) + 24;
+        const rangeStart = clamp(activeIndex - visibleRadius, 0, virtualSteps - 1);
+        const rangeEnd = clamp(activeIndex + visibleRadius, 0, virtualSteps - 1);
+
+        if (lastStyledRange.start !== -1) {
+            for (let i = lastStyledRange.start; i <= lastStyledRange.end; i += 1) {
+                if (i < rangeStart || i > rangeEnd) {
+                    const tick = ticks[i];
+                    if (!tick) {
+                        continue;
+                    }
+                    tick.style.transform = '';
+                    tick.style.opacity = '';
+                }
+            }
+        }
+
+        for (let i = rangeStart; i <= rangeEnd; i += 1) {
+            const tick = ticks[i];
+            if (!tick) {
+                continue;
+            }
+            const tickCenter = i * pixelsPerStep + pixelsPerStep / 2;
+            const distance = Math.abs(tickCenter - centerPosition);
+            const scale = clamp(1.0 - distance * 0.002, 0.85, 1.1);
+            const opacity = clamp(1.0 - distance * 0.0032, 0.22, 1);
+            tick.style.transform = `translateZ(0) scale(${scale.toFixed(3)})`;
+            tick.style.opacity = opacity.toFixed(3);
+        }
+
+        lastStyledRange = { start: rangeStart, end: rangeEnd };
+    let baseValue = startHeight;
+    let centerOffset = getScrollOffsetForIndex(originIndex);
+
+    const normalizeLoopIfNeeded = () => {
+        const centerPx = getCenterOffsetPx();
+        const currentIndex = Math.round((ruler.scrollTop + centerPx - pixelsPerStep / 2) / pixelsPerStep);
+        const isNearStart = currentIndex < recenterThreshold;
+        const isNearEnd = currentIndex > virtualSteps - recenterThreshold;
+        if (!isNearStart && !isNearEnd) {
+            return;
+        }
+        const passedSteps = currentIndex - originIndex;
+        baseValue += passedSteps * stepCm;
+        centerOffset = getScrollOffsetForIndex(originIndex);
+        ruler.scrollTop = centerOffset;
+    };
+        normalizeLoopIfNeeded();
     const ruler = document.getElementById('height-ruler');
     const track = document.getElementById('height-ruler-track');
     const valueElement = document.getElementById('height-ruler-value');
@@ -378,23 +434,18 @@ function renderHeightRuler(currentValue) {
         const maxSafe = rangeSteps * (loopCount - 1);
         if (raw < minSafe || raw > maxSafe) {
             const normalized = ((raw % rangeSteps) + rangeSteps) % rangeSteps;
-            const target = normalized + rangeSteps * Math.floor(loopCount / 2);
+    const pixelsPerStep = 12;
             ruler.scrollTop = getScrollOffsetForIndex(target);
             return target;
         }
-        return raw;
-    };
-
-    const applyHeightValue = () => {
-        const virtualIndex = normalizeVirtualScroll();
-        const normalized = ((virtualIndex % rangeSteps) + rangeSteps) % rangeSteps;
+    const startWeight = 70;
         const value = minHeight + normalized * stepCm;
         valueElement.textContent = `${value}`;
         ticks.forEach((tick) => {
-            tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === virtualIndex);
-        });
-        window.userData[dataKey] = value;
-        window.userData.height = value;
+            <p class="ruler-current" aria-live="polite">
+                <span id="weight-ruler-value" class="ruler-current__number">${startWeight.toFixed(1).replace('.0', '')}</span>
+                <span class="ruler-current__unit">кг</span>
+            </p>
         saveUserData();
         updateButtonStates();
     };
@@ -429,10 +480,70 @@ function renderWeightRuler(currentValue) {
     const dataKey = getDataKey(currentQuestionIndex);
     const parsedCurrent = parseNumberValue(currentValue);
     const defaultWeight = Number.isFinite(parsedCurrent)
-        ? parsedCurrent
-        : Number.isFinite(parseNumberValue(window.userData.currentWeight))
-            ? parseNumberValue(window.userData.currentWeight)
-            : 70;
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+    let lastActiveIndex = -1;
+    let lastStyledRange = { start: -1, end: -1 };
+
+        if (lastActiveIndex !== activeIndex) {
+            if (lastActiveIndex >= 0 && ticks[lastActiveIndex]) {
+                ticks[lastActiveIndex].classList.remove('ruler__tick--active');
+            }
+            if (ticks[activeIndex]) {
+                ticks[activeIndex].classList.add('ruler__tick--active');
+            }
+            lastActiveIndex = activeIndex;
+        }
+
+        const centerPx = getCenterOffsetPx();
+        const centerPosition = scrollOffset + centerPx;
+        const visibleRadius = Math.ceil(centerPx / pixelsPerStep) + 24;
+        const rangeStart = clamp(activeIndex - visibleRadius, 0, virtualSteps - 1);
+        const rangeEnd = clamp(activeIndex + visibleRadius, 0, virtualSteps - 1);
+
+        if (lastStyledRange.start !== -1) {
+            for (let i = lastStyledRange.start; i <= lastStyledRange.end; i += 1) {
+                if (i < rangeStart || i > rangeEnd) {
+                    const tick = ticks[i];
+                    if (!tick) {
+                        continue;
+                    }
+                    tick.style.transform = '';
+                    tick.style.opacity = '';
+                }
+            }
+        }
+
+        for (let i = rangeStart; i <= rangeEnd; i += 1) {
+            const tick = ticks[i];
+            if (!tick) {
+                continue;
+            }
+            const tickCenter = i * pixelsPerStep + pixelsPerStep / 2;
+            const distance = Math.abs(tickCenter - centerPosition);
+            const scale = clamp(1.0 - distance * 0.002, 0.85, 1.1);
+            const opacity = clamp(1.0 - distance * 0.0032, 0.22, 1);
+            tick.style.transform = `translateZ(0) scale(${scale.toFixed(3)})`;
+            tick.style.opacity = opacity.toFixed(3);
+        }
+
+        lastStyledRange = { start: rangeStart, end: rangeEnd };
+    let baseValue = startWeight;
+    let centerOffset = getScrollOffsetForIndex(originIndex);
+
+    const normalizeLoopIfNeeded = () => {
+        const centerPx = getCenterOffsetPx();
+        const currentIndex = Math.round((ruler.scrollLeft + centerPx - pixelsPerStep / 2) / pixelsPerStep);
+        const isNearStart = currentIndex < recenterThreshold;
+        const isNearEnd = currentIndex > virtualSteps - recenterThreshold;
+        if (!isNearStart && !isNearEnd) {
+            return;
+        }
+        const passedSteps = currentIndex - originIndex;
+        baseValue += passedSteps * stepKg;
+        centerOffset = getScrollOffsetForIndex(originIndex);
+        ruler.scrollLeft = centerOffset;
+    };
+        normalizeLoopIfNeeded();
     const startWeight = Math.min(maxWeight, Math.max(minWeight, defaultWeight));
 
     inputContainer.innerHTML = `
@@ -527,6 +638,97 @@ function renderWeightRuler(currentValue) {
         ruler.scrollLeft = getScrollOffsetForIndex(startIndex);
         applyWeightValue();
         ruler.addEventListener('scroll', onScroll, { passive: true });
+    });
+}
+*/
+
+function renderHeightRuler(currentValue) {
+    const question = questions[currentQuestionIndex];
+    const dataKey = getDataKey(currentQuestionIndex);
+    const resolved = resolveNumberPickerState(question, currentValue);
+    const unitLabels = { cm: 'см', kg: 'кг' };
+    const unitLabel = question?.unit && unitLabels[question.unit] ? unitLabels[question.unit] : (question?.unit || '');
+    currentValue = resolved.value;
+
+    if (resolved.shouldPersist) {
+        window.userData[dataKey] = currentValue;
+        saveUserData();
+    }
+
+    const options = buildNumberOptions({ ...question, unit: unitLabel }, currentValue, resolved.range);
+    inputContainer.innerHTML = `
+        <div class="picker-panel picker-panel--inline" data-role="picker-panel">
+            <div class="number-picker">
+                <span class="number-picker__label">${unitLabel || 'значение'}</span>
+                <select id="question-input" class="form-input">
+                    <option value="">${question.placeholder}</option>
+                    ${options}
+                </select>
+            </div>
+        </div>
+    `;
+
+    const input = document.getElementById('question-input');
+    if (!input) {
+        return;
+    }
+    input.value = currentValue || '';
+    input.addEventListener('input', () => {
+        const value = input.value;
+        window.userData[dataKey] = value;
+        saveUserData();
+        updateButtonStates();
+    });
+    input.addEventListener('change', () => {
+        const value = input.value;
+        window.userData[dataKey] = value;
+        saveUserData();
+        updateButtonStates();
+    });
+}
+
+function renderWeightRuler(currentValue) {
+    const question = questions[currentQuestionIndex];
+    const dataKey = getDataKey(currentQuestionIndex);
+    const resolved = resolveNumberPickerState(question, currentValue);
+    const unitLabels = { cm: 'см', kg: 'кг' };
+    const unitLabel = question?.unit && unitLabels[question.unit] ? unitLabels[question.unit] : (question?.unit || '');
+    currentValue = resolved.value;
+
+    if (resolved.shouldPersist) {
+        window.userData[dataKey] = currentValue;
+        saveUserData();
+    }
+
+    const options = buildNumberOptions({ ...question, unit: unitLabel }, currentValue, resolved.range);
+    inputContainer.innerHTML = `
+        <div class="picker-panel picker-panel--inline" data-role="picker-panel">
+            <div class="number-picker">
+                <span class="number-picker__label">${unitLabel || 'значение'}</span>
+                <select id="question-input" class="form-input">
+                    <option value="">${question.placeholder}</option>
+                    ${options}
+                </select>
+            </div>
+        </div>
+    `;
+
+    const input = document.getElementById('question-input');
+    if (!input) {
+        return;
+    }
+    input.value = currentValue || '';
+    input.addEventListener('input', () => {
+        const value = input.value;
+        window.userData[dataKey] = value;
+        saveUserData();
+        updateButtonStates();
+    });
+    input.addEventListener('change', () => {
+        const value = input.value;
+        window.userData[dataKey] = value;
+        saveUserData();
+        updateButtonStates();
     });
 }
 
