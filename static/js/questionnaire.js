@@ -381,6 +381,88 @@ function renderHeightRuler(currentValue) {
     viewport.addEventListener('scroll', updateHeightFromScroll, { passive: true });
 }
 
+function renderWeightRuler(currentValue) {
+    const minWeight = 30;
+    const maxWeight = 200;
+    const stepKg = 0.5;
+    const pixelsPerStep = 16;
+    const dataKey = getDataKey(currentQuestionIndex);
+    const parsedCurrent = parseNumberValue(currentValue);
+    const defaultWeight = Number.isFinite(parsedCurrent)
+        ? Math.round(parsedCurrent * 2) / 2
+        : Number.isFinite(parseNumberValue(window.userData.currentWeight))
+            ? Math.round(parseNumberValue(window.userData.currentWeight) * 2) / 2
+            : 70;
+    const startWeight = Math.min(maxWeight, Math.max(minWeight, defaultWeight));
+
+    inputContainer.innerHTML = `
+        <div class="picker-panel picker-panel--inline" data-role="picker-panel">
+            <div class="weight-ruler">
+                <div class="weight-ruler__center-line" aria-hidden="true"></div>
+                <div class="weight-ruler__viewport" id="weight-ruler-viewport" aria-label="Выбор текущего веса"></div>
+                <div class="weight-ruler__value">
+                    <span id="weight-ruler-value" class="weight-ruler__value-number">${startWeight.toFixed(1).replace('.0', '')}</span>
+                    <span class="weight-ruler__value-unit">кг</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const viewport = document.getElementById('weight-ruler-viewport');
+    const valueElement = document.getElementById('weight-ruler-value');
+    if (!viewport || !valueElement) {
+        return;
+    }
+
+    const scale = document.createElement('div');
+    scale.className = 'weight-ruler__scale';
+    const totalSteps = Math.round((maxWeight - minWeight) / stepKg);
+
+    for (let step = 0; step <= totalSteps; step += 1) {
+        const value = minWeight + step * stepKg;
+        const tick = document.createElement('div');
+        const isMajor = Math.round(value * 10) % 50 === 0;
+        tick.className = isMajor ? 'weight-ruler__tick weight-ruler__tick--major' : 'weight-ruler__tick';
+        tick.style.width = `${pixelsPerStep}px`;
+        if (isMajor) {
+            const label = document.createElement('span');
+            label.className = 'weight-ruler__tick-label';
+            label.textContent = `${Math.round(value)}`;
+            tick.appendChild(label);
+        }
+        scale.appendChild(tick);
+    }
+    viewport.appendChild(scale);
+
+    const updateWeightFromScroll = () => {
+        const rawIndex = Math.round(viewport.scrollLeft / pixelsPerStep);
+        const value = Math.min(maxWeight, Math.max(minWeight, minWeight + rawIndex * stepKg));
+        const rounded = Math.round(value * 2) / 2;
+        const display = rounded.toFixed(1).replace('.0', '');
+        valueElement.textContent = display;
+        window.userData[dataKey] = rounded;
+        window.userData.currentWeight = rounded;
+        saveUserData();
+        updateButtonStates();
+    };
+
+    const alignToValue = (value) => {
+        const targetIndex = Math.round((Math.min(maxWeight, Math.max(minWeight, value)) - minWeight) / stepKg);
+        viewport.scrollLeft = targetIndex * pixelsPerStep;
+        updateWeightFromScroll();
+    };
+
+    requestAnimationFrame(() => {
+        const spacer = Math.max(0, (viewport.clientWidth - pixelsPerStep) / 2);
+        scale.style.paddingLeft = `${spacer}px`;
+        scale.style.paddingRight = `${spacer}px`;
+        alignToValue(startWeight);
+    });
+
+    viewport.addEventListener('scroll', updateWeightFromScroll, { passive: true });
+}
+
+
 // Display input field for date/number questions
 function displayInput(question) {
     let currentValue = window.userData[getDataKey(currentQuestionIndex)];
@@ -593,6 +675,10 @@ function displayInput(question) {
             renderHeightRuler(currentValue);
             return;
         }
+        if (question.id === 4) {
+            renderWeightRuler(currentValue);
+            return;
+        }
         const resolved = resolveNumberPickerState(question, currentValue);
         currentValue = resolved.value;
         if (resolved.shouldPersist) {
@@ -696,7 +782,10 @@ function getNumberRangeForQuestion(question) {
     if (question.id === 3) {
         return { min: 120, max: 220, step: 1 };
     }
-    if (question.id === 4 || question.id === 5) {
+    if (question.id === 4) {
+        return { min: 30, max: 200, step: 0.5 };
+    }
+    if (question.id === 5) {
         return { min: 40, max: 200, step: 0.5 };
     }
     return {

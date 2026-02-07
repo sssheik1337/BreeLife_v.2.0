@@ -190,6 +190,101 @@
         color: #64748b;
         font-weight: 600;
       }
+
+      .weight-ruler {
+        position: relative;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+        padding: 14px 16px 56px;
+      }
+      .weight-ruler__viewport {
+        position: relative;
+        height: 176px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        border-radius: 12px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        white-space: nowrap;
+        scrollbar-width: thin;
+      }
+      .weight-ruler__viewport::-webkit-scrollbar {
+        height: 8px;
+      }
+      .weight-ruler__viewport::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 999px;
+      }
+      .weight-ruler__scale {
+        position: relative;
+        height: 100%;
+        display: flex;
+        align-items: center;
+      }
+      .weight-ruler__tick {
+        position: relative;
+        height: 18px;
+        display: inline-flex;
+        align-items: flex-end;
+        justify-content: center;
+        color: #64748b;
+        font-size: 12px;
+        vertical-align: bottom;
+      }
+      .weight-ruler__tick::before {
+        content: '';
+        display: block;
+        width: 1px;
+        height: 24px;
+        background: #94a3b8;
+      }
+      .weight-ruler__tick--major {
+        color: #0f172a;
+        font-weight: 700;
+      }
+      .weight-ruler__tick--major::before {
+        height: 52px;
+        background: #334155;
+      }
+      .weight-ruler__tick-label {
+        position: absolute;
+        transform: translateY(26px);
+      }
+      .weight-ruler__center-line {
+        position: absolute;
+        top: 10px;
+        bottom: 54px;
+        left: 50%;
+        width: 2px;
+        background: #ef4444;
+        border-radius: 999px;
+        transform: translateX(-1px);
+        pointer-events: none;
+        z-index: 2;
+      }
+      .weight-ruler__value {
+        position: absolute;
+        left: 16px;
+        right: 16px;
+        bottom: 12px;
+        display: inline-flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 6px;
+        color: #0f172a;
+        font-weight: 700;
+      }
+      .weight-ruler__value-number {
+        font-size: 24px;
+        line-height: 1;
+      }
+      .weight-ruler__value-unit {
+        font-size: 14px;
+        color: #64748b;
+        font-weight: 600;
+      }
     </style>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#f0f9ff] to-[#f0fdf4]">
