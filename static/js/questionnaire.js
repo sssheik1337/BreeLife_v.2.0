@@ -346,8 +346,6 @@ function renderHeightRuler(currentValue) {
         return;
     }
 
-    track.style.width = `${totalVirtualSteps * pixelsPerStep}px`;
-
     for (let virtualIndex = 0; virtualIndex < totalVirtualSteps; virtualIndex += 1) {
         const value = minHeight + (virtualIndex % rangeSteps) * stepCm;
         const tick = document.createElement('div');
