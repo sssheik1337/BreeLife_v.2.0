@@ -307,10 +307,10 @@ function displayOptions(options) {
 
 
 function renderHeightRuler(currentValue) {
-    const minHeight = 120;
-    const maxHeight = 220;
-    const stepCm = 1;
-    const pixelsPerStep = 12;
+            <p class="ruler-current" aria-live="polite">
+                <span id="height-ruler-value" class="ruler-current__number">${startHeight}</span>
+                <span class="ruler-current__unit">см</span>
+            </p>
     const loopCount = 7;
     const rangeSteps = Math.round((maxHeight - minHeight) / stepCm) + 1;
     const totalVirtualSteps = rangeSteps * loopCount;
@@ -451,10 +451,10 @@ function renderHeightRuler(currentValue) {
         const value = minHeight + normalized * stepCm;
         valueElement.textContent = `${value}`;
         ticks.forEach((tick) => {
-            tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === virtualIndex);
-        });
-        window.userData[dataKey] = value;
-        window.userData.height = value;
+            <p class="ruler-current" aria-live="polite">
+                <span id="weight-ruler-value" class="ruler-current__number">${startWeight.toFixed(1).replace('.0', '')}</span>
+                <span class="ruler-current__unit">кг</span>
+            </p>
         saveUserData();
         updateButtonStates();
     };
