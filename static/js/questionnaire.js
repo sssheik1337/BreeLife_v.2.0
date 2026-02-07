@@ -306,6 +306,7 @@ function displayOptions(options) {
 }
 
 
+/* Старая реализация выбора роста и веса отключена из-за ошибок.
 function renderHeightRuler(currentValue) {
     const startHeight = 170;
     const totalVirtualSteps = rangeSteps * loopCount;
@@ -637,6 +638,97 @@ function renderWeightRuler(currentValue) {
         ruler.scrollLeft = getScrollOffsetForIndex(startIndex);
         applyWeightValue();
         ruler.addEventListener('scroll', onScroll, { passive: true });
+    });
+}
+*/
+
+function renderHeightRuler(currentValue) {
+    const question = questions[currentQuestionIndex];
+    const dataKey = getDataKey(currentQuestionIndex);
+    const resolved = resolveNumberPickerState(question, currentValue);
+    const unitLabels = { cm: 'см', kg: 'кг' };
+    const unitLabel = question?.unit && unitLabels[question.unit] ? unitLabels[question.unit] : (question?.unit || '');
+    currentValue = resolved.value;
+
+    if (resolved.shouldPersist) {
+        window.userData[dataKey] = currentValue;
+        saveUserData();
+    }
+
+    const options = buildNumberOptions({ ...question, unit: unitLabel }, currentValue, resolved.range);
+    inputContainer.innerHTML = `
+        <div class="picker-panel picker-panel--inline" data-role="picker-panel">
+            <div class="number-picker">
+                <span class="number-picker__label">${unitLabel || 'значение'}</span>
+                <select id="question-input" class="form-input">
+                    <option value="">${question.placeholder}</option>
+                    ${options}
+                </select>
+            </div>
+        </div>
+    `;
+
+    const input = document.getElementById('question-input');
+    if (!input) {
+        return;
+    }
+    input.value = currentValue || '';
+    input.addEventListener('input', () => {
+        const value = input.value;
+        window.userData[dataKey] = value;
+        saveUserData();
+        updateButtonStates();
+    });
+    input.addEventListener('change', () => {
+        const value = input.value;
+        window.userData[dataKey] = value;
+        saveUserData();
+        updateButtonStates();
+    });
+}
+
+function renderWeightRuler(currentValue) {
+    const question = questions[currentQuestionIndex];
+    const dataKey = getDataKey(currentQuestionIndex);
+    const resolved = resolveNumberPickerState(question, currentValue);
+    const unitLabels = { cm: 'см', kg: 'кг' };
+    const unitLabel = question?.unit && unitLabels[question.unit] ? unitLabels[question.unit] : (question?.unit || '');
+    currentValue = resolved.value;
+
+    if (resolved.shouldPersist) {
+        window.userData[dataKey] = currentValue;
+        saveUserData();
+    }
+
+    const options = buildNumberOptions({ ...question, unit: unitLabel }, currentValue, resolved.range);
+    inputContainer.innerHTML = `
+        <div class="picker-panel picker-panel--inline" data-role="picker-panel">
+            <div class="number-picker">
+                <span class="number-picker__label">${unitLabel || 'значение'}</span>
+                <select id="question-input" class="form-input">
+                    <option value="">${question.placeholder}</option>
+                    ${options}
+                </select>
+            </div>
+        </div>
+    `;
+
+    const input = document.getElementById('question-input');
+    if (!input) {
+        return;
+    }
+    input.value = currentValue || '';
+    input.addEventListener('input', () => {
+        const value = input.value;
+        window.userData[dataKey] = value;
+        saveUserData();
+        updateButtonStates();
+    });
+    input.addEventListener('change', () => {
+        const value = input.value;
+        window.userData[dataKey] = value;
+        saveUserData();
+        updateButtonStates();
     });
 }
 

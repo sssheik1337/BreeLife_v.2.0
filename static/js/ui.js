@@ -634,8 +634,6 @@ function redirectToQuestionnaireIfNeeded(status) {
     if (path === '/' || path === '/index') {
         if (profileCompleted) {
             window.location.replace('/profile');
-        } else {
-            window.location.replace('/questionnaire');
         }
         return;
     }
