@@ -135,6 +135,8 @@
       .ruler--vertical {
         height: 280px;
         overflow-x: hidden;
+        display: flex;
+        justify-content: center;
         scroll-snap-type: y mandatory;
         -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
         mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
@@ -148,6 +150,9 @@
       }
       .ruler__track {
         position: relative;
+      }
+      .ruler--vertical .ruler__track {
+        width: max-content;
       }
       .ruler--horizontal .ruler__track {
         height: 100%;
