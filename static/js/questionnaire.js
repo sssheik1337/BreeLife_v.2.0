@@ -719,18 +719,19 @@ function saveUserData() {
 
 async function saveProfileToServer(profile) {
     if (!profile) {
-        return;
+        return false;
     }
     try {
         const apiFetch = window.apiFetch || fetch;
-        await apiFetch('/api/profile/save', {
+        const response = await apiFetch('/api/profile/save', {
             method: 'POST',
             body: JSON.stringify({
                 user_profile: profile
             })
         });
+        return response.ok;
     } catch (error) {
-        return null;
+        return false;
     }
 }
 
@@ -773,7 +774,13 @@ function setupEventListeners() {
                 profile = getUserProfile();
             }
             persistUserData();
-            await saveProfileToServer(profile);
+            const saved = await saveProfileToServer(profile);
+            if (!saved) {
+                if (typeof showNotification === 'function') {
+                    showNotification('Не удалось сохранить профиль. Проверьте подключение и повторите попытку.', 'error');
+                }
+                return;
+            }
             // Все вопросы заполнены, переходим на экран прогресса.
             window.location.href = '/profile';
         }

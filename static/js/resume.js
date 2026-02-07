@@ -1193,22 +1193,51 @@ function renderReminderActions() {
     fetchReminders();
 }
 
+async function persistResumeProfile(profile) {
+    if (!profile || window.serverUser?.authorized !== true) {
+        return true;
+    }
+    try {
+        const fetcher = window.apiFetch || fetch;
+        const response = await fetcher('/api/profile', {
+            method: 'POST',
+            body: JSON.stringify({
+                user_profile: profile
+            })
+        });
+        return response.ok;
+    } catch (error) {
+        return false;
+    }
+}
+
 // Сохранить изменения и перейти в прогресс
-function saveAndContinue() {
+async function saveAndContinue() {
     if (!resumeIsDirty) {
         window.location.href = '/profile';
         return;
     }
 
-    // Данные сохраняются через API, локального хранения нет.
+    let profileForSave = null;
+
+    // Сначала обновляем локальный профиль, затем дожидаемся записи на сервер.
     if (typeof patchUserProfile === 'function') {
         if (typeof mapUserDataToUserProfile === 'function') {
             const mappedProfile = mapUserDataToUserProfile(window.userData || {});
             mappedProfile.completed = true;
-            patchUserProfile(mappedProfile);
+            mappedProfile.profile_completed = true;
+            profileForSave = patchUserProfile(mappedProfile);
         } else {
-            patchUserProfile({ completed: true });
+            profileForSave = patchUserProfile({ completed: true, profile_completed: true });
         }
+    }
+
+    const saved = await persistResumeProfile(profileForSave);
+    if (!saved) {
+        if (typeof showNotification === 'function') {
+            showNotification('Не удалось сохранить профиль. Проверьте подключение и попробуйте снова.', 'error');
+        }
+        return;
     }
 
     if (typeof showNotification === 'function') {
