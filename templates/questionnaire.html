@@ -127,6 +127,7 @@
         background: transparent;
         border: 0;
         scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
       }
       .ruler::-webkit-scrollbar {
         display: none;
@@ -134,12 +135,14 @@
       .ruler--vertical {
         height: 280px;
         overflow-x: hidden;
+        scroll-snap-type: y mandatory;
         -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
         mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
       }
       .ruler--horizontal {
         height: 176px;
         overflow-y: hidden;
+        scroll-snap-type: x mandatory;
         -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
         mask-image: linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
       }
@@ -158,6 +161,7 @@
         opacity: 0.72;
         transform: translateZ(0) scale(1);
         filter: none;
+        scroll-snap-align: center;
         transition: color 0.18s ease-out, opacity 0.18s ease-out, transform 0.18s ease-out, filter 0.18s ease-out;
       }
       .ruler--vertical .ruler__tick {

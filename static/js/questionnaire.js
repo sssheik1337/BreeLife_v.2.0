@@ -433,7 +433,7 @@ function renderHeightRuler(currentValue) {
         const maxSafe = rangeSteps * (loopCount - 1);
         if (raw < minSafe || raw > maxSafe) {
             const normalized = ((raw % rangeSteps) + rangeSteps) % rangeSteps;
-            const target = normalized + rangeSteps * Math.floor(loopCount / 2);
+    const pixelsPerStep = 12;
             ruler.scrollTop = getScrollOffsetForIndex(target);
             return target;
         }
