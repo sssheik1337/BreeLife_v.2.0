@@ -104,222 +104,172 @@
         letter-spacing: 0.04em;
       }
 
-      .height-ruler {
-        position: relative;
-        padding: 8px 0 56px;
-      }
-      .height-ruler__viewport {
-        position: relative;
-        height: 280px;
-        overflow-y: auto;
-        overflow-x: hidden;
-        scrollbar-width: none;
-      }
-      .height-ruler__viewport::-webkit-scrollbar {
-        display: none;
-      }
-      .height-ruler__scale {
-        position: relative;
-      }
-      .height-ruler__tick {
-        height: 12px;
-        display: flex;
-        align-items: center;
-        color: #64748b;
-        font-size: 12px;
-      }
-      .height-ruler__tick::before {
-        content: '';
-        display: block;
-        height: 1px;
-        width: 24px;
-        background: #cbd5e1;
-      }
-      .height-ruler__tick--major {
-        color: #64748b;
-        font-weight: 600;
-      }
-      .height-ruler__tick--major::before {
-        width: 44px;
-        background: #94a3b8;
-      }
-      .height-ruler__tick--active {
-        color: #0f172a;
-        font-weight: 700;
-      }
-      .height-ruler__tick--active::before {
-        background: #0f172a;
-        height: 2px;
-      }
-      .height-ruler__tick--active .height-ruler__tick-label {
-        font-size: 14px;
-      }
-      .height-ruler__tick-label {
-        margin-left: 10px;
-      }
-      .height-ruler::before,
-      .height-ruler::after {
-        content: '';
-        position: absolute;
-        left: 0;
-        right: 0;
-        height: 56px;
-        pointer-events: none;
-        z-index: 3;
-      }
-      .height-ruler::before {
-        top: 8px;
-        background: linear-gradient(to bottom, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
-      }
-      .height-ruler::after {
-        bottom: 56px;
-        background: linear-gradient(to top, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
-      }
-      .height-ruler__center-line {
-        position: absolute;
-        left: 0;
-        right: 0;
-        top: calc(50% - 24px);
-        height: 2px;
-        background: #ef4444;
-        border-radius: 999px;
-        transform: translateY(-1px);
-        pointer-events: none;
-        z-index: 2;
-      }
-      .height-ruler__value {
-        position: absolute;
-        left: 12px;
-        right: 12px;
-        bottom: 12px;
+      .ruler-value {
+        margin-bottom: 8px;
         display: inline-flex;
+        width: 100%;
         align-items: baseline;
         justify-content: center;
         gap: 6px;
         color: #0f172a;
         font-weight: 700;
       }
-      .height-ruler__value-number {
+      .ruler-value__number {
         font-size: 36px;
         line-height: 1;
       }
-      .height-ruler__value-unit {
+      .ruler-value__unit {
         font-size: 14px;
         color: #64748b;
         font-weight: 600;
       }
 
-      .weight-ruler {
+      .ruler {
         position: relative;
-        padding: 8px 0 56px;
-      }
-      .weight-ruler__viewport {
-        position: relative;
-        height: 176px;
-        overflow-x: auto;
-        overflow-y: hidden;
-        white-space: nowrap;
+        overflow: auto;
         scrollbar-width: none;
       }
-      .weight-ruler__viewport::-webkit-scrollbar {
+      .ruler::-webkit-scrollbar {
         display: none;
       }
-      .weight-ruler__scale {
+      .ruler--vertical {
+        height: 280px;
+        overflow-x: hidden;
+      }
+      .ruler--horizontal {
+        height: 176px;
+        overflow-y: hidden;
+      }
+      .ruler__track {
         position: relative;
+      }
+      .ruler--horizontal .ruler__track {
         height: 100%;
         display: flex;
         align-items: center;
       }
-      .weight-ruler__tick {
+
+      .ruler__tick {
+        color: #64748b;
+        font-size: 12px;
+      }
+      .ruler--vertical .ruler__tick {
+        height: 12px;
+        display: flex;
+        align-items: center;
+      }
+      .ruler--horizontal .ruler__tick {
         position: relative;
+        width: 16px;
         height: 18px;
         display: inline-flex;
         align-items: flex-end;
         justify-content: center;
-        color: #64748b;
-        font-size: 12px;
         vertical-align: bottom;
       }
-      .weight-ruler__tick::before {
+      .ruler__tick::before {
         content: '';
         display: block;
-        width: 1px;
-        height: 24px;
         background: #cbd5e1;
       }
-      .weight-ruler__tick--major {
+      .ruler--vertical .ruler__tick::before {
+        width: 24px;
+        height: 1px;
+      }
+      .ruler--horizontal .ruler__tick::before {
+        width: 1px;
+        height: 24px;
+      }
+      .ruler__tick--major {
         color: #64748b;
         font-weight: 600;
       }
-      .weight-ruler__tick--major::before {
+      .ruler--vertical .ruler__tick--major::before {
+        width: 44px;
+        background: #94a3b8;
+      }
+      .ruler--horizontal .ruler__tick--major::before {
         height: 52px;
         background: #94a3b8;
       }
-      .weight-ruler__tick--active {
+      .ruler__tick--active {
         color: #0f172a;
         font-weight: 700;
       }
-      .weight-ruler__tick--active::before {
+      .ruler--vertical .ruler__tick--active::before {
+        background: #0f172a;
+        height: 2px;
+      }
+      .ruler--horizontal .ruler__tick--active::before {
         background: #0f172a;
         width: 2px;
       }
-      .weight-ruler__tick--active .weight-ruler__tick-label {
+      .ruler__tick--active .ruler__tick-label {
         font-size: 14px;
       }
-      .weight-ruler__tick-label {
+      .ruler__tick-label {
+        transition: font-size 0.15s ease-out;
+      }
+      .ruler--vertical .ruler__tick-label {
+        margin-left: 10px;
+      }
+      .ruler--horizontal .ruler__tick-label {
         position: absolute;
         transform: translateY(26px);
       }
-      .weight-ruler::before,
-      .weight-ruler::after {
-        content: '';
+
+      .ruler__indicator {
         position: absolute;
-        top: 8px;
-        bottom: 56px;
-        width: 64px;
-        pointer-events: none;
-        z-index: 3;
-      }
-      .weight-ruler::before {
-        left: 0;
-        background: linear-gradient(to right, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
-      }
-      .weight-ruler::after {
-        right: 0;
-        background: linear-gradient(to left, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
-      }
-      .weight-ruler__center-line {
-        position: absolute;
-        top: 8px;
-        bottom: 54px;
-        left: 50%;
-        width: 2px;
         background: #ef4444;
         border-radius: 999px;
-        transform: translateX(-1px);
         pointer-events: none;
         z-index: 2;
       }
-      .weight-ruler__value {
+      .ruler--vertical .ruler__indicator {
+        left: 0;
+        right: 0;
+        top: 50%;
+        height: 2px;
+        transform: translateY(-1px);
+      }
+      .ruler--horizontal .ruler__indicator {
+        left: 50%;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        transform: translateX(-1px);
+      }
+
+      .ruler__fade {
         position: absolute;
-        left: 12px;
-        right: 12px;
-        bottom: 12px;
-        display: inline-flex;
-        align-items: baseline;
-        justify-content: center;
-        gap: 6px;
-        color: #0f172a;
-        font-weight: 700;
+        pointer-events: none;
+        z-index: 3;
       }
-      .weight-ruler__value-number {
-        font-size: 36px;
-        line-height: 1;
+      .ruler--vertical .ruler__fade {
+        left: 0;
+        right: 0;
+        height: 56px;
       }
-      .weight-ruler__value-unit {
-        font-size: 14px;
-        color: #64748b;
-        font-weight: 600;
+      .ruler--vertical .ruler__fade--start {
+        top: 0;
+        background: linear-gradient(to bottom, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
+      }
+      .ruler--vertical .ruler__fade--end {
+        bottom: 0;
+        background: linear-gradient(to top, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
+      }
+      .ruler--horizontal .ruler__fade {
+        top: 0;
+        bottom: 0;
+        width: 64px;
+      }
+      .ruler--horizontal .ruler__fade--start {
+        left: 0;
+        background: linear-gradient(to right, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
+      }
+      .ruler--horizontal .ruler__fade--end {
+        right: 0;
+        background: linear-gradient(to left, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
       }
     </style>
 </head>
