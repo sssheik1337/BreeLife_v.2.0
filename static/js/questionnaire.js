@@ -414,6 +414,7 @@ function renderHeightRuler(currentValue) {
         const tick = document.createElement('div');
         const isMajor = value % 5 === 0;
         tick.className = isMajor ? 'height-ruler__tick height-ruler__tick--major' : 'height-ruler__tick';
+        tick.dataset.index = String(value - minHeight);
         tick.style.height = `${pixelsPerStep}px`;
         if (isMajor) {
             const label = document.createElement('span');
@@ -424,9 +425,14 @@ function renderHeightRuler(currentValue) {
         scale.appendChild(tick);
     }
     viewport.appendChild(scale);
+    const ticks = Array.from(scale.querySelectorAll('.height-ruler__tick'));
 
     const applyHeightValue = (value) => {
         valueElement.textContent = `${value}`;
+        const activeIndex = value - minHeight;
+        ticks.forEach((tick) => {
+            tick.classList.toggle('height-ruler__tick--active', Number(tick.dataset.index) === activeIndex);
+        });
         window.userData[dataKey] = value;
         window.userData.height = value;
         saveUserData();
@@ -504,6 +510,7 @@ function renderWeightRuler(currentValue) {
         const tick = document.createElement('div');
         const isMajor = Math.round(value * 10) % 50 === 0;
         tick.className = isMajor ? 'weight-ruler__tick weight-ruler__tick--major' : 'weight-ruler__tick';
+        tick.dataset.index = String(step);
         tick.style.width = `${pixelsPerStep}px`;
         if (isMajor) {
             const label = document.createElement('span');
@@ -514,10 +521,15 @@ function renderWeightRuler(currentValue) {
         scale.appendChild(tick);
     }
     viewport.appendChild(scale);
+    const ticks = Array.from(scale.querySelectorAll('.weight-ruler__tick'));
 
     const applyWeightValue = (value) => {
         const display = value.toFixed(1).replace('.0', '');
         valueElement.textContent = display;
+        const activeIndex = Math.round((value - minWeight) / stepKg);
+        ticks.forEach((tick) => {
+            tick.classList.toggle('weight-ruler__tick--active', Number(tick.dataset.index) === activeIndex);
+        });
         window.userData[dataKey] = value;
         window.userData.currentWeight = value;
         saveUserData();

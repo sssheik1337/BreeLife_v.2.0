@@ -109,8 +109,7 @@
         border-radius: 16px;
         border: 1px solid #e2e8f0;
         background: #f8fafc;
-        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-        padding: 14px 14px 56px;
+        padding: 12px 12px 56px;
       }
       .height-ruler__viewport {
         position: relative;
@@ -144,15 +143,23 @@
         display: block;
         height: 1px;
         width: 24px;
-        background: #94a3b8;
+        background: #cbd5e1;
       }
       .height-ruler__tick--major {
-        color: #0f172a;
-        font-weight: 700;
+        color: #64748b;
+        font-weight: 600;
       }
       .height-ruler__tick--major::before {
         width: 44px;
-        background: #334155;
+        background: #94a3b8;
+      }
+      .height-ruler__tick--active {
+        color: #0f172a;
+        font-weight: 700;
+      }
+      .height-ruler__tick--active::before {
+        background: #0f172a;
+        height: 2px;
       }
       .height-ruler__tick-label {
         margin-left: 10px;
@@ -171,8 +178,8 @@
       }
       .height-ruler__value {
         position: absolute;
-        left: 14px;
-        right: 14px;
+        left: 12px;
+        right: 12px;
         bottom: 12px;
         display: inline-flex;
         align-items: baseline;
@@ -196,8 +203,7 @@
         border-radius: 16px;
         border: 1px solid #e2e8f0;
         background: #f8fafc;
-        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-        padding: 14px 16px 56px;
+        padding: 12px 12px 56px;
       }
       .weight-ruler__viewport {
         position: relative;
@@ -238,15 +244,23 @@
         display: block;
         width: 1px;
         height: 24px;
-        background: #94a3b8;
+        background: #cbd5e1;
       }
       .weight-ruler__tick--major {
-        color: #0f172a;
-        font-weight: 700;
+        color: #64748b;
+        font-weight: 600;
       }
       .weight-ruler__tick--major::before {
         height: 52px;
-        background: #334155;
+        background: #94a3b8;
+      }
+      .weight-ruler__tick--active {
+        color: #0f172a;
+        font-weight: 700;
+      }
+      .weight-ruler__tick--active::before {
+        background: #0f172a;
+        width: 2px;
       }
       .weight-ruler__tick-label {
         position: absolute;
@@ -266,8 +280,8 @@
       }
       .weight-ruler__value {
         position: absolute;
-        left: 16px;
-        right: 16px;
+        left: 12px;
+        right: 12px;
         bottom: 12px;
         display: inline-flex;
         align-items: baseline;
