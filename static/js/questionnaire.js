@@ -461,14 +461,14 @@ function renderWeightRuler(currentValue) {
     for (let virtualIndex = 0; virtualIndex < totalVirtualSteps; virtualIndex += 1) {
         const value = minWeight + (virtualIndex % rangeSteps) * stepKg;
         const tick = document.createElement('div');
-        const isMajor = Math.round(value * 10) % 50 === 0;
+        const isMajor = Math.round(value * 10) % 100 === 0;
         tick.className = isMajor ? 'ruler__tick ruler__tick--major' : 'ruler__tick';
         tick.dataset.virtualIndex = String(virtualIndex);
         tick.style.width = `${pixelsPerStep}px`;
         if (isMajor) {
             const label = document.createElement('span');
             label.className = 'ruler__tick-label';
-            label.textContent = Number.isInteger(value) ? `${value}` : value.toFixed(1).replace('.0', '');
+            label.textContent = `${Math.round(value)}`;
             tick.appendChild(label);
         }
         track.appendChild(tick);
