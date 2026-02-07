@@ -966,6 +966,34 @@ async def menu(request: Request, telegram_user_id: int | None = Depends(optional
     )
 
 
+@app.get("/references", response_class=HTMLResponse)
+async def references(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    if telegram_user_id is None:
+        return templates.TemplateResponse(
+            "references.html",
+            {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+        )
+    require_completed_profile(telegram_user_id)
+    return templates.TemplateResponse(
+        "references.html",
+        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+    )
+
+
+@app.get("/support", response_class=HTMLResponse)
+async def support(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    if telegram_user_id is None:
+        return templates.TemplateResponse(
+            "support.html",
+            {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+        )
+    require_completed_profile(telegram_user_id)
+    return templates.TemplateResponse(
+        "support.html",
+        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+    )
+
+
 @app.get("/plans", response_class=HTMLResponse)
 async def plans(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
     if telegram_user_id is None:

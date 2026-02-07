@@ -197,7 +197,8 @@ class CustomNavbar extends HTMLElement {
             <div class="menu-panel" id="menu-panel">
               <a href="/settings/reminders" class="menu-link">Напоминания</a>
               <a href="/plans" class="menu-link">Тарифы</a>
-              <a href="/menu#support" class="menu-link">Помощь</a>
+              <a href="/references" class="menu-link">Справочники</a>
+              <a href="/support" class="menu-link">Помощь</a>
             </div>
           </div>
         </div>
