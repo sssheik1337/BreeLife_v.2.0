@@ -707,16 +707,18 @@ function applyTelegramTheme() {
     const theme = tg.themeParams || {};
     const root = document.documentElement;
     const body = document.body;
+    const preservePageTheme = body?.dataset?.preservePageTheme === 'true';
+
     if (theme.bg_color) {
         root.style.setProperty('--tg-bg-color', theme.bg_color);
-        if (body) {
+        if (body && !preservePageTheme) {
             body.style.backgroundColor = theme.bg_color;
             body.style.backgroundImage = 'none';
         }
     }
     if (theme.text_color) {
         root.style.setProperty('--tg-text-color', theme.text_color);
-        if (body) {
+        if (body && !preservePageTheme) {
             body.style.color = theme.text_color;
         }
     }
