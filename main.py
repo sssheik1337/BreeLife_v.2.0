@@ -652,7 +652,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
     if telegram_user_id is None:
-        return RedirectResponse(url="/profile", status_code=303)
+        return RedirectResponse(url="/questionnaire", status_code=303)
     if is_profile_completed(telegram_user_id):
         return RedirectResponse(url="/profile", status_code=303)
     return RedirectResponse(url="/questionnaire", status_code=303)
@@ -661,7 +661,7 @@ async def index(request: Request, telegram_user_id: int | None = Depends(optiona
 @app.get("/index", response_class=HTMLResponse)
 async def index_alias(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
     if telegram_user_id is None:
-        return RedirectResponse(url="/profile", status_code=303)
+        return RedirectResponse(url="/questionnaire", status_code=303)
     if is_profile_completed(telegram_user_id):
         return RedirectResponse(url="/profile", status_code=303)
     return RedirectResponse(url="/questionnaire", status_code=303)

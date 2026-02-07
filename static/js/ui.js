@@ -629,7 +629,6 @@ function getLocalProfileCompletedFlag() {
 function redirectToQuestionnaireIfNeeded(status) {
     const path = window.location.pathname || '/';
     const serverCompleted = status?.profile_completed === true;
-    const isAuthorized = status?.authorized === true;
     const localCompleted = getLocalProfileCompletedFlag();
     const profileCompleted = serverCompleted || localCompleted;
     if (path === '/' || path === '/index') {
@@ -643,7 +642,7 @@ function redirectToQuestionnaireIfNeeded(status) {
     if (path.startsWith('/questionnaire')) {
         return;
     }
-    if (isAuthorized && !profileCompleted) {
+    if (!profileCompleted) {
         window.location.replace('/questionnaire');
     }
 }
