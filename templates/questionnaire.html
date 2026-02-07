@@ -106,27 +106,17 @@
 
       .height-ruler {
         position: relative;
-        border-radius: 16px;
-        border: 1px solid #e2e8f0;
-        background: #f8fafc;
-        padding: 12px 12px 56px;
+        padding: 8px 0 56px;
       }
       .height-ruler__viewport {
         position: relative;
         height: 280px;
         overflow-y: auto;
         overflow-x: hidden;
-        border-radius: 12px;
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        scrollbar-width: thin;
+        scrollbar-width: none;
       }
       .height-ruler__viewport::-webkit-scrollbar {
-        width: 8px;
-      }
-      .height-ruler__viewport::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 999px;
+        display: none;
       }
       .height-ruler__scale {
         position: relative;
@@ -161,14 +151,35 @@
         background: #0f172a;
         height: 2px;
       }
+      .height-ruler__tick--active .height-ruler__tick-label {
+        font-size: 14px;
+      }
       .height-ruler__tick-label {
         margin-left: 10px;
       }
+      .height-ruler::before,
+      .height-ruler::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 56px;
+        pointer-events: none;
+        z-index: 3;
+      }
+      .height-ruler::before {
+        top: 8px;
+        background: linear-gradient(to bottom, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
+      }
+      .height-ruler::after {
+        bottom: 56px;
+        background: linear-gradient(to top, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
+      }
       .height-ruler__center-line {
         position: absolute;
-        left: 10px;
-        right: 10px;
-        top: 50%;
+        left: 0;
+        right: 0;
+        top: calc(50% - 24px);
         height: 2px;
         background: #ef4444;
         border-radius: 999px;
@@ -189,7 +200,7 @@
         font-weight: 700;
       }
       .height-ruler__value-number {
-        font-size: 24px;
+        font-size: 36px;
         line-height: 1;
       }
       .height-ruler__value-unit {
@@ -200,28 +211,18 @@
 
       .weight-ruler {
         position: relative;
-        border-radius: 16px;
-        border: 1px solid #e2e8f0;
-        background: #f8fafc;
-        padding: 12px 12px 56px;
+        padding: 8px 0 56px;
       }
       .weight-ruler__viewport {
         position: relative;
         height: 176px;
         overflow-x: auto;
         overflow-y: hidden;
-        border-radius: 12px;
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
         white-space: nowrap;
-        scrollbar-width: thin;
+        scrollbar-width: none;
       }
       .weight-ruler__viewport::-webkit-scrollbar {
-        height: 8px;
-      }
-      .weight-ruler__viewport::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
-        border-radius: 999px;
+        display: none;
       }
       .weight-ruler__scale {
         position: relative;
@@ -262,13 +263,34 @@
         background: #0f172a;
         width: 2px;
       }
+      .weight-ruler__tick--active .weight-ruler__tick-label {
+        font-size: 14px;
+      }
       .weight-ruler__tick-label {
         position: absolute;
         transform: translateY(26px);
       }
+      .weight-ruler::before,
+      .weight-ruler::after {
+        content: '';
+        position: absolute;
+        top: 8px;
+        bottom: 56px;
+        width: 64px;
+        pointer-events: none;
+        z-index: 3;
+      }
+      .weight-ruler::before {
+        left: 0;
+        background: linear-gradient(to right, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
+      }
+      .weight-ruler::after {
+        right: 0;
+        background: linear-gradient(to left, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
+      }
       .weight-ruler__center-line {
         position: absolute;
-        top: 10px;
+        top: 8px;
         bottom: 54px;
         left: 50%;
         width: 2px;
@@ -291,7 +313,7 @@
         font-weight: 700;
       }
       .weight-ruler__value-number {
-        font-size: 24px;
+        font-size: 36px;
         line-height: 1;
       }
       .weight-ruler__value-unit {

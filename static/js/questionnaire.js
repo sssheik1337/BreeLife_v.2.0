@@ -306,80 +306,14 @@ function displayOptions(options) {
 }
 
 
-function clampRulerValue(value, min, max) {
-    return Math.min(max, Math.max(min, value));
-}
-
-function roundRulerValue(value, step) {
-    if (!Number.isFinite(value) || !Number.isFinite(step) || step <= 0) {
-        return value;
-    }
-    const precision = step.toString().includes('.')
-        ? step.toString().split('.')[1].length
-        : 0;
-    const rounded = Math.round(value / step) * step;
-    return Number(rounded.toFixed(precision));
-}
-
-function computeRulerValueFromScroll({ scrollOffset, centerOffset, pxPerUnit, step, min, max }) {
-    const raw = (scrollOffset + centerOffset) / pxPerUnit;
-    const rounded = roundRulerValue(raw, step);
-    return clampRulerValue(rounded, min, max);
-}
-
-function getScrollOffsetForRulerValue({ value, centerOffset, pxPerUnit, min, max }) {
-    const safeValue = clampRulerValue(value, min, max);
-    return safeValue * pxPerUnit - centerOffset;
-}
-
-function attachRulerScrollHandler({ viewport, axis, pxPerUnit, centerOffset, step, min, max, onValue }) {
-    let rafId = null;
-    let lastValue = null;
-
-    const readOffset = () => (axis === 'x' ? viewport.scrollLeft : viewport.scrollTop);
-
-    const emitValue = () => {
-        rafId = null;
-        const value = computeRulerValueFromScroll({
-            scrollOffset: readOffset(),
-            centerOffset,
-            pxPerUnit,
-            step,
-            min,
-            max
-        });
-        if (value === lastValue) {
-            return;
-        }
-        lastValue = value;
-        onValue(value);
-    };
-
-    const requestEmit = () => {
-        if (rafId !== null) {
-            return;
-        }
-        rafId = requestAnimationFrame(emitValue);
-    };
-
-    viewport.addEventListener('scroll', requestEmit, { passive: true });
-
-    return {
-        syncNow: () => {
-            if (rafId !== null) {
-                cancelAnimationFrame(rafId);
-                rafId = null;
-            }
-            emitValue();
-        }
-    };
-}
-
 function renderHeightRuler(currentValue) {
     const minHeight = 120;
     const maxHeight = 220;
     const stepCm = 1;
     const pixelsPerStep = 12;
+    const loopCount = 5;
+    const rangeSteps = Math.round((maxHeight - minHeight) / stepCm) + 1;
+    const totalVirtualSteps = rangeSteps * loopCount;
     const dataKey = getDataKey(currentQuestionIndex);
     const parsedCurrent = parseNumberValue(currentValue);
     const defaultHeight = Number.isFinite(parsedCurrent)
@@ -410,11 +344,13 @@ function renderHeightRuler(currentValue) {
 
     const scale = document.createElement('div');
     scale.className = 'height-ruler__scale';
-    for (let value = minHeight; value <= maxHeight; value += stepCm) {
+
+    for (let virtualIndex = 0; virtualIndex < totalVirtualSteps; virtualIndex += 1) {
+        const value = minHeight + (virtualIndex % rangeSteps) * stepCm;
         const tick = document.createElement('div');
         const isMajor = value % 5 === 0;
         tick.className = isMajor ? 'height-ruler__tick height-ruler__tick--major' : 'height-ruler__tick';
-        tick.dataset.index = String(value - minHeight);
+        tick.dataset.virtualIndex = String(virtualIndex);
         tick.style.height = `${pixelsPerStep}px`;
         if (isMajor) {
             const label = document.createElement('span');
@@ -424,14 +360,36 @@ function renderHeightRuler(currentValue) {
         }
         scale.appendChild(tick);
     }
+
     viewport.appendChild(scale);
     const ticks = Array.from(scale.querySelectorAll('.height-ruler__tick'));
 
-    const applyHeightValue = (value) => {
+    const getVirtualIndexFromScroll = () => {
+        const centerOffset = viewport.clientHeight / 2;
+        return Math.round((viewport.scrollTop + centerOffset) / pixelsPerStep);
+    };
+
+    const normalizeVirtualScroll = () => {
+        const raw = getVirtualIndexFromScroll();
+        const minSafe = rangeSteps;
+        const maxSafe = rangeSteps * (loopCount - 1);
+        if (raw < minSafe || raw > maxSafe) {
+            const normalized = ((raw % rangeSteps) + rangeSteps) % rangeSteps;
+            const target = normalized + rangeSteps * Math.floor(loopCount / 2);
+            const centerOffset = viewport.clientHeight / 2;
+            viewport.scrollTop = target * pixelsPerStep - centerOffset;
+            return target;
+        }
+        return raw;
+    };
+
+    const applyHeightValue = () => {
+        const virtualIndex = normalizeVirtualScroll();
+        const normalized = ((virtualIndex % rangeSteps) + rangeSteps) % rangeSteps;
+        const value = minHeight + normalized * stepCm;
         valueElement.textContent = `${value}`;
-        const activeIndex = value - minHeight;
         ticks.forEach((tick) => {
-            tick.classList.toggle('height-ruler__tick--active', Number(tick.dataset.index) === activeIndex);
+            tick.classList.toggle('height-ruler__tick--active', Number(tick.dataset.virtualIndex) === virtualIndex);
         });
         window.userData[dataKey] = value;
         window.userData.height = value;
@@ -439,32 +397,27 @@ function renderHeightRuler(currentValue) {
         updateButtonStates();
     };
 
+    let rafId = null;
+    const onScroll = () => {
+        if (rafId !== null) {
+            return;
+        }
+        rafId = requestAnimationFrame(() => {
+            rafId = null;
+            applyHeightValue();
+        });
+    };
+
     requestAnimationFrame(() => {
         const spacer = Math.max(0, (viewport.clientHeight - pixelsPerStep) / 2);
         scale.style.paddingTop = `${spacer}px`;
         scale.style.paddingBottom = `${spacer}px`;
 
-        const controller = attachRulerScrollHandler({
-            viewport,
-            axis: 'y',
-            pxPerUnit: pixelsPerStep,
-            centerOffset: minHeight * pixelsPerStep,
-            step: 1,
-            min: minHeight,
-            max: maxHeight,
-            onValue: applyHeightValue
-        });
+        const startIndex = Math.round((startHeight - minHeight) / stepCm) + rangeSteps * Math.floor(loopCount / 2);
+        viewport.scrollTop = startIndex * pixelsPerStep - viewport.clientHeight / 2;
 
-        requestAnimationFrame(() => {
-            viewport.scrollTop = getScrollOffsetForRulerValue({
-                value: startHeight,
-                centerOffset: minHeight * pixelsPerStep,
-                pxPerUnit: pixelsPerStep,
-                min: minHeight,
-                max: maxHeight
-            });
-            controller.syncNow();
-        });
+        applyHeightValue();
+        viewport.addEventListener('scroll', onScroll, { passive: true });
     });
 }
 
@@ -473,6 +426,9 @@ function renderWeightRuler(currentValue) {
     const maxWeight = 200;
     const stepKg = 0.5;
     const pixelsPerStep = 16;
+    const loopCount = 5;
+    const rangeSteps = Math.round((maxWeight - minWeight) / stepKg) + 1;
+    const totalVirtualSteps = rangeSteps * loopCount;
     const dataKey = getDataKey(currentQuestionIndex);
     const parsedCurrent = parseNumberValue(currentValue);
     const defaultWeight = Number.isFinite(parsedCurrent)
@@ -503,14 +459,13 @@ function renderWeightRuler(currentValue) {
 
     const scale = document.createElement('div');
     scale.className = 'weight-ruler__scale';
-    const totalSteps = Math.round((maxWeight - minWeight) / stepKg);
 
-    for (let step = 0; step <= totalSteps; step += 1) {
-        const value = minWeight + step * stepKg;
+    for (let virtualIndex = 0; virtualIndex < totalVirtualSteps; virtualIndex += 1) {
+        const value = minWeight + (virtualIndex % rangeSteps) * stepKg;
         const tick = document.createElement('div');
         const isMajor = Math.round(value * 10) % 50 === 0;
         tick.className = isMajor ? 'weight-ruler__tick weight-ruler__tick--major' : 'weight-ruler__tick';
-        tick.dataset.index = String(step);
+        tick.dataset.virtualIndex = String(virtualIndex);
         tick.style.width = `${pixelsPerStep}px`;
         if (isMajor) {
             const label = document.createElement('span');
@@ -520,15 +475,36 @@ function renderWeightRuler(currentValue) {
         }
         scale.appendChild(tick);
     }
+
     viewport.appendChild(scale);
     const ticks = Array.from(scale.querySelectorAll('.weight-ruler__tick'));
 
-    const applyWeightValue = (value) => {
-        const display = value.toFixed(1).replace('.0', '');
-        valueElement.textContent = display;
-        const activeIndex = Math.round((value - minWeight) / stepKg);
+    const getVirtualIndexFromScroll = () => {
+        const centerOffset = viewport.clientWidth / 2;
+        return Math.round((viewport.scrollLeft + centerOffset) / pixelsPerStep);
+    };
+
+    const normalizeVirtualScroll = () => {
+        const raw = getVirtualIndexFromScroll();
+        const minSafe = rangeSteps;
+        const maxSafe = rangeSteps * (loopCount - 1);
+        if (raw < minSafe || raw > maxSafe) {
+            const normalized = ((raw % rangeSteps) + rangeSteps) % rangeSteps;
+            const target = normalized + rangeSteps * Math.floor(loopCount / 2);
+            const centerOffset = viewport.clientWidth / 2;
+            viewport.scrollLeft = target * pixelsPerStep - centerOffset;
+            return target;
+        }
+        return raw;
+    };
+
+    const applyWeightValue = () => {
+        const virtualIndex = normalizeVirtualScroll();
+        const normalized = ((virtualIndex % rangeSteps) + rangeSteps) % rangeSteps;
+        const value = minWeight + normalized * stepKg;
+        valueElement.textContent = value.toFixed(1).replace('.0', '');
         ticks.forEach((tick) => {
-            tick.classList.toggle('weight-ruler__tick--active', Number(tick.dataset.index) === activeIndex);
+            tick.classList.toggle('weight-ruler__tick--active', Number(tick.dataset.virtualIndex) === virtualIndex);
         });
         window.userData[dataKey] = value;
         window.userData.currentWeight = value;
@@ -536,32 +512,27 @@ function renderWeightRuler(currentValue) {
         updateButtonStates();
     };
 
+    let rafId = null;
+    const onScroll = () => {
+        if (rafId !== null) {
+            return;
+        }
+        rafId = requestAnimationFrame(() => {
+            rafId = null;
+            applyWeightValue();
+        });
+    };
+
     requestAnimationFrame(() => {
         const spacer = Math.max(0, (viewport.clientWidth - pixelsPerStep) / 2);
         scale.style.paddingLeft = `${spacer}px`;
         scale.style.paddingRight = `${spacer}px`;
 
-        const controller = attachRulerScrollHandler({
-            viewport,
-            axis: 'x',
-            pxPerUnit: pixelsPerStep,
-            centerOffset: minWeight * pixelsPerStep,
-            step: stepKg,
-            min: minWeight,
-            max: maxWeight,
-            onValue: applyWeightValue
-        });
+        const startIndex = Math.round((startWeight - minWeight) / stepKg) + rangeSteps * Math.floor(loopCount / 2);
+        viewport.scrollLeft = startIndex * pixelsPerStep - viewport.clientWidth / 2;
 
-        requestAnimationFrame(() => {
-            viewport.scrollLeft = getScrollOffsetForRulerValue({
-                value: startWeight,
-                centerOffset: minWeight * pixelsPerStep,
-                pxPerUnit: pixelsPerStep,
-                min: minWeight,
-                max: maxWeight
-            });
-            controller.syncNow();
-        });
+        applyWeightValue();
+        viewport.addEventListener('scroll', onScroll, { passive: true });
     });
 }
 
