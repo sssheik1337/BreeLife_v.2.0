@@ -311,7 +311,7 @@ function renderHeightRuler(currentValue) {
     const minHeight = 120;
     const maxHeight = 220;
     const stepCm = 1;
-    const pixelsPerStep = 12;
+    const pixelsPerStep = 18;
     const loopCount = 7;
     const rangeSteps = Math.round((maxHeight - minHeight) / stepCm) + 1;
     const totalVirtualSteps = rangeSteps * loopCount;
@@ -423,7 +423,7 @@ function renderWeightRuler(currentValue) {
     const minWeight = 30;
     const maxWeight = 200;
     const stepKg = 0.5;
-    const pixelsPerStep = 12;
+    const pixelsPerStep = 18;
     const loopCount = 7;
     const rangeSteps = Math.round((maxWeight - minWeight) / stepKg) + 1;
     const totalVirtualSteps = rangeSteps * loopCount;
