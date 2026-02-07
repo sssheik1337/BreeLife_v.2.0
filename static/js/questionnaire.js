@@ -327,6 +327,11 @@ function computeRulerValueFromScroll({ scrollOffset, centerOffset, pxPerUnit, st
     return clampRulerValue(rounded, min, max);
 }
 
+function getScrollOffsetForRulerValue({ value, centerOffset, pxPerUnit, min, max }) {
+    const safeValue = clampRulerValue(value, min, max);
+    return safeValue * pxPerUnit - centerOffset;
+}
+
 function attachRulerScrollHandler({ viewport, axis, pxPerUnit, centerOffset, step, min, max, onValue }) {
     let rafId = null;
     let lastValue = null;
@@ -358,7 +363,6 @@ function attachRulerScrollHandler({ viewport, axis, pxPerUnit, centerOffset, ste
     };
 
     viewport.addEventListener('scroll', requestEmit, { passive: true });
-    requestEmit();
 
     return {
         syncNow: () => {
@@ -433,8 +437,6 @@ function renderHeightRuler(currentValue) {
         const spacer = Math.max(0, (viewport.clientHeight - pixelsPerStep) / 2);
         scale.style.paddingTop = `${spacer}px`;
         scale.style.paddingBottom = `${spacer}px`;
-        const targetIndex = clampRulerValue(startHeight, minHeight, maxHeight) - minHeight;
-        viewport.scrollTop = targetIndex * pixelsPerStep;
 
         const controller = attachRulerScrollHandler({
             viewport,
@@ -446,7 +448,17 @@ function renderHeightRuler(currentValue) {
             max: maxHeight,
             onValue: applyHeightValue
         });
-        controller.syncNow();
+
+        requestAnimationFrame(() => {
+            viewport.scrollTop = getScrollOffsetForRulerValue({
+                value: startHeight,
+                centerOffset: minHeight * pixelsPerStep,
+                pxPerUnit: pixelsPerStep,
+                min: minHeight,
+                max: maxHeight
+            });
+            controller.syncNow();
+        });
     });
 }
 
@@ -516,9 +528,6 @@ function renderWeightRuler(currentValue) {
         const spacer = Math.max(0, (viewport.clientWidth - pixelsPerStep) / 2);
         scale.style.paddingLeft = `${spacer}px`;
         scale.style.paddingRight = `${spacer}px`;
-        const safeStart = clampRulerValue(startWeight, minWeight, maxWeight);
-        const targetIndex = Math.round((safeStart - minWeight) / stepKg);
-        viewport.scrollLeft = targetIndex * pixelsPerStep;
 
         const controller = attachRulerScrollHandler({
             viewport,
@@ -530,7 +539,17 @@ function renderWeightRuler(currentValue) {
             max: maxWeight,
             onValue: applyWeightValue
         });
-        controller.syncNow();
+
+        requestAnimationFrame(() => {
+            viewport.scrollLeft = getScrollOffsetForRulerValue({
+                value: startWeight,
+                centerOffset: minWeight * pixelsPerStep,
+                pxPerUnit: pixelsPerStep,
+                min: minWeight,
+                max: maxWeight
+            });
+            controller.syncNow();
+        });
     });
 }
 
