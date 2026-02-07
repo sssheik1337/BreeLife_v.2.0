@@ -423,7 +423,7 @@ function renderWeightRuler(currentValue) {
     const minWeight = 30;
     const maxWeight = 200;
     const stepKg = 0.5;
-    const pixelsPerStep = 16;
+    const pixelsPerStep = 12;
     const loopCount = 7;
     const rangeSteps = Math.round((maxWeight - minWeight) / stepKg) + 1;
     const totalVirtualSteps = rangeSteps * loopCount;
@@ -468,7 +468,7 @@ function renderWeightRuler(currentValue) {
         if (isMajor) {
             const label = document.createElement('span');
             label.className = 'ruler__tick-label';
-            label.textContent = `${Math.round(value)}`;
+            label.textContent = Number.isInteger(value) ? `${value}` : value.toFixed(1).replace('.0', '');
             tick.appendChild(label);
         }
         track.appendChild(tick);
