@@ -899,6 +899,12 @@ function renderDayScreen(entries, dateKey) {
 
     const summary = buildDayTotals(dayEntries, entries, dateKey);
     const totals = summary.totals;
+    const mealTitles = {
+        breakfast: 'завтрак',
+        lunch: 'обед',
+        dinner: 'ужин',
+        snack: 'перекус'
+    };
     if (caloriesEl) {
         caloriesEl.textContent = dayEntries.length ? `${Math.round(totals.calories)} ккал` : '—';
     }
@@ -924,7 +930,10 @@ function renderDayScreen(entries, dateKey) {
         }
         const entry = findProductsEntry(entries, dateKey, mealKey);
         if (!entry) {
-            list.innerHTML = '<p class="text-sm text-slate-400">Ничего не добавлено.</p>';
+            list.innerHTML = `
+                <p class="text-sm text-slate-400">Ничего не добавлено.</p>
+                <button type="button" class="text-emerald-600 font-semibold mt-2" data-action="edit-meal" data-meal="${mealKey}">Добавить ${mealTitles[mealKey] || 'приём пищи'}</button>
+            `;
             total.textContent = '';
             return;
         }
@@ -1513,7 +1522,11 @@ function bindGlobalDiaryHandlers() {
             config.waterInput.value = next.toString();
             const sleepValue = config.sleepInput?.value || '';
             const activityValue = Boolean(config.activityInput?.checked);
-            persistDayMeta(dateKey, next, sleepValue, activityValue, { hintId: config.hintId });
+            const saved = persistDayMeta(dateKey, next, sleepValue, activityValue, { hintId: config.hintId });
+            if (saved && typeof showNotification === 'function') {
+                const amountMl = Math.round(amount * 1000);
+                showNotification(`Добавлено ${amountMl} мл воды. Сейчас: ${next.toFixed(2)} л.`);
+            }
             return;
         }
 

@@ -2,6 +2,64 @@
 
 const apiFetch = window.apiFetch || fetch;
 
+let resumeInitialProfileSnapshot = null;
+let resumeIsDirty = false;
+
+function buildComparableResumeProfileState(source = 'current') {
+    let candidate = null;
+
+    if (source === 'initial') {
+        if (typeof getUserProfile === 'function') {
+            candidate = getUserProfile() || {};
+        }
+    } else if (typeof mapUserDataToUserProfile === 'function') {
+        candidate = mapUserDataToUserProfile(window.userData || {});
+    } else if (typeof getUserProfile === 'function') {
+        candidate = getUserProfile() || {};
+    }
+
+    const profile = candidate && typeof candidate === 'object' ? candidate : {};
+    const macros = profile.macros && typeof profile.macros === 'object' ? profile.macros : {};
+
+    return {
+        sex: profile.sex ?? null,
+        birth_date: profile.birth_date ?? null,
+        height_cm: Number(profile.height_cm) || null,
+        weight_kg: Number(profile.weight_kg) || null,
+        target_weight_kg: Number(profile.target_weight_kg) || null,
+        goal: profile.goal ?? null,
+        activity_factor: Number(profile.activity_factor) || null,
+        goal_deadline: profile.goal_deadline ?? null,
+        food_diary: typeof profile.food_diary === 'boolean' ? profile.food_diary : null,
+        tdee_calories: Number(profile.tdee_calories) || null,
+        macros: {
+            protein_g: Number(macros.protein_g) || null,
+            fat_g: Number(macros.fat_g) || null,
+            carbs_g: Number(macros.carbs_g) || null
+        }
+    };
+}
+
+function updateResumeActionButtons() {
+    const saveButton = document.getElementById('resume-save-button');
+    const goProgressButton = document.getElementById('resume-go-progress-button');
+    if (!saveButton || !goProgressButton) {
+        return;
+    }
+
+    saveButton.classList.toggle('hidden', !resumeIsDirty);
+    goProgressButton.classList.toggle('hidden', resumeIsDirty);
+}
+
+function refreshResumeDirtyState() {
+    const currentSnapshot = buildComparableResumeProfileState('current');
+    if (!resumeInitialProfileSnapshot) {
+        resumeInitialProfileSnapshot = buildComparableResumeProfileState('initial');
+    }
+    resumeIsDirty = JSON.stringify(currentSnapshot) !== JSON.stringify(resumeInitialProfileSnapshot);
+    updateResumeActionButtons();
+}
+
 // Initialize summary page
 function generateSummary() {
     const cardsContainer = document.getElementById('data-cards');
@@ -950,6 +1008,41 @@ async function renderTrialStatus() {
 }
 
 // Рендер кнопок напоминаний для Telegram
+
+function renderResumeReminderStatus() {
+    const badge = document.getElementById('resume-reminders-badge');
+    const summary = document.getElementById('resume-reminders-summary');
+    if (!badge || !summary) {
+        return;
+    }
+
+    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const settings = profile?.reminder_settings && typeof profile.reminder_settings === 'object'
+        ? profile.reminder_settings
+        : {};
+
+    const entries = [
+        ['water', 'Вода'],
+        ['sleep', 'Сон'],
+        ['activity', 'Активность']
+    ];
+
+    const enabled = entries
+        .filter(([key]) => settings?.[key]?.enabled === true)
+        .map(([, label]) => label);
+
+    if (!enabled.length) {
+        badge.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600';
+        badge.textContent = 'Выключено';
+        summary.textContent = 'Напоминания пока отключены. Можно включить в настройках.';
+        return;
+    }
+
+    badge.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700';
+    badge.textContent = `Включено: ${enabled.length}`;
+    summary.textContent = `Активны напоминания: ${enabled.join(', ')}.`;
+}
+
 function renderReminderActions() {
     const section = document.getElementById('reminders-section');
     const actionsContainer = document.getElementById('reminders-actions');
@@ -1086,8 +1179,13 @@ function renderReminderActions() {
     fetchReminders();
 }
 
-// Save all data and redirect to profile
+// Сохранить изменения и перейти в прогресс
 function saveAndContinue() {
+    if (!resumeIsDirty) {
+        window.location.href = '/profile';
+        return;
+    }
+
     // Данные сохраняются через API, локального хранения нет.
     if (typeof patchUserProfile === 'function') {
         if (typeof mapUserDataToUserProfile === 'function') {
@@ -1098,16 +1196,14 @@ function saveAndContinue() {
             patchUserProfile({ completed: true });
         }
     }
-    
-    // Show success notification
+
     if (typeof showNotification === 'function') {
-        showNotification('Профиль успешно сохранен!', 'success');
-}
-    
-    // Redirect after a short delay
+        showNotification('Изменения сохранены. Переходим в прогресс.', 'success');
+    }
+
     setTimeout(() => {
         window.location.href = '/profile';
-    }, 1000);
+    }, 600);
 }
 
 // Initialize when DOM is loaded
@@ -1131,10 +1227,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     applyAiRecommendationToResume();
     renderNutritionRings();
     renderTrialStatus();
-    renderReminderActions();
+    renderResumeReminderStatus();
     
-    // Добавляем обработчик для кнопки сохранения
-    const saveButton = document.querySelector('a.btn-primary');
+    resumeInitialProfileSnapshot = buildComparableResumeProfileState('initial');
+    refreshResumeDirtyState();
+
+    const saveButton = document.getElementById('resume-save-button');
     if (saveButton) {
         saveButton.addEventListener('click', function(event) {
             event.preventDefault();

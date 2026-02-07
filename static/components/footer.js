@@ -156,7 +156,7 @@ class CustomFooter extends HTMLElement {
             <span class="bottom-link__icon" aria-hidden="true">📋</span>
             <span>Рацион</span>
           </a>
-          <a href="/profile#profile-month-grid-section" class="bottom-link" data-bottom-link="progress">
+          <a href="/profile" class="bottom-link" data-bottom-link="progress">
             <span class="bottom-link__icon" aria-hidden="true">📊</span>
             <span>Прогресс</span>
           </a>
@@ -237,15 +237,15 @@ class CustomFooter extends HTMLElement {
         bottomSpacer.style.height = '0';
       }
     }
-    let activeKey = 'profile';
-    if (currentPath.startsWith('/diary')) {
+    let activeKey = 'progress';
+    if (currentPath.startsWith('/resume')) {
+      activeKey = 'profile';
+    } else if (currentPath.startsWith('/diary')) {
       activeKey = 'diary';
     } else if (currentPath.startsWith('/meal-plan')) {
-      activeKey = 'meal-plan';
-    } else if (currentHash.includes('progress') || currentHash.includes('month')) {
+      activeKey = 'mealPlan';
+    } else if (currentPath.startsWith('/profile')) {
       activeKey = 'progress';
-    } else if (currentPath.startsWith('/profile') || currentPath.startsWith('/resume')) {
-      activeKey = 'profile';
     }
 
     Object.entries(bottomLinks).forEach(([key, link]) => {

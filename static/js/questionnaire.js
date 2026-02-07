@@ -774,8 +774,8 @@ function setupEventListeners() {
             }
             persistUserData();
             await saveProfileToServer(profile);
-            // Все вопросы заполнены, переходим на страницу сводки.
-            window.location.href = '/resume';
+            // Все вопросы заполнены, переходим на экран прогресса.
+            window.location.href = '/profile';
         }
     });
     

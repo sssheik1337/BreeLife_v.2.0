@@ -619,7 +619,9 @@ function redirectToQuestionnaireIfNeeded(profileCompleted) {
     const path = window.location.pathname || '/';
     if (path === '/' || path === '/index') {
         if (profileCompleted) {
-            window.location.replace('/resume');
+            window.location.replace('/profile');
+        } else {
+            window.location.replace('/questionnaire');
         }
         return;
     }
@@ -637,18 +639,20 @@ function redirectFromMenuIfCompleted(profileCompleted) {
     }
     const path = window.location.pathname || '/';
     if (path.startsWith('/menu')) {
-        window.location.replace('/resume');
+        // Для завершённого профиля не уводим пользователя из меню автоматически.
+        return;
     }
 }
 
 function syncLocalProfileCompletion(profileCompleted) {
-    if (profileCompleted) {
-        return;
+    const serverCompleted = profileCompleted === true;
+    window.profileCompleted = serverCompleted;
+    if (typeof patchUserProfile === 'function') {
+        patchUserProfile({
+            completed: serverCompleted,
+            profile_completed: serverCompleted
+        });
     }
-    const localProfileCompleted = typeof getUserProfile === 'function'
-        ? getUserProfile()?.completed === true
-        : false;
-    window.profileCompleted = localProfileCompleted;
 }
 
 function notifyProfileStatus() {

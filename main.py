@@ -650,19 +650,21 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
-    )
+async def index(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    if telegram_user_id is None:
+        return RedirectResponse(url="/profile", status_code=303)
+    if is_profile_completed(telegram_user_id):
+        return RedirectResponse(url="/profile", status_code=303)
+    return RedirectResponse(url="/questionnaire", status_code=303)
 
 
 @app.get("/index", response_class=HTMLResponse)
-async def index_alias(request: Request):
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
-    )
+async def index_alias(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    if telegram_user_id is None:
+        return RedirectResponse(url="/profile", status_code=303)
+    if is_profile_completed(telegram_user_id):
+        return RedirectResponse(url="/profile", status_code=303)
+    return RedirectResponse(url="/questionnaire", status_code=303)
 
 
 @app.get("/healthz")
@@ -960,6 +962,20 @@ async def menu(request: Request, telegram_user_id: int | None = Depends(optional
     require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "menu.html",
+        {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+    )
+
+
+@app.get("/settings/reminders", response_class=HTMLResponse)
+async def reminders_settings(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    if telegram_user_id is None:
+        return templates.TemplateResponse(
+            "reminders_settings.html",
+            {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
+        )
+    require_completed_profile(telegram_user_id)
+    return templates.TemplateResponse(
+        "reminders_settings.html",
         {"request": request, "admin_config": loadAdminConfig(), "ai_enabled": AI_ENABLED},
     )
 

@@ -98,6 +98,7 @@
             subscription_started_at: null,
             trial_started_at: null,
             completed: false,
+            profile_completed: false,
             favorite_product_ids: [],
             excluded_product_ids: []
         };
@@ -253,21 +254,34 @@
         merged.subscription_status = merged.subscription_status || null;
         merged.subscription_started_at = merged.subscription_started_at || null;
         merged.trial_started_at = merged.trial_started_at || null;
-        merged.completed = parseBoolean(merged.completed);
+        const normalizedCompleted = parseBoolean(merged.completed);
+        const normalizedProfileCompleted = parseBoolean(merged.profile_completed);
+        merged.completed = normalizedCompleted;
+        merged.profile_completed = normalizedProfileCompleted;
         merged.favorite_product_ids = normalizeIdList(merged.favorite_product_ids);
         merged.excluded_product_ids = normalizeIdList(merged.excluded_product_ids);
 
+        const requiredFields = [
+            merged.sex,
+            merged.birth_date,
+            merged.height_cm,
+            merged.weight_kg,
+            merged.target_weight_kg,
+            merged.goal,
+            merged.activity_factor
+        ];
+        const calculatedCompleted = requiredFields.every((value) => value !== null && value !== undefined && value !== '');
+
         if (merged.completed === null) {
-            const requiredFields = [
-                merged.sex,
-                merged.birth_date,
-                merged.height_cm,
-                merged.weight_kg,
-                merged.target_weight_kg,
-                merged.goal,
-                merged.activity_factor
-            ];
-            merged.completed = requiredFields.every((value) => value !== null && value !== undefined && value !== '');
+            merged.completed = calculatedCompleted;
+        }
+        if (merged.profile_completed === null) {
+            merged.profile_completed = merged.completed;
+        }
+
+        // В спорной ситуации приоритет у подтверждённого сервером profile_completed.
+        if (merged.profile_completed !== merged.completed) {
+            merged.completed = merged.profile_completed;
         }
 
         return merged;

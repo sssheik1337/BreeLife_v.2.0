@@ -1029,12 +1029,11 @@ function getActivityForDate(entries, dateKey) {
 
 function renderProfileRings() {
     const caloriesContainer = document.getElementById('profile-calories-ring');
-    const macrosContainer = document.getElementById('profile-macros-rings');
     const waterContainer = document.getElementById('profile-water-ring');
     const sleepContainer = document.getElementById('profile-sleep-ring');
     const activityContainer = document.getElementById('profile-activity-ring');
 
-    if (!caloriesContainer || !macrosContainer || !waterContainer || !sleepContainer || !activityContainer) {
+    if (!caloriesContainer || !waterContainer || !sleepContainer || !activityContainer) {
         return;
     }
 
@@ -1068,94 +1067,6 @@ function renderProfileRings() {
             emphasize: true
         })
     );
-
-    const macros = profile?.macros;
-    const macroItems = [
-        {
-            label: 'Белки',
-            key: 'protein',
-            consumed: todayTotals.protein_g,
-            target: Number(macros?.protein_g),
-            percent: todayTotals.hasEntries && Number.isFinite(macros?.protein_g) && macros.protein_g > 0
-                ? Math.round((todayTotals.protein_g / macros.protein_g) * 100)
-                : null,
-            color: '#a855f7'
-        },
-        {
-            label: 'Жиры',
-            key: 'fat',
-            consumed: todayTotals.fat_g,
-            target: Number(macros?.fat_g),
-            percent: todayTotals.hasEntries && Number.isFinite(macros?.fat_g) && macros.fat_g > 0
-                ? Math.round((todayTotals.fat_g / macros.fat_g) * 100)
-                : null,
-            color: '#f59e0b'
-        },
-        {
-            label: 'Углеводы',
-            key: 'carbs',
-            consumed: todayTotals.carbs_g,
-            target: Number(macros?.carbs_g),
-            percent: todayTotals.hasEntries && Number.isFinite(macros?.carbs_g) && macros.carbs_g > 0
-                ? Math.round((todayTotals.carbs_g / macros.carbs_g) * 100)
-                : null,
-            color: '#06b6d4'
-        }
-    ];
-
-    macrosContainer.innerHTML = '';
-    macroItems.forEach((item) => {
-        const card = document.createElement('div');
-        card.className = 'stat-card flex justify-center';
-        const ringWrapper = document.createElement('div');
-        ringWrapper.className = 'ring-compact flex justify-center';
-        const hasTarget = Number.isFinite(item.target) && item.target > 0;
-        const macroValue = todayTotals.hasEntries
-            ? hasTarget
-                ? `Факт / цель: ${Math.round(item.consumed)} / ${Math.round(item.target)} г`
-                : `Факт: ${Math.round(item.consumed)} г`
-            : 'Нет данных';
-        ringWrapper.appendChild(
-            createProgressRing({
-                size: 96,
-                stroke: 8,
-                percent: item.percent,
-                color: item.color,
-                label: item.label,
-                value: macroValue
-            })
-        );
-        card.appendChild(ringWrapper);
-        macrosContainer.appendChild(card);
-    });
-
-    const fiberTarget = Number(window.adminConfig?.reminders?.fiber_target_g);
-    const hasFiberTarget = Number.isFinite(fiberTarget) && fiberTarget > 0;
-    const fiberPercent = todayTotals.hasEntries && hasFiberTarget
-        ? Math.round((todayTotals.fiber_g / fiberTarget) * 100)
-        : null;
-    const fiberValue = todayTotals.hasEntries
-        ? hasFiberTarget
-            ? `Факт / цель: ${Math.round(todayTotals.fiber_g)} / ${Math.round(fiberTarget)} г`
-            : `Факт: ${Math.round(todayTotals.fiber_g)} г`
-        : 'Нет данных';
-    const fiberCard = document.createElement('div');
-    fiberCard.className = 'stat-card flex justify-center';
-    const fiberWrapper = document.createElement('div');
-    fiberWrapper.className = 'ring-compact flex justify-center';
-    fiberWrapper.appendChild(
-        createProgressRing({
-            size: 96,
-            stroke: 8,
-            percent: fiberPercent,
-            color: '#84cc16',
-            label: 'Клетчатка',
-            value: fiberValue
-        })
-    );
-    fiberCard.appendChild(fiberWrapper);
-    macrosContainer.appendChild(fiberCard);
-
     const waterTarget = Number(window.adminConfig?.reminders?.water_min_l);
     const waterTotal = Number(todayTotals.water_l) || 0;
     const hasWater = todayTotals.hasEntries && Number.isFinite(waterTotal);
@@ -1210,7 +1121,6 @@ function renderProfileRings() {
     );
 
     animateCountUps(caloriesContainer);
-    animateCountUps(macrosContainer);
     animateCountUps(waterContainer);
     animateCountUps(sleepContainer);
     animateCountUps(activityContainer);
@@ -1727,6 +1637,41 @@ function renderWeeklyReview() {
     messageText.textContent = review.message || '';
 }
 
+
+function renderProfileReminderStatus() {
+    const badge = document.getElementById('profile-reminders-badge');
+    const summary = document.getElementById('profile-reminders-summary');
+    if (!badge || !summary) {
+        return;
+    }
+
+    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const settings = profile?.reminder_settings && typeof profile.reminder_settings === 'object'
+        ? profile.reminder_settings
+        : {};
+
+    const entries = [
+        ['water', 'Вода'],
+        ['sleep', 'Сон'],
+        ['activity', 'Активность']
+    ];
+
+    const enabled = entries
+        .filter(([key]) => settings?.[key]?.enabled === true)
+        .map(([, label]) => label);
+
+    if (!enabled.length) {
+        badge.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600';
+        badge.textContent = 'Выключено';
+        summary.textContent = 'Напоминания пока отключены. Настройте их в отдельном разделе.';
+        return;
+    }
+
+    badge.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700';
+    badge.textContent = `Включено: ${enabled.length}`;
+    summary.textContent = `Активны напоминания: ${enabled.join(', ')}.`;
+}
+
 async function loadProfileFromServer() {
     if (typeof window.syncProfileWithBackend === 'function') {
         await window.syncProfileWithBackend();
@@ -1836,8 +1781,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderWeeklyAdjustments();
         renderWeeklyReview();
         applySubscriptionAccess();
-        renderProfileRecommendations();
-        renderHabitsPlanner();
-        initReminderControls();
+        renderProfileReminderStatus();
     })();
 });

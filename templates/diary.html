@@ -103,13 +103,20 @@
 
                 <div class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100">
                     <div class="flex items-center justify-between">
-                        <span class="font-semibold text-slate-800">🌙 Привычки дня</span>
+                        <span class="font-semibold text-slate-800">🌙 Сон и активность за день</span>
                     </div>
-                    <input type="time" id="diary-day-sleep" class="form-input mt-3" placeholder="Время отхода ко сну">
+                    <p class="text-xs text-slate-500 mt-2">
+                        Время сна и активность сохраняются вручную для выбранной даты.
+                    </p>
+                    <label class="text-sm text-slate-600 mt-3 block">
+                        Время отхода ко сну (необязательно)
+                        <input type="time" id="diary-day-sleep" class="form-input mt-2" placeholder="Время отхода ко сну">
+                    </label>
                     <label class="flex items-center gap-2 text-sm text-slate-600 mt-3">
                         <input type="checkbox" class="form-checkbox" id="diary-day-activity">
-                        <span>Сегодня была активность</span>
+                        <span>Сегодня была активность (отмечаю вручную)</span>
                     </label>
+                    <p class="text-xs text-slate-400 mt-2">Чекбокс не проставляется автоматически.</p>
                 </div>
 
                 <div id="diary-products-panel" class="diary-panel hidden">
