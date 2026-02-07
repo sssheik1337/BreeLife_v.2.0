@@ -336,8 +336,24 @@ function renderHeightRuler(currentValue) {
                 <div class="ruler__track" id="height-ruler-track"></div>
             </div>
         </div>
-    `;
+    const recenterThreshold = 1400;
+    let baseValue = startHeight;
+    let centerOffset = getScrollOffsetForIndex(originIndex);
 
+    const normalizeLoopIfNeeded = () => {
+        const centerPx = getCenterOffsetPx();
+        const currentIndex = Math.round((ruler.scrollTop + centerPx - pixelsPerStep / 2) / pixelsPerStep);
+        const isNearStart = currentIndex < recenterThreshold;
+        const isNearEnd = currentIndex > virtualSteps - recenterThreshold;
+        if (!isNearStart && !isNearEnd) {
+            return;
+        }
+        const passedSteps = currentIndex - originIndex;
+        baseValue += passedSteps * stepCm;
+        centerOffset = getScrollOffsetForIndex(originIndex);
+        ruler.scrollTop = centerOffset;
+    };
+        normalizeLoopIfNeeded();
     const ruler = document.getElementById('height-ruler');
     const track = document.getElementById('height-ruler-track');
     const valueElement = document.getElementById('height-ruler-value');
@@ -431,8 +447,24 @@ function renderWeightRuler(currentValue) {
     const defaultWeight = Number.isFinite(parsedCurrent)
         ? Math.round(parsedCurrent * 2) / 2
         : Number.isFinite(parseNumberValue(window.userData.currentWeight))
-            ? Math.round(parseNumberValue(window.userData.currentWeight) * 2) / 2
-            : 70;
+    const recenterThreshold = 1400;
+    let baseValue = startWeight;
+    let centerOffset = getScrollOffsetForIndex(originIndex);
+
+    const normalizeLoopIfNeeded = () => {
+        const centerPx = getCenterOffsetPx();
+        const currentIndex = Math.round((ruler.scrollLeft + centerPx - pixelsPerStep / 2) / pixelsPerStep);
+        const isNearStart = currentIndex < recenterThreshold;
+        const isNearEnd = currentIndex > virtualSteps - recenterThreshold;
+        if (!isNearStart && !isNearEnd) {
+            return;
+        }
+        const passedSteps = currentIndex - originIndex;
+        baseValue += passedSteps * stepKg;
+        centerOffset = getScrollOffsetForIndex(originIndex);
+        ruler.scrollLeft = centerOffset;
+    };
+        normalizeLoopIfNeeded();
     const startWeight = Math.min(maxWeight, Math.max(minWeight, defaultWeight));
 
     inputContainer.innerHTML = `
