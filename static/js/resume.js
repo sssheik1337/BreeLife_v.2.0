@@ -5,6 +5,18 @@ const apiFetch = window.apiFetch || fetch;
 let resumeInitialProfileSnapshot = null;
 let resumeIsDirty = false;
 
+
+function hasMeaningfulUserData(data) {
+    if (!data || typeof data !== 'object') {
+        return false;
+    }
+    const keys = ['gender', 'birthDate', 'height', 'currentWeight', 'targetWeight', 'activityLevel', 'goalType'];
+    return keys.some((key) => {
+        const value = data[key];
+        return value !== null && value !== undefined && value !== '';
+    });
+}
+
 function buildComparableResumeProfileState(source = 'current') {
     let candidate = null;
 
@@ -12,9 +24,11 @@ function buildComparableResumeProfileState(source = 'current') {
         if (typeof getUserProfile === 'function') {
             candidate = getUserProfile() || {};
         }
-    } else if (typeof mapUserDataToUserProfile === 'function') {
+    } else if (typeof mapUserDataToUserProfile === 'function' && hasMeaningfulUserData(window.userData)) {
         candidate = mapUserDataToUserProfile(window.userData || {});
-    } else if (typeof getUserProfile === 'function') {
+    }
+
+    if (!candidate && typeof getUserProfile === 'function') {
         candidate = getUserProfile() || {};
     }
 
@@ -1219,6 +1233,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     if (typeof syncProfileWithBackend === 'function') {
         await syncProfileWithBackend();
+    }
+    if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
+        window.userData = {
+            ...(window.userData || {}),
+            ...mapUserProfileToUserData(getUserProfile())
+        };
     }
     generateSummary();
     calculateBMI();
