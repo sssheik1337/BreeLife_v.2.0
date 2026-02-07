@@ -311,7 +311,7 @@ function renderHeightRuler(currentValue) {
     const minHeight = 120;
     const maxHeight = 220;
     const stepCm = 1;
-    const pixelsPerStep = 18;
+    const pixelsPerStep = 24;
     const loopCount = 7;
     const rangeSteps = Math.round((maxHeight - minHeight) / stepCm) + 1;
     const totalVirtualSteps = rangeSteps * loopCount;
@@ -345,6 +345,8 @@ function renderHeightRuler(currentValue) {
     if (!ruler || !track || !valueElement) {
         return;
     }
+
+    track.style.width = `${totalVirtualSteps * pixelsPerStep}px`;
 
     for (let virtualIndex = 0; virtualIndex < totalVirtualSteps; virtualIndex += 1) {
         const value = minHeight + (virtualIndex % rangeSteps) * stepCm;
@@ -423,7 +425,7 @@ function renderWeightRuler(currentValue) {
     const minWeight = 30;
     const maxWeight = 200;
     const stepKg = 0.5;
-    const pixelsPerStep = 18;
+    const pixelsPerStep = 24;
     const loopCount = 7;
     const rangeSteps = Math.round((maxWeight - minWeight) / stepKg) + 1;
     const totalVirtualSteps = rangeSteps * loopCount;
@@ -458,6 +460,8 @@ function renderWeightRuler(currentValue) {
         return;
     }
 
+    track.style.width = `${totalVirtualSteps * pixelsPerStep}px`;
+
     for (let virtualIndex = 0; virtualIndex < totalVirtualSteps; virtualIndex += 1) {
         const value = minWeight + (virtualIndex % rangeSteps) * stepKg;
         const tick = document.createElement('div');
@@ -485,21 +489,17 @@ function renderWeightRuler(currentValue) {
 
     const getScrollOffsetForIndex = (index) => index * pixelsPerStep + pixelsPerStep / 2 - getCenterOffset();
 
-    const normalizeVirtualScroll = () => {
-        const raw = getVirtualIndexFromScroll();
+    const normalizeVirtualScroll = (rawIndex) => {
         const minSafe = rangeSteps;
         const maxSafe = rangeSteps * (loopCount - 1);
-        if (raw < minSafe || raw > maxSafe) {
-            const normalized = ((raw % rangeSteps) + rangeSteps) % rangeSteps;
-            const target = normalized + rangeSteps * Math.floor(loopCount / 2);
-            ruler.scrollLeft = getScrollOffsetForIndex(target);
-            return target;
+        if (rawIndex < minSafe || rawIndex > maxSafe) {
+            const normalized = ((rawIndex % rangeSteps) + rangeSteps) % rangeSteps;
+            return normalized + rangeSteps * Math.floor(loopCount / 2);
         }
-        return raw;
+        return rawIndex;
     };
 
-    const applyWeightValue = () => {
-        const virtualIndex = normalizeVirtualScroll();
+    const applyWeightValue = (virtualIndex) => {
         const normalized = ((virtualIndex % rangeSteps) + rangeSteps) % rangeSteps;
         const value = minWeight + normalized * stepKg;
         valueElement.textContent = value.toFixed(1).replace('.0', '');
@@ -519,14 +519,19 @@ function renderWeightRuler(currentValue) {
         }
         rafId = requestAnimationFrame(() => {
             rafId = null;
-            applyWeightValue();
+            const rawIndex = getVirtualIndexFromScroll();
+            const normalizedIndex = normalizeVirtualScroll(rawIndex);
+            if (normalizedIndex !== rawIndex) {
+                ruler.scrollLeft = getScrollOffsetForIndex(normalizedIndex);
+            }
+            applyWeightValue(normalizedIndex);
         });
     };
 
     requestAnimationFrame(() => {
         const startIndex = Math.round((startWeight - minWeight) / stepKg) + rangeSteps * Math.floor(loopCount / 2);
         ruler.scrollLeft = getScrollOffsetForIndex(startIndex);
-        applyWeightValue();
+        applyWeightValue(startIndex);
         ruler.addEventListener('scroll', onScroll, { passive: true });
     });
 }
