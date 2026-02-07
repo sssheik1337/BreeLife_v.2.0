@@ -499,6 +499,28 @@ function renderWeightRuler(currentValue) {
         return rawIndex;
     };
 
+    const updateWeightMagnifier = (virtualIndex) => {
+        const centerOffset = getCenterOffset();
+        const centerPosition = ruler.scrollLeft + centerOffset;
+        const visibleRadius = Math.ceil(centerOffset / pixelsPerStep) + 18;
+        const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+        const rangeStart = clamp(virtualIndex - visibleRadius, 0, totalVirtualSteps - 1);
+        const rangeEnd = clamp(virtualIndex + visibleRadius, 0, totalVirtualSteps - 1);
+
+        for (let i = rangeStart; i <= rangeEnd; i += 1) {
+            const tick = ticks[i];
+            if (!tick) {
+                continue;
+            }
+            const tickCenter = i * pixelsPerStep + pixelsPerStep / 2;
+            const distance = Math.abs(tickCenter - centerPosition);
+            const scale = clamp(1.4 - distance * 0.02, 1, 1.4);
+            const opacity = clamp(1 - distance * 0.015, 0.3, 1);
+            tick.style.transform = `translateZ(0) scale(${scale.toFixed(3)})`;
+            tick.style.opacity = opacity.toFixed(3);
+        }
+    };
+
     const applyWeightValue = (virtualIndex) => {
         const normalized = ((virtualIndex % rangeSteps) + rangeSteps) % rangeSteps;
         const value = minWeight + normalized * stepKg;
@@ -510,6 +532,7 @@ function renderWeightRuler(currentValue) {
         window.userData.currentWeight = value;
         saveUserData();
         updateButtonStates();
+        updateWeightMagnifier(virtualIndex);
     };
 
     let rafId = null;
