@@ -305,6 +305,82 @@ function displayOptions(options) {
     }
 }
 
+function renderHeightRuler(currentValue) {
+    const minHeight = 120;
+    const maxHeight = 220;
+    const stepCm = 1;
+    const pixelsPerStep = 12;
+    const dataKey = getDataKey(currentQuestionIndex);
+    const parsedCurrent = parseNumberValue(currentValue);
+    const defaultHeight = Number.isFinite(parsedCurrent)
+        ? Math.round(parsedCurrent)
+        : Number.isFinite(parseNumberValue(window.userData.height))
+            ? Math.round(parseNumberValue(window.userData.height))
+            : 160;
+    const startHeight = Math.min(maxHeight, Math.max(minHeight, defaultHeight));
+
+    inputContainer.innerHTML = `
+        <div class="picker-panel picker-panel--inline" data-role="picker-panel">
+            <div class="height-ruler">
+                <div class="height-ruler__center-line" aria-hidden="true"></div>
+                <div class="height-ruler__viewport" id="height-ruler-viewport" aria-label="Выбор роста"></div>
+                <div class="height-ruler__value">
+                    <span id="height-ruler-value" class="height-ruler__value-number">${startHeight}</span>
+                    <span class="height-ruler__value-unit">см</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const viewport = document.getElementById('height-ruler-viewport');
+    const valueElement = document.getElementById('height-ruler-value');
+    if (!viewport || !valueElement) {
+        return;
+    }
+
+    const scale = document.createElement('div');
+    scale.className = 'height-ruler__scale';
+    for (let value = minHeight; value <= maxHeight; value += stepCm) {
+        const tick = document.createElement('div');
+        const isMajor = value % 5 === 0;
+        tick.className = isMajor ? 'height-ruler__tick height-ruler__tick--major' : 'height-ruler__tick';
+        tick.style.height = `${pixelsPerStep}px`;
+        if (isMajor) {
+            const label = document.createElement('span');
+            label.className = 'height-ruler__tick-label';
+            label.textContent = `${value}`;
+            tick.appendChild(label);
+        }
+        scale.appendChild(tick);
+    }
+    viewport.appendChild(scale);
+
+    const updateHeightFromScroll = () => {
+        const rawIndex = Math.round(viewport.scrollTop / pixelsPerStep);
+        const value = Math.min(maxHeight, Math.max(minHeight, minHeight + rawIndex));
+        valueElement.textContent = `${value}`;
+        window.userData[dataKey] = value;
+        window.userData.height = value;
+        saveUserData();
+        updateButtonStates();
+    };
+
+    const alignToValue = (value) => {
+        const targetIndex = Math.min(maxHeight, Math.max(minHeight, value)) - minHeight;
+        viewport.scrollTop = targetIndex * pixelsPerStep;
+        updateHeightFromScroll();
+    };
+
+    requestAnimationFrame(() => {
+        const spacer = Math.max(0, (viewport.clientHeight - pixelsPerStep) / 2);
+        scale.style.paddingTop = `${spacer}px`;
+        scale.style.paddingBottom = `${spacer}px`;
+        alignToValue(startHeight);
+    });
+
+    viewport.addEventListener('scroll', updateHeightFromScroll, { passive: true });
+}
+
 // Display input field for date/number questions
 function displayInput(question) {
     let currentValue = window.userData[getDataKey(currentQuestionIndex)];
@@ -513,6 +589,10 @@ function displayInput(question) {
             daySelect.addEventListener('change', applyBirthDate);
         }
     } else if (question.type === 'number') {
+        if (question.id === 3) {
+            renderHeightRuler(currentValue);
+            return;
+        }
         const resolved = resolveNumberPickerState(question, currentValue);
         currentValue = resolved.value;
         if (resolved.shouldPersist) {
@@ -614,7 +694,7 @@ function parseNumberValue(value) {
 
 function getNumberRangeForQuestion(question) {
     if (question.id === 3) {
-        return { min: 140, max: 210, step: 1 };
+        return { min: 120, max: 220, step: 1 };
     }
     if (question.id === 4 || question.id === 5) {
         return { min: 40, max: 200, step: 0.5 };
