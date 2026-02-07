@@ -24,35 +24,17 @@
                     <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 mb-4 shadow-lg">
                         <i data-feather="book-open" class="w-7 h-7 text-white"></i>
                     </div>
-                    <h1 class="text-2xl font-bold text-slate-800">Дневник дня</h1>
-                    <p class="text-slate-500 mt-2">Всё за один день: еда, вода, сон и активность.</p>
+                    <h1 class="text-2xl font-bold text-slate-800">Дневник питания</h1>
+                    <p class="text-slate-500 mt-2">Добавляйте продукты по приёмам пищи и редактируйте записи через кнопку «+».</p>
                 </div>
 
                 <div class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100" id="diary-mode-day">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                            <h3 class="font-semibold text-slate-800">Сегодняшняя картина</h3>
-                            <p class="text-sm text-slate-500">Выберите дату, чтобы увидеть день целиком.</p>
+                            <h3 class="font-semibold text-slate-800">Приёмы пищи по дате</h3>
+                            <p class="text-sm text-slate-500">Выберите дату и добавляйте продукты в завтрак, обед, ужин или перекус.</p>
                         </div>
                         <input type="date" id="diary-day-date" class="form-input w-auto" required>
-                    </div>
-                    <div class="mt-4 grid grid-cols-2 gap-3">
-                        <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                            <div class="text-xs text-slate-500">Калории</div>
-                            <div id="diary-day-summary-calories" class="text-lg font-semibold text-slate-800">—</div>
-                        </div>
-                        <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                            <div class="text-xs text-slate-500">БЖУ</div>
-                            <div id="diary-day-summary-macros" class="text-sm font-semibold text-slate-800">—</div>
-                        </div>
-                        <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                            <div class="text-xs text-slate-500">Вода</div>
-                            <div id="diary-day-summary-water" class="text-lg font-semibold text-slate-800">—</div>
-                        </div>
-                        <div class="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                            <div class="text-xs text-slate-500">Сон</div>
-                            <div id="diary-day-summary-sleep" class="text-lg font-semibold text-slate-800">—</div>
-                        </div>
                     </div>
                     <p id="diary-day-hint" class="text-sm text-slate-500 mt-3"></p>
                 </div>
@@ -86,37 +68,6 @@
                         </div>
                         <div id="diary-meal-snack-list" class="mt-3 space-y-2 text-sm text-slate-600"></div>
                     </div>
-                </div>
-
-                <div class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100">
-                    <div class="flex items-center justify-between">
-                        <span class="font-semibold text-slate-800">💧 Вода за день</span>
-                        <span id="diary-water-total" class="text-xs text-slate-500"></span>
-                    </div>
-                    <input type="number" id="diary-day-water" class="form-input mt-3" placeholder="Вода, л" min="0" step="0.01">
-                    <div class="flex flex-wrap gap-2 mt-3">
-                        <button type="button" class="btn-secondary" data-action="quick-water" data-water-target="day" data-water-add="0.25">+250 мл</button>
-                        <button type="button" class="btn-secondary" data-action="quick-water" data-water-target="day" data-water-add="0.5">+500 мл</button>
-                        <button type="button" class="btn-secondary" data-action="quick-water" data-water-target="day" data-water-add="1">+1 л</button>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100">
-                    <div class="flex items-center justify-between">
-                        <span class="font-semibold text-slate-800">🌙 Сон и активность за день</span>
-                    </div>
-                    <p class="text-xs text-slate-500 mt-2">
-                        Время сна и активность сохраняются вручную для выбранной даты.
-                    </p>
-                    <label class="text-sm text-slate-600 mt-3 block">
-                        Время отхода ко сну (необязательно)
-                        <input type="time" id="diary-day-sleep" class="form-input mt-2" placeholder="Время отхода ко сну">
-                    </label>
-                    <label class="flex items-center gap-2 text-sm text-slate-600 mt-3">
-                        <input type="checkbox" class="form-checkbox" id="diary-day-activity">
-                        <span>Сегодня была активность (отмечаю вручную)</span>
-                    </label>
-                    <p class="text-xs text-slate-400 mt-2">Чекбокс не проставляется автоматически.</p>
                 </div>
 
                 <div id="diary-products-panel" class="diary-panel hidden">
@@ -157,62 +108,6 @@
                     </div>
                 </div>
 
-                <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100" data-diary-section>
-                    <h3 class="font-semibold text-slate-800 mb-4">Последние дни</h3>
-                    <div id="diary-list" class="space-y-3 text-sm text-slate-600"></div>
-                </div>
-
-                <div id="diary-risk-section" class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100" data-diary-section>
-                    <h3 class="font-semibold text-slate-800 mb-4">Риск отклонения</h3>
-                    <div class="flex items-center gap-3">
-                        <span id="diary-risk-indicator" class="inline-flex h-3 w-3 rounded-full bg-emerald-400"></span>
-                        <span id="diary-risk-label" class="text-sm font-semibold text-slate-700">Риск низкий</span>
-                    </div>
-                    <p class="text-sm text-slate-500 mt-4 font-semibold">Что это значит</p>
-                    <p id="diary-risk-comment" class="text-sm text-slate-600 mt-2"></p>
-                    <a id="diary-fix-button" href="/diary" class="btn-secondary w-full mt-4 text-center">
-                        Как исправить
-                    </a>
-                </div>
-
-                <div id="diary-ai-section" class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100" data-diary-section>
-                    <div class="flex items-center gap-2 mb-4">
-                        <h3 class="font-semibold text-slate-800">Комментарий от ИИ</h3>
-                        <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 hidden" data-ai-badge>
-                            ИИ-рекомендации (beta)
-                        </span>
-                    </div>
-                    <div id="diary-ai-comment" class="space-y-2 text-sm text-slate-600"></div>
-                </div>
-
-                <div id="diary-paywall" class="bg-rose-50 rounded-2xl p-6 shadow-lg border border-rose-100 hidden" data-diary-section>
-                    <h3 class="font-semibold text-rose-800 mb-3">Подписка закончилась</h3>
-                    <p id="diary-paywall-text" class="text-sm text-rose-700"></p>
-                    <div class="mt-4 border-t border-rose-100 pt-4">
-                        <p class="text-sm font-semibold text-rose-800">Почему платная версия полезна именно вам</p>
-                        <p id="diary-payment-motivation" class="text-sm text-rose-700 mt-2"></p>
-                    </div>
-                    <ul class="mt-4 space-y-2 text-sm text-rose-700">
-                        <li class="flex items-start gap-2">
-                            <span class="mt-1 h-2 w-2 rounded-full bg-rose-400"></span>
-                            <span>Прогноз сроков и риска отклонений</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <span class="mt-1 h-2 w-2 rounded-full bg-rose-400"></span>
-                            <span>Персональные рекомендации по питанию</span>
-                        </li>
-                        <li class="flex items-start gap-2">
-                            <span class="mt-1 h-2 w-2 rounded-full bg-rose-400"></span>
-                            <span>Аналитика дневника и динамика</span>
-                        </li>
-                    </ul>
-                    <button id="diary-paywall-button" type="button" class="btn-primary w-full mt-5">
-                        Оформить подписку
-                    </button>
-                    <p class="text-xs text-slate-500 mt-2">
-                        Оплата будет доступна после подключения эквайринга
-                    </p>
-                </div>
             </div>
         </main>
 
@@ -222,8 +117,6 @@
             <button type="button" class="diary-fab__item" data-fab-action="meal" data-meal="lunch">➕ Добавить обед</button>
             <button type="button" class="diary-fab__item" data-fab-action="meal" data-meal="dinner">➕ Добавить ужин</button>
             <button type="button" class="diary-fab__item" data-fab-action="meal" data-meal="snack">➕ Добавить перекус</button>
-            <button type="button" class="diary-fab__item" data-fab-action="water">💧 Добавить воду</button>
-            <button type="button" class="diary-fab__item" data-fab-action="sleep">🌙 Указать сон</button>
         </div>
 
         <custom-footer></custom-footer>

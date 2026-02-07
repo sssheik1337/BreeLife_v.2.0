@@ -383,7 +383,7 @@ function renderDiaryList(entries) {
             ? `<div class="text-slate-500">Сон: ${String(Math.floor(summary.sleep_time / 60)).padStart(2, '0')}:${String(summary.sleep_time % 60).padStart(2, '0')}</div>`
             : '';
         const entriesMarkup = dayEntries.map((entry) => {
-            const modeLabel = entry.mode === MODE_PRODUCTS ? 'По продуктам' : 'Итоги дня';
+            const modeLabel = entry.mode === MODE_PRODUCTS ? 'По продуктам' : 'Запись';
             const mealLabel = entry.mode === MODE_PRODUCTS ? (mealLabels[entry.meal] || 'Приём пищи') : '';
             const totals = entry.mode === MODE_PRODUCTS
                 ? entry.totals || calculateTotals(entry.items || [])
@@ -834,44 +834,18 @@ function renderDailySummary(entries, date) {
 function renderDayScreen(entries, dateKey) {
     const container = document.getElementById('diary-mode-day');
     const dateInput = document.getElementById('diary-day-date');
-    const waterInput = document.getElementById('diary-day-water');
-    const sleepInput = document.getElementById('diary-day-sleep');
-    const activityInput = document.getElementById('diary-day-activity');
-    const caloriesEl = document.getElementById('diary-day-summary-calories');
-    const macrosEl = document.getElementById('diary-day-summary-macros');
-    const waterEl = document.getElementById('diary-day-summary-water');
-    const sleepEl = document.getElementById('diary-day-summary-sleep');
-    const waterTotal = document.getElementById('diary-water-total');
     const hint = document.getElementById('diary-day-hint');
-    if (!container || !dateInput || !waterInput || !sleepInput || !activityInput || !hint) {
+    if (!container || !dateInput || !hint) {
         return;
     }
     if (!dateKey) {
         dateInput.value = '';
-        hint.textContent = 'Выберите дату, чтобы управлять днём.';
-        if (caloriesEl) {
-            caloriesEl.textContent = '—';
-        }
-        if (macrosEl) {
-            macrosEl.textContent = '—';
-        }
-        if (waterEl) {
-            waterEl.textContent = '—';
-        }
-        if (sleepEl) {
-            sleepEl.textContent = '—';
-        }
-        if (waterTotal) {
-            waterTotal.textContent = '';
-        }
-        waterInput.value = '';
-        sleepInput.value = '';
-        activityInput.checked = false;
+        hint.textContent = 'Выберите дату и добавьте хотя бы один приём пищи.';
         ['breakfast', 'lunch', 'dinner', 'snack'].forEach((meal) => {
             const list = document.getElementById(`diary-meal-${meal}-list`);
             const total = document.getElementById(`diary-meal-${meal}-total`);
             if (list) {
-                list.innerHTML = '<p class="text-sm text-slate-400">Ничего не добавлено.</p>';
+                list.innerHTML = '<p class="text-slate-400">Выберите дату, чтобы добавить продукты.</p>';
             }
             if (total) {
                 total.textContent = '';
@@ -879,48 +853,21 @@ function renderDayScreen(entries, dateKey) {
         });
         return;
     }
+
     dateInput.value = dateKey;
+
     const dayEntries = getEntriesByDate(entries, dateKey);
-    const waterMax = getMaxWaterForDate(entries, dateKey);
-    const sleepMinutes = getMinSleepForDate(entries, dateKey);
-    const activityValue = getActivityForDate(entries, dateKey);
-    waterInput.value = waterMax > 0 ? waterMax.toFixed(1) : '';
-    sleepInput.value = sleepMinutes !== null
-        ? `${String(Math.floor(sleepMinutes / 60)).padStart(2, '0')}:${String(sleepMinutes % 60).padStart(2, '0')}`
-        : '';
-    activityInput.checked = activityValue;
-    hint.textContent = dayEntries.length
-        ? 'Изменения сохраняются сразу для выбранной даты.'
-        : 'За этот день пока нет записей. Добавьте приём пищи или воду.';
+    const mealEntries = dayEntries.filter((entry) => entry.mode === MODE_PRODUCTS && entry.meal);
+    hint.textContent = mealEntries.length
+        ? 'Заполняйте приёмы пищи продуктами. Для редактирования используйте кнопку «Редактировать».'
+        : 'За эту дату ещё нет приёмов пищи. Нажмите «Добавить» в нужной карточке или кнопку «+».';
 
-    if (waterTotal) {
-        waterTotal.textContent = `${waterMax.toFixed(1)} л`;
-    }
-
-    const summary = buildDayTotals(dayEntries, entries, dateKey);
-    const totals = summary.totals;
     const mealTitles = {
         breakfast: 'завтрак',
         lunch: 'обед',
         dinner: 'ужин',
         snack: 'перекус'
     };
-    if (caloriesEl) {
-        caloriesEl.textContent = dayEntries.length ? `${Math.round(totals.calories)} ккал` : '—';
-    }
-    if (macrosEl) {
-        macrosEl.textContent = dayEntries.length
-            ? `Б ${Math.round(totals.protein_g)} · Ж ${Math.round(totals.fat_g)} · У ${Math.round(totals.carbs_g)}`
-            : '—';
-    }
-    if (waterEl) {
-        waterEl.textContent = waterMax > 0 ? `${waterMax.toFixed(1)} л` : '—';
-    }
-    if (sleepEl) {
-        sleepEl.textContent = sleepMinutes !== null
-            ? `${String(Math.floor(sleepMinutes / 60)).padStart(2, '0')}:${String(sleepMinutes % 60).padStart(2, '0')}`
-            : '—';
-    }
 
     const renderMealCard = (mealKey) => {
         const list = document.getElementById(`diary-meal-${mealKey}-list`);
@@ -928,36 +875,37 @@ function renderDayScreen(entries, dateKey) {
         if (!list || !total) {
             return;
         }
-        const entry = findProductsEntry(entries, dateKey, mealKey);
+        const entry = mealEntries.find((item) => item.meal === mealKey) || null;
         if (!entry) {
             list.innerHTML = `
-                <p class="text-sm text-slate-400">Ничего не добавлено.</p>
+                <p class="text-slate-400">Ничего не добавлено.</p>
                 <button type="button" class="text-emerald-600 font-semibold mt-2" data-action="edit-meal" data-meal="${mealKey}">Добавить ${mealTitles[mealKey] || 'приём пищи'}</button>
             `;
             total.textContent = '';
             return;
         }
+
         const totals = entry.totals || calculateTotals(entry.items || []);
-        total.textContent = `${Math.round(totals.calories)} ккал`;
-        const itemsMarkup = Array.isArray(entry.items) && entry.items.length
-            ? entry.items.map((item) => `
-                <div class="flex items-center justify-between">
-                    <span>${item?.name || 'Без названия'}</span>
-                    <span class="text-xs text-slate-400">${Math.round(item?.calories || 0)} ккал</span>
-                </div>
-            `).join('')
-            : '<p class="text-sm text-slate-400">Список продуктов не заполнен.</p>';
+        const carbs = Math.round(Number(totals.carbs_g) || 0);
+        total.textContent = `${Math.round(Number(totals.calories) || 0)} ккал`;
+        const items = Array.isArray(entry.items) ? entry.items : [];
         list.innerHTML = `
-            <div class="space-y-2">${itemsMarkup}</div>
-            <div class="mt-3 flex items-center gap-3 text-xs">
+            <div class="space-y-2">
+                ${items.map((item) => `
+                    <div class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                        <span>${item.name}</span>
+                        <span class="text-xs text-slate-500">${Math.round(Number(item.grams) || 0)} г</span>
+                    </div>
+                `).join('')}
+                <p class="text-xs text-slate-500">Б ${Math.round(Number(totals.protein_g) || 0)} • Ж ${Math.round(Number(totals.fat_g) || 0)} • У ${carbs}</p>
                 <button type="button" class="text-emerald-600 font-semibold" data-action="edit-meal" data-meal="${mealKey}">Редактировать</button>
-                <button type="button" class="text-rose-500 font-semibold" data-action="delete-entry" data-date="${entry.date}" data-mode="${MODE_PRODUCTS}" data-meal="${mealKey}">Удалить</button>
             </div>
         `;
     };
 
     ['breakfast', 'lunch', 'dinner', 'snack'].forEach(renderMealCard);
 }
+
 
 function updateDayMeta(entries, dateKey, waterValue, sleepValue, activityValue) {
     if (!dateKey) {
@@ -1461,7 +1409,7 @@ function bindGlobalDiaryHandlers() {
     document.addEventListener('click', (event) => {
         const fabToggle = event.target.closest('[data-action="fab-toggle"]');
         if (fabToggle) {
-            toggleFabMenu();
+            openProductsForm(getSelectedDate(), 'breakfast');
             return;
         }
 
@@ -1477,12 +1425,6 @@ function bindGlobalDiaryHandlers() {
             closeFabMenu();
             if (action === 'meal') {
                 openProductsForm(getSelectedDate(), fabItem.dataset.meal || 'breakfast');
-            } else if (action === 'water') {
-                const waterInput = document.getElementById('diary-day-water');
-                waterInput?.focus();
-            } else if (action === 'sleep') {
-                const sleepInput = document.getElementById('diary-day-sleep');
-                sleepInput?.focus();
             }
             return;
         }
@@ -1492,24 +1434,11 @@ function bindGlobalDiaryHandlers() {
             const target = quickWaterButton.dataset.waterTarget;
             const amount = Number(quickWaterButton.dataset.waterAdd);
             const targets = {
-                day: {
-                    dateInput: document.getElementById('diary-day-date'),
-                    waterInput: document.getElementById('diary-day-water'),
-                    sleepInput: document.getElementById('diary-day-sleep'),
-                    activityInput: document.getElementById('diary-day-activity'),
-                    hintId: 'diary-day-hint'
-                },
                 products: {
                     dateInput: document.getElementById('diary-products-date'),
                     waterInput: document.getElementById('diary-products-water'),
                     sleepInput: document.getElementById('diary-products-sleep'),
                     activityInput: document.getElementById('diary-products-activity')
-                },
-                summary: {
-                    dateInput: document.getElementById('diary-summary-date'),
-                    waterInput: document.getElementById('diary-summary-water'),
-                    sleepInput: document.getElementById('diary-summary-sleep'),
-                    activityInput: document.getElementById('diary-summary-activity')
                 }
             };
             const config = target ? targets[target] : null;
@@ -1844,23 +1773,6 @@ async function initDiary() {
         });
     }
 
-    const dayWaterInput = document.getElementById('diary-day-water');
-    const daySleepInput = document.getElementById('diary-day-sleep');
-    const dayActivityInput = document.getElementById('diary-day-activity');
-    const persistDayChanges = () => {
-        const dateKey = getSelectedDate();
-        if (!dateKey) {
-            return;
-        }
-        const waterValue = Number(dayWaterInput?.value);
-        const sleepValue = daySleepInput?.value || '';
-        const activityValue = Boolean(dayActivityInput?.checked);
-        persistDayMeta(dateKey, waterValue, sleepValue, activityValue, { hintId: 'diary-day-hint' });
-    };
-    dayWaterInput?.addEventListener('change', persistDayChanges);
-    daySleepInput?.addEventListener('change', persistDayChanges);
-    dayActivityInput?.addEventListener('change', persistDayChanges);
-
     const handleDateChange = () => {
         const entries = readDiaryEntries();
         const selected = getSelectedDate();
@@ -1933,7 +1845,7 @@ async function initDiary() {
     renderDayScreen(readDiaryEntries(), resolvedDate);
 
     if (openFabOnLoad) {
-        toggleFabMenu();
+        openProductsForm(getSelectedDate(), getMealFromUrl() || 'breakfast');
         params.delete('fab');
         const next = params.toString();
         const nextUrl = next ? `${window.location.pathname}?${next}` : window.location.pathname;
