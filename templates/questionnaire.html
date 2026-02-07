@@ -168,6 +168,9 @@
       }
       .ruler--vertical .ruler__track {
         width: max-content;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
       }
       .ruler--horizontal .ruler__track {
         height: 100%;
@@ -188,6 +191,7 @@
         height: 12px;
         display: flex;
         align-items: center;
+        justify-content: center;
       }
       .ruler--horizontal .ruler__tick {
         position: relative;

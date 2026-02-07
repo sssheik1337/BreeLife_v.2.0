@@ -373,21 +373,17 @@ function renderHeightRuler(currentValue) {
 
     const getScrollOffsetForIndex = (index) => index * pixelsPerStep + pixelsPerStep / 2 - getCenterOffset();
 
-    const normalizeVirtualScroll = () => {
-        const raw = getVirtualIndexFromScroll();
+    const normalizeVirtualScroll = (rawIndex) => {
         const minSafe = rangeSteps;
         const maxSafe = rangeSteps * (loopCount - 1);
-        if (raw < minSafe || raw > maxSafe) {
-            const normalized = ((raw % rangeSteps) + rangeSteps) % rangeSteps;
-            const target = normalized + rangeSteps * Math.floor(loopCount / 2);
-            ruler.scrollTop = getScrollOffsetForIndex(target);
-            return target;
+        if (rawIndex < minSafe || rawIndex > maxSafe) {
+            const normalized = ((rawIndex % rangeSteps) + rangeSteps) % rangeSteps;
+            return normalized + rangeSteps * Math.floor(loopCount / 2);
         }
-        return raw;
+        return rawIndex;
     };
 
-    const applyHeightValue = () => {
-        const virtualIndex = normalizeVirtualScroll();
+    const applyHeightValue = (virtualIndex) => {
         const normalized = ((virtualIndex % rangeSteps) + rangeSteps) % rangeSteps;
         const value = minHeight + normalized * stepCm;
         valueElement.textContent = `${value}`;
@@ -407,14 +403,19 @@ function renderHeightRuler(currentValue) {
         }
         rafId = requestAnimationFrame(() => {
             rafId = null;
-            applyHeightValue();
+            const rawIndex = getVirtualIndexFromScroll();
+            const normalizedIndex = normalizeVirtualScroll(rawIndex);
+            if (normalizedIndex !== rawIndex) {
+                ruler.scrollTop = getScrollOffsetForIndex(normalizedIndex);
+            }
+            applyHeightValue(normalizedIndex);
         });
     };
 
     requestAnimationFrame(() => {
         const startIndex = Math.round((startHeight - minHeight) / stepCm) + rangeSteps * Math.floor(loopCount / 2);
         ruler.scrollTop = getScrollOffsetForIndex(startIndex);
-        applyHeightValue();
+        applyHeightValue(startIndex);
         ruler.addEventListener('scroll', onScroll, { passive: true });
     });
 }
