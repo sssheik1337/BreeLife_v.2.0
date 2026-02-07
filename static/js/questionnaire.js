@@ -307,12 +307,7 @@ function displayOptions(options) {
 
 
 function renderHeightRuler(currentValue) {
-            <p class="ruler-current" aria-live="polite">
-                <span id="height-ruler-value" class="ruler-current__number">${startHeight}</span>
-                <span class="ruler-current__unit">см</span>
-            </p>
-    const loopCount = 7;
-    const rangeSteps = Math.round((maxHeight - minHeight) / stepCm) + 1;
+    const startHeight = 170;
     const totalVirtualSteps = rangeSteps * loopCount;
     const dataKey = getDataKey(currentQuestionIndex);
     const parsedCurrent = parseNumberValue(currentValue);
@@ -442,12 +437,7 @@ function renderHeightRuler(currentValue) {
             ruler.scrollTop = getScrollOffsetForIndex(target);
             return target;
         }
-        return raw;
-    };
-
-    const applyHeightValue = () => {
-        const virtualIndex = normalizeVirtualScroll();
-        const normalized = ((virtualIndex % rangeSteps) + rangeSteps) % rangeSteps;
+    const startWeight = 70;
         const value = minHeight + normalized * stepCm;
         valueElement.textContent = `${value}`;
         ticks.forEach((tick) => {
