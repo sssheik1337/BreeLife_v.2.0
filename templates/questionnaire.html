@@ -39,7 +39,7 @@
         right: 0;
         height: 24px;
         pointer-events: none;
-        z-index: 2;
+        z-index: 4;
       }
       .wheel-column::before {
         top: 0;
@@ -127,6 +127,8 @@
       .ruler {
         position: relative;
         overflow: auto;
+        background: transparent;
+        border: 0;
         scrollbar-width: none;
       }
       .ruler::-webkit-scrollbar {
@@ -135,10 +137,14 @@
       .ruler--vertical {
         height: 280px;
         overflow-x: hidden;
+        -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
+        mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
       }
       .ruler--horizontal {
         height: 176px;
         overflow-y: hidden;
+        -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
+        mask-image: linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
       }
       .ruler__track {
         position: relative;
@@ -152,6 +158,10 @@
       .ruler__tick {
         color: #64748b;
         font-size: 12px;
+        opacity: 0.72;
+        transform: translateZ(0) scale(1);
+        filter: none;
+        transition: color 0.18s ease-out, opacity 0.18s ease-out, transform 0.18s ease-out, filter 0.18s ease-out;
       }
       .ruler--vertical .ruler__tick {
         height: 12px;
@@ -181,8 +191,9 @@
         height: 24px;
       }
       .ruler__tick--major {
-        color: #64748b;
+        color: #475569;
         font-weight: 600;
+        opacity: 0.9;
       }
       .ruler--vertical .ruler__tick--major::before {
         width: 44px;
@@ -193,8 +204,11 @@
         background: #94a3b8;
       }
       .ruler__tick--active {
-        color: #0f172a;
-        font-weight: 700;
+        color: #020617;
+        font-weight: 800;
+        opacity: 1;
+        transform: translateZ(0) scale(1.1);
+        filter: drop-shadow(0 2px 8px rgba(15, 23, 42, 0.24));
       }
       .ruler--vertical .ruler__tick--active::before {
         background: #0f172a;
@@ -205,10 +219,13 @@
         width: 2px;
       }
       .ruler__tick--active .ruler__tick-label {
-        font-size: 14px;
+        font-size: 16px;
+        font-weight: 800;
+        letter-spacing: 0.01em;
+        text-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
       }
       .ruler__tick-label {
-        transition: font-size 0.15s ease-out;
+        transition: font-size 0.18s ease-out, transform 0.18s ease-out;
       }
       .ruler--vertical .ruler__tick-label {
         margin-left: 10px;
@@ -223,7 +240,7 @@
         background: #ef4444;
         border-radius: 999px;
         pointer-events: none;
-        z-index: 2;
+        z-index: 5;
       }
       .ruler--vertical .ruler__indicator {
         left: 0;
@@ -244,6 +261,7 @@
         position: absolute;
         pointer-events: none;
         z-index: 3;
+        opacity: 0.75;
       }
       .ruler--vertical .ruler__fade {
         left: 0;
