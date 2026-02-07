@@ -334,9 +334,53 @@ function renderHeightRuler(currentValue) {
                 <div class="ruler__fade ruler__fade--end" aria-hidden="true"></div>
                 <div class="ruler__indicator" aria-hidden="true"></div>
                 <div class="ruler__track" id="height-ruler-track"></div>
-            </div>
-        </div>
-    const recenterThreshold = 1400;
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+    let lastActiveIndex = -1;
+    let lastStyledRange = { start: -1, end: -1 };
+
+        if (lastActiveIndex !== activeIndex) {
+            if (lastActiveIndex >= 0 && ticks[lastActiveIndex]) {
+                ticks[lastActiveIndex].classList.remove('ruler__tick--active');
+            }
+            if (ticks[activeIndex]) {
+                ticks[activeIndex].classList.add('ruler__tick--active');
+            }
+            lastActiveIndex = activeIndex;
+        }
+
+        const centerPx = getCenterOffsetPx();
+        const centerPosition = scrollOffset + centerPx;
+        const visibleRadius = Math.ceil(centerPx / pixelsPerStep) + 24;
+        const rangeStart = clamp(activeIndex - visibleRadius, 0, virtualSteps - 1);
+        const rangeEnd = clamp(activeIndex + visibleRadius, 0, virtualSteps - 1);
+
+        if (lastStyledRange.start !== -1) {
+            for (let i = lastStyledRange.start; i <= lastStyledRange.end; i += 1) {
+                if (i < rangeStart || i > rangeEnd) {
+                    const tick = ticks[i];
+                    if (!tick) {
+                        continue;
+                    }
+                    tick.style.transform = '';
+                    tick.style.opacity = '';
+                }
+            }
+        }
+
+        for (let i = rangeStart; i <= rangeEnd; i += 1) {
+            const tick = ticks[i];
+            if (!tick) {
+                continue;
+            }
+            const tickCenter = i * pixelsPerStep + pixelsPerStep / 2;
+            const distance = Math.abs(tickCenter - centerPosition);
+            const scale = clamp(1.0 - distance * 0.002, 0.85, 1.1);
+            const opacity = clamp(1.0 - distance * 0.0032, 0.22, 1);
+            tick.style.transform = `translateZ(0) scale(${scale.toFixed(3)})`;
+            tick.style.opacity = opacity.toFixed(3);
+        }
+
+        lastStyledRange = { start: rangeStart, end: rangeEnd };
     let baseValue = startHeight;
     let centerOffset = getScrollOffsetForIndex(originIndex);
 
@@ -445,9 +489,53 @@ function renderWeightRuler(currentValue) {
     const dataKey = getDataKey(currentQuestionIndex);
     const parsedCurrent = parseNumberValue(currentValue);
     const defaultWeight = Number.isFinite(parsedCurrent)
-        ? Math.round(parsedCurrent * 2) / 2
-        : Number.isFinite(parseNumberValue(window.userData.currentWeight))
-    const recenterThreshold = 1400;
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+    let lastActiveIndex = -1;
+    let lastStyledRange = { start: -1, end: -1 };
+
+        if (lastActiveIndex !== activeIndex) {
+            if (lastActiveIndex >= 0 && ticks[lastActiveIndex]) {
+                ticks[lastActiveIndex].classList.remove('ruler__tick--active');
+            }
+            if (ticks[activeIndex]) {
+                ticks[activeIndex].classList.add('ruler__tick--active');
+            }
+            lastActiveIndex = activeIndex;
+        }
+
+        const centerPx = getCenterOffsetPx();
+        const centerPosition = scrollOffset + centerPx;
+        const visibleRadius = Math.ceil(centerPx / pixelsPerStep) + 24;
+        const rangeStart = clamp(activeIndex - visibleRadius, 0, virtualSteps - 1);
+        const rangeEnd = clamp(activeIndex + visibleRadius, 0, virtualSteps - 1);
+
+        if (lastStyledRange.start !== -1) {
+            for (let i = lastStyledRange.start; i <= lastStyledRange.end; i += 1) {
+                if (i < rangeStart || i > rangeEnd) {
+                    const tick = ticks[i];
+                    if (!tick) {
+                        continue;
+                    }
+                    tick.style.transform = '';
+                    tick.style.opacity = '';
+                }
+            }
+        }
+
+        for (let i = rangeStart; i <= rangeEnd; i += 1) {
+            const tick = ticks[i];
+            if (!tick) {
+                continue;
+            }
+            const tickCenter = i * pixelsPerStep + pixelsPerStep / 2;
+            const distance = Math.abs(tickCenter - centerPosition);
+            const scale = clamp(1.0 - distance * 0.002, 0.85, 1.1);
+            const opacity = clamp(1.0 - distance * 0.0032, 0.22, 1);
+            tick.style.transform = `translateZ(0) scale(${scale.toFixed(3)})`;
+            tick.style.opacity = opacity.toFixed(3);
+        }
+
+        lastStyledRange = { start: rangeStart, end: rangeEnd };
     let baseValue = startWeight;
     let centerOffset = getScrollOffsetForIndex(originIndex);
 
