@@ -131,29 +131,23 @@
       .ruler--vertical {
         height: 280px;
         overflow-x: hidden;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        scroll-snap-type: y proximity;
+        scroll-snap-type: y mandatory;
         -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
         mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
       }
       .ruler--horizontal {
         height: 176px;
         overflow-y: hidden;
-        scroll-snap-type: x proximity;
+        scroll-snap-type: x mandatory;
         -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
         mask-image: linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
       }
       .ruler__track {
         position: relative;
-        background: transparent;
       }
       .ruler--vertical .ruler__track {
         width: max-content;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
+        margin: 0 auto;
       }
       .ruler--horizontal .ruler__track {
         height: 100%;
