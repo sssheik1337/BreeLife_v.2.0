@@ -388,7 +388,7 @@ function renderHeightRuler(currentValue) {
     const updateHeightMagnifier = (virtualIndex) => {
         const centerOffset = getCenterOffset();
         const centerPosition = ruler.scrollTop + centerOffset;
-        const visibleRadius = Math.ceil(centerOffset / pixelsPerStep) + 18;
+        const visibleRadius = Math.ceil(centerOffset / pixelsPerStep) + 10;
         const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
         const rangeStart = clamp(virtualIndex - visibleRadius, 0, totalVirtualSteps - 1);
         const rangeEnd = clamp(virtualIndex + visibleRadius, 0, totalVirtualSteps - 1);
@@ -526,7 +526,7 @@ function renderWeightRuler(currentValue) {
     const updateWeightMagnifier = (virtualIndex) => {
         const centerOffset = getCenterOffset();
         const centerPosition = ruler.scrollLeft + centerOffset;
-        const visibleRadius = Math.ceil(centerOffset / pixelsPerStep) + 18;
+        const visibleRadius = Math.ceil(centerOffset / pixelsPerStep) + 10;
         const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
         const rangeStart = clamp(virtualIndex - visibleRadius, 0, totalVirtualSteps - 1);
         const rangeEnd = clamp(virtualIndex + visibleRadius, 0, totalVirtualSteps - 1);
