@@ -2,7 +2,8 @@ import hashlib
 import hmac
 import json
 import logging
-from contextlib import asynccontextmanager
+import sqlite3
+from contextlib import asynccontextmanager, contextmanager
 import secrets
 import uuid
 from urllib.parse import parse_qsl
@@ -155,6 +156,7 @@ init_db()
 
 ADMIN_CONFIG_PATH = Path("config/admin_config.json")
 ADMIN_PRODUCTS_PATH = Path("static/data/products.json")
+PRODUCTS_DB_PATH = Path("static/data/products.db")
 ADMIN_CONFIG_CACHE: dict[str, object] | None = None
 ADMIN_CONFIG_MTIME: float | None = None
 ADMIN_SESSION_COOKIE = "admin_session"
@@ -183,17 +185,144 @@ def loadAdminConfig() -> dict[str, object]:
     return ADMIN_CONFIG_CACHE or {}
 
 
-def loadAdminProducts() -> list[dict[str, object]]:
-    """Загрузить список продуктов из файла, если он доступен."""
-    if not ADMIN_PRODUCTS_PATH.exists():
-        return []
+@contextmanager
+def getProductsConnection() -> sqlite3.Connection:
+    PRODUCTS_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(PRODUCTS_DB_PATH)
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
     try:
-        data = json.loads(ADMIN_PRODUCTS_PATH.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return []
-    if not isinstance(data, list):
-        return []
-    return [item for item in data if isinstance(item, dict)]
+        yield connection
+    finally:
+        connection.close()
+
+
+def ensureProductsDb() -> None:
+    with getProductsConnection() as connection:
+        connection.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS product_groups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS products (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                group_name TEXT,
+                kcal REAL,
+                protein_g REAL,
+                fat_g REAL,
+                carbs_g REAL,
+                carbs_simple_g REAL,
+                carbs_complex_g REAL,
+                fiber_g REAL,
+                tags TEXT,
+                health_level TEXT
+            );
+            """
+        )
+        columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(products)").fetchall()
+        }
+        if "carbs_g" not in columns:
+            connection.execute("ALTER TABLE products ADD COLUMN carbs_g REAL")
+        products_count = connection.execute("SELECT COUNT(*) FROM products").fetchone()[0]
+        groups_count = connection.execute("SELECT COUNT(*) FROM product_groups").fetchone()[0]
+        if products_count or groups_count:
+            return
+        legacy_products = []
+        if ADMIN_PRODUCTS_PATH.exists():
+            try:
+                legacy_products = json.loads(ADMIN_PRODUCTS_PATH.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                legacy_products = []
+        if not isinstance(legacy_products, list):
+            legacy_products = []
+        config = loadAdminConfig()
+        legacy_groups = normalize_group_list(
+            config.get("product_groups") if isinstance(config, dict) else []
+        )
+        for item in legacy_products:
+            group = item.get("group") if isinstance(item, dict) else None
+            if isinstance(group, str):
+                normalized = group.strip()
+                if normalized and normalized not in legacy_groups:
+                    legacy_groups.append(normalized)
+        for group in sorted(legacy_groups):
+            connection.execute(
+                "INSERT OR IGNORE INTO product_groups (name) VALUES (?)",
+                (group,),
+            )
+        for item in legacy_products:
+            if not isinstance(item, dict):
+                continue
+            tags = item.get("tags")
+            tags_payload = json.dumps(tags, ensure_ascii=False) if isinstance(tags, list) else None
+            connection.execute(
+                """
+                INSERT INTO products (
+                    id, name, group_name, kcal, protein_g, fat_g, carbs_g,
+                    carbs_simple_g, carbs_complex_g, fiber_g, tags, health_level
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    item.get("id"),
+                    item.get("name"),
+                    item.get("group"),
+                    item.get("kcal"),
+                    item.get("protein_g"),
+                    item.get("fat_g"),
+                    item.get("carbs_g"),
+                    item.get("carbs_simple_g"),
+                    item.get("carbs_complex_g"),
+                    item.get("fiber_g"),
+                    tags_payload,
+                    item.get("health_level"),
+                ),
+            )
+        connection.commit()
+
+
+def loadAdminProducts() -> list[dict[str, object]]:
+    """Загрузить список продуктов из SQLite."""
+    ensureProductsDb()
+    with getProductsConnection() as connection:
+        rows = connection.execute(
+            """
+            SELECT id, name, group_name, kcal, protein_g, fat_g, carbs_g,
+                   carbs_simple_g, carbs_complex_g, fiber_g, tags, health_level
+            FROM products
+            ORDER BY id
+            """
+        ).fetchall()
+    products: list[dict[str, object]] = []
+    for row in rows:
+        tags_value = row["tags"]
+        tags = []
+        if isinstance(tags_value, str):
+            try:
+                parsed = json.loads(tags_value)
+            except json.JSONDecodeError:
+                parsed = []
+            if isinstance(parsed, list):
+                tags = parsed
+        products.append(
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "group": row["group_name"],
+                "kcal": row["kcal"],
+                "protein_g": row["protein_g"],
+                "fat_g": row["fat_g"],
+                "carbs_g": row["carbs_g"],
+                "carbs_simple_g": row["carbs_simple_g"],
+                "carbs_complex_g": row["carbs_complex_g"],
+                "fiber_g": row["fiber_g"],
+                "tags": tags,
+                "health_level": row["health_level"],
+            }
+        )
+    return products
 
 
 def normalizeProductName(value: str) -> str:
@@ -220,11 +349,38 @@ def search_products(query: str) -> dict[str, list[dict[str, object]]]:
 
 
 def saveAdminProducts(products: list[dict[str, object]]) -> None:
-    """Сохранить список продуктов в файл."""
-    ADMIN_PRODUCTS_PATH.write_text(
-        json.dumps(products, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    """Сохранить список продуктов в SQLite."""
+    ensureProductsDb()
+    with getProductsConnection() as connection:
+        connection.execute("DELETE FROM products")
+        for item in products:
+            if not isinstance(item, dict):
+                continue
+            tags = item.get("tags")
+            tags_payload = json.dumps(tags, ensure_ascii=False) if isinstance(tags, list) else None
+            connection.execute(
+                """
+                INSERT INTO products (
+                    id, name, group_name, kcal, protein_g, fat_g, carbs_g,
+                    carbs_simple_g, carbs_complex_g, fiber_g, tags, health_level
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    item.get("id"),
+                    item.get("name"),
+                    item.get("group"),
+                    item.get("kcal"),
+                    item.get("protein_g"),
+                    item.get("fat_g"),
+                    item.get("carbs_g"),
+                    item.get("carbs_simple_g"),
+                    item.get("carbs_complex_g"),
+                    item.get("fiber_g"),
+                    tags_payload,
+                    item.get("health_level"),
+                ),
+            )
+        connection.commit()
 
 
 def updateAdminConfig(data: dict[str, object]) -> None:
@@ -270,18 +426,39 @@ def normalize_group_list(values: object) -> list[str]:
     return groups
 
 
+def loadAdminGroups() -> list[str]:
+    ensureProductsDb()
+    with getProductsConnection() as connection:
+        rows = connection.execute(
+            "SELECT name FROM product_groups ORDER BY name"
+        ).fetchall()
+    return [row["name"] for row in rows]
+
+
+def saveAdminGroups(groups: list[str]) -> None:
+    ensureProductsDb()
+    with getProductsConnection() as connection:
+        connection.execute("DELETE FROM product_groups")
+        for group in groups:
+            connection.execute(
+                "INSERT OR IGNORE INTO product_groups (name) VALUES (?)",
+                (group,),
+            )
+        connection.commit()
+
+
 def collect_product_groups(
     products: list[dict[str, object]],
-    config: dict[str, object],
+    groups: list[str],
 ) -> list[str]:
-    groups = normalize_group_list(config.get("product_groups"))
+    collected = normalize_group_list(groups)
     for item in products:
         group = item.get("group")
         if isinstance(group, str):
             normalized = group.strip()
-            if normalized and normalized not in groups:
-                groups.append(normalized)
-    return sorted(groups)
+            if normalized and normalized not in collected:
+                collected.append(normalized)
+    return sorted(collected)
 
 
 def renderAdminIndex(
@@ -305,8 +482,7 @@ def renderAdminProducts(
     success: str | None = None,
 ) -> HTMLResponse:
     products = loadAdminProducts()
-    config = loadAdminConfig()
-    groups = collect_product_groups(products, config if isinstance(config, dict) else {})
+    groups = collect_product_groups(products, loadAdminGroups())
     return templates.TemplateResponse(
         "admin_products.html",
         {
@@ -324,8 +500,7 @@ def renderAdminGroups(
     error: str | None = None,
     success: str | None = None,
 ) -> HTMLResponse:
-    config = loadAdminConfig()
-    groups = normalize_group_list(config.get("product_groups") if isinstance(config, dict) else [])
+    groups = loadAdminGroups()
     return templates.TemplateResponse(
         "admin_groups.html",
         {
@@ -1119,12 +1294,12 @@ async def admin_products_add(
         }
     )
     saveAdminProducts(products)
-    config = loadAdminConfig()
-    if isinstance(config, dict):
-        groups = normalize_group_list(config.get("product_groups"))
-        if group.strip() and group.strip() not in groups:
-            config["product_groups"] = sorted(groups + [group.strip()])
-            updateAdminConfig(config)
+    normalized_group = group.strip()
+    if normalized_group:
+        groups = loadAdminGroups()
+        if normalized_group not in groups:
+            groups.append(normalized_group)
+            saveAdminGroups(sorted(groups))
     return renderAdminProducts(request, success="Продукт добавлен.")
 
 
@@ -1162,12 +1337,12 @@ async def admin_products_update(
     if not updated:
         return renderAdminProducts(request, error="Продукт не найден.")
     saveAdminProducts(products)
-    config = loadAdminConfig()
-    if isinstance(config, dict):
-        groups = normalize_group_list(config.get("product_groups"))
-        if group.strip() and group.strip() not in groups:
-            config["product_groups"] = sorted(groups + [group.strip()])
-            updateAdminConfig(config)
+    normalized_group = group.strip()
+    if normalized_group:
+        groups = loadAdminGroups()
+        if normalized_group not in groups:
+            groups.append(normalized_group)
+            saveAdminGroups(sorted(groups))
     return renderAdminProducts(request, success="Продукт обновлён.")
 
 
@@ -1211,15 +1386,11 @@ async def admin_groups_add(request: Request, name: str = Form(...)):
     normalized = name.strip()
     if not normalized:
         return renderAdminGroups(request, error="Название группы не может быть пустым.")
-    config = loadAdminConfig()
-    if not isinstance(config, dict):
-        config = {}
-    groups = normalize_group_list(config.get("product_groups"))
+    groups = loadAdminGroups()
     if normalized in groups:
         return renderAdminGroups(request, error="Такая группа уже существует.")
     groups.append(normalized)
-    config["product_groups"] = sorted(groups)
-    updateAdminConfig(config)
+    saveAdminGroups(sorted(groups))
     return renderAdminGroups(request, success="Группа добавлена.")
 
 
@@ -1228,15 +1399,11 @@ async def admin_groups_delete(request: Request, name: str = Form(...)):
     if not isAdminAuthenticated(request):
         return RedirectResponse(url="/admin", status_code=303)
     normalized = name.strip()
-    config = loadAdminConfig()
-    if not isinstance(config, dict):
-        config = {}
-    groups = normalize_group_list(config.get("product_groups"))
+    groups = loadAdminGroups()
     updated = [group for group in groups if group != normalized]
     if len(updated) == len(groups):
         return renderAdminGroups(request, error="Группа не найдена.")
-    config["product_groups"] = sorted(updated)
-    updateAdminConfig(config)
+    saveAdminGroups(sorted(updated))
     return renderAdminGroups(request, success="Группа удалена.")
 
 
@@ -1702,6 +1869,11 @@ async def products_search(q: str):
         "exact": [normalize_item(item) for item in results["exact"]],
         "similar": [normalize_item(item) for item in results["similar"]],
     }
+
+
+@app.get("/static/data/products.json")
+async def products_static_json():
+    return JSONResponse(loadAdminProducts())
 
 
 @app.post("/api/subscription/start_trial")
