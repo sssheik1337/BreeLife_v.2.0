@@ -119,7 +119,7 @@ function generateSummary() {
             details: data.currentWeight ? `${kgToLbs(data.currentWeight)} фунтов` : null
         },
         {
-            label: 'Целевой вес',
+            label: 'Желаемый вес',
             value: data.targetWeight ? `${data.targetWeight} кг` : 'Не указано',
             icon: 'target',
             color: 'pink',
