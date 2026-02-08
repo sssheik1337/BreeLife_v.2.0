@@ -105,7 +105,7 @@
         transition: max-height 0.3s ease, opacity 0.2s ease;
       }
       .group-section[open] .group-content {
-        max-height: 4000px;
+        max-height: var(--group-content-height, 0);
         opacity: 1;
       }
       .product-card {
@@ -287,5 +287,37 @@
         {% endfor %}
       </div>
     </div>
+    <script>
+      const groupSections = Array.from(document.querySelectorAll(".group-section"));
+
+      const updateGroupHeight = (section) => {
+        const content = section.querySelector(".group-content");
+        if (!content) {
+          return;
+        }
+        const height = section.open ? `${content.scrollHeight}px` : "0px";
+        section.style.setProperty("--group-content-height", height);
+      };
+
+      groupSections.forEach((section) => {
+        const summary = section.querySelector("summary");
+        updateGroupHeight(section);
+        if (summary) {
+          summary.addEventListener("click", () => {
+            groupSections.forEach((otherSection) => {
+              if (otherSection !== section) {
+                otherSection.open = false;
+                updateGroupHeight(otherSection);
+              }
+            });
+            window.requestAnimationFrame(() => updateGroupHeight(section));
+          });
+        }
+      });
+
+      window.addEventListener("resize", () => {
+        groupSections.forEach((section) => updateGroupHeight(section));
+      });
+    </script>
   </body>
 </html>
