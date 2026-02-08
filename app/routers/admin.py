@@ -67,12 +67,30 @@ def render_admin_products(
 ) -> HTMLResponse:
     products = load_admin_products()
     groups = collect_product_groups(products, load_admin_groups())
+    default_group = "Без группы"
+    grouped_products: dict[str, list[dict[str, object]]] = {group: [] for group in groups}
+    for product in products:
+        group_value = product.get("group")
+        normalized_group = group_value.strip() if isinstance(group_value, str) else ""
+        group_key = normalized_group or default_group
+        if group_key not in grouped_products:
+            grouped_products[group_key] = []
+        grouped_products[group_key].append(product)
+    ordered_groups = sorted(
+        grouped_products.keys(),
+        key=lambda value: (value == default_group, value.lower()),
+    )
+    grouped_list = [
+        {"name": group_name, "products": grouped_products[group_name]}
+        for group_name in ordered_groups
+    ]
     return templates.TemplateResponse(
         "admin_products.html",
         {
             "request": request,
             "products": products,
             "groups": groups,
+            "grouped_products": grouped_list,
             "error": error,
             "success": success,
         },
@@ -324,5 +342,46 @@ async def admin_groups_delete(request: Request, name: str = Form(...)):
     updated = [group for group in groups if group != normalized]
     if len(updated) == len(groups):
         return render_admin_groups(request, error="Группа не найдена.")
+    products = load_admin_products()
+    has_products = any(
+        item.get("group") == normalized
+        for item in products
+        if isinstance(item.get("group"), str)
+    )
+    if has_products:
+        return render_admin_groups(
+            request,
+            error="Нельзя удалить группу, пока в ней есть продукты.",
+        )
     save_admin_groups(sorted(updated))
     return render_admin_groups(request, success="Группа удалена.")
+
+
+@router.post("/admin/groups/update", response_class=HTMLResponse)
+async def admin_groups_update(
+    request: Request,
+    name: str = Form(...),
+    new_name: str = Form(...),
+):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    normalized = name.strip()
+    normalized_new = new_name.strip()
+    if not normalized_new:
+        return render_admin_groups(request, error="Новое название не может быть пустым.")
+    groups = load_admin_groups()
+    if normalized not in groups:
+        return render_admin_groups(request, error="Группа не найдена.")
+    if normalized_new != normalized and normalized_new in groups:
+        return render_admin_groups(request, error="Такая группа уже существует.")
+    updated_groups = [
+        normalized_new if group == normalized else group
+        for group in groups
+    ]
+    products = load_admin_products()
+    for item in products:
+        if item.get("group") == normalized:
+            item["group"] = normalized_new
+    save_admin_products(products)
+    save_admin_groups(sorted(updated_groups))
+    return render_admin_groups(request, success="Группа переименована.")

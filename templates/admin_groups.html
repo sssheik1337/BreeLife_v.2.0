@@ -72,6 +72,13 @@
         padding: 10px;
         border: 1px solid #e2e8f0;
         border-radius: 10px;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .group-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
       }
       .toolbar-links a {
         margin-right: 12px;
@@ -126,10 +133,20 @@
         {% for group in groups %}
           <div class="group-item">
             <div>{{ group }}</div>
-            <form method="post" action="/admin/groups/delete">
-              <input type="hidden" name="name" value="{{ group }}" />
-              <button class="btn-danger" type="submit">Удалить</button>
-            </form>
+            <div class="group-actions">
+              <form method="post" action="/admin/groups/update">
+                <input type="hidden" name="name" value="{{ group }}" />
+                <label>
+                  Новое название
+                  <input type="text" name="new_name" required />
+                </label>
+                <button class="btn-primary" type="submit">Переименовать</button>
+              </form>
+              <form method="post" action="/admin/groups/delete">
+                <input type="hidden" name="name" value="{{ group }}" />
+                <button class="btn-danger" type="submit">Удалить</button>
+              </form>
+            </div>
           </div>
         {% endfor %}
       </div>
