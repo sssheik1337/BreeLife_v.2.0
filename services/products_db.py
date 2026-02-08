@@ -3,9 +3,11 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
+from config import PRODUCTS_DB_PATH
+
 ADMIN_CONFIG_PATH = Path("config/admin_config.json")
 ADMIN_PRODUCTS_PATH = Path("static/data/products.json")
-PRODUCTS_DB_PATH = Path("static/data/products.db")
+PRODUCTS_DB_PATH = Path(PRODUCTS_DB_PATH)
 
 
 @contextmanager

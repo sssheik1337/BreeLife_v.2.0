@@ -46,6 +46,9 @@ DB_PATH = os.getenv("DB_PATH")
 if not DB_PATH:
     raise RuntimeError("DB_PATH is required. Set it in the environment.")
 
+# Путь к базе данных продуктов.
+PRODUCTS_DB_PATH = os.getenv("PRODUCTS_DB_PATH", "static/data/products.db")
+
 # Данные доступа в админку.
 ADMIN_LOGIN = os.getenv("ADMIN_LOGIN", "")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
