@@ -43,6 +43,10 @@
         background: #2563eb;
         color: #ffffff;
       }
+      .btn-secondary {
+        background: #e2e8f0;
+        color: #0f172a;
+      }
       .btn-danger {
         background: #dc2626;
         color: #ffffff;
@@ -134,14 +138,9 @@
           <div class="group-item">
             <div>{{ group }}</div>
             <div class="group-actions">
-              <form method="post" action="/admin/groups/update">
-                <input type="hidden" name="name" value="{{ group }}" />
-                <label>
-                  Новое название
-                  <input type="text" name="new_name" required />
-                </label>
-                <button class="btn-primary" type="submit">Переименовать</button>
-              </form>
+              <button class="btn-secondary js-rename-group" type="button" data-group="{{ group }}">
+                Переименовать
+              </button>
               <form method="post" action="/admin/groups/delete">
                 <input type="hidden" name="name" value="{{ group }}" />
                 <button class="btn-danger" type="submit">Удалить</button>
@@ -151,5 +150,30 @@
         {% endfor %}
       </div>
     </div>
+    <form id="rename-group-form" method="post" action="/admin/groups/update" hidden>
+      <input type="hidden" name="name" />
+      <input type="hidden" name="new_name" />
+    </form>
+    <script>
+      const renameForm = document.getElementById("rename-group-form");
+      const renameButtons = document.querySelectorAll(".js-rename-group");
+
+      renameButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const currentName = button.dataset.group || "";
+          const nextName = window.prompt("Новое название группы:", currentName);
+          if (!nextName) {
+            return;
+          }
+          const normalized = nextName.trim();
+          if (!normalized) {
+            return;
+          }
+          renameForm.querySelector("input[name=\"name\"]").value = currentName;
+          renameForm.querySelector("input[name=\"new_name\"]").value = normalized;
+          renameForm.submit();
+        });
+      });
+    </script>
   </body>
 </html>
