@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
 from config import APP_ENV, APP_HOST, APP_NAME, APP_PORT, DEBUG, IS_PROD, PUBLIC_APP_URL
-from app.context import TELEGRAM_SESSION_COOKIE, load_admin_config, templates
+from app.context import TELEGRAM_SESSION_COOKIE, load_admin_config, load_plans_config, templates
 
 router = APIRouter()
 
@@ -69,7 +69,7 @@ async def admin_config():
 @router.get("/api/plans")
 async def plans_public():
     admin_config = load_admin_config()
-    plans = admin_config.get("plans") if isinstance(admin_config, dict) else []
+    plans = load_plans_config()
     trial_days = int(admin_config.get("trial_days", 30))
     if not isinstance(plans, list) or not plans:
         plans = [

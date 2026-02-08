@@ -9,8 +9,10 @@ from app.context import (
     ADMIN_SESSIONS,
     ADMIN_SESSION_COOKIE,
     ADMIN_SESSION_TTL,
+    load_plans_config,
     templates,
     load_admin_config,
+    update_plans_config,
     update_admin_config,
 )
 from services.products_db import (
@@ -124,7 +126,7 @@ def render_admin_norms(
     if not isinstance(norms, dict):
         norms = {}
     trial_days = int(config.get("trial_days", 30))
-    plans = config.get("plans") if isinstance(config, dict) else []
+    plans = load_plans_config()
     if not isinstance(plans, list) or not plans:
         plans = [
             {
@@ -390,9 +392,7 @@ async def admin_plans_add(
     config = load_admin_config()
     if not isinstance(config, dict):
         config = {}
-    plans = config.get("plans") if isinstance(config, dict) else []
-    if not isinstance(plans, list):
-        plans = []
+    plans = load_plans_config()
     if any(isinstance(plan, dict) and plan.get("id") == normalized_id for plan in plans):
         return render_admin_norms(request, error="Тариф с таким ID уже существует.")
     features_list = [line.strip() for line in features.splitlines() if line.strip()]
@@ -407,8 +407,7 @@ async def admin_plans_add(
             "features": features_list,
         }
     )
-    config["plans"] = plans
-    update_admin_config(config)
+    update_plans_config(plans)
     return render_admin_norms(request, success="Тариф добавлен.")
 
 
@@ -428,9 +427,7 @@ async def admin_plans_update(
     config = load_admin_config()
     if not isinstance(config, dict):
         config = {}
-    plans = config.get("plans") if isinstance(config, dict) else []
-    if not isinstance(plans, list):
-        plans = []
+    plans = load_plans_config()
     updated = False
     features_list = [line.strip() for line in features.splitlines() if line.strip()]
     for plan in plans:
@@ -445,8 +442,7 @@ async def admin_plans_update(
             break
     if not updated:
         return render_admin_norms(request, error="Тариф не найден.")
-    config["plans"] = plans
-    update_admin_config(config)
+    update_plans_config(plans)
     return render_admin_norms(request, success="Тариф обновлён.")
 
 
@@ -457,14 +453,11 @@ async def admin_plans_delete(request: Request, plan_id: str = Form(...)):
     config = load_admin_config()
     if not isinstance(config, dict):
         config = {}
-    plans = config.get("plans") if isinstance(config, dict) else []
-    if not isinstance(plans, list):
-        plans = []
+    plans = load_plans_config()
     filtered = [plan for plan in plans if not (isinstance(plan, dict) and plan.get("id") == plan_id)]
     if len(filtered) == len(plans):
         return render_admin_norms(request, error="Тариф не найден.")
-    config["plans"] = filtered
-    update_admin_config(config)
+    update_plans_config(filtered)
     return render_admin_norms(request, success="Тариф удалён.")
 
 

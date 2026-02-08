@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from config import IS_DEV
-from app.context import load_admin_config
+from app.context import load_admin_config, load_plans_config
 from app.dependencies import load_profile, require_telegram_user_id
 from app.schemas import PaymentRequest, SubscriptionRequest
 
@@ -77,7 +77,7 @@ async def start_payment(payload: PaymentRequest):
     if not plan_id:
         raise HTTPException(status_code=400, detail="PLAN_REQUIRED")
     admin_config = load_admin_config()
-    plans = admin_config.get("plans") if isinstance(admin_config, dict) else []
+    plans = load_plans_config()
     matched = None
     if isinstance(plans, list):
         matched = next((plan for plan in plans if plan.get("id") == plan_id), None)

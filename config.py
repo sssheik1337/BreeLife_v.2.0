@@ -49,6 +49,9 @@ if not DB_PATH:
 # Путь к базе данных продуктов.
 PRODUCTS_DB_PATH = os.getenv("PRODUCTS_DB_PATH", "static/data/products.db")
 
+# Путь к файлу с тарифами.
+PLANS_PATH = os.getenv("PLANS_PATH", "config/plans.json")
+
 # Данные доступа в админку.
 ADMIN_LOGIN = os.getenv("ADMIN_LOGIN", "")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
