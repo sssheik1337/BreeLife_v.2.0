@@ -6,6 +6,7 @@ from aiogram.filters import CommandStart
 from fastapi import FastAPI
 
 from config import APP_NAME, DEBUG, PUBLIC_APP_URL, PUBLIC_BASE_URL, TELEGRAM_BOT_TOKEN
+from services.products_db import ensure_products_db
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ def register_telegram_handlers(dispatcher_instance: Dispatcher) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("🚀 FastAPI started")
+    ensure_products_db()
     global bot, dispatcher
     if not TELEGRAM_BOT_TOKEN:
         logger.error("TELEGRAM_BOT_TOKEN не задан. Бот не будет запущен.")
