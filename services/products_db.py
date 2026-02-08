@@ -6,7 +6,6 @@ from pathlib import Path
 from config import PRODUCTS_DB_PATH
 
 ADMIN_CONFIG_PATH = Path("config/admin_config.json")
-ADMIN_PRODUCTS_PATH = Path("static/data/products.json")
 PRODUCTS_DB_PATH = Path(PRODUCTS_DB_PATH)
 
 
@@ -67,14 +66,6 @@ def ensure_products_db() -> None:
         groups_count = connection.execute("SELECT COUNT(*) FROM product_groups").fetchone()[0]
         if products_count or groups_count:
             return
-        legacy_products = []
-        if ADMIN_PRODUCTS_PATH.exists():
-            try:
-                legacy_products = json.loads(ADMIN_PRODUCTS_PATH.read_text(encoding="utf-8"))
-            except json.JSONDecodeError:
-                legacy_products = []
-        if not isinstance(legacy_products, list):
-            legacy_products = []
         legacy_groups = []
         if ADMIN_CONFIG_PATH.exists():
             try:
@@ -84,43 +75,10 @@ def ensure_products_db() -> None:
             legacy_groups = normalize_group_list(
                 config.get("product_groups") if isinstance(config, dict) else []
             )
-        for item in legacy_products:
-            group = item.get("group") if isinstance(item, dict) else None
-            if isinstance(group, str):
-                normalized = group.strip()
-                if normalized and normalized not in legacy_groups:
-                    legacy_groups.append(normalized)
         for group in sorted(legacy_groups):
             connection.execute(
                 "INSERT OR IGNORE INTO product_groups (name) VALUES (?)",
                 (group,),
-            )
-        for item in legacy_products:
-            if not isinstance(item, dict):
-                continue
-            tags = item.get("tags")
-            tags_payload = json.dumps(tags, ensure_ascii=False) if isinstance(tags, list) else None
-            connection.execute(
-                """
-                INSERT INTO products (
-                    id, name, group_name, kcal, protein_g, fat_g, carbs_g,
-                    carbs_simple_g, carbs_complex_g, fiber_g, tags, health_level
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    item.get("id"),
-                    item.get("name"),
-                    item.get("group"),
-                    item.get("kcal"),
-                    item.get("protein_g"),
-                    item.get("fat_g"),
-                    item.get("carbs_g"),
-                    item.get("carbs_simple_g"),
-                    item.get("carbs_complex_g"),
-                    item.get("fiber_g"),
-                    tags_payload,
-                    item.get("health_level"),
-                ),
             )
         connection.commit()
 
@@ -200,10 +158,6 @@ def save_admin_products(products: list[dict[str, object]]) -> None:
                 ),
             )
         connection.commit()
-    ADMIN_PRODUCTS_PATH.write_text(
-        json.dumps(products, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
 
 
 def load_admin_groups() -> list[str]:
