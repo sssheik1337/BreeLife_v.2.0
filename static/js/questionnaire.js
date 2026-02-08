@@ -311,7 +311,7 @@ function renderHeightRuler(currentValue) {
     const minHeight = 120;
     const maxHeight = 220;
     const stepCm = 1;
-    const pixelsPerStep = 24;
+    const pixelsPerStep = 12;
     const loopCount = 7;
     const rangeSteps = Math.round((maxHeight - minHeight) / stepCm) + 1;
     const totalVirtualSteps = rangeSteps * loopCount;
@@ -392,7 +392,7 @@ function renderHeightRuler(currentValue) {
         const value = minHeight + normalized * stepCm;
         valueElement.textContent = `${value}`;
         if (currentElement) {
-            currentElement.textContent = `${value}`;
+            currentElement.textContent = value % 5 === 0 ? `${value}` : '';
         }
         ticks.forEach((tick) => {
             tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === virtualIndex);
