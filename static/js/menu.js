@@ -1,6 +1,6 @@
 // Отрисовка списка тарифов из JSON
 
-const PLANS_ENDPOINT = '/static/data/plans.json';
+const PLANS_ENDPOINT = '/api/plans';
 let cachedPlans = [];
 let activePlan = 'free';
 
@@ -43,6 +43,8 @@ function createPlanCard(plan) {
 
   const features = Array.isArray(plan.features) ? plan.features : [];
   const subtitle = plan.duration_days > 0 ? `Срок: ${plan.duration_days} дней` : 'Без ограничений по сроку';
+  const currentPrice = plan.price_current || plan.price || '';
+  const oldPrice = plan.price_old_enabled && plan.price_old ? plan.price_old : '';
   const isTrial = plan.id === 'trial';
   const isPremium = plan.id === 'premium';
   const isFree = plan.id === 'free';
@@ -64,7 +66,10 @@ function createPlanCard(plan) {
         <h2 class="text-lg font-semibold text-slate-800">${plan.title}</h2>
         <p class="text-sm text-slate-500">${subtitle}</p>
       </div>
-      <div class="text-xl font-bold text-emerald-600">${plan.price}</div>
+      <div class="text-right">
+        ${oldPrice ? `<div class="text-sm text-slate-400 line-through">${oldPrice}</div>` : ''}
+        <div class="text-xl font-bold text-emerald-600">${currentPrice}</div>
+      </div>
     </div>
     <ul class="space-y-2 text-sm text-slate-600">
       ${features.map((feature) => `<li class="flex items-start gap-2"><span class="text-emerald-500">•</span><span>${feature}</span></li>`).join('')}

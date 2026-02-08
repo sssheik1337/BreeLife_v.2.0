@@ -123,6 +123,44 @@ def render_admin_norms(
     norms = config.get("norms") if isinstance(config, dict) else {}
     if not isinstance(norms, dict):
         norms = {}
+    trial_days = int(config.get("trial_days", 30))
+    plans = config.get("plans") if isinstance(config, dict) else []
+    if not isinstance(plans, list) or not plans:
+        plans = [
+            {
+                "id": "trial",
+                "title": "Пробный период",
+                "duration_days": trial_days,
+                "price_current": "0 ₽",
+                "price_old": "",
+                "price_old_enabled": False,
+                "features": [],
+            },
+            {
+                "id": "premium",
+                "title": "Подписка",
+                "duration_days": 30,
+                "price_current": "399 ₽ / месяц",
+                "price_old": "",
+                "price_old_enabled": False,
+                "features": [],
+            },
+        ]
+    normalized_plans: list[dict[str, object]] = []
+    for plan in plans:
+        if not isinstance(plan, dict):
+            continue
+        normalized_plans.append(
+            {
+                "id": str(plan.get("id", "")).strip(),
+                "title": str(plan.get("title", "")).strip(),
+                "duration_days": int(plan.get("duration_days", 0) or 0),
+                "price_current": str(plan.get("price_current", plan.get("price", ""))).strip(),
+                "price_old": str(plan.get("price_old", "")).strip(),
+                "price_old_enabled": bool(plan.get("price_old_enabled", False)),
+                "features": plan.get("features", []),
+            }
+        )
     return templates.TemplateResponse(
         "admin_norms.html",
         {
@@ -132,6 +170,8 @@ def render_admin_norms(
                 "sleep_hours": norms.get("sleep_hours", 8),
                 "fiber_g": norms.get("fiber_g", 25),
             },
+            "trial_days": trial_days,
+            "plans": normalized_plans,
             "error": error,
             "success": success,
         },
@@ -316,6 +356,116 @@ async def admin_norms_update(
     }
     update_admin_config(config)
     return render_admin_norms(request, success="Нормы обновлены.")
+
+
+@router.post("/admin/trial/update", response_class=HTMLResponse)
+async def admin_trial_update(request: Request, trial_days: int = Form(...)):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    config = load_admin_config()
+    if not isinstance(config, dict):
+        config = {}
+    config["trial_days"] = max(0, trial_days)
+    update_admin_config(config)
+    return render_admin_norms(request, success="Пробный период обновлён.")
+
+
+@router.post("/admin/plans/add", response_class=HTMLResponse)
+async def admin_plans_add(
+    request: Request,
+    plan_id: str = Form(...),
+    title: str = Form(...),
+    duration_days: int = Form(...),
+    price_current: str = Form(...),
+    price_old: str = Form(""),
+    price_old_enabled: bool = Form(False),
+    features: str = Form(""),
+):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    normalized_id = plan_id.strip()
+    normalized_title = title.strip()
+    if not normalized_id or not normalized_title:
+        return render_admin_norms(request, error="ID и название тарифа обязательны.")
+    config = load_admin_config()
+    if not isinstance(config, dict):
+        config = {}
+    plans = config.get("plans") if isinstance(config, dict) else []
+    if not isinstance(plans, list):
+        plans = []
+    if any(isinstance(plan, dict) and plan.get("id") == normalized_id for plan in plans):
+        return render_admin_norms(request, error="Тариф с таким ID уже существует.")
+    features_list = [line.strip() for line in features.splitlines() if line.strip()]
+    plans.append(
+        {
+            "id": normalized_id,
+            "title": normalized_title,
+            "duration_days": max(0, duration_days),
+            "price_current": price_current.strip(),
+            "price_old": price_old.strip(),
+            "price_old_enabled": bool(price_old_enabled),
+            "features": features_list,
+        }
+    )
+    config["plans"] = plans
+    update_admin_config(config)
+    return render_admin_norms(request, success="Тариф добавлен.")
+
+
+@router.post("/admin/plans/update", response_class=HTMLResponse)
+async def admin_plans_update(
+    request: Request,
+    plan_id: str = Form(...),
+    title: str = Form(...),
+    duration_days: int = Form(...),
+    price_current: str = Form(...),
+    price_old: str = Form(""),
+    price_old_enabled: bool = Form(False),
+    features: str = Form(""),
+):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    config = load_admin_config()
+    if not isinstance(config, dict):
+        config = {}
+    plans = config.get("plans") if isinstance(config, dict) else []
+    if not isinstance(plans, list):
+        plans = []
+    updated = False
+    features_list = [line.strip() for line in features.splitlines() if line.strip()]
+    for plan in plans:
+        if isinstance(plan, dict) and plan.get("id") == plan_id:
+            plan["title"] = title.strip()
+            plan["duration_days"] = max(0, duration_days)
+            plan["price_current"] = price_current.strip()
+            plan["price_old"] = price_old.strip()
+            plan["price_old_enabled"] = bool(price_old_enabled)
+            plan["features"] = features_list
+            updated = True
+            break
+    if not updated:
+        return render_admin_norms(request, error="Тариф не найден.")
+    config["plans"] = plans
+    update_admin_config(config)
+    return render_admin_norms(request, success="Тариф обновлён.")
+
+
+@router.post("/admin/plans/delete", response_class=HTMLResponse)
+async def admin_plans_delete(request: Request, plan_id: str = Form(...)):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    config = load_admin_config()
+    if not isinstance(config, dict):
+        config = {}
+    plans = config.get("plans") if isinstance(config, dict) else []
+    if not isinstance(plans, list):
+        plans = []
+    filtered = [plan for plan in plans if not (isinstance(plan, dict) and plan.get("id") == plan_id)]
+    if len(filtered) == len(plans):
+        return render_admin_norms(request, error="Тариф не найден.")
+    config["plans"] = filtered
+    update_admin_config(config)
+    return render_admin_norms(request, success="Тариф удалён.")
 
 
 @router.post("/admin/groups/add", response_class=HTMLResponse)

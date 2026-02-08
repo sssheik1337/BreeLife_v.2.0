@@ -64,3 +64,47 @@ async def admin_config():
     if IS_PROD and not DEBUG:
         raise HTTPException(status_code=403, detail="Доступ запрещён.")
     return load_admin_config()
+
+
+@router.get("/api/plans")
+async def plans_public():
+    admin_config = load_admin_config()
+    plans = admin_config.get("plans") if isinstance(admin_config, dict) else []
+    trial_days = int(admin_config.get("trial_days", 30))
+    if not isinstance(plans, list) or not plans:
+        plans = [
+            {
+                "id": "trial",
+                "title": "Пробный период",
+                "duration_days": trial_days,
+                "price_current": "0 ₽",
+                "price_old": "",
+                "price_old_enabled": False,
+                "features": [],
+            },
+            {
+                "id": "premium",
+                "title": "Подписка",
+                "duration_days": 30,
+                "price_current": "399 ₽ / месяц",
+                "price_old": "",
+                "price_old_enabled": False,
+                "features": [],
+            },
+        ]
+    normalized: list[dict[str, object]] = []
+    for plan in plans:
+        if not isinstance(plan, dict):
+            continue
+        normalized.append(
+            {
+                "id": plan.get("id"),
+                "title": plan.get("title"),
+                "duration_days": plan.get("duration_days", 0),
+                "price_current": plan.get("price_current", plan.get("price", "")),
+                "price_old": plan.get("price_old", ""),
+                "price_old_enabled": plan.get("price_old_enabled", False),
+                "features": plan.get("features", []),
+            }
+        )
+    return normalized
