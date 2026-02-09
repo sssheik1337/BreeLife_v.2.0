@@ -349,7 +349,6 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
             <div class="ruler ruler--vertical" id="height-ruler" aria-label="Выбор роста">
                 <div class="ruler__fade ruler__fade--start" aria-hidden="true"></div>
                 <div class="ruler__fade ruler__fade--end" aria-hidden="true"></div>
-                <div class="ruler__indicator" aria-hidden="true"></div>
                 <div class="ruler__track" id="height-ruler-track"></div>
             </div>
         </div>
@@ -472,7 +471,6 @@ function renderWeightRuler(currentValue, range = WEIGHT_RANGE) {
             <div class="ruler ruler--horizontal" id="weight-ruler" aria-label="Выбор текущего веса">
                 <div class="ruler__fade ruler__fade--start" aria-hidden="true"></div>
                 <div class="ruler__fade ruler__fade--end" aria-hidden="true"></div>
-                <div class="ruler__indicator" aria-hidden="true"></div>
                 <div class="ruler__track" id="weight-ruler-track"></div>
             </div>
         </div>
