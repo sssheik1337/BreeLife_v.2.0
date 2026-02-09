@@ -485,7 +485,7 @@ function renderWeightRuler(currentValue) {
     for (let virtualIndex = 0; virtualIndex < totalVirtualSteps; virtualIndex += 1) {
         const value = minWeight + (virtualIndex % rangeSteps) * stepKg;
         const tick = document.createElement('div');
-        const isMajor = Math.round(value * 10) % 100 === 0;
+        const isMajor = Math.round(value * 10) % 50 === 0;
         tick.className = isMajor ? 'ruler__tick ruler__tick--major' : 'ruler__tick';
         tick.dataset.virtualIndex = String(virtualIndex);
         tick.style.width = `${pixelsPerStep}px`;
