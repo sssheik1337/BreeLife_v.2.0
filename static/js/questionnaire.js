@@ -387,17 +387,25 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
     const ticks = Array.from(track.querySelectorAll('.ruler__tick'));
 
     const getCenterOffset = () => ruler.clientHeight / 2;
+    const getEdgePadding = () => Math.max(0, getCenterOffset() - pixelsPerStep / 2);
 
     const getVirtualIndexFromScroll = () => {
         const centerOffset = getCenterOffset();
-        const rawIndex = Math.round((ruler.scrollTop + centerOffset - pixelsPerStep / 2) / pixelsPerStep);
+        const edgePadding = getEdgePadding();
+        const rawIndex = Math.round(
+            (ruler.scrollTop + centerOffset - edgePadding - pixelsPerStep / 2) / pixelsPerStep
+        );
         return Math.min(rangeSteps - 1, Math.max(0, rawIndex));
     };
 
-    const getScrollOffsetForIndex = (index) => index * pixelsPerStep + pixelsPerStep / 2 - getCenterOffset();
+    const getScrollOffsetForIndex = (index) => {
+        const edgePadding = getEdgePadding();
+        return index * pixelsPerStep + pixelsPerStep / 2 + edgePadding - getCenterOffset();
+    };
 
     const updateHeightMagnifier = (virtualIndex) => {
         const centerOffset = getCenterOffset();
+        const edgePadding = getEdgePadding();
         const centerPosition = ruler.scrollTop + centerOffset;
         const visibleRadius = Math.ceil(centerOffset / pixelsPerStep) + 10;
         const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -409,7 +417,7 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
             if (!tick) {
                 continue;
             }
-            const tickCenter = i * pixelsPerStep + pixelsPerStep / 2;
+            const tickCenter = edgePadding + i * pixelsPerStep + pixelsPerStep / 2;
             const distance = Math.abs(tickCenter - centerPosition);
             const scale = clamp(1.4 - distance * 0.02, 1, 1.4);
             const opacity = clamp(1 - distance * 0.015, 0.3, 1);
@@ -446,6 +454,9 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
 
     requestAnimationFrame(() => {
         const startIndex = Math.round((maxHeight - startHeight) / stepCm);
+        const edgePadding = getEdgePadding();
+        track.style.paddingTop = `${edgePadding}px`;
+        track.style.paddingBottom = `${edgePadding}px`;
         ruler.scrollTop = getScrollOffsetForIndex(startIndex);
         applyHeightValue(startIndex);
         ruler.addEventListener('scroll', onScroll, { passive: true });
