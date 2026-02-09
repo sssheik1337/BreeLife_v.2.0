@@ -386,15 +386,11 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
 
     const getVirtualIndexFromScroll = () => {
         const centerOffset = getCenterOffset();
-        const edgePadding = getEdgePadding();
-        const rawIndex = Math.round((ruler.scrollTop + centerOffset - edgePadding - pixelsPerStep / 2) / pixelsPerStep);
+        const rawIndex = Math.round((ruler.scrollTop + centerOffset - pixelsPerStep / 2) / pixelsPerStep);
         return Math.min(rangeSteps - 1, Math.max(0, rawIndex));
     };
 
-    const getScrollOffsetForIndex = (index) => {
-        const edgePadding = getEdgePadding();
-        return index * pixelsPerStep + pixelsPerStep / 2 + edgePadding - getCenterOffset();
-    };
+    const getScrollOffsetForIndex = (index) => index * pixelsPerStep + pixelsPerStep / 2 - getCenterOffset();
 
     const applyEdgePadding = () => {
         const edgePadding = getEdgePadding();
@@ -521,15 +517,11 @@ function renderWeightRuler(currentValue, range = WEIGHT_RANGE) {
 
     const getVirtualIndexFromScroll = () => {
         const centerOffset = getCenterOffset();
-        const edgePadding = getEdgePadding();
-        const rawIndex = Math.round((ruler.scrollLeft + centerOffset - edgePadding - pixelsPerStep / 2) / pixelsPerStep);
+        const rawIndex = Math.round((ruler.scrollLeft + centerOffset - pixelsPerStep / 2) / pixelsPerStep);
         return Math.min(rangeSteps - 1, Math.max(0, rawIndex));
     };
 
-    const getScrollOffsetForIndex = (index) => {
-        const edgePadding = getEdgePadding();
-        return index * pixelsPerStep + pixelsPerStep / 2 + edgePadding - getCenterOffset();
-    };
+    const getScrollOffsetForIndex = (index) => index * pixelsPerStep + pixelsPerStep / 2 - getCenterOffset();
 
     const applyEdgePadding = () => {
         const edgePadding = getEdgePadding();
