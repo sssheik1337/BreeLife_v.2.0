@@ -367,7 +367,7 @@ function renderHeightRuler(currentValue) {
     track.style.height = `${totalVirtualSteps * pixelsPerStep}px`;
 
     for (let virtualIndex = 0; virtualIndex < totalVirtualSteps; virtualIndex += 1) {
-        const value = minHeight + (virtualIndex % rangeSteps) * stepCm;
+        const value = maxHeight - (virtualIndex % rangeSteps) * stepCm;
         const tick = document.createElement('div');
         const isMajor = value % 5 === 0;
         tick.className = isMajor ? 'ruler__tick ruler__tick--major' : 'ruler__tick';
@@ -427,7 +427,7 @@ function renderHeightRuler(currentValue) {
 
     const applyHeightValue = (virtualIndex) => {
         const normalized = ((virtualIndex % rangeSteps) + rangeSteps) % rangeSteps;
-        const value = minHeight + normalized * stepCm;
+        const value = maxHeight - normalized * stepCm;
         valueElement.textContent = `${value}`;
         ticks.forEach((tick) => {
             tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === virtualIndex);
@@ -456,7 +456,7 @@ function renderHeightRuler(currentValue) {
     };
 
     requestAnimationFrame(() => {
-        const startIndex = Math.round((startHeight - minHeight) / stepCm) + rangeSteps * Math.floor(loopCount / 2);
+        const startIndex = Math.round((maxHeight - startHeight) / stepCm) + rangeSteps * Math.floor(loopCount / 2);
         ruler.scrollTop = getScrollOffsetForIndex(startIndex);
         applyHeightValue(startIndex);
         ruler.addEventListener('scroll', onScroll, { passive: true });
