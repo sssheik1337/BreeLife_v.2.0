@@ -126,6 +126,29 @@ def render_admin_norms(
     if not isinstance(norms, dict):
         norms = {}
     trial_days = int(config.get("trial_days", 30))
+    return templates.TemplateResponse(
+        "admin_norms.html",
+        {
+            "request": request,
+            "norms": {
+                "water_l": norms.get("water_l", 2),
+                "sleep_hours": norms.get("sleep_hours", 8),
+                "fiber_g": norms.get("fiber_g", 25),
+            },
+            "trial_days": trial_days,
+            "error": error,
+            "success": success,
+        },
+    )
+
+
+def render_admin_plans(
+    request: Request,
+    error: str | None = None,
+    success: str | None = None,
+) -> HTMLResponse:
+    config = load_admin_config()
+    trial_days = int(config.get("trial_days", 30))
     plans = load_plans_config()
     if not isinstance(plans, list) or not plans:
         plans = [
@@ -164,15 +187,9 @@ def render_admin_norms(
             }
         )
     return templates.TemplateResponse(
-        "admin_norms.html",
+        "admin_plans.html",
         {
             "request": request,
-            "norms": {
-                "water_l": norms.get("water_l", 2),
-                "sleep_hours": norms.get("sleep_hours", 8),
-                "fiber_g": norms.get("fiber_g", 25),
-            },
-            "trial_days": trial_days,
             "plans": normalized_plans,
             "error": error,
             "success": success,
@@ -209,6 +226,13 @@ async def admin_norms(request: Request):
     if not is_admin_authenticated(request):
         return RedirectResponse(url="/admin", status_code=303)
     return render_admin_norms(request)
+
+
+@router.get("/admin/plans", response_class=HTMLResponse)
+async def admin_plans(request: Request):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    return render_admin_plans(request)
 
 
 @router.post("/admin/login", response_class=HTMLResponse)

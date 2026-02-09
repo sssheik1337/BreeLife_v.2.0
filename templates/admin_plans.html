@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Админка — тарифы</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f8fafc;
+        margin: 0;
+        padding: 24px;
+        color: #0f172a;
+      }
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+      }
+      .card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+      }
+      input[type="text"],
+      input[type="number"] {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid #cbd5f5;
+        border-radius: 6px;
+        box-sizing: border-box;
+      }
+      textarea {
+        width: 100%;
+        min-height: 90px;
+        padding: 6px 8px;
+        border: 1px solid #cbd5f5;
+        border-radius: 6px;
+        box-sizing: border-box;
+        resize: vertical;
+      }
+      button {
+        padding: 6px 12px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .btn-primary {
+        background: #2563eb;
+        color: #ffffff;
+      }
+      .btn-danger {
+        background: #dc2626;
+        color: #ffffff;
+      }
+      .message {
+        margin-bottom: 12px;
+        padding: 10px 12px;
+        border-radius: 6px;
+      }
+      .message.error {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+      .message.success {
+        background: #dcfce7;
+        color: #166534;
+      }
+      .plan-row {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .plan-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 16px;
+        margin-top: 12px;
+      }
+      .plan-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .toolbar-links a {
+        margin-right: 12px;
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .logout button {
+        background: #0f172a;
+        color: #ffffff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="toolbar">
+      <div>
+        <h1>Тарифы</h1>
+        <div class="toolbar-links">
+          <a href="/admin">Главная</a>
+          <a href="/admin/products">Продукты</a>
+          <a href="/admin/groups">Группы</a>
+          <a href="/admin/norms">Нормы</a>
+        </div>
+      </div>
+      <form class="logout" method="post" action="/admin/logout">
+        <button type="submit">Выйти</button>
+      </form>
+    </div>
+
+    {% if error %}
+      <div class="message error">{{ error }}</div>
+    {% endif %}
+    {% if success %}
+      <div class="message success">{{ success }}</div>
+    {% endif %}
+
+    <div class="card">
+      <h2>Добавить тариф</h2>
+      <form method="post" action="/admin/plans/add">
+        <div class="plan-row">
+          <label>
+            ID
+            <input type="text" name="plan_id" required />
+          </label>
+          <label>
+            Название
+            <input type="text" name="title" required />
+          </label>
+          <label>
+            Длительность, дней
+            <input type="number" name="duration_days" min="0" required />
+          </label>
+          <label>
+            Текущая цена
+            <input type="text" name="price_current" required />
+          </label>
+          <label>
+            Старая цена
+            <input type="text" name="price_old" />
+          </label>
+          <label>
+            Старая цена активна
+            <input type="checkbox" name="price_old_enabled" value="1" />
+          </label>
+        </div>
+        <label style="display: block; margin-top: 12px;">
+          Преимущества (по одному на строку)
+          <textarea name="features"></textarea>
+        </label>
+        <div style="margin-top: 12px;">
+          <button class="btn-primary" type="submit">Добавить тариф</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Список тарифов</h2>
+      {% for plan in plans %}
+        <div class="plan-card">
+          <form method="post" action="/admin/plans/update">
+            <div class="plan-row">
+              <label>
+                ID
+                <input type="text" name="plan_id" value="{{ plan.id }}" readonly />
+              </label>
+              <label>
+                Название
+                <input type="text" name="title" value="{{ plan.title }}" required />
+              </label>
+              <label>
+                Длительность, дней
+                <input type="number" name="duration_days" min="0" value="{{ plan.duration_days }}" required />
+              </label>
+              <label>
+                Текущая цена
+                <input type="text" name="price_current" value="{{ plan.price_current }}" required />
+              </label>
+              <label>
+                Старая цена
+                <input type="text" name="price_old" value="{{ plan.price_old }}" />
+              </label>
+              <label>
+                Старая цена активна
+                <input type="checkbox" name="price_old_enabled" value="1" {% if plan.price_old_enabled %}checked{% endif %} />
+              </label>
+            </div>
+            <label style="display: block; margin-top: 12px;">
+              Преимущества (по одному на строку)
+              <textarea name="features">{% if plan.features %}{{ plan.features | join('\n') }}{% endif %}</textarea>
+            </label>
+            <div class="plan-actions">
+              <button class="btn-primary" type="submit">Сохранить</button>
+              <button class="btn-danger" type="submit" formaction="/admin/plans/delete" name="plan_id" value="{{ plan.id }}">
+                Удалить
+              </button>
+            </div>
+          </form>
+        </div>
+      {% endfor %}
+    </div>
+  </body>
+</html>
