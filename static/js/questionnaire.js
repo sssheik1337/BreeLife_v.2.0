@@ -365,14 +365,10 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
     track.style.height = `${rangeSteps * pixelsPerStep}px`;
 
     for (let index = 0; index < rangeSteps; index += 1) {
-        const value = maxHeight - index * stepCm;
+        const value = minHeight + index * stepCm;
         const tick = document.createElement('div');
         const isMajor = value % 5 === 0;
-        const isEdge = index === 0 || index === rangeSteps - 1;
         tick.className = isMajor ? 'ruler__tick ruler__tick--major' : 'ruler__tick';
-        if (isEdge) {
-            tick.classList.add('ruler__tick--edge');
-        }
         tick.dataset.virtualIndex = String(index);
         tick.style.height = `${pixelsPerStep}px`;
         if (isMajor) {
@@ -387,25 +383,17 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
     const ticks = Array.from(track.querySelectorAll('.ruler__tick'));
 
     const getCenterOffset = () => ruler.clientHeight / 2;
-    const getEdgePadding = () => Math.max(0, getCenterOffset() - pixelsPerStep / 2);
 
     const getVirtualIndexFromScroll = () => {
         const centerOffset = getCenterOffset();
-        const edgePadding = getEdgePadding();
-        const rawIndex = Math.round(
-            (ruler.scrollTop + centerOffset - edgePadding - pixelsPerStep / 2) / pixelsPerStep
-        );
+        const rawIndex = Math.round((ruler.scrollTop + centerOffset - pixelsPerStep / 2) / pixelsPerStep);
         return Math.min(rangeSteps - 1, Math.max(0, rawIndex));
     };
 
-    const getScrollOffsetForIndex = (index) => {
-        const edgePadding = getEdgePadding();
-        return index * pixelsPerStep + pixelsPerStep / 2 + edgePadding - getCenterOffset();
-    };
+    const getScrollOffsetForIndex = (index) => index * pixelsPerStep + pixelsPerStep / 2 - getCenterOffset();
 
     const updateHeightMagnifier = (virtualIndex) => {
         const centerOffset = getCenterOffset();
-        const edgePadding = getEdgePadding();
         const centerPosition = ruler.scrollTop + centerOffset;
         const visibleRadius = Math.ceil(centerOffset / pixelsPerStep) + 10;
         const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -417,7 +405,7 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
             if (!tick) {
                 continue;
             }
-            const tickCenter = edgePadding + i * pixelsPerStep + pixelsPerStep / 2;
+            const tickCenter = i * pixelsPerStep + pixelsPerStep / 2;
             const distance = Math.abs(tickCenter - centerPosition);
             const scale = clamp(1.4 - distance * 0.02, 1, 1.4);
             const opacity = clamp(1 - distance * 0.015, 0.3, 1);
@@ -428,7 +416,7 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
 
     const applyHeightValue = (virtualIndex) => {
         const clampedIndex = Math.min(rangeSteps - 1, Math.max(0, virtualIndex));
-        const value = maxHeight - clampedIndex * stepCm;
+        const value = minHeight + clampedIndex * stepCm;
         valueElement.textContent = `${value}`;
         ticks.forEach((tick) => {
             tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === clampedIndex);
@@ -453,10 +441,7 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
     };
 
     requestAnimationFrame(() => {
-        const startIndex = Math.round((maxHeight - startHeight) / stepCm);
-        const edgePadding = getEdgePadding();
-        track.style.paddingTop = `${edgePadding}px`;
-        track.style.paddingBottom = `${edgePadding}px`;
+        const startIndex = Math.round((startHeight - minHeight) / stepCm);
         ruler.scrollTop = getScrollOffsetForIndex(startIndex);
         applyHeightValue(startIndex);
         ruler.addEventListener('scroll', onScroll, { passive: true });
