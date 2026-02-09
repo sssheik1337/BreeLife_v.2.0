@@ -350,7 +350,11 @@ function renderHeightRuler(currentValue) {
         const value = maxHeight - index * stepCm;
         const tick = document.createElement('div');
         const isMajor = value % 5 === 0;
+        const isEdge = index === 0 || index === rangeSteps - 1;
         tick.className = isMajor ? 'ruler__tick ruler__tick--major' : 'ruler__tick';
+        if (isEdge) {
+            tick.classList.add('ruler__tick--edge');
+        }
         tick.dataset.virtualIndex = String(index);
         tick.style.height = `${pixelsPerStep}px`;
         if (isMajor) {
@@ -484,7 +488,11 @@ function renderWeightRuler(currentValue) {
         const value = minWeight + index * stepKg;
         const tick = document.createElement('div');
         const isMajor = Math.round(value * 10) % 50 === 0;
+        const isEdge = index === 0 || index === rangeSteps - 1;
         tick.className = isMajor ? 'ruler__tick ruler__tick--major' : 'ruler__tick';
+        if (isEdge) {
+            tick.classList.add('ruler__tick--edge');
+        }
         tick.dataset.virtualIndex = String(index);
         tick.style.width = `${pixelsPerStep}px`;
         if (isMajor) {

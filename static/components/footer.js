@@ -138,7 +138,7 @@ class CustomFooter extends HTMLElement {
           <div class="copyright">
             © ${new Date().getFullYear()} Health Bloom • Сделано с ❤️ для здоровой жизни
           </div>
-</div>
+        </div>
       </footer>
 
       <nav class="bottom-nav" aria-label="Основная навигация">
