@@ -45,6 +45,24 @@ function buildActivityOptions() {
     }));
 }
 
+const HEIGHT_RANGE = {
+    min: 120,
+    max: 220,
+    step: 1
+};
+
+const WEIGHT_RANGE = {
+    min: 30,
+    max: 200,
+    step: 0.5
+};
+
+const TARGET_WEIGHT_RANGE = {
+    min: 40,
+    max: 200,
+    step: 0.5
+};
+
 // Описание вопросов
 const questions = [
     {
@@ -72,10 +90,10 @@ const questions = [
         type: "number",
         icon: "maximize-2",
         placeholder: "Введите рост в сантиметрах",
-unit: "cm",
-        min: 100,
-        max: 250,
-        step: 1
+        unit: "cm",
+        min: HEIGHT_RANGE.min,
+        max: HEIGHT_RANGE.max,
+        step: HEIGHT_RANGE.step
     },
     {
         id: 4,
@@ -83,10 +101,10 @@ unit: "cm",
         type: "number",
         icon: "scale",
         placeholder: "Введите вес в килограммах",
-unit: "kg",
-        min: 30,
-        max: 200,
-        step: 0.5
+        unit: "kg",
+        min: WEIGHT_RANGE.min,
+        max: WEIGHT_RANGE.max,
+        step: WEIGHT_RANGE.step
     },
     {
         id: 5,
@@ -95,9 +113,9 @@ unit: "kg",
         icon: "target",
         placeholder: "Введите желаемый вес в килограммах",
         unit: "kg",
-        min: 30,
-        max: 200,
-        step: 0.5
+        min: TARGET_WEIGHT_RANGE.min,
+        max: TARGET_WEIGHT_RANGE.max,
+        step: TARGET_WEIGHT_RANGE.step
     },
     {
         id: 6,
@@ -307,10 +325,10 @@ function displayOptions(options) {
 
 
 
-function renderHeightRuler(currentValue) {
-    const minHeight = 120;
-    const maxHeight = 220;
-    const stepCm = 1;
+function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
+    const minHeight = range.min;
+    const maxHeight = range.max;
+    const stepCm = range.step;
     const pixelsPerStep = 12;
     const rangeSteps = Math.round((maxHeight - minHeight) / stepCm) + 1;
     const dataKey = getDataKey(currentQuestionIndex);
@@ -402,9 +420,8 @@ function renderHeightRuler(currentValue) {
             const tickCenter = edgePadding + i * pixelsPerStep + pixelsPerStep / 2;
             const distance = Math.abs(tickCenter - centerPosition);
             const scale = clamp(1.4 - distance * 0.02, 1, 1.4);
-            const opacity = clamp(1 - distance * 0.015, 0.3, 1);
             tick.style.transform = `translateZ(0) scale(${scale.toFixed(3)})`;
-            tick.style.opacity = opacity.toFixed(3);
+            tick.style.opacity = '1';
         }
     };
 
@@ -445,10 +462,10 @@ function renderHeightRuler(currentValue) {
     });
 }
 
-function renderWeightRuler(currentValue) {
-    const minWeight = 30;
-    const maxWeight = 200;
-    const stepKg = 0.5;
+function renderWeightRuler(currentValue, range = WEIGHT_RANGE) {
+    const minWeight = range.min;
+    const maxWeight = range.max;
+    const stepKg = range.step;
     const pixelsPerStep = 24;
     const rangeSteps = Math.round((maxWeight - minWeight) / stepKg) + 1;
     const dataKey = getDataKey(currentQuestionIndex);
@@ -540,9 +557,8 @@ function renderWeightRuler(currentValue) {
             const tickCenter = edgePadding + i * pixelsPerStep + pixelsPerStep / 2;
             const distance = Math.abs(tickCenter - centerPosition);
             const scale = clamp(1.4 - distance * 0.02, 1, 1.4);
-            const opacity = clamp(1 - distance * 0.015, 0.3, 1);
             tick.style.transform = `translateZ(0) scale(${scale.toFixed(3)})`;
-            tick.style.opacity = opacity.toFixed(3);
+            tick.style.opacity = '1';
         }
     };
 
@@ -792,11 +808,12 @@ function displayInput(question) {
         }
     } else if (question.type === 'number') {
         if (question.id === 3) {
-            renderHeightRuler(currentValue);
+            renderHeightRuler(currentValue, HEIGHT_RANGE);
             return;
         }
         if (question.id === 4 || question.id === 5) {
-            renderWeightRuler(currentValue);
+            const range = question.id === 4 ? WEIGHT_RANGE : TARGET_WEIGHT_RANGE;
+            renderWeightRuler(currentValue, range);
             return;
         }
         const resolved = resolveNumberPickerState(question, currentValue);
@@ -900,13 +917,13 @@ function parseNumberValue(value) {
 
 function getNumberRangeForQuestion(question) {
     if (question.id === 3) {
-        return { min: 120, max: 220, step: 1 };
+        return HEIGHT_RANGE;
     }
     if (question.id === 4) {
-        return { min: 30, max: 200, step: 0.5 };
+        return WEIGHT_RANGE;
     }
     if (question.id === 5) {
-        return { min: 40, max: 200, step: 0.5 };
+        return TARGET_WEIGHT_RANGE;
     }
     return {
         min: Number(question.min) || 0,
