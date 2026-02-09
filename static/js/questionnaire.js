@@ -1030,14 +1030,39 @@ async function saveProfileToServer(profile) {
     if (!profile) {
         return false;
     }
-    try {
+
+    const sendProfile = async () => {
         const apiFetch = window.apiFetch || fetch;
-        const response = await apiFetch('/api/profile/save', {
+        return apiFetch('/api/profile/save', {
             method: 'POST',
             body: JSON.stringify({
                 user_profile: profile
             })
         });
+    };
+
+    const tryInitTelegramAuth = async () => {
+        if (typeof initTelegramAuth !== 'function') {
+            return false;
+        }
+        try {
+            const configResponse = await fetch('/api/app/config');
+            const appConfig = configResponse.ok ? await configResponse.json() : {};
+            return await initTelegramAuth(appConfig || {});
+        } catch (error) {
+            return false;
+        }
+    };
+
+    try {
+        let response = await sendProfile();
+        if (response.status === 401) {
+            const reAuthorized = await tryInitTelegramAuth();
+            if (!reAuthorized) {
+                return false;
+            }
+            response = await sendProfile();
+        }
         return response.ok;
     } catch (error) {
         return false;
