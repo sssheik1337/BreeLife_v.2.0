@@ -325,12 +325,14 @@ function displayOptions(options) {
 
 
 
-function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
-    const minHeight = range.min;
-    const maxHeight = range.max;
-    const stepCm = range.step;
+function renderHeightRuler(currentValue) {
+    const minHeight = 120;
+    const maxHeight = 220;
+    const stepCm = 1;
     const pixelsPerStep = 12;
+    const loopCount = 7;
     const rangeSteps = Math.round((maxHeight - minHeight) / stepCm) + 1;
+    const totalVirtualSteps = rangeSteps * loopCount;
     const dataKey = getDataKey(currentQuestionIndex);
     const parsedCurrent = parseNumberValue(currentValue);
     const defaultHeight = Number.isFinite(parsedCurrent)
@@ -349,6 +351,7 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
             <div class="ruler ruler--vertical" id="height-ruler" aria-label="Выбор роста">
                 <div class="ruler__fade ruler__fade--start" aria-hidden="true"></div>
                 <div class="ruler__fade ruler__fade--end" aria-hidden="true"></div>
+                <div class="ruler__indicator" aria-hidden="true"></div>
                 <div class="ruler__track" id="height-ruler-track"></div>
             </div>
         </div>
@@ -361,14 +364,14 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
         return;
     }
 
-    track.style.height = `${rangeSteps * pixelsPerStep}px`;
+    track.style.height = `${totalVirtualSteps * pixelsPerStep}px`;
 
-    for (let index = 0; index < rangeSteps; index += 1) {
-        const value = minHeight + index * stepCm;
+    for (let virtualIndex = 0; virtualIndex < totalVirtualSteps; virtualIndex += 1) {
+        const value = minHeight + (virtualIndex % rangeSteps) * stepCm;
         const tick = document.createElement('div');
         const isMajor = value % 5 === 0;
         tick.className = isMajor ? 'ruler__tick ruler__tick--major' : 'ruler__tick';
-        tick.dataset.virtualIndex = String(index);
+        tick.dataset.virtualIndex = String(virtualIndex);
         tick.style.height = `${pixelsPerStep}px`;
         if (isMajor) {
             const label = document.createElement('span');
@@ -382,37 +385,38 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
     const ticks = Array.from(track.querySelectorAll('.ruler__tick'));
 
     const getCenterOffset = () => ruler.clientHeight / 2;
-    const getEdgePadding = () => Math.max(0, getCenterOffset() - pixelsPerStep / 2);
 
     const getVirtualIndexFromScroll = () => {
         const centerOffset = getCenterOffset();
-        const rawIndex = Math.round((ruler.scrollTop + centerOffset - pixelsPerStep / 2) / pixelsPerStep);
-        return Math.min(rangeSteps - 1, Math.max(0, rawIndex));
+        return Math.round((ruler.scrollTop + centerOffset - pixelsPerStep / 2) / pixelsPerStep);
     };
 
     const getScrollOffsetForIndex = (index) => index * pixelsPerStep + pixelsPerStep / 2 - getCenterOffset();
 
-    const applyEdgePadding = () => {
-        const edgePadding = getEdgePadding();
-        track.style.paddingTop = `${edgePadding}px`;
-        track.style.paddingBottom = `${edgePadding}px`;
+    const normalizeVirtualScroll = (rawIndex) => {
+        const minSafe = rangeSteps;
+        const maxSafe = rangeSteps * (loopCount - 1);
+        if (rawIndex < minSafe || rawIndex > maxSafe) {
+            const normalized = ((rawIndex % rangeSteps) + rangeSteps) % rangeSteps;
+            return normalized + rangeSteps * Math.floor(loopCount / 2);
+        }
+        return rawIndex;
     };
 
     const updateHeightMagnifier = (virtualIndex) => {
         const centerOffset = getCenterOffset();
-        const edgePadding = getEdgePadding();
         const centerPosition = ruler.scrollTop + centerOffset;
         const visibleRadius = Math.ceil(centerOffset / pixelsPerStep) + 10;
         const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-        const rangeStart = clamp(virtualIndex - visibleRadius, 0, rangeSteps - 1);
-        const rangeEnd = clamp(virtualIndex + visibleRadius, 0, rangeSteps - 1);
+        const rangeStart = clamp(virtualIndex - visibleRadius, 0, totalVirtualSteps - 1);
+        const rangeEnd = clamp(virtualIndex + visibleRadius, 0, totalVirtualSteps - 1);
 
         for (let i = rangeStart; i <= rangeEnd; i += 1) {
             const tick = ticks[i];
             if (!tick) {
                 continue;
             }
-            const tickCenter = edgePadding + i * pixelsPerStep + pixelsPerStep / 2;
+            const tickCenter = i * pixelsPerStep + pixelsPerStep / 2;
             const distance = Math.abs(tickCenter - centerPosition);
             const scale = clamp(1.4 - distance * 0.02, 1, 1.4);
             const opacity = clamp(1 - distance * 0.015, 0.3, 1);
@@ -422,17 +426,17 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
     };
 
     const applyHeightValue = (virtualIndex) => {
-        const clampedIndex = Math.min(rangeSteps - 1, Math.max(0, virtualIndex));
-        const value = minHeight + clampedIndex * stepCm;
+        const normalized = ((virtualIndex % rangeSteps) + rangeSteps) % rangeSteps;
+        const value = minHeight + normalized * stepCm;
         valueElement.textContent = `${value}`;
         ticks.forEach((tick) => {
-            tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === clampedIndex);
+            tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === virtualIndex);
         });
         window.userData[dataKey] = value;
         window.userData.height = value;
         saveUserData();
         updateButtonStates();
-        updateHeightMagnifier(clampedIndex);
+        updateHeightMagnifier(virtualIndex);
     };
 
     let rafId = null;
@@ -443,25 +447,30 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
         rafId = requestAnimationFrame(() => {
             rafId = null;
             const rawIndex = getVirtualIndexFromScroll();
-            applyHeightValue(rawIndex);
+            const normalizedIndex = normalizeVirtualScroll(rawIndex);
+            if (normalizedIndex !== rawIndex) {
+                ruler.scrollTop = getScrollOffsetForIndex(normalizedIndex);
+            }
+            applyHeightValue(normalizedIndex);
         });
     };
 
     requestAnimationFrame(() => {
-        const startIndex = Math.round((startHeight - minHeight) / stepCm);
-        applyEdgePadding();
+        const startIndex = Math.round((startHeight - minHeight) / stepCm) + rangeSteps * Math.floor(loopCount / 2);
         ruler.scrollTop = getScrollOffsetForIndex(startIndex);
         applyHeightValue(startIndex);
         ruler.addEventListener('scroll', onScroll, { passive: true });
     });
 }
 
-function renderWeightRuler(currentValue, range = WEIGHT_RANGE) {
-    const minWeight = range.min;
-    const maxWeight = range.max;
-    const stepKg = range.step;
-    const pixelsPerStep = 16;
+function renderWeightRuler(currentValue) {
+    const minWeight = 30;
+    const maxWeight = 200;
+    const stepKg = 0.5;
+    const pixelsPerStep = 24;
+    const loopCount = 7;
     const rangeSteps = Math.round((maxWeight - minWeight) / stepKg) + 1;
+    const totalVirtualSteps = rangeSteps * loopCount;
     const dataKey = getDataKey(currentQuestionIndex);
     const parsedCurrent = parseNumberValue(currentValue);
     const defaultWeight = Number.isFinite(parsedCurrent)
@@ -480,6 +489,7 @@ function renderWeightRuler(currentValue, range = WEIGHT_RANGE) {
             <div class="ruler ruler--horizontal" id="weight-ruler" aria-label="Выбор текущего веса">
                 <div class="ruler__fade ruler__fade--start" aria-hidden="true"></div>
                 <div class="ruler__fade ruler__fade--end" aria-hidden="true"></div>
+                <div class="ruler__indicator" aria-hidden="true"></div>
                 <div class="ruler__track" id="weight-ruler-track"></div>
             </div>
         </div>
@@ -492,14 +502,14 @@ function renderWeightRuler(currentValue, range = WEIGHT_RANGE) {
         return;
     }
 
-    track.style.width = `${rangeSteps * pixelsPerStep}px`;
+    track.style.width = `${totalVirtualSteps * pixelsPerStep}px`;
 
-    for (let index = 0; index < rangeSteps; index += 1) {
-        const value = minWeight + index * stepKg;
+    for (let virtualIndex = 0; virtualIndex < totalVirtualSteps; virtualIndex += 1) {
+        const value = minWeight + (virtualIndex % rangeSteps) * stepKg;
         const tick = document.createElement('div');
-        const isMajor = Math.round(value * 10) % 50 === 0;
+        const isMajor = Math.round(value * 10) % 100 === 0;
         tick.className = isMajor ? 'ruler__tick ruler__tick--major' : 'ruler__tick';
-        tick.dataset.virtualIndex = String(index);
+        tick.dataset.virtualIndex = String(virtualIndex);
         tick.style.width = `${pixelsPerStep}px`;
         if (isMajor) {
             const label = document.createElement('span');
@@ -513,37 +523,38 @@ function renderWeightRuler(currentValue, range = WEIGHT_RANGE) {
     const ticks = Array.from(track.querySelectorAll('.ruler__tick'));
 
     const getCenterOffset = () => ruler.clientWidth / 2;
-    const getEdgePadding = () => Math.max(0, getCenterOffset() - pixelsPerStep / 2);
 
     const getVirtualIndexFromScroll = () => {
         const centerOffset = getCenterOffset();
-        const rawIndex = Math.round((ruler.scrollLeft + centerOffset - pixelsPerStep / 2) / pixelsPerStep);
-        return Math.min(rangeSteps - 1, Math.max(0, rawIndex));
+        return Math.round((ruler.scrollLeft + centerOffset - pixelsPerStep / 2) / pixelsPerStep);
     };
 
     const getScrollOffsetForIndex = (index) => index * pixelsPerStep + pixelsPerStep / 2 - getCenterOffset();
 
-    const applyEdgePadding = () => {
-        const edgePadding = getEdgePadding();
-        track.style.paddingLeft = `${edgePadding}px`;
-        track.style.paddingRight = `${edgePadding}px`;
+    const normalizeVirtualScroll = (rawIndex) => {
+        const minSafe = rangeSteps;
+        const maxSafe = rangeSteps * (loopCount - 1);
+        if (rawIndex < minSafe || rawIndex > maxSafe) {
+            const normalized = ((rawIndex % rangeSteps) + rangeSteps) % rangeSteps;
+            return normalized + rangeSteps * Math.floor(loopCount / 2);
+        }
+        return rawIndex;
     };
 
     const updateWeightMagnifier = (virtualIndex) => {
         const centerOffset = getCenterOffset();
-        const edgePadding = getEdgePadding();
         const centerPosition = ruler.scrollLeft + centerOffset;
         const visibleRadius = Math.ceil(centerOffset / pixelsPerStep) + 10;
         const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-        const rangeStart = clamp(virtualIndex - visibleRadius, 0, rangeSteps - 1);
-        const rangeEnd = clamp(virtualIndex + visibleRadius, 0, rangeSteps - 1);
+        const rangeStart = clamp(virtualIndex - visibleRadius, 0, totalVirtualSteps - 1);
+        const rangeEnd = clamp(virtualIndex + visibleRadius, 0, totalVirtualSteps - 1);
 
         for (let i = rangeStart; i <= rangeEnd; i += 1) {
             const tick = ticks[i];
             if (!tick) {
                 continue;
             }
-            const tickCenter = edgePadding + i * pixelsPerStep + pixelsPerStep / 2;
+            const tickCenter = i * pixelsPerStep + pixelsPerStep / 2;
             const distance = Math.abs(tickCenter - centerPosition);
             const scale = clamp(1.4 - distance * 0.02, 1, 1.4);
             const opacity = clamp(1 - distance * 0.015, 0.3, 1);
@@ -553,17 +564,17 @@ function renderWeightRuler(currentValue, range = WEIGHT_RANGE) {
     };
 
     const applyWeightValue = (virtualIndex) => {
-        const clampedIndex = Math.min(rangeSteps - 1, Math.max(0, virtualIndex));
-        const value = minWeight + clampedIndex * stepKg;
+        const normalized = ((virtualIndex % rangeSteps) + rangeSteps) % rangeSteps;
+        const value = minWeight + normalized * stepKg;
         valueElement.textContent = value.toFixed(1).replace('.0', '');
         ticks.forEach((tick) => {
-            tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === clampedIndex);
+            tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === virtualIndex);
         });
         window.userData[dataKey] = value;
         window.userData.currentWeight = value;
         saveUserData();
         updateButtonStates();
-        updateWeightMagnifier(clampedIndex);
+        updateWeightMagnifier(virtualIndex);
     };
 
     let rafId = null;
@@ -574,18 +585,22 @@ function renderWeightRuler(currentValue, range = WEIGHT_RANGE) {
         rafId = requestAnimationFrame(() => {
             rafId = null;
             const rawIndex = getVirtualIndexFromScroll();
-            applyWeightValue(rawIndex);
+            const normalizedIndex = normalizeVirtualScroll(rawIndex);
+            if (normalizedIndex !== rawIndex) {
+                ruler.scrollLeft = getScrollOffsetForIndex(normalizedIndex);
+            }
+            applyWeightValue(normalizedIndex);
         });
     };
 
     requestAnimationFrame(() => {
-        const startIndex = Math.round((startWeight - minWeight) / stepKg);
-        applyEdgePadding();
+        const startIndex = Math.round((startWeight - minWeight) / stepKg) + rangeSteps * Math.floor(loopCount / 2);
         ruler.scrollLeft = getScrollOffsetForIndex(startIndex);
         applyWeightValue(startIndex);
         ruler.addEventListener('scroll', onScroll, { passive: true });
     });
 }
+
 
 // Display input field for date/number questions
 function displayInput(question) {
