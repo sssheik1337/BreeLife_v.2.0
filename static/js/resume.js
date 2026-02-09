@@ -799,7 +799,6 @@ function createProgressRing({ percent, value, label, color }) {
 
 // Рендер статуса пробного периода
 async function renderTrialStatus() {
-    const statusElement = document.getElementById('trial-status');
     const datesElement = document.getElementById('trial-dates');
     const badgeElement = document.getElementById('trial-badge');
     const warningElement = document.getElementById('trial-warning');
@@ -810,12 +809,11 @@ async function renderTrialStatus() {
     const recommendationsSection = document.getElementById('recommendations-section');
     const nutritionSection = document.getElementById('nutrition-rings-section');
 
-    if (!statusElement || !datesElement || !badgeElement || !paywallElement || !payButton) {
+    if (!datesElement || !badgeElement || !paywallElement || !payButton) {
         return;
     }
 
     if (typeof getUserProfile !== 'function') {
-        statusElement.textContent = 'Не удалось загрузить профиль';
         datesElement.textContent = 'Повторите попытку позже.';
         return;
     }
@@ -823,7 +821,6 @@ async function renderTrialStatus() {
     const profile = getUserProfile();
     const isDevMode = window.appIsDev === true || window.appMode === 'development';
     if (window.serverUser?.authorized !== true) {
-        statusElement.textContent = 'Нет авторизации Telegram';
         datesElement.textContent = 'Откройте приложение через кнопку бота.';
         badgeElement.textContent = 'Пробный период до --';
         if (warningElement) {
@@ -888,7 +885,6 @@ async function renderTrialStatus() {
     try {
         subscription = await fetchSubscriptionStatus();
     } catch (error) {
-        statusElement.textContent = 'Не удалось загрузить статус подписки';
         datesElement.textContent = 'Попробуйте обновить страницу.';
         badgeElement.textContent = 'Пробный период до --';
         paywallElement.classList.add('hidden');
@@ -899,7 +895,6 @@ async function renderTrialStatus() {
     }
 
     if (subscription.subscription_status === 'disabled' || isDevMode) {
-        statusElement.textContent = 'DEV MODE: подписки отключены';
         datesElement.textContent = 'Оплата и пробный период недоступны в режиме разработки.';
         badgeElement.textContent = 'DEV MODE';
         paywallElement.classList.add('hidden');
@@ -926,7 +921,6 @@ async function renderTrialStatus() {
         try {
             subscription = await startTrial();
         } catch (error) {
-            statusElement.textContent = 'Не удалось активировать пробный период';
             datesElement.textContent = 'Попробуйте обновить страницу.';
             badgeElement.textContent = 'Пробный период до --';
             paywallElement.classList.add('hidden');
@@ -941,8 +935,11 @@ async function renderTrialStatus() {
     }
 
     const untilDate = formatDateRu(subscription.subscription_until);
+    const accessUntilText = untilDate
+        ? `Максимальный доступ открыт до ${untilDate}`
+        : 'Максимальный доступ открыт до --';
     paywallElement.classList.add('hidden');
-    badgeElement.textContent = untilDate ? `Пробный период до ${untilDate}` : 'Пробный период до --';
+    badgeElement.textContent = accessUntilText;
     if (warningElement) {
         warningElement.textContent = '';
         warningElement.classList.add('hidden');
@@ -957,10 +954,7 @@ async function renderTrialStatus() {
     }
 
     if (subscription.subscription_status === 'trial') {
-        statusElement.textContent = 'Пробный период активен';
-        datesElement.textContent = untilDate
-            ? `Пробный период действует до ${untilDate}.`
-            : 'Даты пробного периода уточняются.';
+        datesElement.textContent = accessUntilText;
         if (warningElement && subscription.subscription_until) {
             const endDate = new Date(subscription.subscription_until);
             const now = new Date();
@@ -972,13 +966,8 @@ async function renderTrialStatus() {
             }
         }
     } else if (subscription.subscription_status === 'active') {
-        statusElement.textContent = 'Подписка активна';
-        datesElement.textContent = untilDate
-            ? `Подписка действует до ${untilDate}.`
-            : 'Даты подписки уточняются.';
-        badgeElement.textContent = untilDate ? `Подписка до ${untilDate}` : 'Подписка активна';
+        datesElement.textContent = accessUntilText;
     } else if (subscription.subscription_status === 'expired') {
-        statusElement.textContent = 'Пробный период завершён';
         datesElement.textContent = untilDate
             ? `Пробный период закончился ${untilDate}.`
             : 'Пробный период завершён.';
@@ -991,7 +980,6 @@ async function renderTrialStatus() {
             paymentMotivation.textContent = await getPaymentMotivation(profile, deviations);
         }
     } else {
-        statusElement.textContent = 'Статус подписки неизвестен';
         datesElement.textContent = 'Попробуйте обновить страницу.';
         badgeElement.textContent = 'Пробный период до --';
     }
