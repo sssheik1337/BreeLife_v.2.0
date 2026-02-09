@@ -312,9 +312,7 @@ function renderHeightRuler(currentValue) {
     const maxHeight = 220;
     const stepCm = 1;
     const pixelsPerStep = 12;
-    const loopCount = 7;
     const rangeSteps = Math.round((maxHeight - minHeight) / stepCm) + 1;
-    const totalVirtualSteps = rangeSteps * loopCount;
     const dataKey = getDataKey(currentQuestionIndex);
     const parsedCurrent = parseNumberValue(currentValue);
     const defaultHeight = Number.isFinite(parsedCurrent)
@@ -346,14 +344,14 @@ function renderHeightRuler(currentValue) {
         return;
     }
 
-    track.style.height = `${totalVirtualSteps * pixelsPerStep}px`;
+    track.style.height = `${rangeSteps * pixelsPerStep}px`;
 
-    for (let virtualIndex = 0; virtualIndex < totalVirtualSteps; virtualIndex += 1) {
-        const value = minHeight + (virtualIndex % rangeSteps) * stepCm;
+    for (let index = 0; index < rangeSteps; index += 1) {
+        const value = maxHeight - index * stepCm;
         const tick = document.createElement('div');
         const isMajor = value % 5 === 0;
         tick.className = isMajor ? 'ruler__tick ruler__tick--major' : 'ruler__tick';
-        tick.dataset.virtualIndex = String(virtualIndex);
+        tick.dataset.virtualIndex = String(index);
         tick.style.height = `${pixelsPerStep}px`;
         if (isMajor) {
             const label = document.createElement('span');
@@ -367,38 +365,37 @@ function renderHeightRuler(currentValue) {
     const ticks = Array.from(track.querySelectorAll('.ruler__tick'));
 
     const getCenterOffset = () => ruler.clientHeight / 2;
+    const getEdgePadding = () => Math.max(0, getCenterOffset() - pixelsPerStep / 2);
 
     const getVirtualIndexFromScroll = () => {
         const centerOffset = getCenterOffset();
-        return Math.round((ruler.scrollTop + centerOffset - pixelsPerStep / 2) / pixelsPerStep);
+        const edgePadding = getEdgePadding();
+        const rawIndex = Math.round(
+            (ruler.scrollTop + centerOffset - edgePadding - pixelsPerStep / 2) / pixelsPerStep
+        );
+        return Math.min(rangeSteps - 1, Math.max(0, rawIndex));
     };
 
-    const getScrollOffsetForIndex = (index) => index * pixelsPerStep + pixelsPerStep / 2 - getCenterOffset();
-
-    const normalizeVirtualScroll = (rawIndex) => {
-        const minSafe = rangeSteps;
-        const maxSafe = rangeSteps * (loopCount - 1);
-        if (rawIndex < minSafe || rawIndex > maxSafe) {
-            const normalized = ((rawIndex % rangeSteps) + rangeSteps) % rangeSteps;
-            return normalized + rangeSteps * Math.floor(loopCount / 2);
-        }
-        return rawIndex;
+    const getScrollOffsetForIndex = (index) => {
+        const edgePadding = getEdgePadding();
+        return index * pixelsPerStep + pixelsPerStep / 2 + edgePadding - getCenterOffset();
     };
 
     const updateHeightMagnifier = (virtualIndex) => {
         const centerOffset = getCenterOffset();
+        const edgePadding = getEdgePadding();
         const centerPosition = ruler.scrollTop + centerOffset;
         const visibleRadius = Math.ceil(centerOffset / pixelsPerStep) + 10;
         const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-        const rangeStart = clamp(virtualIndex - visibleRadius, 0, totalVirtualSteps - 1);
-        const rangeEnd = clamp(virtualIndex + visibleRadius, 0, totalVirtualSteps - 1);
+        const rangeStart = clamp(virtualIndex - visibleRadius, 0, rangeSteps - 1);
+        const rangeEnd = clamp(virtualIndex + visibleRadius, 0, rangeSteps - 1);
 
         for (let i = rangeStart; i <= rangeEnd; i += 1) {
             const tick = ticks[i];
             if (!tick) {
                 continue;
             }
-            const tickCenter = i * pixelsPerStep + pixelsPerStep / 2;
+            const tickCenter = edgePadding + i * pixelsPerStep + pixelsPerStep / 2;
             const distance = Math.abs(tickCenter - centerPosition);
             const scale = clamp(1.4 - distance * 0.02, 1, 1.4);
             const opacity = clamp(1 - distance * 0.015, 0.3, 1);
@@ -408,17 +405,17 @@ function renderHeightRuler(currentValue) {
     };
 
     const applyHeightValue = (virtualIndex) => {
-        const normalized = ((virtualIndex % rangeSteps) + rangeSteps) % rangeSteps;
-        const value = minHeight + normalized * stepCm;
+        const clampedIndex = Math.min(rangeSteps - 1, Math.max(0, virtualIndex));
+        const value = maxHeight - clampedIndex * stepCm;
         valueElement.textContent = `${value}`;
         ticks.forEach((tick) => {
-            tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === virtualIndex);
+            tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === clampedIndex);
         });
         window.userData[dataKey] = value;
         window.userData.height = value;
         saveUserData();
         updateButtonStates();
-        updateHeightMagnifier(virtualIndex);
+        updateHeightMagnifier(clampedIndex);
     };
 
     let rafId = null;
@@ -429,16 +426,15 @@ function renderHeightRuler(currentValue) {
         rafId = requestAnimationFrame(() => {
             rafId = null;
             const rawIndex = getVirtualIndexFromScroll();
-            const normalizedIndex = normalizeVirtualScroll(rawIndex);
-            if (normalizedIndex !== rawIndex) {
-                ruler.scrollTop = getScrollOffsetForIndex(normalizedIndex);
-            }
-            applyHeightValue(normalizedIndex);
+            applyHeightValue(rawIndex);
         });
     };
 
     requestAnimationFrame(() => {
-        const startIndex = Math.round((startHeight - minHeight) / stepCm) + rangeSteps * Math.floor(loopCount / 2);
+        const startIndex = Math.round((maxHeight - startHeight) / stepCm);
+        const edgePadding = getEdgePadding();
+        track.style.paddingTop = `${edgePadding}px`;
+        track.style.paddingBottom = `${edgePadding}px`;
         ruler.scrollTop = getScrollOffsetForIndex(startIndex);
         applyHeightValue(startIndex);
         ruler.addEventListener('scroll', onScroll, { passive: true });
