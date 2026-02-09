@@ -245,7 +245,7 @@
 
       .ruler__indicator {
         position: absolute;
-        background: #ef4444;
+        background: #0f172a;
         border-radius: 999px;
         pointer-events: none;
         z-index: 5;
@@ -255,14 +255,14 @@
         right: 0;
         top: 50%;
         height: 2px;
-        transform: translateY(-1px);
+        transform: translateY(-50%);
       }
       .ruler--horizontal .ruler__indicator {
         left: 50%;
         top: 0;
         bottom: 0;
         width: 2px;
-        transform: translateX(-1px);
+        transform: translateX(-50%);
       }
 
       .ruler__fade {
@@ -278,11 +278,11 @@
       }
       .ruler--vertical .ruler__fade--start {
         top: 0;
-        background: linear-gradient(to bottom, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
+        background: linear-gradient(to bottom, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 100%);
       }
       .ruler--vertical .ruler__fade--end {
         bottom: 0;
-        background: linear-gradient(to top, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
+        background: linear-gradient(to top, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 100%);
       }
       .ruler--horizontal .ruler__fade {
         top: 0;
@@ -291,11 +291,11 @@
       }
       .ruler--horizontal .ruler__fade--start {
         left: 0;
-        background: linear-gradient(to right, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
+        background: linear-gradient(to right, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 100%);
       }
       .ruler--horizontal .ruler__fade--end {
         right: 0;
-        background: linear-gradient(to left, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
+        background: linear-gradient(to left, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 100%);
       }
     </style>
 </head>
