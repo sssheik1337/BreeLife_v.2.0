@@ -387,25 +387,17 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
     const ticks = Array.from(track.querySelectorAll('.ruler__tick'));
 
     const getCenterOffset = () => ruler.clientHeight / 2;
-    const getEdgePadding = () => Math.max(0, getCenterOffset() - pixelsPerStep / 2);
 
     const getVirtualIndexFromScroll = () => {
         const centerOffset = getCenterOffset();
-        const edgePadding = getEdgePadding();
-        const rawIndex = Math.round(
-            (ruler.scrollTop + centerOffset - edgePadding - pixelsPerStep / 2) / pixelsPerStep
-        );
+        const rawIndex = Math.round((ruler.scrollTop + centerOffset - pixelsPerStep / 2) / pixelsPerStep);
         return Math.min(rangeSteps - 1, Math.max(0, rawIndex));
     };
 
-    const getScrollOffsetForIndex = (index) => {
-        const edgePadding = getEdgePadding();
-        return index * pixelsPerStep + pixelsPerStep / 2 + edgePadding - getCenterOffset();
-    };
+    const getScrollOffsetForIndex = (index) => index * pixelsPerStep + pixelsPerStep / 2 - getCenterOffset();
 
     const updateHeightMagnifier = (virtualIndex) => {
         const centerOffset = getCenterOffset();
-        const edgePadding = getEdgePadding();
         const centerPosition = ruler.scrollTop + centerOffset;
         const visibleRadius = Math.ceil(centerOffset / pixelsPerStep) + 10;
         const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -417,11 +409,12 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
             if (!tick) {
                 continue;
             }
-            const tickCenter = edgePadding + i * pixelsPerStep + pixelsPerStep / 2;
+            const tickCenter = i * pixelsPerStep + pixelsPerStep / 2;
             const distance = Math.abs(tickCenter - centerPosition);
             const scale = clamp(1.4 - distance * 0.02, 1, 1.4);
+            const opacity = clamp(1 - distance * 0.015, 0.3, 1);
             tick.style.transform = `translateZ(0) scale(${scale.toFixed(3)})`;
-            tick.style.opacity = '1';
+            tick.style.opacity = opacity.toFixed(3);
         }
     };
 
@@ -453,9 +446,6 @@ function renderHeightRuler(currentValue, range = HEIGHT_RANGE) {
 
     requestAnimationFrame(() => {
         const startIndex = Math.round((maxHeight - startHeight) / stepCm);
-        const edgePadding = getEdgePadding();
-        track.style.paddingTop = `${edgePadding}px`;
-        track.style.paddingBottom = `${edgePadding}px`;
         ruler.scrollTop = getScrollOffsetForIndex(startIndex);
         applyHeightValue(startIndex);
         ruler.addEventListener('scroll', onScroll, { passive: true });
@@ -466,7 +456,7 @@ function renderWeightRuler(currentValue, range = WEIGHT_RANGE) {
     const minWeight = range.min;
     const maxWeight = range.max;
     const stepKg = range.step;
-    const pixelsPerStep = 24;
+    const pixelsPerStep = 16;
     const rangeSteps = Math.round((maxWeight - minWeight) / stepKg) + 1;
     const dataKey = getDataKey(currentQuestionIndex);
     const parsedCurrent = parseNumberValue(currentValue);
@@ -524,25 +514,17 @@ function renderWeightRuler(currentValue, range = WEIGHT_RANGE) {
     const ticks = Array.from(track.querySelectorAll('.ruler__tick'));
 
     const getCenterOffset = () => ruler.clientWidth / 2;
-    const getEdgePadding = () => Math.max(0, getCenterOffset() - pixelsPerStep / 2);
 
     const getVirtualIndexFromScroll = () => {
         const centerOffset = getCenterOffset();
-        const edgePadding = getEdgePadding();
-        const rawIndex = Math.round(
-            (ruler.scrollLeft + centerOffset - edgePadding - pixelsPerStep / 2) / pixelsPerStep
-        );
+        const rawIndex = Math.round((ruler.scrollLeft + centerOffset - pixelsPerStep / 2) / pixelsPerStep);
         return Math.min(rangeSteps - 1, Math.max(0, rawIndex));
     };
 
-    const getScrollOffsetForIndex = (index) => {
-        const edgePadding = getEdgePadding();
-        return index * pixelsPerStep + pixelsPerStep / 2 + edgePadding - getCenterOffset();
-    };
+    const getScrollOffsetForIndex = (index) => index * pixelsPerStep + pixelsPerStep / 2 - getCenterOffset();
 
     const updateWeightMagnifier = (virtualIndex) => {
         const centerOffset = getCenterOffset();
-        const edgePadding = getEdgePadding();
         const centerPosition = ruler.scrollLeft + centerOffset;
         const visibleRadius = Math.ceil(centerOffset / pixelsPerStep) + 10;
         const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -554,11 +536,12 @@ function renderWeightRuler(currentValue, range = WEIGHT_RANGE) {
             if (!tick) {
                 continue;
             }
-            const tickCenter = edgePadding + i * pixelsPerStep + pixelsPerStep / 2;
+            const tickCenter = i * pixelsPerStep + pixelsPerStep / 2;
             const distance = Math.abs(tickCenter - centerPosition);
             const scale = clamp(1.4 - distance * 0.02, 1, 1.4);
+            const opacity = clamp(1 - distance * 0.015, 0.3, 1);
             tick.style.transform = `translateZ(0) scale(${scale.toFixed(3)})`;
-            tick.style.opacity = '1';
+            tick.style.opacity = opacity.toFixed(3);
         }
     };
 
@@ -590,9 +573,6 @@ function renderWeightRuler(currentValue, range = WEIGHT_RANGE) {
 
     requestAnimationFrame(() => {
         const startIndex = Math.round((startWeight - minWeight) / stepKg);
-        const edgePadding = getEdgePadding();
-        track.style.paddingLeft = `${edgePadding}px`;
-        track.style.paddingRight = `${edgePadding}px`;
         ruler.scrollLeft = getScrollOffsetForIndex(startIndex);
         applyWeightValue(startIndex);
         ruler.addEventListener('scroll', onScroll, { passive: true });
