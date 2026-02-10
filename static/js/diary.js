@@ -1409,7 +1409,7 @@ function bindGlobalDiaryHandlers() {
     document.addEventListener('click', (event) => {
         const fabToggle = event.target.closest('[data-action="fab-toggle"]');
         if (fabToggle) {
-            openProductsForm(getSelectedDate(), 'breakfast');
+            toggleFabMenu();
             return;
         }
 
@@ -1855,7 +1855,7 @@ async function initDiary() {
     renderDayScreen(readDiaryEntries(), resolvedDate);
 
     if (openFabOnLoad) {
-        openProductsForm(getSelectedDate(), getMealFromUrl() || 'breakfast');
+        toggleFabMenu();
         params.delete('fab');
         const next = params.toString();
         const nextUrl = next ? `${window.location.pathname}?${next}` : window.location.pathname;
