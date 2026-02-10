@@ -720,10 +720,10 @@ function updateWelcomeGreeting(status) {
     const username = typeof status?.username === 'string' ? status.username.trim() : '';
     const displayName = firstName || username;
     if (!displayName) {
-        greetingElement.textContent = 'Привет 👋';
+        greetingElement.textContent = 'Привет 👋 Это ваш персональный спутник здоровья';
         return;
     }
-    greetingElement.textContent = `Привет, ${displayName} 👋`;
+    greetingElement.textContent = `Привет, ${displayName}, это твой персональный спутник здоровья 👋`;
 }
 
 function restoreUserDataFromLocalStorage() {
