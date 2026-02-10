@@ -92,6 +92,20 @@
         padding: 1.25rem;
       }
 
+      .today-plan-value {
+        font-size: 1.5rem;
+        line-height: 1.15;
+        font-weight: 800;
+        color: #0f172a;
+      }
+      .today-plan-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
       .ring-secondary {
         padding: 0.75rem;
         border-radius: 1.25rem;
@@ -157,6 +171,40 @@
                     <p class="text-slate-500 mt-2">Ваш прогресс и динамика по ключевым показателям</p>
 </div>
                 
+
+                <!-- План на сегодня -->
+                <div class="profile-card p-6 mb-6" id="profile-today-plan">
+                    <div class="flex items-start justify-between gap-3 mb-4">
+                        <div>
+                            <h3 class="font-semibold text-slate-800">План на сегодня</h3>
+                            <p class="text-sm text-slate-500">Целевые значения по калориям, БЖУ и гидратации</p>
+                        </div>
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">Дневной ориентир</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <div class="rounded-2xl bg-slate-50 p-4">
+                            <p class="today-plan-label">Калории</p>
+                            <p id="today-plan-calories" class="today-plan-value">—</p>
+                        </div>
+                        <div class="rounded-2xl bg-slate-50 p-4">
+                            <p class="today-plan-label">Белки</p>
+                            <p id="today-plan-protein" class="today-plan-value">—</p>
+                        </div>
+                        <div class="rounded-2xl bg-slate-50 p-4">
+                            <p class="today-plan-label">Жиры</p>
+                            <p id="today-plan-fat" class="today-plan-value">—</p>
+                        </div>
+                        <div class="rounded-2xl bg-slate-50 p-4">
+                            <p class="today-plan-label">Углеводы</p>
+                            <p id="today-plan-carbs" class="today-plan-value">—</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 rounded-2xl bg-sky-50 p-4 flex items-center justify-between">
+                        <p class="today-plan-label text-sky-700">Гидратация</p>
+                        <p id="today-plan-water" class="today-plan-value text-sky-700">—</p>
+                    </div>
+                </div>
+
                 <!-- Weekly Progress -->
                 <div class="profile-card profile-card--secondary p-6 mb-6" id="profile-weekly-progress">
                     <div class="flex items-center justify-between mb-4">

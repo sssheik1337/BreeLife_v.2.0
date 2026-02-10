@@ -1027,6 +1027,49 @@ function getActivityForDate(entries, dateKey) {
     return entries.some((entry) => entry?.date === dateKey && entry?.activity === true);
 }
 
+
+function renderTodayPlanCard() {
+    const caloriesElement = document.getElementById('today-plan-calories');
+    const proteinElement = document.getElementById('today-plan-protein');
+    const fatElement = document.getElementById('today-plan-fat');
+    const carbsElement = document.getElementById('today-plan-carbs');
+    const waterElement = document.getElementById('today-plan-water');
+
+    if (!caloriesElement || !proteinElement || !fatElement || !carbsElement || !waterElement) {
+        return;
+    }
+
+    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const tdee = Number(profile?.tdee_calories);
+    const adminConfig = window.adminConfig || {};
+    const macrosConfig = adminConfig.default_macros || {};
+
+    const proteinPercent = Number.isFinite(Number(macrosConfig.protein_pct)) ? Number(macrosConfig.protein_pct) : 0.30;
+    const fatPercent = Number.isFinite(Number(macrosConfig.fat_pct)) ? Number(macrosConfig.fat_pct) : 0.25;
+    const carbsPercent = Number.isFinite(Number(macrosConfig.carbs_pct)) ? Number(macrosConfig.carbs_pct) : 0.45;
+
+    if (Number.isFinite(tdee) && tdee > 0) {
+        const proteinTarget = (tdee * proteinPercent) / 4;
+        const fatTarget = (tdee * fatPercent) / 9;
+        const carbsTarget = (tdee * carbsPercent) / 4;
+
+        caloriesElement.textContent = `${Math.round(tdee)} ккал`;
+        proteinElement.textContent = `${Math.round(proteinTarget)} г`;
+        fatElement.textContent = `${Math.round(fatTarget)} г`;
+        carbsElement.textContent = `${Math.round(carbsTarget)} г`;
+    } else {
+        caloriesElement.textContent = '—';
+        proteinElement.textContent = '—';
+        fatElement.textContent = '—';
+        carbsElement.textContent = '—';
+    }
+
+    const waterTarget = Number(window.adminConfig?.reminders?.water_min_l);
+    waterElement.textContent = Number.isFinite(waterTarget) && waterTarget > 0
+        ? `${waterTarget.toFixed(1)} л`
+        : '—';
+}
+
 function renderProfileRings() {
     const caloriesContainer = document.getElementById('profile-calories-ring');
     const waterContainer = document.getElementById('profile-water-ring');
@@ -1771,6 +1814,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof window.syncHabitEntriesWithBackend === 'function') {
             await window.syncHabitEntriesWithBackend();
         }
+        renderTodayPlanCard();
         renderProfileRings();
         renderWeeklyProgress();
         renderCalorieTrend(Number(activeRange));
