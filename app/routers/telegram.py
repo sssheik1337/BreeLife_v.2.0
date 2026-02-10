@@ -20,13 +20,15 @@ async def telegram_bot_info():
 @router.post("/api/auth/telegram")
 async def telegram_auth(request: Request, response: Response, payload: TelegramAuthRequest):
     init_data = None
-    parse_errors: list[Exception] = []
+    parse_type_errors: list[Exception] = []
+    parse_value_errors: list[Exception] = []
 
-    # Поддержка разных сигнатур aiogram + корректная обработка невалидной подписи.
+    # Поддержка разных сигнатур aiogram и порядков аргументов между версиями.
     parse_variants = (
         lambda: safe_parse_webapp_init_data(payload.initData, bot_token=TELEGRAM_BOT_TOKEN),
-        lambda: safe_parse_webapp_init_data(payload.initData, TELEGRAM_BOT_TOKEN),
         lambda: safe_parse_webapp_init_data(payload.initData, token=TELEGRAM_BOT_TOKEN),
+        lambda: safe_parse_webapp_init_data(payload.initData, TELEGRAM_BOT_TOKEN),
+        lambda: safe_parse_webapp_init_data(TELEGRAM_BOT_TOKEN, payload.initData),
     )
 
     for parse_variant in parse_variants:
@@ -34,14 +36,17 @@ async def telegram_auth(request: Request, response: Response, payload: TelegramA
             init_data = parse_variant()
             break
         except TypeError as error:
-            parse_errors.append(error)
+            parse_type_errors.append(error)
             continue
         except ValueError as error:
-            raise HTTPException(status_code=401, detail="INVALID_INIT_DATA_SIGNATURE") from error
+            parse_value_errors.append(error)
+            continue
 
     if init_data is None:
+        if parse_value_errors:
+            raise HTTPException(status_code=401, detail="INVALID_INIT_DATA_SIGNATURE") from parse_value_errors[-1]
         raise HTTPException(status_code=500, detail="TELEGRAM_PARSER_INCOMPATIBLE") from (
-            parse_errors[-1] if parse_errors else None
+            parse_type_errors[-1] if parse_type_errors else None
         )
 
     user = init_data.user
