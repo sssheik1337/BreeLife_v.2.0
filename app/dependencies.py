@@ -46,7 +46,7 @@ def optional_current_user(request: Request) -> int | None:
 
 
 def require_completed_profile(telegram_user_id: int) -> dict[str, object]:
-    profile = read_payload(telegram_user_id)
+    profile = read_payload("profiles", telegram_user_id)
     if not profile:
         raise HTTPException(status_code=404, detail="PROFILE_NOT_FOUND")
     if not profile.get("is_completed"):
@@ -55,11 +55,11 @@ def require_completed_profile(telegram_user_id: int) -> dict[str, object]:
 
 
 def load_profile(telegram_user_id: int) -> dict[str, object]:
-    return read_payload(telegram_user_id) or {}
+    return read_payload("profiles", telegram_user_id) or {}
 
 
 def update_profile(telegram_user_id: int, data: dict[str, object]) -> None:
-    write_payload(telegram_user_id, data)
+    write_payload("profiles", telegram_user_id, data)
 
 
 def apply_profile_patch(profile: dict[str, object], patch: dict[str, object]) -> dict[str, object]:
@@ -84,7 +84,7 @@ def maybe_set_admin_session(response: Response, token: str | None) -> None:
 
 
 def get_profile_and_admin_config(telegram_user_id: int | None) -> dict[str, object]:
-    profile = read_payload(telegram_user_id) if telegram_user_id is not None else {}
+    profile = read_payload("profiles", telegram_user_id) if telegram_user_id is not None else {}
     admin_config = load_admin_config()
     if not isinstance(admin_config, dict):
         admin_config = {}
