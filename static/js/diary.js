@@ -1563,6 +1563,14 @@ function bindGlobalDiaryHandlers() {
             renderDayScreen(readDiaryEntries(), dateKey);
         }
     });
+
+    window.addEventListener('diary-open-fab-menu', () => {
+        // По событию от нижней кнопки "+" открываем именно меню действий,
+        // сохраняя сценарий: список -> выбор пункта -> форма продуктов.
+        setActiveMode(MODE_DAY);
+        closeFabMenu();
+        toggleFabMenu();
+    });
 }
 
 function getSelectedDate() {
