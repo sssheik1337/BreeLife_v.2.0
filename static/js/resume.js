@@ -4,6 +4,7 @@ const apiFetch = window.apiFetch || fetch;
 
 let resumeInitialProfileSnapshot = null;
 let resumeIsDirty = false;
+let resumeHasUserEdits = false;
 
 
 function hasMeaningfulUserData(data) {
@@ -62,8 +63,17 @@ function refreshResumeDirtyState() {
     if (!resumeInitialProfileSnapshot) {
         resumeInitialProfileSnapshot = buildComparableResumeProfileState('initial');
     }
-    resumeIsDirty = JSON.stringify(currentSnapshot) !== JSON.stringify(resumeInitialProfileSnapshot);
+    resumeIsDirty = resumeHasUserEdits && JSON.stringify(currentSnapshot) !== JSON.stringify(resumeInitialProfileSnapshot);
     updateResumeActionButtons();
+}
+
+
+function setupResumeDirtyTracking() {
+    document.addEventListener('resume-profile-edited', () => {
+        // Помечаем только явные пользовательские правки, чтобы кнопка сохранения не мигала от фоновых пересчётов.
+        resumeHasUserEdits = true;
+        refreshResumeDirtyState();
+    });
 }
 
 // Initialize summary page
@@ -1088,7 +1098,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     renderTrialStatus();
     
     resumeInitialProfileSnapshot = buildComparableResumeProfileState('initial');
+    resumeHasUserEdits = false;
     refreshResumeDirtyState();
+
+    setupResumeDirtyTracking();
 
     const saveButton = document.getElementById('resume-save-button');
     if (saveButton) {
