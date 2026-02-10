@@ -450,6 +450,18 @@ function setTelegramAccessLock(isLocked) {
     document.body.classList.toggle('telegram-auth-locked', Boolean(isLocked));
 }
 
+function getTelegramIdentityFallback() {
+    const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
+    if (!user || typeof user !== 'object') {
+        return { first_name: '', last_name: '', username: '' };
+    }
+    return {
+        first_name: typeof user.first_name === 'string' ? user.first_name.trim() : '',
+        last_name: typeof user.last_name === 'string' ? user.last_name.trim() : '',
+        username: typeof user.username === 'string' ? user.username.trim() : ''
+    };
+}
+
 function buildBotLink(username) {
     if (!username) {
         return null;
@@ -576,9 +588,13 @@ async function initTelegramAuth(appConfig) {
     window.telegramInitData = initData;
     installTelegramInitDataInterceptor(initData);
     try {
-        const response = await fetch('/api/auth/telegram', {
+        const fetcher = window.apiFetch || fetch;
+        const response = await fetcher('/api/auth/telegram', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': initData
+            },
             body: JSON.stringify({ initData })
         });
         if (!response.ok) {
@@ -605,13 +621,25 @@ async function loadProfileStatus() {
             return { authorized: false, profile_completed: false, telegram_user_id: null };
         }
         const data = await response.json();
+        const fallback = getTelegramIdentityFallback();
         return {
             authorized: Boolean(data?.authorized),
             profile_completed: Boolean(data?.profile_completed),
-            telegram_user_id: data?.telegram_user_id ?? null
+            telegram_user_id: data?.telegram_user_id ?? null,
+            first_name: (typeof data?.first_name === 'string' && data.first_name.trim()) ? data.first_name.trim() : fallback.first_name,
+            last_name: (typeof data?.last_name === 'string' && data.last_name.trim()) ? data.last_name.trim() : fallback.last_name,
+            username: (typeof data?.username === 'string' && data.username.trim()) ? data.username.trim() : fallback.username
         };
     } catch (error) {
-        return { authorized: false, profile_completed: false, telegram_user_id: null };
+        const fallback = getTelegramIdentityFallback();
+        return {
+            authorized: false,
+            profile_completed: false,
+            telegram_user_id: null,
+            first_name: fallback.first_name,
+            last_name: fallback.last_name,
+            username: fallback.username
+        };
     }
 }
 

@@ -18,17 +18,22 @@ async def telegram_bot_info():
 
 
 @router.post("/api/auth/telegram")
-async def telegram_auth(request: Request, response: Response, payload: TelegramAuthRequest):
+async def telegram_auth(request: Request, response: Response, payload: TelegramAuthRequest | None = None):
     init_data = None
     parse_type_errors: list[Exception] = []
     parse_value_errors: list[Exception] = []
 
+    raw_init_data = (payload.initData if payload else None) or request.headers.get("X-Telegram-Init-Data") or ""
+    if not isinstance(raw_init_data, str) or not raw_init_data.strip():
+        raise HTTPException(status_code=400, detail="INIT_DATA_REQUIRED")
+    raw_init_data = raw_init_data.strip()
+
     # Поддержка разных сигнатур aiogram и порядков аргументов между версиями.
     parse_variants = (
-        lambda: safe_parse_webapp_init_data(payload.initData, bot_token=TELEGRAM_BOT_TOKEN),
-        lambda: safe_parse_webapp_init_data(payload.initData, token=TELEGRAM_BOT_TOKEN),
-        lambda: safe_parse_webapp_init_data(payload.initData, TELEGRAM_BOT_TOKEN),
-        lambda: safe_parse_webapp_init_data(TELEGRAM_BOT_TOKEN, payload.initData),
+        lambda: safe_parse_webapp_init_data(raw_init_data, bot_token=TELEGRAM_BOT_TOKEN),
+        lambda: safe_parse_webapp_init_data(raw_init_data, token=TELEGRAM_BOT_TOKEN),
+        lambda: safe_parse_webapp_init_data(raw_init_data, TELEGRAM_BOT_TOKEN),
+        lambda: safe_parse_webapp_init_data(TELEGRAM_BOT_TOKEN, raw_init_data),
     )
 
     for parse_variant in parse_variants:

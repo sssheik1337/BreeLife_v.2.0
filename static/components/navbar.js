@@ -242,8 +242,11 @@ class CustomNavbar extends HTMLElement {
         return;
       }
       const displayName = buildDisplayName(status);
-      userNameElement.textContent = displayName || '';
-      userNameElement.style.display = displayName ? 'block' : 'none';
+      if (!displayName) {
+        return;
+      }
+      userNameElement.textContent = displayName;
+      userNameElement.style.display = 'block';
     };
 
     const loadUserName = async () => {
