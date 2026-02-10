@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пробный период — BreeLife</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="min-h-screen" style="background: var(--tg-bg-color, #f8fafc); color: var(--tg-text-color, #0f172a);">
+    <custom-layout>
+        <custom-navbar></custom-navbar>
+
+        <main class="flex-1 px-4 py-8 flex items-center justify-center">
+            <section class="w-full max-w-md">
+                <div class="bg-white/90 rounded-3xl border border-slate-100 shadow-[0_20px_50px_rgba(15,23,42,0.08)] p-7 text-center">
+                    <div class="mx-auto mb-5 h-16 w-16 rounded-full bg-emerald-50 flex items-center justify-center text-3xl" aria-hidden="true">🎁</div>
+                    <h1 class="text-2xl font-bold text-slate-800">Мы всё подготовили для вас 💚</h1>
+                    <p class="mt-3 text-slate-500">Вы получили полный доступ ко всем возможностям приложения</p>
+
+                    <div class="mt-5 rounded-2xl bg-emerald-50 px-4 py-3">
+                        <p id="trial-start-keyline" class="text-base font-semibold text-emerald-800">Пробный период активен</p>
+                    </div>
+
+                    <p class="mt-3 text-xs text-slate-500">Без оплаты и без привязки карты</p>
+
+                    <button id="trial-start-continue" type="button" class="btn-primary w-full mt-6 flex items-center justify-center gap-2">
+                        <span>Продолжить</span>
+                        <i data-feather="arrow-right" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <custom-footer></custom-footer>
+    </custom-layout>
+
+    <script src="/static/components/layout.js"></script>
+    <script src="/static/components/navbar.js"></script>
+    <script src="/static/components/footer.js"></script>
+    <script src="/static/js/storage.js"></script>
+    <script src="/static/js/ui.js"></script>
+    <script>
+        window.adminConfig = {{ admin_config | tojson }};
+        window.aiEnabled = {{ ai_enabled | tojson }};
+        if (window.feather) {
+            feather.replace();
+        }
+    </script>
+    <script src="/static/js/trial_start.js"></script>
+</body>
+</html>

@@ -1118,7 +1118,7 @@ function setupEventListeners() {
                 return;
             }
             // Все вопросы заполнены, переходим на экран прогресса.
-            window.location.href = '/profile';
+            window.location.href = '/trial-start';
         }
     });
     

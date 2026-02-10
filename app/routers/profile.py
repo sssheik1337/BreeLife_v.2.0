@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from config import AI_ENABLED
 from app.context import load_admin_config, templates
@@ -36,7 +36,9 @@ async def profile(request: Request, telegram_user_id: int | None = Depends(optio
             "profile.html",
             {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
         )
-    require_completed_profile(telegram_user_id)
+    profile_data = require_completed_profile(telegram_user_id)
+    if profile_data.get("trial_welcome_seen") is not True:
+        return RedirectResponse(url="/trial-start", status_code=307)
     return templates.TemplateResponse(
         "profile.html",
         {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
@@ -46,6 +48,18 @@ async def profile(request: Request, telegram_user_id: int | None = Depends(optio
 @router.get("/profile.html", response_class=HTMLResponse)
 async def profile_alias(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
     return await profile(request, telegram_user_id)
+
+
+@router.get("/trial-start", response_class=HTMLResponse)
+async def trial_start(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    if telegram_user_id is not None:
+        profile_data = require_completed_profile(telegram_user_id)
+        if profile_data.get("trial_welcome_seen") is True:
+            return RedirectResponse(url="/profile", status_code=307)
+    return templates.TemplateResponse(
+        "trial_start.html",
+        {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
+    )
 
 
 @router.post("/api/profile")
