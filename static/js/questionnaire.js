@@ -571,7 +571,11 @@ function renderWeightRuler(currentValue) {
             tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === virtualIndex);
         });
         window.userData[dataKey] = value;
-        window.userData.currentWeight = value;
+        // Не затираем текущий вес на шаге "Желаемый вес".
+        // Синхронизируем currentWeight только когда пользователь редактирует именно текущий вес.
+        if (dataKey === 'currentWeight') {
+            window.userData.currentWeight = value;
+        }
         saveUserData();
         updateButtonStates();
         updateWeightMagnifier(virtualIndex);
