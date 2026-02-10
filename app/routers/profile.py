@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse
 
-from app.context import templates
+from config import AI_ENABLED
+from app.context import load_admin_config, templates
 from app.dependencies import (
     apply_profile_patch,
     load_profile,
@@ -19,12 +20,12 @@ async def resume(request: Request, telegram_user_id: int | None = Depends(option
     if telegram_user_id is None:
         return templates.TemplateResponse(
             "resume.html",
-            {"request": request},
+            {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
         )
     require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "resume.html",
-        {"request": request},
+        {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
     )
 
 
@@ -33,12 +34,12 @@ async def profile(request: Request, telegram_user_id: int | None = Depends(optio
     if telegram_user_id is None:
         return templates.TemplateResponse(
             "profile.html",
-            {"request": request},
+            {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
         )
     require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "profile.html",
-        {"request": request},
+        {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
     )
 
 
