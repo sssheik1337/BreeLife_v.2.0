@@ -18,6 +18,24 @@ function hasMeaningfulUserData(data) {
     });
 }
 
+
+function normalizeDateOnly(value) {
+    if (!value) {
+        return null;
+    }
+    // Уже ISO YYYY-MM-DD
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+        return value.trim();
+    }
+    // Попытка распарсить (в т.ч. "DD.MM.YYYY" / "YYYY/MM/DD" и т.п.)
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) {
+        return typeof value === 'string' ? value.trim() : String(value);
+    }
+    // Нам нужна только дата без времени
+    return d.toISOString().slice(0, 10);
+}
+
 function buildComparableResumeProfileState(source = 'current') {
     let candidate = null;
 
@@ -36,13 +54,13 @@ function buildComparableResumeProfileState(source = 'current') {
     const profile = candidate && typeof candidate === 'object' ? candidate : {};
     return {
         sex: profile.sex ?? null,
-        birth_date: profile.birth_date ?? null,
+        birth_date: normalizeDateOnly(profile.birth_date),
         height_cm: Number(profile.height_cm) || null,
         weight_kg: Number(profile.weight_kg) || null,
         target_weight_kg: Number(profile.target_weight_kg) || null,
         goal: profile.goal ?? null,
         activity_factor: Number(profile.activity_factor) || null,
-        goal_deadline: profile.goal_deadline ?? null,
+        goal_deadline: normalizeDateOnly(profile.goal_deadline),
         food_diary: typeof profile.food_diary === 'boolean' ? profile.food_diary : null
     };
 }
