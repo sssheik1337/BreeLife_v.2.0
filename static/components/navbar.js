@@ -202,10 +202,10 @@ class CustomNavbar extends HTMLElement {
         <div class="nav-actions">
           <div class="menu-wrapper">
             <button type="button" class="profile-toggle" data-nav="menu" aria-label="Открыть меню профиля" title="Профиль">
+              <span class="profile-first-name" id="navbar-user-first-name" aria-live="polite">Профиль</span>
               <span class="profile-avatar" id="navbar-avatar" aria-hidden="true">
                 <span class="profile-avatar-fallback" id="navbar-avatar-fallback">U</span>
               </span>
-              <span class="profile-first-name" id="navbar-user-first-name" aria-live="polite">Профиль</span>
             </button>
             <div class="menu-panel" id="menu-panel">
               <a href="/settings/reminders" class="menu-link">Напоминания</a>
