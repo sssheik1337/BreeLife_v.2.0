@@ -453,12 +453,13 @@ function setTelegramAccessLock(isLocked) {
 function getTelegramIdentityFallback() {
     const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
     if (!user || typeof user !== 'object') {
-        return { first_name: '', last_name: '', username: '' };
+        return { first_name: '', last_name: '', username: '', photo_url: '' };
     }
     return {
         first_name: typeof user.first_name === 'string' ? user.first_name.trim() : '',
         last_name: typeof user.last_name === 'string' ? user.last_name.trim() : '',
-        username: typeof user.username === 'string' ? user.username.trim() : ''
+        username: typeof user.username === 'string' ? user.username.trim() : '',
+        photo_url: typeof user.photo_url === 'string' ? user.photo_url.trim() : ''
     };
 }
 
@@ -628,7 +629,8 @@ async function loadProfileStatus() {
             telegram_user_id: data?.telegram_user_id ?? null,
             first_name: (typeof data?.first_name === 'string' && data.first_name.trim()) ? data.first_name.trim() : fallback.first_name,
             last_name: (typeof data?.last_name === 'string' && data.last_name.trim()) ? data.last_name.trim() : fallback.last_name,
-            username: (typeof data?.username === 'string' && data.username.trim()) ? data.username.trim() : fallback.username
+            username: (typeof data?.username === 'string' && data.username.trim()) ? data.username.trim() : fallback.username,
+            photo_url: (typeof data?.photo_url === 'string' && data.photo_url.trim()) ? data.photo_url.trim() : fallback.photo_url
         };
     } catch (error) {
         const fallback = getTelegramIdentityFallback();
@@ -638,7 +640,8 @@ async function loadProfileStatus() {
             telegram_user_id: null,
             first_name: fallback.first_name,
             last_name: fallback.last_name,
-            username: fallback.username
+            username: fallback.username,
+            photo_url: fallback.photo_url
         };
     }
 }
@@ -706,7 +709,8 @@ function notifyProfileStatus() {
         isDevMode: window.appIsDev === true || window.appMode === 'development',
         first_name: window.serverUser?.first_name ?? null,
         last_name: window.serverUser?.last_name ?? null,
-        username: window.serverUser?.username ?? null
+        username: window.serverUser?.username ?? null,
+        photo_url: window.serverUser?.photo_url ?? null
     };
     window.dispatchEvent(new CustomEvent('profile-status-updated', { detail }));
 }
@@ -827,7 +831,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         profile_completed: status.profile_completed === true,
         first_name: status.first_name ?? null,
         last_name: status.last_name ?? null,
-        username: status.username ?? null
+        username: status.username ?? null,
+        photo_url: status.photo_url ?? null
     };
     window.profileCompleted = status.profile_completed;
     updateWelcomeGreeting(status);

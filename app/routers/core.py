@@ -46,6 +46,7 @@ async def api_me_status(request: Request):
         "first_name": session.get("first_name") if session else None,
         "last_name": session.get("last_name") if session else None,
         "username": session.get("username") if session else None,
+        "photo_url": session.get("photo_url") if session else None,
     }
 
 
@@ -58,6 +59,7 @@ async def api_session(request: Request):
         "first_name": session.get("first_name") if session else None,
         "last_name": session.get("last_name") if session else None,
         "username": session.get("username") if session else None,
+        "photo_url": session.get("photo_url") if session else None,
     }
 
 
