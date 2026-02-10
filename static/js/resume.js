@@ -33,8 +33,6 @@ function buildComparableResumeProfileState(source = 'current') {
     }
 
     const profile = candidate && typeof candidate === 'object' ? candidate : {};
-    const macros = profile.macros && typeof profile.macros === 'object' ? profile.macros : {};
-
     return {
         sex: profile.sex ?? null,
         birth_date: profile.birth_date ?? null,
@@ -44,13 +42,7 @@ function buildComparableResumeProfileState(source = 'current') {
         goal: profile.goal ?? null,
         activity_factor: Number(profile.activity_factor) || null,
         goal_deadline: profile.goal_deadline ?? null,
-        food_diary: typeof profile.food_diary === 'boolean' ? profile.food_diary : null,
-        tdee_calories: Number(profile.tdee_calories) || null,
-        macros: {
-            protein_g: Number(macros.protein_g) || null,
-            fat_g: Number(macros.fat_g) || null,
-            carbs_g: Number(macros.carbs_g) || null
-        }
+        food_diary: typeof profile.food_diary === 'boolean' ? profile.food_diary : null
     };
 }
 
@@ -1011,176 +1003,6 @@ async function renderTrialStatus() {
 
 // Рендер кнопок напоминаний для Telegram
 
-function renderResumeReminderStatus() {
-    const badge = document.getElementById('resume-reminders-badge');
-    const summary = document.getElementById('resume-reminders-summary');
-    if (!badge || !summary) {
-        return;
-    }
-
-    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
-    const settings = profile?.reminder_settings && typeof profile.reminder_settings === 'object'
-        ? profile.reminder_settings
-        : {};
-
-    const entries = [
-        ['water', 'Вода'],
-        ['sleep', 'Сон'],
-        ['activity', 'Активность']
-    ];
-
-    const enabled = entries
-        .filter(([key]) => settings?.[key]?.enabled === true)
-        .map(([, label]) => label);
-
-    if (!enabled.length) {
-        badge.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600';
-        badge.textContent = 'Выключено';
-        summary.textContent = 'Напоминания пока отключены. Можно включить в настройках.';
-        return;
-    }
-
-    badge.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700';
-    badge.textContent = `Включено: ${enabled.length}`;
-    summary.textContent = `Активны напоминания: ${enabled.join(', ')}.`;
-}
-
-function renderReminderActions() {
-    const section = document.getElementById('reminders-section');
-    const actionsContainer = document.getElementById('reminders-actions');
-    const hintElement = document.getElementById('reminders-hint');
-
-    if (!section || !actionsContainer || !hintElement) {
-        return;
-    }
-
-    if (typeof getUserProfile !== 'function') {
-        hintElement.textContent = 'Не удалось загрузить профиль для настройки напоминаний.';
-        return;
-    }
-
-    const profile = getUserProfile();
-    actionsContainer.innerHTML = '';
-    hintElement.textContent = '';
-
-    const isTelegramAvailable = window.serverUser?.authorized === true;
-
-    if (!isTelegramAvailable) {
-        hintElement.textContent = 'Telegram ID не найден. Откройте приложение в Telegram, чтобы включить напоминания.';
-    }
-
-    const scheduleReminder = async (payload) => {
-        try {
-            const response = await apiFetch('/api/reminders/schedule', {
-                method: 'POST',
-                body: JSON.stringify(payload)
-            });
-            if (!response.ok) {
-                throw new Error('Ошибка сервера при сохранении напоминания.');
-            }
-            const data = await response.json();
-            if (data?.status === 'scheduled') {
-                if (typeof showNotification === 'function') {
-                    showNotification('Напоминание сохранено!', 'success');
-                }
-            } else {
-                throw new Error('Ответ сервера не подтверждает сохранение.');
-            }
-        } catch (error) {
-            if (typeof showNotification === 'function') {
-                showNotification('Не удалось сохранить напоминание.', 'error');
-            }
-        }
-    };
-
-    const typeLabels = {
-        food_diary: 'Дневник питания',
-        water: 'Вода',
-        weekly_summary: 'Еженедельный обзор',
-        goal_deadline: 'Дедлайн цели'
-    };
-
-    const renderPreview = (reminder) => {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'rounded-xl border border-slate-100 bg-slate-50 p-4';
-
-        const title = document.createElement('div');
-        title.className = 'text-sm font-semibold text-slate-700';
-        title.textContent = typeLabels[reminder.type] || 'Напоминание';
-
-        const text = document.createElement('p');
-        text.className = 'text-sm text-slate-600 mt-2';
-        text.textContent = reminder.text;
-
-        const actions = document.createElement('div');
-        actions.className = 'mt-3 grid grid-cols-2 gap-2';
-
-        const enableButton = document.createElement('button');
-        enableButton.type = 'button';
-        enableButton.className = `btn-primary ${isTelegramAvailable ? '' : 'opacity-60 cursor-not-allowed'}`;
-        enableButton.textContent = 'Включить';
-        enableButton.disabled = !isTelegramAvailable;
-
-        const skipButton = document.createElement('button');
-        skipButton.type = 'button';
-        skipButton.className = 'btn-secondary';
-        skipButton.textContent = 'Пропустить';
-
-        enableButton.addEventListener('click', async () => {
-            if (!isTelegramAvailable) {
-                return;
-            }
-            await scheduleReminder({
-                type: reminder.type,
-                when_iso: reminder.suggested_time_iso
-            });
-            wrapper.remove();
-        });
-
-        skipButton.addEventListener('click', () => {
-            wrapper.remove();
-        });
-
-        actions.appendChild(enableButton);
-        actions.appendChild(skipButton);
-        wrapper.appendChild(title);
-        wrapper.appendChild(text);
-        wrapper.appendChild(actions);
-        actionsContainer.appendChild(wrapper);
-    };
-
-    const fetchReminders = async () => {
-        try {
-            const response = await apiFetch('/api/reminders/auto-generate', {
-                method: 'POST',
-                body: JSON.stringify({
-                    user_profile: profile,
-                    weekly_review: profile.weekly_review || {}
-                })
-            });
-            if (!response.ok) {
-                throw new Error('Не удалось получить список напоминаний.');
-            }
-            const data = await response.json();
-            const reminders = Array.isArray(data?.reminders) ? data.reminders : [];
-            if (!reminders.length) {
-                hintElement.textContent = 'Пока нет рекомендаций по напоминаниям.';
-                return;
-            }
-            reminders.forEach((reminder) => {
-                if (!reminder?.type || !reminder?.text || !reminder?.suggested_time_iso) {
-                    return;
-                }
-                renderPreview(reminder);
-            });
-        } catch (error) {
-            hintElement.textContent = 'Не удалось загрузить превью напоминаний.';
-        }
-    };
-
-    fetchReminders();
-}
-
 async function persistResumeProfile(profile) {
     if (!profile || window.serverUser?.authorized !== true) {
         return true;
@@ -1264,7 +1086,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     applyAiRecommendationToResume();
     renderNutritionRings();
     renderTrialStatus();
-    renderResumeReminderStatus();
     
     resumeInitialProfileSnapshot = buildComparableResumeProfileState('initial');
     refreshResumeDirtyState();

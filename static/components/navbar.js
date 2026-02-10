@@ -163,6 +163,14 @@ class CustomNavbar extends HTMLElement {
           background: #f1f5f9;
         }
 
+        .menu-link__status {
+          margin-left: auto;
+          font-size: 0.7rem;
+          font-weight: 600;
+          color: #64748b;
+          white-space: nowrap;
+        }
+
         @media (max-width: 640px) {
           .navbar {
             padding: 1rem 1.25rem;
@@ -208,7 +216,7 @@ class CustomNavbar extends HTMLElement {
               </span>
             </button>
             <div class="menu-panel" id="menu-panel">
-              <a href="/settings/reminders" class="menu-link">Напоминания</a>
+              <a href="/settings/reminders" class="menu-link">Напоминания <span id="navbar-reminders-status" class="menu-link__status">Проверяем...</span></a>
               <a href="/plans" class="menu-link">Тарифы</a>
               <a href="/references" class="menu-link">Справочники</a>
               <a href="/support" class="menu-link">Помощь</a>
@@ -294,6 +302,31 @@ class CustomNavbar extends HTMLElement {
       }
     };
 
+
+    const renderRemindersStatus = () => {
+      const statusElement = this.shadowRoot.getElementById('navbar-reminders-status');
+      if (!statusElement) {
+        return;
+      }
+
+      const profile = typeof window.getUserProfile === 'function' ? window.getUserProfile() : {};
+      const settings = profile?.reminder_settings && typeof profile.reminder_settings === 'object'
+        ? profile.reminder_settings
+        : {};
+
+      const enabledCount = ['water', 'sleep', 'activity']
+        .filter((key) => settings?.[key]?.enabled === true)
+        .length;
+
+      if (enabledCount > 0) {
+        statusElement.textContent = `Вкл: ${enabledCount}`;
+        statusElement.style.color = '#059669';
+      } else {
+        statusElement.textContent = 'Выкл';
+        statusElement.style.color = '#64748b';
+      }
+    };
+
     const bindMenu = () => {
       const menuButton = this.shadowRoot.querySelector('[data-nav="menu"]');
       const menuPanel = this.shadowRoot.getElementById('menu-panel');
@@ -336,9 +369,15 @@ class CustomNavbar extends HTMLElement {
       if (event?.detail) {
         applyUserIdentity(event.detail);
       }
+      renderRemindersStatus();
+    });
+
+    window.addEventListener('focus', () => {
+      renderRemindersStatus();
     });
 
     bindMenu();
+    renderRemindersStatus();
   }
 }
 
