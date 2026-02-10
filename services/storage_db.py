@@ -63,6 +63,16 @@ TABLES = {
             updated_at TEXT NOT NULL
         )
     """,
+    "telegram_users": """
+        CREATE TABLE IF NOT EXISTS telegram_users (
+            telegram_user_id INTEGER PRIMARY KEY,
+            first_name TEXT,
+            last_name TEXT,
+            username TEXT,
+            photo_url TEXT,
+            updated_at TEXT NOT NULL
+        )
+    """,
     "sessions": """
         CREATE TABLE IF NOT EXISTS sessions (
             session_id TEXT PRIMARY KEY,
@@ -122,10 +132,52 @@ def write_payload(table: str, telegram_user_id: int, payload: dict | list) -> No
         connection.commit()
 
 
-def create_session(telegram_user_id: int) -> str:
-    """Создать сессию пользователя и вернуть её идентификатор."""
+def upsert_telegram_user(
+    telegram_user_id: int,
+    first_name: str | None = None,
+    last_name: str | None = None,
+    username: str | None = None,
+    photo_url: str | None = None,
+) -> None:
+    """Обновить персональные данные пользователя из Telegram."""
+    updated_at = datetime.now(timezone.utc).isoformat()
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.execute(
+            """
+            INSERT INTO telegram_users (telegram_user_id, first_name, last_name, username, photo_url, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(telegram_user_id)
+            DO UPDATE SET
+                first_name = excluded.first_name,
+                last_name = excluded.last_name,
+                username = excluded.username,
+                photo_url = excluded.photo_url,
+                updated_at = excluded.updated_at
+            """,
+            (telegram_user_id, first_name, last_name, username, photo_url, updated_at),
+        )
+        connection.commit()
+
+
+def create_session(
+    telegram_user_id: int,
+    telegram_username: str | None = None,
+    telegram_name: str | None = None,
+    telegram_last_name: str | None = None,
+    telegram_photo_url: str | None = None,
+) -> dict[str, object]:
+    """Создать сессию пользователя и вернуть её данные."""
     session_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc).isoformat()
+
+    upsert_telegram_user(
+        telegram_user_id=telegram_user_id,
+        first_name=telegram_name,
+        last_name=telegram_last_name,
+        username=telegram_username,
+        photo_url=telegram_photo_url,
+    )
+
     with sqlite3.connect(DB_PATH) as connection:
         connection.execute(
             """
@@ -135,17 +187,36 @@ def create_session(telegram_user_id: int) -> str:
             (session_id, telegram_user_id, now, now),
         )
         connection.commit()
-    return session_id
+
+    return {
+        "token": session_id,
+        "telegram_user_id": telegram_user_id,
+        "first_name": telegram_name,
+        "last_name": telegram_last_name,
+        "username": telegram_username,
+        "photo_url": telegram_photo_url,
+    }
 
 
-def get_session_user(session_id: str) -> int | None:
-    """Получить telegram_user_id по session_id и обновить last_seen_at."""
+def get_session_user(session_id: str) -> dict[str, object] | None:
+    """Получить данные пользователя по session_id и обновить last_seen_at."""
     if not session_id:
         return None
     now = datetime.now(timezone.utc).isoformat()
     with sqlite3.connect(DB_PATH) as connection:
+        connection.row_factory = sqlite3.Row
         cursor = connection.execute(
-            "SELECT telegram_user_id FROM sessions WHERE session_id = ?",
+            """
+            SELECT
+                s.telegram_user_id,
+                u.first_name,
+                u.last_name,
+                u.username,
+                u.photo_url
+            FROM sessions s
+            LEFT JOIN telegram_users u ON u.telegram_user_id = s.telegram_user_id
+            WHERE s.session_id = ?
+            """,
             (session_id,),
         )
         row = cursor.fetchone()
@@ -156,4 +227,11 @@ def get_session_user(session_id: str) -> int | None:
             (now, session_id),
         )
         connection.commit()
-    return int(row[0])
+
+    return {
+        "telegram_user_id": int(row["telegram_user_id"]),
+        "first_name": row["first_name"],
+        "last_name": row["last_name"],
+        "username": row["username"],
+        "photo_url": row["photo_url"],
+    }

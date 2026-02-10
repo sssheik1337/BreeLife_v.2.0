@@ -675,9 +675,27 @@ function syncLocalProfileCompletion(status) {
 function notifyProfileStatus() {
     const detail = {
         profileCompleted: window.profileCompleted === true,
-        isDevMode: window.appIsDev === true || window.appMode === 'development'
+        isDevMode: window.appIsDev === true || window.appMode === 'development',
+        first_name: window.serverUser?.first_name ?? null,
+        last_name: window.serverUser?.last_name ?? null,
+        username: window.serverUser?.username ?? null
     };
     window.dispatchEvent(new CustomEvent('profile-status-updated', { detail }));
+}
+
+function updateWelcomeGreeting(status) {
+    const greetingElement = document.getElementById('welcome-greeting');
+    if (!greetingElement) {
+        return;
+    }
+    const firstName = typeof status?.first_name === 'string' ? status.first_name.trim() : '';
+    const username = typeof status?.username === 'string' ? status.username.trim() : '';
+    const displayName = firstName || username;
+    if (!displayName) {
+        greetingElement.textContent = 'Привет 👋';
+        return;
+    }
+    greetingElement.textContent = `Привет, ${displayName} 👋`;
 }
 
 function restoreUserDataFromLocalStorage() {
@@ -775,9 +793,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     window.serverUser = {
         authorized: status.authorized === true,
         telegram_user_id: status.telegram_user_id ?? null,
-        profile_completed: status.profile_completed === true
+        profile_completed: status.profile_completed === true,
+        first_name: status.first_name ?? null,
+        last_name: status.last_name ?? null,
+        username: status.username ?? null
     };
     window.profileCompleted = status.profile_completed;
+    updateWelcomeGreeting(status);
     if (typeof window.syncProfileWithBackend === 'function') {
         await window.syncProfileWithBackend();
     }

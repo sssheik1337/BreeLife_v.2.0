@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse
 
 from config import APP_ENV, APP_HOST, APP_NAME, APP_PORT, DEBUG, IS_PROD, PUBLIC_APP_URL
 from app.context import TELEGRAM_SESSION_COOKIE, load_admin_config, load_plans_config, templates
+from services.storage_db import get_session_user, read_payload
 
 router = APIRouter()
 
@@ -32,16 +33,31 @@ async def healthz():
 
 @router.get("/api/me/status")
 async def api_me_status(request: Request):
+    token = request.cookies.get(TELEGRAM_SESSION_COOKIE)
+    session = get_session_user(token) if token else None
+    profile_completed = False
+    if session:
+        profile = read_payload("profiles", int(session.get("telegram_user_id"))) or {}
+        profile_completed = bool(profile.get("is_completed") or profile.get("completed") or profile.get("profile_completed"))
     return {
-        "authenticated": bool(request.cookies.get(TELEGRAM_SESSION_COOKIE)),
+        "authorized": bool(session),
+        "telegram_user_id": session.get("telegram_user_id") if session else None,
+        "profile_completed": profile_completed,
+        "first_name": session.get("first_name") if session else None,
+        "last_name": session.get("last_name") if session else None,
+        "username": session.get("username") if session else None,
     }
 
 
 @router.get("/api/session")
 async def api_session(request: Request):
+    token = request.cookies.get(TELEGRAM_SESSION_COOKIE)
+    session = get_session_user(token) if token else None
     return {
-        "session_cookie": bool(request.cookies.get(TELEGRAM_SESSION_COOKIE)),
-        "telegram_cookie": bool(request.cookies.get("telegram_session")),
+        "authorized": bool(session),
+        "first_name": session.get("first_name") if session else None,
+        "last_name": session.get("last_name") if session else None,
+        "username": session.get("username") if session else None,
     }
 
 

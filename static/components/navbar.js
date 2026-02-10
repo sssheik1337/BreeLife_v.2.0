@@ -48,6 +48,17 @@ class CustomNavbar extends HTMLElement {
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
         }
+
+        .user-name {
+          margin-left: 0.5rem;
+          max-width: 220px;
+          font-size: 0.9rem;
+          font-weight: 600;
+          color: #0f172a;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
         .nav-actions {
           display: flex;
           gap: 0.75rem;
@@ -171,6 +182,11 @@ class CustomNavbar extends HTMLElement {
           .logo-text {
             font-size: 1.125rem;
           }
+
+          .user-name {
+            max-width: 120px;
+            font-size: 0.8rem;
+          }
           
           .logo-icon {
             width: 32px;
@@ -184,6 +200,7 @@ class CustomNavbar extends HTMLElement {
         <a href="/profile" class="logo">
           <div class="logo-icon">🌿</div>
           <div class="logo-text">${appName}</div>
+          <div class="user-name" id="navbar-user-name" aria-live="polite"></div>
 </a>
         
         <div class="nav-actions">
@@ -204,6 +221,43 @@ class CustomNavbar extends HTMLElement {
         </div>
       </nav>
     `;
+
+
+    const buildDisplayName = (status) => {
+      const firstName = typeof status?.first_name === 'string' ? status.first_name.trim() : '';
+      const lastName = typeof status?.last_name === 'string' ? status.last_name.trim() : '';
+      const username = typeof status?.username === 'string' ? status.username.trim() : '';
+      if (firstName && lastName) {
+        return `${firstName} ${lastName}`;
+      }
+      if (firstName) {
+        return firstName;
+      }
+      return username;
+    };
+
+    const applyUserName = (status) => {
+      const userNameElement = this.shadowRoot.getElementById('navbar-user-name');
+      if (!userNameElement) {
+        return;
+      }
+      const displayName = buildDisplayName(status);
+      userNameElement.textContent = displayName || '';
+      userNameElement.style.display = displayName ? 'block' : 'none';
+    };
+
+    const loadUserName = async () => {
+      try {
+        const response = await fetch('/api/me/status');
+        if (!response.ok) {
+          return;
+        }
+        const status = await response.json();
+        applyUserName(status);
+      } catch (error) {
+        // Ошибку загрузки имени в шапке игнорируем.
+      }
+    };
 
     const setActiveLink = () => {
       const path = window.location.pathname || '/';
@@ -259,6 +313,16 @@ class CustomNavbar extends HTMLElement {
         });
       }
     };
+
+    if (window.serverUser && typeof window.serverUser === 'object') {
+      applyUserName(window.serverUser);
+    }
+    loadUserName();
+    window.addEventListener('profile-status-updated', (event) => {
+      if (event?.detail) {
+        applyUserName(event.detail);
+      }
+    });
 
     setActiveLink();
   }

@@ -27,6 +27,8 @@ async def telegram_auth(request: Request, response: Response, payload: TelegramA
         telegram_user_id=user.id,
         telegram_username=user.username,
         telegram_name=user.first_name,
+        telegram_last_name=user.last_name,
+        telegram_photo_url=user.photo_url,
     )
     response.set_cookie(
         TELEGRAM_SESSION_COOKIE,

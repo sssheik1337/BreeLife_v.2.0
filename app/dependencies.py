@@ -19,7 +19,7 @@ def require_telegram_user_id(request: Request, response: Response) -> int:
     session = get_session_user(token)
     if not session:
         raise HTTPException(status_code=401, detail="UNAUTHORIZED")
-    telegram_user_id = session.get("telegram_user_id")
+    telegram_user_id = session.get("telegram_user_id") if isinstance(session, dict) else session
     if telegram_user_id is None:
         raise HTTPException(status_code=401, detail="UNAUTHORIZED")
     response.set_cookie(
@@ -39,7 +39,7 @@ def optional_current_user(request: Request) -> int | None:
     session = get_session_user(token)
     if not session:
         return None
-    telegram_user_id = session.get("telegram_user_id")
+    telegram_user_id = session.get("telegram_user_id") if isinstance(session, dict) else session
     if telegram_user_id is None:
         return None
     return telegram_user_id
