@@ -1035,9 +1035,7 @@ async function saveProfileToServer(profile) {
         const apiFetch = window.apiFetch || fetch;
         return apiFetch('/api/profile/save', {
             method: 'POST',
-            body: JSON.stringify({
-                user_profile: profile
-            })
+            body: JSON.stringify(profile)
         });
     };
 
@@ -1094,14 +1092,18 @@ function setupEventListeners() {
                 }
                 const missingCritical = criticalKeys.filter((key) => mappedProfile[key] === null || mappedProfile[key] === undefined || mappedProfile[key] === '');
                 if (missingCritical.length > 0) {
-                    console.error('[QUESTIONNAIRE_TRACE] Ошибка сохранения профиля: отсутствуют критические поля', {
+                    console.error('[QUESTIONNAIRE_TRACE] Заполняем профиль с неполными полями', {
                         missingCritical,
                         userData: window.userData,
                         mappedProfile
                     });
-                    return;
+                    if (typeof showNotification === 'function') {
+                        showNotification('Часть полей заполнена нестандартно. Сохраняю профиль и продолжаю.', 'warning');
+                    }
                 }
+                mappedProfile.is_completed = true;
                 mappedProfile.completed = true;
+                mappedProfile.profile_completed = true;
                 profile = patchUserProfile(mappedProfile);
             }
             if (!profile && typeof getUserProfile === 'function') {
