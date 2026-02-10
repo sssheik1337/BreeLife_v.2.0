@@ -19,7 +19,13 @@ async def telegram_bot_info():
 
 @router.post("/api/auth/telegram")
 async def telegram_auth(request: Request, response: Response, payload: TelegramAuthRequest):
-    init_data = safe_parse_webapp_init_data(payload.initData, bot_token=TELEGRAM_BOT_TOKEN)
+    try:
+        init_data = safe_parse_webapp_init_data(payload.initData, bot_token=TELEGRAM_BOT_TOKEN)
+    except TypeError:
+        try:
+            init_data = safe_parse_webapp_init_data(payload.initData, TELEGRAM_BOT_TOKEN)
+        except TypeError:
+            init_data = safe_parse_webapp_init_data(payload.initData, token=TELEGRAM_BOT_TOKEN)
     user = init_data.user
     if not user:
         raise HTTPException(status_code=400, detail="USER_NOT_FOUND")
