@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from app.context import templates
+from config import AI_ENABLED
+from app.context import load_admin_config, templates
 from app.dependencies import (
     load_profile,
     optional_current_user,
@@ -21,12 +22,12 @@ async def diary(request: Request, telegram_user_id: int | None = Depends(optiona
     if telegram_user_id is None:
         return templates.TemplateResponse(
             "diary.html",
-            {"request": request},
+            {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
         )
     require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "diary.html",
-        {"request": request},
+        {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
     )
 
 
