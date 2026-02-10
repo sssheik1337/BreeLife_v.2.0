@@ -31,8 +31,7 @@
 
         try {
             const startResponse = await fetcher('/api/subscription/start_trial', {
-                method: 'POST',
-                body: JSON.stringify({})
+                method: 'POST'
             });
             if (!startResponse.ok) {
                 return null;

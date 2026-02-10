@@ -12,7 +12,7 @@ class ProfilePayload(BaseModel):
 
 
 class SubscriptionRequest(BaseModel):
-    plan_id: str
+    plan_id: str | None = None
 
 
 class PaymentRequest(BaseModel):
