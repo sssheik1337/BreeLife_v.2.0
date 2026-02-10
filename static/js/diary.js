@@ -1855,6 +1855,9 @@ async function initDiary() {
     renderDayScreen(readDiaryEntries(), resolvedDate);
 
     if (openFabOnLoad) {
+        // Всегда возвращаем режим дня, чтобы сначала показывать именно FAB-меню,
+        // а не форму добавления продуктов.
+        setActiveMode(MODE_DAY);
         toggleFabMenu();
         params.delete('fab');
         const next = params.toString();
