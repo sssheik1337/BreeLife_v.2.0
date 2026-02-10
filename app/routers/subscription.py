@@ -51,7 +51,7 @@ async def subscription_status(request: Request, response: Response):
 
 
 @router.post("/api/subscription/start_trial")
-async def start_trial(request: Request, response: Response, payload: SubscriptionRequest):
+async def start_trial(request: Request, response: Response, payload: SubscriptionRequest | None = None):
     if IS_DEV:
         raise HTTPException(status_code=403, detail="DEV_MODE_DISABLED")
     telegram_user_id = require_telegram_user_id(request, response)
