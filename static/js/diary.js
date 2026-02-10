@@ -1426,6 +1426,16 @@ function bindGlobalDiaryHandlers() {
             if (action === 'meal') {
                 openProductsForm(getSelectedDate(), fabItem.dataset.meal || 'breakfast');
             }
+            if (action === 'water') {
+                openProductsForm(getSelectedDate(), 'breakfast');
+                setTimeout(() => {
+                    const waterInput = document.getElementById('diary-products-water');
+                    if (waterInput) {
+                        waterInput.focus();
+                        waterInput.select();
+                    }
+                }, 0);
+            }
             return;
         }
 
