@@ -483,9 +483,7 @@ function summarizeMacrosByDate(entries, range) {
 
 function renderWaterHistory(rangeDays = 7) {
     const grid = document.getElementById('water-history-grid');
-    const desc = document.getElementById('water-history-desc');
-    const insight = document.getElementById('water-history-insight');
-    if (!grid || !desc || !insight) {
+    if (!grid) {
         return;
     }
 
@@ -509,14 +507,8 @@ function renderWaterHistory(rangeDays = 7) {
     });
 
     const target = Number(window.adminConfig?.reminders?.water_min_l);
-    let totalWater = 0;
-    let daysWithData = 0;
     const maxWater = range.reduce((maxValue, { dateKey }) => {
         const value = dateKey ? (waterByDate.get(dateKey) || 0) : 0;
-        if (dateKey && waterByDate.has(dateKey)) {
-            totalWater += value;
-            daysWithData += 1;
-        }
         return Math.max(maxValue, value);
     }, 0);
     const scale = Math.max(maxWater, Number.isFinite(target) ? target : 0, 0.5);
@@ -563,31 +555,11 @@ function renderWaterHistory(rangeDays = 7) {
         grid.appendChild(item);
     });
 
-    if (!Number.isFinite(target) || target <= 0) {
-        desc.textContent = 'Цель по воде не задана, показываем фактические значения.';
-        insight.textContent = daysWithData
-            ? 'Есть записи по воде, но цель не задана. Попробуйте отмечать воду регулярно.'
-            : 'Пока нет записей по воде. Начните с одного дня — так проще войти в ритм.';
-    } else {
-        desc.textContent = `Цель: ${target.toFixed(1)} л в день.`;
-        if (!daysWithData) {
-            insight.textContent = 'Пока нет записей по воде. Заполните пару дней — и появится понятная картина.';
-        } else {
-            const average = totalWater / daysWithData;
-            if (average >= target) {
-                insight.textContent = 'Хорошо: в среднем вода на уровне цели. Продолжайте в том же духе.';
-            } else {
-                insight.textContent = 'Воды в среднем меньше цели. Попробуйте добавить стакан воды в первой половине дня.';
-            }
-        }
-    }
 }
 
 function renderCalorieTrend(rangeDays = 7) {
     const grid = document.getElementById('calorie-trend-grid');
-    const desc = document.getElementById('calorie-trend-desc');
-    const insight = document.getElementById('calorie-trend-insight');
-    if (!grid || !desc || !insight) {
+    if (!grid) {
         return;
     }
 
@@ -608,14 +580,8 @@ function renderCalorieTrend(rangeDays = 7) {
     });
 
     const range = buildDateRange(rangeDays);
-    let totalCalories = 0;
-    let daysWithData = 0;
     const maxCalories = range.reduce((maxValue, { dateKey }) => {
         const value = dateKey ? (caloriesByDate.get(dateKey) || 0) : 0;
-        if (dateKey && caloriesByDate.has(dateKey)) {
-            totalCalories += value;
-            daysWithData += 1;
-        }
         return Math.max(maxValue, value);
     }, 0);
     const scale = Math.max(maxCalories, Number.isFinite(targetCalories) ? targetCalories : 0, 1);
@@ -661,26 +627,6 @@ function renderCalorieTrend(rangeDays = 7) {
         grid.appendChild(item);
     });
 
-    if (!Number.isFinite(targetCalories) || targetCalories <= 0) {
-        desc.textContent = 'Ориентир по калориям ещё не рассчитан, поэтому показываем факт.';
-        insight.textContent = daysWithData
-            ? 'Есть записи по калориям, но ориентир не задан. Постарайтесь держать дни примерно на одном уровне.'
-            : 'Пока нет записей по калориям. Заполните пару дней, чтобы увидеть тенденции.';
-    } else {
-        desc.textContent = `Ориентир на день: ${Math.round(targetCalories)} ккал.`;
-        if (!daysWithData) {
-            insight.textContent = 'Пока нет записей. Как только появятся данные, здесь будет понятный вывод.';
-        } else {
-            const average = totalCalories / daysWithData;
-            if (average >= targetCalories * 1.1) {
-                insight.textContent = 'В среднем калорий больше нужного. Если хотите ближе к цели, уменьшите порции или выберите более лёгкие блюда.';
-            } else if (average <= targetCalories * 0.9) {
-                insight.textContent = 'В среднем калорий меньше нужного. Можно добавить небольшой перекус, чтобы поддерживать энергию.';
-            } else {
-                insight.textContent = 'В среднем всё близко к ориентиру — это хороший знак стабильности.';
-            }
-        }
-    }
 }
 
 function resolveCarbTotals(totalValue, simpleValue, complexValue) {
