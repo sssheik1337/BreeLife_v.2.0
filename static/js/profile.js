@@ -592,7 +592,7 @@ function renderCalorieTrend(rangeDays = 7) {
     }
 
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
-    const targetCalories = Number(profile?.tdee_calories);
+    const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
     const entries = readDiaryEntries();
     const caloriesByDate = new Map();
 
@@ -888,7 +888,7 @@ function renderTodayPlanCard() {
     }
 
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
-    const tdee = Number(profile?.tdee_calories);
+    const tdee = Number(profile?.calories_target ?? profile?.tdee_calories);
     const adminConfig = window.adminConfig || {};
     const macrosConfig = adminConfig.default_macros || {};
 
@@ -929,7 +929,7 @@ function renderProfileRings() {
     }
 
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
-    const tdee = Number(profile?.tdee_calories);
+    const tdee = Number(profile?.calories_target ?? profile?.tdee_calories);
     const entries = readDiaryEntries();
     const todayTotals = getTodayDiaryTotals();
     const todayKey = typeof window.normalizeLocalDate === 'function'
@@ -1057,7 +1057,7 @@ function renderMonthGrid() {
     today.setHours(0, 0, 0, 0);
     const todayDate = normalizeDateKey(today);
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
-    const targetCalories = Number(profile?.tdee_calories);
+    const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
     const waterTarget = Number(window.adminConfig?.reminders?.water_min_l);
     const sleepTargetMinutes = parseSleepMinutes(window.adminConfig?.reminders?.sleep_target);
     let daysWithData = 0;
@@ -1154,7 +1154,7 @@ function renderWeeklyProgress() {
     startDate.setHours(0, 0, 0, 0);
     startDate.setDate(today.getDate() - dayIndex);
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
-    const targetCalories = Number(profile?.tdee_calories);
+    const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
 
     const entries = readDiaryEntries();
     const caloriesByDate = new Map();
