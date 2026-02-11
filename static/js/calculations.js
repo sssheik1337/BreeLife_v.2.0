@@ -136,7 +136,6 @@ function adjustCaloriesByWeeklyProgress(profile, weeklyAverageWeight) {
     const tdee = Number(profile?.tdee_calories);
     const currentCaloriesTarget = Number(profile?.calories_target);
     const plannedRate = Number(profile?.weight_rate_kg_per_week);
-    const weight = Number(profile?.weight_kg);
 
     if (!goal || !Number.isFinite(tdee) || tdee <= 0 || !Number.isFinite(currentCaloriesTarget)) {
         return {
@@ -148,9 +147,19 @@ function adjustCaloriesByWeeklyProgress(profile, weeklyAverageWeight) {
         };
     }
 
+    if (goal === 'maintain') {
+        return {
+            calories_target: currentCaloriesTarget,
+            calorie_delta: currentCaloriesTarget - tdee,
+            weight_rate_kg_per_week: plannedRate,
+            adjusted: false,
+            warning_message: null
+        };
+    }
+
     const previousWeekWeight = Number(weeklyAverageWeight?.previous_week_weight ?? weeklyAverageWeight?.previous);
     const currentWeekWeight = Number(weeklyAverageWeight?.current_week_weight ?? weeklyAverageWeight?.current);
-    if (!Number.isFinite(previousWeekWeight) || !Number.isFinite(currentWeekWeight) || !Number.isFinite(plannedRate) || plannedRate === 0) {
+    if (!Number.isFinite(previousWeekWeight) || !Number.isFinite(currentWeekWeight) || !Number.isFinite(plannedRate)) {
         return {
             calories_target: currentCaloriesTarget,
             calorie_delta: currentCaloriesTarget - tdee,
@@ -160,11 +169,11 @@ function adjustCaloriesByWeeklyProgress(profile, weeklyAverageWeight) {
         };
     }
 
-    // Фактический темп за неделю: прошлый средний вес минус текущий средний вес.
-    const actualRateRaw = previousWeekWeight - currentWeekWeight;
-    const plannedAbs = Math.abs(plannedRate);
-    const actualAbs = goal === 'gain' ? Math.abs(-actualRateRaw) : Math.abs(actualRateRaw);
-    if (plannedAbs <= 0) {
+    // Унифицированный факт темпа: текущий средний вес минус прошлый.
+    const actualRate = currentWeekWeight - previousWeekWeight;
+    const deviation = actualRate - plannedRate;
+
+    if (Math.abs(deviation) <= 0.1) {
         return {
             calories_target: currentCaloriesTarget,
             calorie_delta: currentCaloriesTarget - tdee,
@@ -174,53 +183,8 @@ function adjustCaloriesByWeeklyProgress(profile, weeklyAverageWeight) {
         };
     }
 
-    const deviationRatio = Math.abs(actualAbs - plannedAbs) / plannedAbs;
-    if (deviationRatio <= 0.3) {
-        return {
-            calories_target: currentCaloriesTarget,
-            calorie_delta: currentCaloriesTarget - tdee,
-            weight_rate_kg_per_week: plannedRate,
-            adjusted: false,
-            warning_message: null
-        };
-    }
-
-    let nextCalorieDelta = currentCaloriesTarget - tdee;
-    let warningMessage = null;
-
-    if (goal === 'lose') {
-        const isSlower = actualAbs < plannedAbs;
-        nextCalorieDelta += isSlower ? -100 : 100;
-        warningMessage = isSlower
-            ? 'Снижение идёт медленнее плана. Увеличиваю дефицит на 100 ккал.'
-            : 'Снижение идёт быстрее плана. Уменьшаю дефицит на 100 ккал.';
-    } else if (goal === 'gain') {
-        const isSlower = actualAbs < plannedAbs;
-        nextCalorieDelta += isSlower ? 100 : -100;
-        warningMessage = isSlower
-            ? 'Набор идёт медленнее плана. Увеличиваю профицит на 100 ккал.'
-            : 'Набор идёт быстрее плана. Уменьшаю профицит на 100 ккал.';
-    } else {
-        return {
-            calories_target: tdee,
-            calorie_delta: 0,
-            weight_rate_kg_per_week: 0,
-            adjusted: false,
-            warning_message: null
-        };
-    }
-
-    let nextRate = (nextCalorieDelta * 7) / 7700;
-    const adaptiveLimit = resolveAdaptiveRateLimit(goal, weight);
-    if (goal === 'lose' && Number.isFinite(adaptiveLimit)) {
-        nextRate = Math.min(0, Math.max(nextRate, -adaptiveLimit));
-    }
-    if (goal === 'gain' && Number.isFinite(adaptiveLimit)) {
-        nextRate = Math.max(0, Math.min(nextRate, adaptiveLimit));
-    }
-
-    nextCalorieDelta = (nextRate * 7700) / 7;
-    let nextCaloriesTarget = tdee + nextCalorieDelta;
+    const correction = deviation * 1100;
+    let nextCaloriesTarget = currentCaloriesTarget - correction;
     nextCaloriesTarget = applyCaloriesSafetyClamp(nextCaloriesTarget, profile?.sex);
     if (!Number.isFinite(nextCaloriesTarget)) {
         return {
@@ -232,8 +196,9 @@ function adjustCaloriesByWeeklyProgress(profile, weeklyAverageWeight) {
         };
     }
 
-    nextCalorieDelta = nextCaloriesTarget - tdee;
-    nextRate = (nextCalorieDelta * 7) / 7700;
+    const nextCalorieDelta = nextCaloriesTarget - tdee;
+    const nextRate = (nextCalorieDelta * 7) / 7700;
+    const warningMessage = 'Обновил цель по калориям пропорционально фактическому отклонению недельного темпа.';
 
     return {
         calories_target: nextCaloriesTarget,
