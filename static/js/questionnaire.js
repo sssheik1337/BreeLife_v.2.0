@@ -1212,6 +1212,13 @@ function setupEventListeners() {
                 console.log('[QUESTIONNAIRE_TRACE] перед mapUserDataToUserProfile:', window.userData);
                 const mappedProfile = mapUserDataToUserProfile(window.userData);
                 console.log('[QUESTIONNAIRE_TRACE] результат mapUserDataToUserProfile:', mappedProfile);
+
+                // Защита от редкого рассинхрона ключей: если map не вернул пол, пробуем восстановить напрямую из userData.
+                const rawGender = window.userData?.gender ?? window.userData?.sex ?? null;
+                if (!mappedProfile.sex && (rawGender === 'male' || rawGender === 'female')) {
+                    mappedProfile.sex = rawGender;
+                }
+
                 const criticalKeys = ['sex', 'birth_date', 'height_cm', 'weight_kg', 'activity_factor', 'goal'];
                 if (mappedProfile.goal !== 'maintain') {
                     criticalKeys.push('target_weight_kg');
@@ -1226,14 +1233,15 @@ function setupEventListeners() {
                 }
                 const missingCritical = criticalKeys.filter((key) => mappedProfile[key] === null || mappedProfile[key] === undefined || mappedProfile[key] === '');
                 if (missingCritical.length > 0) {
-                    console.error('[QUESTIONNAIRE_TRACE] Заполняем профиль с неполными полями', {
+                    console.error('[QUESTIONNAIRE_TRACE] Блокирующая неполнота профиля', {
                         missingCritical,
                         userData: window.userData,
                         mappedProfile
                     });
                     if (typeof showNotification === 'function') {
-                        showNotification('Часть полей заполнена нестандартно. Сохраняю профиль и продолжаю.', 'warning');
+                        showNotification('Не удалось сохранить профиль: заполните обязательные поля и повторите.', 'error');
                     }
+                    return;
                 }
                 mappedProfile.is_completed = true;
                 mappedProfile.completed = true;

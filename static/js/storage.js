@@ -743,7 +743,15 @@
             mergedCandidate.target_weight_kg
         );
         if (consistency.blocking) {
-            return { ...(fallbackProfile || {}) };
+            // При конфликте цели и веса не теряем остальные обновления профиля:
+            // откатываем только конфликтующие поля до последнего валидного состояния.
+            const fallback = { ...(fallbackProfile || {}) };
+            return {
+                ...mergedCandidate,
+                goal: fallback.goal ?? null,
+                target_weight_kg: fallback.target_weight_kg ?? null,
+                goal_deadline: fallback.goal_deadline ?? null
+            };
         }
 
         return mergedCandidate;
