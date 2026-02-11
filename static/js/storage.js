@@ -76,6 +76,12 @@
             food_diary: null,
             bmr: null,
             tdee_calories: null,
+            calories_target: null,
+            calorie_delta: null,
+            required_rate_kg_per_week: null,
+            required_calorie_delta: null,
+            required_calories_target: null,
+            safe_weeks_estimate: null,
             macros: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
@@ -147,6 +153,48 @@
             return value;
         }
         return null;
+    }
+
+    function validateGoalWeightConsistency(goal, currentWeight, targetWeight) {
+        const current = parseNumber(currentWeight);
+        const target = parseNumber(targetWeight);
+        if (!goal || current === null || target === null) {
+            return {
+                valid: true,
+                blocking: false,
+                warning: false,
+                code: null,
+                message: null
+            };
+        }
+
+        if (goal === 'gain' && target <= current) {
+            return {
+                valid: false,
+                blocking: true,
+                warning: false,
+                code: 'GAIN_TARGET_NOT_ABOVE_CURRENT',
+                message: 'Цель набора массы противоречит выбранному желаемому весу'
+            };
+        }
+
+        if (goal === 'lose' && target >= current) {
+            return {
+                valid: false,
+                blocking: true,
+                warning: false,
+                code: 'LOSE_TARGET_NOT_BELOW_CURRENT',
+                message: 'Цель снижения веса противоречит выбранному желаемому весу'
+            };
+        }
+
+        return {
+            valid: true,
+            blocking: false,
+            warning: false,
+            code: null,
+            message: null
+        };
     }
 
     function normalizeIdList(value) {
@@ -237,11 +285,22 @@
         merged.weight_kg = parseNumber(merged.weight_kg);
         merged.target_weight_kg = parseNumber(merged.target_weight_kg);
         merged.goal = normalizeGoal(merged.goal);
+        if (merged.goal === 'maintain') {
+            // Для поддержания веса целевой вес и дедлайн не используются.
+            merged.target_weight_kg = null;
+            merged.goal_deadline = null;
+        }
         merged.activity_factor = parseNumber(merged.activity_factor);
         merged.goal_deadline = merged.goal_deadline || null;
         merged.food_diary = parseBoolean(merged.food_diary);
         merged.bmr = parseNumber(merged.bmr);
         merged.tdee_calories = parseNumber(merged.tdee_calories);
+        merged.calories_target = parseNumber(merged.calories_target);
+        merged.calorie_delta = parseNumber(merged.calorie_delta);
+        merged.required_rate_kg_per_week = parseNumber(merged.required_rate_kg_per_week);
+        merged.required_calorie_delta = parseNumber(merged.required_calorie_delta);
+        merged.required_calories_target = parseNumber(merged.required_calories_target);
+        merged.safe_weeks_estimate = parseNumber(merged.safe_weeks_estimate);
         merged.macros = normalizeMacros(merged.macros);
         merged.weight_rate_kg_per_week = parseNumber(merged.weight_rate_kg_per_week);
         merged.predicted_goal_date = merged.predicted_goal_date || null;
@@ -266,10 +325,12 @@
             merged.birth_date,
             merged.height_cm,
             merged.weight_kg,
-            merged.target_weight_kg,
             merged.goal,
             merged.activity_factor
         ];
+        if (merged.goal !== 'maintain') {
+            requiredFields.push(merged.target_weight_kg);
+        }
         const calculatedCompleted = requiredFields.every((value) => value !== null && value !== undefined && value !== '');
 
         if (merged.completed === null) {
@@ -667,10 +728,40 @@
         }
     }
 
+    function enforceGoalWeightConsistencyInMerge(candidate, fallbackProfile) {
+        const mergedCandidate = { ...(candidate || {}) };
+        const normalizedGoal = normalizeGoal(mergedCandidate.goal);
+        if (normalizedGoal === 'maintain') {
+            mergedCandidate.target_weight_kg = null;
+            mergedCandidate.goal_deadline = null;
+            return mergedCandidate;
+        }
+
+        const consistency = validateGoalWeightConsistency(
+            normalizedGoal,
+            mergedCandidate.weight_kg,
+            mergedCandidate.target_weight_kg
+        );
+        if (consistency.blocking) {
+            // При конфликте цели и веса не теряем остальные обновления профиля:
+            // откатываем только конфликтующие поля до последнего валидного состояния.
+            const fallback = { ...(fallbackProfile || {}) };
+            return {
+                ...mergedCandidate,
+                goal: fallback.goal ?? null,
+                target_weight_kg: fallback.target_weight_kg ?? null,
+                goal_deadline: fallback.goal_deadline ?? null
+            };
+        }
+
+        return mergedCandidate;
+    }
+
     function setUserProfile(profile) {
         const current = getUserProfile();
         const merged = { ...current, ...(profile || {}) };
-        const trialResult = applyTrialStartIfNeeded(current, merged);
+        const consistentMerged = enforceGoalWeightConsistencyInMerge(merged, current);
+        const trialResult = applyTrialStartIfNeeded(current, consistentMerged);
         const normalized = normalizeUserProfile(trialResult.merged);
         cachedProfile = normalized;
         try {
@@ -691,7 +782,8 @@
         if (partial && Object.prototype.hasOwnProperty.call(partial, 'macros')) {
             merged.macros = partial.macros;
         }
-        const trialResult = applyTrialStartIfNeeded(current, merged);
+        const consistentMerged = enforceGoalWeightConsistencyInMerge(merged, current);
+        const trialResult = applyTrialStartIfNeeded(current, consistentMerged);
         const normalized = normalizeUserProfile(trialResult.merged);
         cachedProfile = normalized;
         try {
@@ -1126,6 +1218,7 @@
     window.setUserProfile = setUserProfile;
     window.patchUserProfile = patchUserProfile;
     window.normalizeLocalDate = normalizeLocalDate;
+    window.validateGoalWeightConsistency = validateGoalWeightConsistency;
     window.getDiaryEntries = getDiaryEntries;
     window.setDiaryEntries = setDiaryEntries;
     window.getHabitEntries = getHabitEntries;
