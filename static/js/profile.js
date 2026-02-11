@@ -878,38 +878,19 @@ function getActivityForDate(entries, dateKey) {
 
 function renderTodayPlanCard() {
     const caloriesElement = document.getElementById('today-plan-calories');
-    const proteinElement = document.getElementById('today-plan-protein');
-    const fatElement = document.getElementById('today-plan-fat');
-    const carbsElement = document.getElementById('today-plan-carbs');
     const waterElement = document.getElementById('today-plan-water');
 
-    if (!caloriesElement || !proteinElement || !fatElement || !carbsElement || !waterElement) {
+    if (!caloriesElement || !waterElement) {
         return;
     }
 
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
-    const tdee = Number(profile?.calories_target ?? profile?.tdee_calories);
-    const adminConfig = window.adminConfig || {};
-    const macrosConfig = adminConfig.default_macros || {};
+    const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
 
-    const proteinPercent = Number.isFinite(Number(macrosConfig.protein_pct)) ? Number(macrosConfig.protein_pct) : 0.30;
-    const fatPercent = Number.isFinite(Number(macrosConfig.fat_pct)) ? Number(macrosConfig.fat_pct) : 0.25;
-    const carbsPercent = Number.isFinite(Number(macrosConfig.carbs_pct)) ? Number(macrosConfig.carbs_pct) : 0.45;
-
-    if (Number.isFinite(tdee) && tdee > 0) {
-        const proteinTarget = (tdee * proteinPercent) / 4;
-        const fatTarget = (tdee * fatPercent) / 9;
-        const carbsTarget = (tdee * carbsPercent) / 4;
-
-        caloriesElement.textContent = `${Math.round(tdee)} ккал`;
-        proteinElement.textContent = `${Math.round(proteinTarget)} г`;
-        fatElement.textContent = `${Math.round(fatTarget)} г`;
-        carbsElement.textContent = `${Math.round(carbsTarget)} г`;
+    if (Number.isFinite(targetCalories) && targetCalories > 0) {
+        caloriesElement.textContent = `${Math.round(targetCalories)} ккал`;
     } else {
         caloriesElement.textContent = '—';
-        proteinElement.textContent = '—';
-        fatElement.textContent = '—';
-        carbsElement.textContent = '—';
     }
 
     const waterTarget = Number(window.adminConfig?.reminders?.water_min_l);
