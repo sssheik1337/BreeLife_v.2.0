@@ -120,13 +120,17 @@ function calculateMacros(payload) {
     };
 }
 
-function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, target_weight_kg }) {
+function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, target_weight_kg, goal_deadline }) {
     if (!goal || tdee_calories === null || tdee_calories === undefined) {
         return {
             calories_target: null,
             calorie_delta: null,
+            required_rate_kg_per_week: null,
+            required_calorie_delta: null,
+            required_calories_target: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
+            warning_message: null,
             error: null,
             label: null
         };
@@ -139,8 +143,12 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         return {
             calories_target: null,
             calorie_delta: null,
+            required_rate_kg_per_week: null,
+            required_calorie_delta: null,
+            required_calories_target: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
+            warning_message: null,
             error: null,
             label: null
         };
@@ -159,8 +167,12 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         return {
             calories_target: null,
             calorie_delta: null,
+            required_rate_kg_per_week: null,
+            required_calorie_delta: null,
+            required_calories_target: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
+            warning_message: null,
             error: null,
             label: null
         };
@@ -183,19 +195,73 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         return {
             calories_target: caloriesTarget,
             calorie_delta: calorieDelta,
+            required_rate_kg_per_week: null,
+            required_calorie_delta: null,
+            required_calories_target: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
+            warning_message: null,
             error: 'LOGICAL_INCONSISTENCY',
             label: null
         };
+    }
+
+    let requiredRate = null;
+    let requiredCalorieDelta = null;
+    let requiredCaloriesTarget = null;
+    let warningMessage = null;
+
+    if (goal_deadline && Number.isFinite(weight) && Number.isFinite(target)) {
+        const deadlineDate = new Date(`${goal_deadline}T00:00:00`);
+        if (!Number.isNaN(deadlineDate.getTime())) {
+            const todayDate = new Date();
+            todayDate.setHours(0, 0, 0, 0);
+            const diffMs = deadlineDate.getTime() - todayDate.getTime();
+            const weeksAvailable = diffMs / (1000 * 60 * 60 * 24 * 7);
+
+            if (weeksAvailable > 0) {
+                const deadlineDeltaKg = target - weight;
+                requiredRate = deadlineDeltaKg / weeksAvailable;
+                if (goal === 'lose' && requiredRate < -1) {
+                    warningMessage = 'Выбранный дедлайн требует слишком быстрого снижения веса. Рекомендуется сдвинуть дату цели.';
+                }
+                if (goal === 'gain' && requiredRate > 0.5) {
+                    warningMessage = 'Выбранный дедлайн требует слишком быстрого набора веса. Рекомендуется сдвинуть дату цели.';
+                }
+
+                if (goal === 'lose') {
+                    requiredRate = clamp(requiredRate, -1.0, -0.25);
+                } else if (goal === 'gain') {
+                    requiredRate = clamp(requiredRate, 0.1, 0.5);
+                } else if (goal === 'maintain') {
+                    requiredRate = 0;
+                }
+
+                requiredCalorieDelta = (requiredRate * 7700) / 7;
+                requiredCaloriesTarget = tdee + requiredCalorieDelta;
+                if (sex === 'female') {
+                    requiredCaloriesTarget = Math.max(requiredCaloriesTarget, 1200);
+                }
+                if (sex === 'male') {
+                    requiredCaloriesTarget = Math.max(requiredCaloriesTarget, 1500);
+                }
+                requiredCalorieDelta = requiredCaloriesTarget - tdee;
+            } else {
+                warningMessage = 'Дедлайн цели уже прошёл или слишком близко. Укажите более реалистичную дату.';
+            }
+        }
     }
 
     if (goal === 'maintain') {
         return {
             calories_target: caloriesTarget,
             calorie_delta: calorieDelta,
+            required_rate_kg_per_week: requiredRate,
+            required_calorie_delta: requiredCalorieDelta,
+            required_calories_target: requiredCaloriesTarget,
             weight_rate_kg_per_week: 0,
             predicted_goal_date: null,
+            warning_message: warningMessage,
             error: null,
             label: 'поддержание веса'
         };
@@ -209,8 +275,12 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         return {
             calories_target: caloriesTarget,
             calorie_delta: calorieDelta,
+            required_rate_kg_per_week: requiredRate,
+            required_calorie_delta: requiredCalorieDelta,
+            required_calories_target: requiredCaloriesTarget,
             weight_rate_kg_per_week: rate,
             predicted_goal_date: null,
+            warning_message: warningMessage,
             error: null,
             label: null
         };
@@ -221,8 +291,12 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         return {
             calories_target: caloriesTarget,
             calorie_delta: calorieDelta,
+            required_rate_kg_per_week: requiredRate,
+            required_calorie_delta: requiredCalorieDelta,
+            required_calories_target: requiredCaloriesTarget,
             weight_rate_kg_per_week: 0,
             predicted_goal_date: null,
+            warning_message: warningMessage,
             error: null,
             label: null
         };
@@ -233,8 +307,12 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         return {
             calories_target: caloriesTarget,
             calorie_delta: calorieDelta,
+            required_rate_kg_per_week: requiredRate,
+            required_calorie_delta: requiredCalorieDelta,
+            required_calories_target: requiredCaloriesTarget,
             weight_rate_kg_per_week: rate,
             predicted_goal_date: null,
+            warning_message: warningMessage,
             error: 'LOGICAL_INCONSISTENCY',
             label: null
         };
@@ -250,8 +328,12 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
     return {
         calories_target: caloriesTarget,
         calorie_delta: calorieDelta,
+        required_rate_kg_per_week: requiredRate,
+        required_calorie_delta: requiredCalorieDelta,
+        required_calories_target: requiredCaloriesTarget,
         weight_rate_kg_per_week: rate,
         predicted_goal_date: predictedDate,
+        warning_message: warningMessage,
         error: null,
         label: null
     };

@@ -5,6 +5,7 @@ const apiFetch = window.apiFetch || fetch;
 let resumeInitialProfileSnapshot = null;
 let resumeIsDirty = false;
 let resumeHasUserEdits = false;
+let resumeLastGoalDeadlineWarning = null;
 
 
 function hasMeaningfulUserData(data) {
@@ -191,13 +192,18 @@ function updateCalculatedMetrics() {
             goal: profile.goal,
             tdee_calories: tdee,
             weight_kg: hasValidWeight ? weight : null,
-            target_weight_kg: profile.target_weight_kg
+            target_weight_kg: profile.target_weight_kg,
+            goal_deadline: profile.goal_deadline
         })
         : {
             calories_target: null,
             calorie_delta: null,
+            required_rate_kg_per_week: null,
+            required_calorie_delta: null,
+            required_calories_target: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
+            warning_message: null,
             label: null
         };
     const macros = Number.isFinite(weight) && weight > 0 && Number.isFinite(weightForecast?.calories_target)
@@ -217,9 +223,21 @@ function updateCalculatedMetrics() {
             macros,
             calories_target: weightForecast.calories_target,
             calorie_delta: weightForecast.calorie_delta,
+            required_rate_kg_per_week: weightForecast.required_rate_kg_per_week,
+            required_calorie_delta: weightForecast.required_calorie_delta,
+            required_calories_target: weightForecast.required_calories_target,
             weight_rate_kg_per_week: weightForecast.weight_rate_kg_per_week,
             predicted_goal_date: weightForecast.predicted_goal_date
         });
+    }
+
+    if (weightForecast.warning_message && typeof showNotification === 'function') {
+        if (resumeLastGoalDeadlineWarning !== weightForecast.warning_message) {
+            showNotification(weightForecast.warning_message, 'warning');
+            resumeLastGoalDeadlineWarning = weightForecast.warning_message;
+        }
+    } else {
+        resumeLastGoalDeadlineWarning = null;
     }
 
     const ageElement = document.getElementById('age-value');

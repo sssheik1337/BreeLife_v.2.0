@@ -78,6 +78,9 @@
             tdee_calories: null,
             calories_target: null,
             calorie_delta: null,
+            required_rate_kg_per_week: null,
+            required_calorie_delta: null,
+            required_calories_target: null,
             macros: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
@@ -246,6 +249,9 @@
         merged.tdee_calories = parseNumber(merged.tdee_calories);
         merged.calories_target = parseNumber(merged.calories_target);
         merged.calorie_delta = parseNumber(merged.calorie_delta);
+        merged.required_rate_kg_per_week = parseNumber(merged.required_rate_kg_per_week);
+        merged.required_calorie_delta = parseNumber(merged.required_calorie_delta);
+        merged.required_calories_target = parseNumber(merged.required_calories_target);
         merged.macros = normalizeMacros(merged.macros);
         merged.weight_rate_kg_per_week = parseNumber(merged.weight_rate_kg_per_week);
         merged.predicted_goal_date = merged.predicted_goal_date || null;
