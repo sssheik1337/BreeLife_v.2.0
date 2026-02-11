@@ -48,6 +48,10 @@ function calculateTDEE(bmr, activity_factor) {
     return base * factor;
 }
 
+function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+}
+
 function calculateMacros(tdee_calories) {
     if (tdee_calories === null) {
         return null;
@@ -72,45 +76,82 @@ function calculateMacros(tdee_calories) {
     };
 }
 
-function calculateWeightGoalForecast({ goal, weight_kg, target_weight_kg }) {
-    if (!goal || weight_kg === null || target_weight_kg === null) {
+function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, target_weight_kg }) {
+    if (!goal || tdee_calories === null || tdee_calories === undefined) {
         return {
+            calories_target: null,
+            calorie_delta: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
             label: null
         };
     }
 
+    const tdee = Number(tdee_calories);
     const weight = Number(weight_kg);
     const target = Number(target_weight_kg);
-    if (!Number.isFinite(weight) || !Number.isFinite(target)) {
+    if (!Number.isFinite(tdee)) {
         return {
+            calories_target: null,
+            calorie_delta: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
             label: null
         };
     }
 
-    const adminConfig = window.adminConfig || {};
-    const rateMap = adminConfig.weight_rates || {
-        lose: -0.5,
-        gain: 0.3,
-        maintain: 0
-    };
-    const rate = rateMap[goal];
-    if (rate === undefined) {
+    let delta = null;
+    if (goal === 'lose') {
+        delta = -Math.min(0.20 * tdee, 500);
+    } else if (goal === 'gain') {
+        delta = Math.min(0.15 * tdee, 400);
+    } else if (goal === 'maintain') {
+        delta = 0;
+    }
+
+    if (delta === null) {
         return {
+            calories_target: null,
+            calorie_delta: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
             label: null
         };
     }
 
-    if (rate === 0) {
+    const caloriesTargetRaw = tdee + delta;
+    let caloriesTarget = caloriesTargetRaw;
+    if (sex === 'female') {
+        caloriesTarget = Math.max(caloriesTargetRaw, 1200);
+    }
+    if (sex === 'male') {
+        caloriesTarget = Math.max(caloriesTargetRaw, 1500);
+    }
+
+    const calorieDelta = caloriesTarget - tdee;
+    const weeklyDeltaKg = (calorieDelta * 7) / 7700;
+
+    if (goal === 'maintain') {
         return {
+            calories_target: caloriesTarget,
+            calorie_delta: calorieDelta,
             weight_rate_kg_per_week: 0,
             predicted_goal_date: null,
             label: 'поддержание веса'
+        };
+    }
+
+    const rate = goal === 'lose'
+        ? clamp(weeklyDeltaKg, -1.0, -0.25)
+        : clamp(weeklyDeltaKg, 0.1, 0.5);
+
+    if (!Number.isFinite(weight) || !Number.isFinite(target)) {
+        return {
+            calories_target: caloriesTarget,
+            calorie_delta: calorieDelta,
+            weight_rate_kg_per_week: rate,
+            predicted_goal_date: null,
+            label: null
         };
     }
 
@@ -124,6 +165,8 @@ function calculateWeightGoalForecast({ goal, weight_kg, target_weight_kg }) {
         : targetDate.toISOString().split('T')[0];
 
     return {
+        calories_target: caloriesTarget,
+        calorie_delta: calorieDelta,
         weight_rate_kg_per_week: rate,
         predicted_goal_date: predictedDate,
         label: null

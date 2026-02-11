@@ -76,6 +76,8 @@
             food_diary: null,
             bmr: null,
             tdee_calories: null,
+            calories_target: null,
+            calorie_delta: null,
             macros: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
@@ -242,6 +244,8 @@
         merged.food_diary = parseBoolean(merged.food_diary);
         merged.bmr = parseNumber(merged.bmr);
         merged.tdee_calories = parseNumber(merged.tdee_calories);
+        merged.calories_target = parseNumber(merged.calories_target);
+        merged.calorie_delta = parseNumber(merged.calorie_delta);
         merged.macros = normalizeMacros(merged.macros);
         merged.weight_rate_kg_per_week = parseNumber(merged.weight_rate_kg_per_week);
         merged.predicted_goal_date = merged.predicted_goal_date || null;

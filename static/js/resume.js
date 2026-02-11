@@ -188,11 +188,15 @@ function updateCalculatedMetrics() {
     const macros = tdee !== null && typeof calculateMacros === 'function' ? calculateMacros(tdee) : null;
     const weightForecast = typeof calculateWeightGoalForecast === 'function'
         ? calculateWeightGoalForecast({
+            sex: profile.sex,
             goal: profile.goal,
+            tdee_calories: tdee,
             weight_kg: hasValidWeight ? weight : null,
             target_weight_kg: profile.target_weight_kg
         })
         : {
+            calories_target: null,
+            calorie_delta: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
             label: null
@@ -204,6 +208,8 @@ function updateCalculatedMetrics() {
             bmr,
             tdee_calories: tdee,
             macros,
+            calories_target: weightForecast.calories_target,
+            calorie_delta: weightForecast.calorie_delta,
             weight_rate_kg_per_week: weightForecast.weight_rate_kg_per_week,
             predicted_goal_date: weightForecast.predicted_goal_date
         });
