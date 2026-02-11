@@ -1136,11 +1136,13 @@ function renderWeeklyProgress() {
     const percentElement = document.getElementById('weekly-progress-percent');
     const descElement = document.getElementById('weekly-progress-desc');
     const insight = document.getElementById('weekly-progress-insight');
-    if (!container || !percentElement || !descElement || !insight) {
+    if (!percentElement) {
         return;
     }
 
-    container.innerHTML = '';
+    if (container) {
+        container.innerHTML = '';
+    }
 
     const dayLabels = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
     const today = new Date();
@@ -1210,66 +1212,82 @@ function renderWeeklyProgress() {
             totalCalories += dayCalories;
         }
 
-        const item = document.createElement('a');
-        item.className = 'weekly-day flex flex-col items-center gap-1 p-2';
-        if (dateKey) {
-            item.href = `/diary?date=${dateKey}&mode=day`;
-        } else {
-            item.href = '/diary?mode=day';
+        if (container) {
+            const item = document.createElement('a');
+            item.className = 'weekly-day flex flex-col items-center gap-1 p-2';
+            if (dateKey) {
+                item.href = `/diary?date=${dateKey}&mode=day`;
+            } else {
+                item.href = '/diary?mode=day';
+            }
+            if (todayKey && dateKey === todayKey) {
+                item.classList.add('is-today');
+            }
+            const bar = document.createElement('div');
+            bar.className = 'w-full rounded-lg';
+            bar.style.transition = 'height 220ms ease, background-color 220ms ease';
+            const heightPercent = Math.min(Math.max(dayPercent * 100, 0), 100);
+            if (!hasData) {
+                bar.style.height = '0%';
+                bar.style.background = '#e2e8f0';
+            } else {
+                bar.style.height = `${heightPercent}%`;
+                bar.style.background = percentToGradientColor(dayPercent);
+            }
+            const barWrapper = document.createElement('div');
+            barWrapper.className = 'w-full flex items-end justify-center';
+            barWrapper.style.height = '64px';
+            barWrapper.appendChild(bar);
+            const label = document.createElement('div');
+            label.className = 'text-xs text-slate-500 mt-1';
+            label.textContent = dayLabels[i];
+            const dateText = document.createElement('div');
+            dateText.className = 'text-[10px] text-slate-400';
+            dateText.textContent = dateLabel;
+            item.appendChild(barWrapper);
+            item.appendChild(label);
+            item.appendChild(dateText);
+            container.appendChild(item);
         }
-        if (todayKey && dateKey === todayKey) {
-            item.classList.add('is-today');
-        }
-        const bar = document.createElement('div');
-        bar.className = 'w-full rounded-lg';
-        bar.style.transition = 'height 220ms ease, background-color 220ms ease';
-        const heightPercent = Math.min(Math.max(dayPercent * 100, 0), 100);
-        if (!hasData) {
-            bar.style.height = '0%';
-            bar.style.background = '#e2e8f0';
-        } else {
-            bar.style.height = `${heightPercent}%`;
-            bar.style.background = percentToGradientColor(dayPercent);
-        }
-        const barWrapper = document.createElement('div');
-        barWrapper.className = 'w-full flex items-end justify-center';
-        barWrapper.style.height = '64px';
-        barWrapper.appendChild(bar);
-        const label = document.createElement('div');
-        label.className = 'text-xs text-slate-500 mt-1';
-        label.textContent = dayLabels[i];
-        const dateText = document.createElement('div');
-        dateText.className = 'text-[10px] text-slate-400';
-        dateText.textContent = dateLabel;
-        item.appendChild(barWrapper);
-        item.appendChild(label);
-        item.appendChild(dateText);
-        container.appendChild(item);
     }
 
     const denominator = shouldAverageLoggedDays ? loggedDays : 7;
     const percent = denominator ? Math.round((totalPercent / denominator) * 100) : 0;
     percentElement.textContent = `${percent}%`;
-    descElement.textContent = 'Учитываются записи дневника питания.';
+    if (descElement) {
+        descElement.textContent = 'Учитываются записи дневника питания.';
+    }
     if (!loggedDays) {
-        insight.textContent = 'Пока нет записей за неделю. Добавьте несколько дней — и появится понятный вывод.';
+        if (insight) {
+            insight.textContent = 'Пока нет записей за неделю. Добавьте несколько дней — и появится понятный вывод.';
+        }
         return;
     }
     if (loggedDays < 3) {
-        insight.textContent = 'Записей пока мало, вывод приблизительный. Попробуйте отмечать питание чаще.';
+        if (insight) {
+            insight.textContent = 'Записей пока мало, вывод приблизительный. Попробуйте отмечать питание чаще.';
+        }
         return;
     }
     if (!Number.isFinite(targetCalories) || targetCalories <= 0) {
-        insight.textContent = 'Есть записи за неделю, но ориентир не задан. Старайтесь держать дни более ровными.';
+        if (insight) {
+            insight.textContent = 'Есть записи за неделю, но ориентир не задан. Старайтесь держать дни более ровными.';
+        }
         return;
     }
     const avgCalories = totalCalories / loggedDays;
     if (avgCalories >= targetCalories * 1.1) {
-        insight.textContent = 'В среднем за неделю калорий было больше нужного. Если хотите ближе к цели, уменьшайте порции постепенно.';
+        if (insight) {
+            insight.textContent = 'В среднем за неделю калорий было больше нужного. Если хотите ближе к цели, уменьшайте порции постепенно.';
+        }
     } else if (avgCalories <= targetCalories * 0.9) {
-        insight.textContent = 'В среднем за неделю калорий было меньше нужного. Можно добавить небольшой перекус, чтобы поддерживать энергию.';
+        if (insight) {
+            insight.textContent = 'В среднем за неделю калорий было меньше нужного. Можно добавить небольшой перекус, чтобы поддерживать энергию.';
+        }
     } else {
-        insight.textContent = 'Неделя выглядит ровно — вы держите хороший ритм.';
+        if (insight) {
+            insight.textContent = 'Неделя выглядит ровно — вы держите хороший ритм.';
+        }
     }
 }
 
