@@ -1,5 +1,17 @@
 // Расчёты показателей здоровья
 
+function logForecastDebug(debugData) {
+    if (window.appDebug === true) {
+        console.log('[MODEL_DEBUG] forecast', debugData);
+    }
+}
+
+function logWeeklyCorrectionDebug(debugData) {
+    if (window.appDebug === true) {
+        console.log('[MODEL_DEBUG] weekly correction', debugData);
+    }
+}
+
 function calculateAge(birth_date) {
     if (!birth_date) {
         return null;
@@ -166,6 +178,14 @@ function adjustCaloriesByWeeklyProgress(profile, weeklyAverageWeight) {
     const deviation = actualRate - plannedRate;
 
     if (Math.abs(deviation) <= 0.1) {
+        logWeeklyCorrectionDebug({
+            goal,
+            plannedRate,
+            actualRate,
+            deviation,
+            corrected: false,
+            reason: 'Отклонение меньше порога'
+        });
         return {
             calories_target: currentCaloriesTarget,
             calorie_delta: currentCaloriesTarget - tdee,
@@ -191,6 +211,18 @@ function adjustCaloriesByWeeklyProgress(profile, weeklyAverageWeight) {
     const nextCalorieDelta = nextCaloriesTarget - tdee;
     const nextRate = (nextCalorieDelta * 7) / 7700;
     const warningMessage = 'Обновил цель по калориям пропорционально фактическому отклонению недельного темпа.';
+    logWeeklyCorrectionDebug({
+        goal,
+        plannedRate,
+        actualRate,
+        deviation,
+        correction,
+        calories_target_before: currentCaloriesTarget,
+        calories_target_after: nextCaloriesTarget,
+        calorie_delta_after: nextCalorieDelta,
+        weight_rate_after: nextRate,
+        corrected: true
+    });
 
     return {
         calories_target: nextCaloriesTarget,
@@ -270,6 +302,14 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
 
     if (goal === 'maintain') {
         // Режим поддержания полностью изолирован: без расчётов deltaKg/rate и без учёта дедлайна.
+        logForecastDebug({
+            deltaKg: null,
+            plannedRate: 0,
+            maxSafeRate: null,
+            calorie_delta: 0,
+            calories_target: tdee,
+            safe_weeks_estimate: null
+        });
         return {
             calories_target: tdee,
             calorie_delta: 0,
@@ -316,6 +356,15 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
 
     const consistency = validateGoalWeightConsistency(goal, weight, target);
     if (consistency.conflict) {
+        logForecastDebug({
+            deltaKg,
+            plannedRate,
+            maxSafeRate: adaptiveLimit,
+            calorie_delta: calorieDelta,
+            calories_target: caloriesTarget,
+            safe_weeks_estimate: null,
+            blocked: true
+        });
         return {
             calories_target: caloriesTarget,
             calorie_delta: calorieDelta,
@@ -361,6 +410,14 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
     }
 
     const rate = plannedRate;
+    logForecastDebug({
+        deltaKg,
+        plannedRate,
+        maxSafeRate: adaptiveLimit,
+        calorie_delta: calorieDelta,
+        calories_target: caloriesTarget,
+        safe_weeks_estimate: safeWeeksEstimate
+    });
 
     if (!Number.isFinite(weight) || !Number.isFinite(target)) {
         return {
