@@ -120,6 +120,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             calorie_delta: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
+            error: null,
             label: null
         };
     }
@@ -133,6 +134,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             calorie_delta: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
+            error: null,
             label: null
         };
     }
@@ -152,6 +154,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             calorie_delta: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
+            error: null,
             label: null
         };
     }
@@ -175,6 +178,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             calorie_delta: calorieDelta,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
+            error: 'LOGICAL_INCONSISTENCY',
             label: null
         };
     }
@@ -185,6 +189,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             calorie_delta: calorieDelta,
             weight_rate_kg_per_week: 0,
             predicted_goal_date: null,
+            error: null,
             label: 'поддержание веса'
         };
     }
@@ -199,15 +204,38 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             calorie_delta: calorieDelta,
             weight_rate_kg_per_week: rate,
             predicted_goal_date: null,
+            error: null,
             label: null
         };
     }
 
     const weightDelta = target - weight;
-    const weeksNeeded = Math.abs(weightDelta) / Math.abs(rate);
+    if (rate === 0) {
+        return {
+            calories_target: caloriesTarget,
+            calorie_delta: calorieDelta,
+            weight_rate_kg_per_week: 0,
+            predicted_goal_date: null,
+            error: null,
+            label: null
+        };
+    }
+
+    const weeksNeeded = weightDelta / rate;
+    if (!Number.isFinite(weeksNeeded) || weeksNeeded <= 0) {
+        return {
+            calories_target: caloriesTarget,
+            calorie_delta: calorieDelta,
+            weight_rate_kg_per_week: rate,
+            predicted_goal_date: null,
+            error: 'LOGICAL_INCONSISTENCY',
+            label: null
+        };
+    }
+
     const today = new Date();
     const targetDate = new Date(today);
-    targetDate.setDate(targetDate.getDate() + Math.round(weeksNeeded * 7));
+    targetDate.setDate(targetDate.getDate() + Math.ceil(weeksNeeded) * 7);
     const predictedDate = Number.isNaN(targetDate.getTime())
         ? null
         : targetDate.toISOString().split('T')[0];
@@ -217,6 +245,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         calorie_delta: calorieDelta,
         weight_rate_kg_per_week: rate,
         predicted_goal_date: predictedDate,
+        error: null,
         label: null
     };
 }
