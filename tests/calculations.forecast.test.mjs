@@ -209,3 +209,21 @@ test('weekly-коррекция: при малом отклонении (<= 0.1)
     assert.equal(result.calorie_delta, 300);
     assert.equal(result.weight_rate_kg_per_week, 0.25);
 });
+
+
+test('безопасный темп задаётся до калорий и не пересчитывается после clamp', () => {
+    const result = calculateWeightGoalForecast({
+        sex: 'female',
+        goal: 'lose',
+        tdee_calories: 1300,
+        weight_kg: 60,
+        target_weight_kg: 55,
+        goal_deadline: null
+    });
+
+    // Для 60 кг лимит: 0.6 кг/нед, направление вниз => -0.6.
+    assert.equal(result.weight_rate_kg_per_week, -0.6);
+    // До clamp цель была бы ниже 1200, поэтому применяется безопасный порог.
+    assert.equal(result.calories_target, 1200);
+    assert.equal(result.calorie_delta, -100);
+});

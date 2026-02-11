@@ -310,12 +310,17 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         };
     }
 
-    const baseRate = goal === 'lose' ? -adaptiveLimit : adaptiveLimit;
-    const baseCalorieDelta = (baseRate * 7700) / 7;
-    let caloriesTarget = tdee + baseCalorieDelta;
+    const deltaKg = Number.isFinite(weight) && Number.isFinite(target)
+        ? target - weight
+        : null;
+    const direction = Number.isFinite(deltaKg) ? Math.sign(deltaKg) : 0;
+    // Безопасный темп задаётся сразу от направления цели и адаптивного лимита.
+    const plannedRate = direction * adaptiveLimit;
+    const plannedCalorieDelta = (plannedRate * 7700) / 7;
+
+    let caloriesTarget = tdee + plannedCalorieDelta;
     caloriesTarget = applyCaloriesSafetyClamp(caloriesTarget, sex);
     const calorieDelta = caloriesTarget - tdee;
-    const weeklyDeltaKg = (calorieDelta * 7) / 7700;
 
     const consistency = validateGoalWeightConsistency(goal, weight, target);
     if (consistency.conflict) {
@@ -340,8 +345,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
     let safeWeeksEstimate = null;
     let warningMessage = null;
 
-    if (goal !== 'maintain' && Number.isFinite(weight) && Number.isFinite(target) && Number.isFinite(adaptiveLimit) && adaptiveLimit > 0) {
-        const deltaKg = target - weight;
+    if (Number.isFinite(deltaKg) && Number.isFinite(adaptiveLimit) && adaptiveLimit > 0) {
         if (deltaKg !== 0) {
             // Безопасный срок считается только от дистанции по весу и безопасного темпа модели.
             safeWeeksEstimate = Math.ceil(Math.abs(deltaKg) / adaptiveLimit);
@@ -364,13 +368,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         }
     }
 
-    let rate = weeklyDeltaKg;
-    if (goal === 'lose' && Number.isFinite(adaptiveLimit)) {
-        rate = Math.max(weeklyDeltaKg, -adaptiveLimit);
-    }
-    if (goal === 'gain' && Number.isFinite(adaptiveLimit)) {
-        rate = Math.min(weeklyDeltaKg, adaptiveLimit);
-    }
+    const rate = plannedRate;
 
     if (!Number.isFinite(weight) || !Number.isFinite(target)) {
         return {
