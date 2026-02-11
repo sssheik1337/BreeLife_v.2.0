@@ -387,7 +387,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
     }
 
     const weightDelta = target - weight;
-    if (rate === 0) {
+    if (rate === 0 || weightDelta === 0) {
         return {
             calories_target: caloriesTarget,
             calorie_delta: calorieDelta,
@@ -395,7 +395,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_calorie_delta: requiredCalorieDelta,
             required_calories_target: requiredCaloriesTarget,
             safe_weeks_estimate: safeWeeksEstimate,
-            weight_rate_kg_per_week: 0,
+            weight_rate_kg_per_week: rate,
             predicted_goal_date: null,
             warning_message: warningMessage,
             error: null,
@@ -403,7 +403,8 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         };
     }
 
-    const weeksNeeded = weightDelta / rate;
+    // Дата прогноза — вторичная метрика, рассчитывается только от дистанции и текущего темпа.
+    const weeksNeeded = Math.ceil(Math.abs(weightDelta) / Math.abs(rate));
     if (!Number.isFinite(weeksNeeded) || weeksNeeded <= 0) {
         return {
             calories_target: caloriesTarget,
@@ -415,14 +416,14 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             weight_rate_kg_per_week: rate,
             predicted_goal_date: null,
             warning_message: warningMessage,
-            error: 'LOGICAL_INCONSISTENCY',
+            error: null,
             label: null
         };
     }
 
     const today = new Date();
     const targetDate = new Date(today);
-    targetDate.setDate(targetDate.getDate() + Math.ceil(weeksNeeded) * 7);
+    targetDate.setDate(targetDate.getDate() + weeksNeeded * 7);
     const predictedDate = Number.isNaN(targetDate.getTime())
         ? null
         : targetDate.toISOString().split('T')[0];

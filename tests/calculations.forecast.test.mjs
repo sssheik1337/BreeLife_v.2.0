@@ -227,3 +227,41 @@ test('безопасный темп задаётся до калорий и не
     assert.equal(result.calories_target, 1200);
     assert.equal(result.calorie_delta, -100);
 });
+
+
+test('прогноз даты считается как ceil(abs(delta)/abs(rate)) и только при ненулевом темпе', () => {
+    const result = calculateWeightGoalForecast({
+        sex: 'female',
+        goal: 'lose',
+        tdee_calories: 2200,
+        weight_kg: 60,
+        target_weight_kg: 55,
+        goal_deadline: null
+    });
+
+    assert.equal(result.weight_rate_kg_per_week !== 0, true);
+
+    const expectedDate = (() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const expected = new Date(today);
+        // delta = 5 кг, безопасный темп для 60 кг = 0.6 кг/нед => ceil(5/0.6)=9 недель.
+        expected.setDate(expected.getDate() + 9 * 7);
+        return expected.toISOString().split('T')[0];
+    })();
+
+    assert.equal(result.predicted_goal_date, expectedDate);
+});
+
+test('если deltaKg == 0, дата прогноза не рассчитывается', () => {
+    const result = calculateWeightGoalForecast({
+        sex: 'male',
+        goal: 'maintain',
+        tdee_calories: 2400,
+        weight_kg: 80,
+        target_weight_kg: 80,
+        goal_deadline: null
+    });
+
+    assert.equal(result.predicted_goal_date, null);
+});
