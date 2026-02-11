@@ -1030,6 +1030,60 @@ function saveUserData() {
     persistUserData();
 }
 
+function validateGoalWeightConsistencyForQuestionnaire(data) {
+    const profile = typeof mapUserDataToUserProfile === 'function'
+        ? mapUserDataToUserProfile(data)
+        : null;
+    if (!profile) {
+        return {
+            ok: true,
+            warning: null,
+            error: null
+        };
+    }
+
+    const goal = profile.goal;
+    const current = Number(profile.weight_kg);
+    const target = Number(profile.target_weight_kg);
+    if (!goal || !Number.isFinite(current) || !Number.isFinite(target)) {
+        return {
+            ok: true,
+            warning: null,
+            error: null
+        };
+    }
+
+    if (goal === 'lose' && target >= current) {
+        return {
+            ok: false,
+            warning: null,
+            error: 'Цель снижения веса противоречит выбранному желаемому весу'
+        };
+    }
+
+    if (goal === 'gain' && target <= current) {
+        return {
+            ok: false,
+            warning: null,
+            error: 'Цель набора массы противоречит выбранному желаемому весу'
+        };
+    }
+
+    if (goal === 'maintain' && Math.abs(target - current) > 1) {
+        return {
+            ok: true,
+            warning: 'Для цели поддержания веса разница между текущим и желаемым весом обычно не превышает 1 кг.',
+            error: null
+        };
+    }
+
+    return {
+        ok: true,
+        warning: null,
+        error: null
+    };
+}
+
 async function saveProfileToServer(profile) {
     if (!profile) {
         return false;
@@ -1081,6 +1135,16 @@ function setupEventListeners() {
         } else {
             // Сохраняем профиль и отправляем на сервер (если доступен Telegram ID).
             let profile = null;
+            const consistency = validateGoalWeightConsistencyForQuestionnaire(window.userData);
+            if (!consistency.ok) {
+                if (typeof showNotification === 'function' && consistency.error) {
+                    showNotification(consistency.error, 'error');
+                }
+                return;
+            }
+            if (consistency.warning && typeof showNotification === 'function') {
+                showNotification(consistency.warning, 'warning');
+            }
             if (typeof patchUserProfile === 'function' && typeof mapUserDataToUserProfile === 'function') {
                 console.log('[QUESTIONNAIRE_TRACE] перед mapUserDataToUserProfile:', window.userData);
                 const mappedProfile = mapUserDataToUserProfile(window.userData);

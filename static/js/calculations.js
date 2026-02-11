@@ -52,6 +52,43 @@ function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
 }
 
+function validateGoalWeightConsistency(goal, currentWeight, targetWeight) {
+    const current = Number(currentWeight);
+    const target = Number(targetWeight);
+    if (!Number.isFinite(current) || !Number.isFinite(target)) {
+        return {
+            conflict: false,
+            warning: false
+        };
+    }
+
+    if (goal === 'lose' && target >= current) {
+        return {
+            conflict: true,
+            warning: false
+        };
+    }
+
+    if (goal === 'gain' && target <= current) {
+        return {
+            conflict: true,
+            warning: false
+        };
+    }
+
+    if (goal === 'maintain' && Math.abs(target - current) > 1) {
+        return {
+            conflict: false,
+            warning: true
+        };
+    }
+
+    return {
+        conflict: false,
+        warning: false
+    };
+}
+
 function calculateMacros(tdee_calories) {
     if (tdee_calories === null) {
         return null;
@@ -131,6 +168,17 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
     const calorieDelta = caloriesTarget - tdee;
     const weeklyDeltaKg = (calorieDelta * 7) / 7700;
 
+    const consistency = validateGoalWeightConsistency(goal, weight, target);
+    if (consistency.conflict) {
+        return {
+            calories_target: caloriesTarget,
+            calorie_delta: calorieDelta,
+            weight_rate_kg_per_week: null,
+            predicted_goal_date: null,
+            label: null
+        };
+    }
+
     if (goal === 'maintain') {
         return {
             calories_target: caloriesTarget,
@@ -155,8 +203,8 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         };
     }
 
-    const delta = target - weight;
-    const weeksNeeded = Math.abs(delta) / Math.abs(rate);
+    const weightDelta = target - weight;
+    const weeksNeeded = Math.abs(weightDelta) / Math.abs(rate);
     const today = new Date();
     const targetDate = new Date(today);
     targetDate.setDate(targetDate.getDate() + Math.round(weeksNeeded * 7));
