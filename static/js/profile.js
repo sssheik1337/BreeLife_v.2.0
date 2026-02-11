@@ -1274,7 +1274,9 @@ function renderWeeklyProgress() {
 }
 
 function renderWeeklyAdjustments() {
-    const list = document.getElementById('profile-weekly-adjustments-list');
+    const weeklyReviewCard = document.getElementById('profile-weekly-review');
+    const list = weeklyReviewCard?.querySelector('#profile-weekly-adjustments-list')
+        || document.getElementById('profile-weekly-adjustments-list');
     if (!list) {
         return;
     }
