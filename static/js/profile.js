@@ -1000,8 +1000,7 @@ function renderProfileRings() {
 
 function renderMonthGrid() {
     const container = document.getElementById('profile-month-grid');
-    const insight = document.getElementById('profile-month-grid-insight');
-    if (!container || !insight) {
+    if (!container) {
         return;
     }
 
@@ -1041,9 +1040,6 @@ function renderMonthGrid() {
     const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
     const waterTarget = Number(window.adminConfig?.reminders?.water_min_l);
     const sleepTargetMinutes = parseSleepMinutes(window.adminConfig?.reminders?.sleep_target);
-    let daysWithData = 0;
-    let daysOnTrack = 0;
-    let daysOffTrack = 0;
     for (let i = 0; i < days; i += 1) {
         const date = new Date(today);
         date.setDate(today.getDate() - (days - 1 - i));
@@ -1061,9 +1057,6 @@ function renderMonthGrid() {
         const hasData = dateKey
             ? (caloriesByDate.has(dateKey) || waterByDate.has(dateKey) || sleepByDate.has(dateKey) || activityByDate.has(dateKey))
             : false;
-        if (hasData) {
-            daysWithData += 1;
-        }
         const habitStatus = resolveHabitStatus(dateKey, {
             water: dayWater,
             sleepMinutes: daySleep ?? null,
@@ -1074,10 +1067,8 @@ function renderMonthGrid() {
         if (hasData && habitStatus) {
             if (habitsOk) {
                 day.classList.add('month-day--good');
-                daysOnTrack += 1;
             } else {
                 day.classList.add('month-day--bad');
-                daysOffTrack += 1;
             }
         } else if (hasData && Number.isFinite(targetCalories) && targetCalories > 0
             && Number.isFinite(waterTarget) && waterTarget > 0
@@ -1088,10 +1079,8 @@ function renderMonthGrid() {
             const activityOk = dayActivity === true;
             if (caloriesOk && waterOk && sleepOk && activityOk) {
                 day.classList.add('month-day--good');
-                daysOnTrack += 1;
             } else {
                 day.classList.add('month-day--bad');
-                daysOffTrack += 1;
             }
         } else if (hasData) {
             day.classList.add('month-day--empty');
@@ -1100,15 +1089,6 @@ function renderMonthGrid() {
         }
         day.textContent = date.getDate().toString();
         container.appendChild(day);
-    }
-    if (!daysWithData) {
-        insight.textContent = 'Пока нет отметок за месяц. Начните с пары дней, и появится понятная картина.';
-    } else if (daysOnTrack > daysOffTrack) {
-        insight.textContent = 'Большинство дней выглядят ровно — хороший ритм.';
-    } else if (daysOffTrack > daysOnTrack) {
-        insight.textContent = 'Есть несколько дней вне ритма. Попробуйте сделать график более регулярным.';
-    } else {
-        insight.textContent = 'Ритм пока смешанный. Если отметить больше дней, вывод будет точнее.';
     }
 }
 
