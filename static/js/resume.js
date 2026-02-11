@@ -179,6 +179,14 @@ function updateCalculatedMetrics() {
     const hasValidHeight = Number.isFinite(height) && height > 0;
     const hasValidAge = age !== null && age > 0;
     const hasValidMetrics = hasValidWeight && hasValidHeight && hasValidAge;
+
+    // Итоговая цепочка расчётов:
+    // Анкета -> Валидация цели/веса -> BMR -> TDEE -> Безопасный темп -> Энергетическая модель
+    // -> Safety clamp -> Дата прогноза -> Weekly автокоррекция.
+    const consistency = typeof validateGoalWeightConsistency === 'function'
+        ? validateGoalWeightConsistency(profile.goal, profile.weight_kg, profile.target_weight_kg)
+        : { conflict: false };
+
     const bmr = hasValidMetrics && typeof calculateBMR === 'function'
         ? calculateBMR({
             sex: profile.sex,
@@ -190,16 +198,9 @@ function updateCalculatedMetrics() {
     const tdee = bmr !== null && typeof calculateTDEE === 'function'
         ? calculateTDEE(bmr, profile.activity_factor)
         : null;
-    const weightForecast = typeof calculateWeightGoalForecast === 'function'
-        ? calculateWeightGoalForecast({
-            sex: profile.sex,
-            goal: profile.goal,
-            tdee_calories: tdee,
-            weight_kg: hasValidWeight ? weight : null,
-            target_weight_kg: profile.target_weight_kg,
-            goal_deadline: profile.goal_deadline
-        })
-        : {
+
+    const weightForecast = (consistency?.conflict === true)
+        ? {
             calories_target: null,
             calorie_delta: null,
             required_rate_kg_per_week: null,
@@ -209,11 +210,41 @@ function updateCalculatedMetrics() {
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
             warning_message: null,
+            error: 'LOGICAL_INCONSISTENCY',
             label: null
-        };
+        }
+        : (typeof calculateWeightGoalForecast === 'function'
+            ? calculateWeightGoalForecast({
+                sex: profile.sex,
+                goal: profile.goal,
+                tdee_calories: tdee,
+                weight_kg: hasValidWeight ? weight : null,
+                target_weight_kg: profile.target_weight_kg,
+                goal_deadline: profile.goal_deadline
+            })
+            : {
+                calories_target: null,
+                calorie_delta: null,
+                required_rate_kg_per_week: null,
+                required_calorie_delta: null,
+                required_calories_target: null,
+                safe_weeks_estimate: null,
+                weight_rate_kg_per_week: null,
+                predicted_goal_date: null,
+                warning_message: null,
+                label: null
+            });
+
+    const weeklySourceProfile = {
+        ...profile,
+        tdee_calories: tdee,
+        calories_target: weightForecast.calories_target,
+        weight_rate_kg_per_week: weightForecast.weight_rate_kg_per_week
+    };
     const weeklyAdjustment = typeof adjustCaloriesByWeeklyProgress === 'function'
-        ? adjustCaloriesByWeeklyProgress(profile, profile?.weekly_stats)
+        ? adjustCaloriesByWeeklyProgress(weeklySourceProfile, profile?.weekly_stats)
         : null;
+
     const effectiveCaloriesTarget = Number.isFinite(weeklyAdjustment?.calories_target)
         ? weeklyAdjustment.calories_target
         : weightForecast.calories_target;
@@ -223,7 +254,7 @@ function updateCalculatedMetrics() {
     const effectiveWeightRate = Number.isFinite(weeklyAdjustment?.weight_rate_kg_per_week)
         ? weeklyAdjustment.weight_rate_kg_per_week
         : weightForecast.weight_rate_kg_per_week;
-    const macros = Number.isFinite(weight) && weight > 0 && Number.isFinite(weightForecast?.calories_target)
+    const macros = Number.isFinite(weight) && weight > 0 && Number.isFinite(effectiveCaloriesTarget)
         && typeof calculateMacros === 'function'
         ? calculateMacros({
             goal: profile.goal,
