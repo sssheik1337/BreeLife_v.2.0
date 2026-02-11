@@ -311,9 +311,25 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         };
     }
 
+    if (goal === 'maintain') {
+        // Режим поддержания полностью изолирован: без расчётов deltaKg/rate и без учёта дедлайна.
+        return {
+            calories_target: tdee,
+            calorie_delta: 0,
+            required_rate_kg_per_week: null,
+            required_calorie_delta: null,
+            required_calories_target: null,
+            safe_weeks_estimate: null,
+            weight_rate_kg_per_week: 0,
+            predicted_goal_date: null,
+            warning_message: null,
+            error: null,
+            label: 'поддержание веса'
+        };
+    }
+
     const adaptiveLimit = resolveAdaptiveRateLimit(goal, weight);
-    const hasGoalRate = goal === 'maintain' || Number.isFinite(adaptiveLimit);
-    if (!hasGoalRate) {
+    if (!Number.isFinite(adaptiveLimit)) {
         return {
             calories_target: null,
             calorie_delta: null,
@@ -329,19 +345,11 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         };
     }
 
-    const baseRate = goal === 'maintain'
-        ? 0
-        : goal === 'lose'
-            ? -adaptiveLimit
-            : adaptiveLimit;
+    const baseRate = goal === 'lose' ? -adaptiveLimit : adaptiveLimit;
     const baseCalorieDelta = (baseRate * 7700) / 7;
     let caloriesTarget = tdee + baseCalorieDelta;
     caloriesTarget = applyCaloriesSafetyClamp(caloriesTarget, sex);
-    if (goal === 'maintain') {
-        // Для поддержания фиксируем цель калорий на уровне TDEE.
-        caloriesTarget = tdee;
-    }
-    const calorieDelta = goal === 'maintain' ? 0 : (caloriesTarget - tdee);
+    const calorieDelta = caloriesTarget - tdee;
     const weeklyDeltaKg = (calorieDelta * 7) / 7700;
 
     const consistency = validateGoalWeightConsistency(goal, weight, target);
@@ -389,22 +397,6 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
                 }
             }
         }
-    }
-
-    if (goal === 'maintain') {
-        return {
-            calories_target: caloriesTarget,
-            calorie_delta: calorieDelta,
-            required_rate_kg_per_week: requiredRate,
-            required_calorie_delta: requiredCalorieDelta,
-            required_calories_target: requiredCaloriesTarget,
-            safe_weeks_estimate: safeWeeksEstimate,
-            weight_rate_kg_per_week: 0,
-            predicted_goal_date: null,
-            warning_message: warningMessage,
-            error: null,
-            label: 'поддержание веса'
-        };
     }
 
     let rate = weeklyDeltaKg;

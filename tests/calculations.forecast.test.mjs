@@ -108,14 +108,14 @@ test('55 кг → gain 5 кг: корректный профицит и вали
     assertRateConsistency(result);
 });
 
-test('maintain: нулевая дельта, нулевой темп и отсутствие прогнозной даты', () => {
+test('maintain: полностью изолированный режим без дедлайна и расчётов delta/rate', () => {
     const result = calculateWeightGoalForecast({
         sex: 'male',
         goal: 'maintain',
         tdee_calories: 2400,
         weight_kg: 80,
-        target_weight_kg: 80,
-        goal_deadline: null
+        target_weight_kg: 70,
+        goal_deadline: isoDateAfterDays(7)
     });
 
     assert.equal(result.error, null);
@@ -123,6 +123,8 @@ test('maintain: нулевая дельта, нулевой темп и отсу
     assert.equal(result.calorie_delta, 0);
     assert.equal(result.weight_rate_kg_per_week, 0);
     assert.equal(result.predicted_goal_date, null);
+    assert.equal(result.safe_weeks_estimate, null);
+    assert.equal(result.warning_message, null, 'Дедлайн в режиме maintain должен игнорироваться');
 
     assertNoNaN(result);
     assertDateIsPossible(result);
