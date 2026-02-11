@@ -367,45 +367,26 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
     let safeWeeksEstimate = null;
     let warningMessage = null;
 
-    if (goal_deadline && Number.isFinite(weight) && Number.isFinite(target)) {
-        const deadlineDate = new Date(`${goal_deadline}T00:00:00`);
-        if (!Number.isNaN(deadlineDate.getTime())) {
-            const todayDate = new Date();
-            todayDate.setHours(0, 0, 0, 0);
-            const diffMs = deadlineDate.getTime() - todayDate.getTime();
-            const weeksAvailable = diffMs / (1000 * 60 * 60 * 24 * 7);
+    if (goal !== 'maintain' && Number.isFinite(weight) && Number.isFinite(target) && Number.isFinite(adaptiveLimit) && adaptiveLimit > 0) {
+        const deltaKg = target - weight;
+        if (deltaKg !== 0) {
+            // Безопасный срок считается только от дистанции по весу и безопасного темпа модели.
+            safeWeeksEstimate = Math.ceil(Math.abs(deltaKg) / adaptiveLimit);
+        }
 
-            if (weeksAvailable > 0) {
-                const deadlineDeltaKg = target - weight;
-                requiredRate = deadlineDeltaKg / weeksAvailable;
-                if (goal === 'lose' && Number.isFinite(adaptiveLimit) && requiredRate < -adaptiveLimit) {
-                    safeWeeksEstimate = Math.ceil(Math.abs(deadlineDeltaKg) / adaptiveLimit);
-                    warningMessage = `Для достижения цели к выбранной дате потребуется темп выше безопасного. Рекомендуемый срок достижения: ${safeWeeksEstimate} недель.`;
-                }
-                if (goal === 'gain' && Number.isFinite(adaptiveLimit) && requiredRate > adaptiveLimit) {
-                    safeWeeksEstimate = Math.ceil(Math.abs(deadlineDeltaKg) / adaptiveLimit);
-                    warningMessage = `Для достижения цели к выбранной дате потребуется темп выше безопасного. Рекомендуемый срок достижения: ${safeWeeksEstimate} недель.`;
-                }
+        if (goal_deadline) {
+            const deadlineDate = new Date(`${goal_deadline}T00:00:00`);
+            if (!Number.isNaN(deadlineDate.getTime())) {
+                const todayDate = new Date();
+                todayDate.setHours(0, 0, 0, 0);
+                const diffMs = deadlineDate.getTime() - todayDate.getTime();
+                const weeksAvailable = diffMs / (1000 * 60 * 60 * 24 * 7);
 
-                if (goal === 'lose' && Number.isFinite(adaptiveLimit)) {
-                    requiredRate = Math.max(requiredRate, -adaptiveLimit);
-                } else if (goal === 'gain' && Number.isFinite(adaptiveLimit)) {
-                    requiredRate = Math.min(requiredRate, adaptiveLimit);
-                } else if (goal === 'maintain') {
-                    requiredRate = 0;
+                if (weeksAvailable <= 0) {
+                    warningMessage = 'Дедлайн цели уже прошёл или слишком близко. Укажите более реалистичную дату.';
+                } else if (Number.isFinite(safeWeeksEstimate) && weeksAvailable < safeWeeksEstimate) {
+                    warningMessage = `К выбранной дате цель может быть недостижима при безопасном темпе. Рекомендуемый срок достижения: ${safeWeeksEstimate} недель.`;
                 }
-
-                requiredCalorieDelta = (requiredRate * 7700) / 7;
-                requiredCaloriesTarget = tdee + requiredCalorieDelta;
-                if (sex === 'female') {
-                    requiredCaloriesTarget = Math.max(requiredCaloriesTarget, 1200);
-                }
-                if (sex === 'male') {
-                    requiredCaloriesTarget = Math.max(requiredCaloriesTarget, 1500);
-                }
-                requiredCalorieDelta = requiredCaloriesTarget - tdee;
-            } else {
-                warningMessage = 'Дедлайн цели уже прошёл или слишком близко. Укажите более реалистичную дату.';
             }
         }
     }

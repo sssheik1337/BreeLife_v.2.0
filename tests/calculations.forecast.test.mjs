@@ -128,7 +128,16 @@ test('maintain: нулевая дельта, нулевой темп и отсу
     assertDateIsPossible(result);
 });
 
-test('дедлайн слишком агрессивный: предупреждение и безопасный темп', () => {
+test('дедлайн слишком агрессивный: дедлайн не управляет темпом и калориями', () => {
+    const baseResult = calculateWeightGoalForecast({
+        sex: 'male',
+        goal: 'lose',
+        tdee_calories: 2800,
+        weight_kg: 120,
+        target_weight_kg: 100,
+        goal_deadline: null
+    });
+
     const result = calculateWeightGoalForecast({
         sex: 'male',
         goal: 'lose',
@@ -140,10 +149,16 @@ test('дедлайн слишком агрессивный: предупрежд
 
     assert.equal(result.error, null);
     assert.equal(typeof result.warning_message, 'string');
-    assert.match(result.warning_message, /темп выше безопасного/i);
+    assert.match(result.warning_message, /недостижима при безопасном темпе/i);
     assert.equal(Number.isFinite(result.safe_weeks_estimate), true, 'Должна рассчитываться безопасная оценка недель');
-    assert.equal(result.required_rate_kg_per_week >= -1.2, true, 'Требуемый темп должен ограничиваться безопасным лимитом');
-    assert.equal(result.required_calories_target >= 1500, true, 'Требуемые калории не должны быть ниже безопасной границы');
+
+    assert.equal(result.calorie_delta, baseResult.calorie_delta, 'Дедлайн не должен менять calorie_delta');
+    assert.equal(result.calories_target, baseResult.calories_target, 'Дедлайн не должен менять calories_target');
+    assert.equal(result.weight_rate_kg_per_week, baseResult.weight_rate_kg_per_week, 'Дедлайн не должен менять темп');
+
+    assert.equal(result.required_rate_kg_per_week, null);
+    assert.equal(result.required_calorie_delta, null);
+    assert.equal(result.required_calories_target, null);
 
     assertNoNaN(result);
     assertDateIsPossible(result);
