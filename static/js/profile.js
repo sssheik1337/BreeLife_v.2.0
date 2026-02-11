@@ -1295,11 +1295,12 @@ function renderWeeklyAdjustments() {
     }
 
     list.innerHTML = '';
-    analysis.adjustments.forEach((item) => {
+    analysis.adjustments.slice(0, 3).forEach((item) => {
         const li = document.createElement('li');
         li.className = 'flex items-start gap-2';
         li.innerHTML = '<span class="text-amber-500">•</span>';
         const span = document.createElement('span');
+        span.className = 'weekly-review-clamp';
         span.textContent = item;
         li.appendChild(span);
         list.appendChild(li);
