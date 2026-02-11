@@ -538,7 +538,7 @@ function renderWaterHistory(rangeDays = 7) {
 
         const barWrapper = document.createElement('div');
         barWrapper.className = 'w-full flex items-end justify-center';
-        barWrapper.style.height = rangeDays === 30 ? '56px' : '72px';
+        barWrapper.style.height = rangeDays === 30 ? '48px' : '62px';
 
         const bar = document.createElement('div');
         bar.className = 'w-full rounded-lg';
@@ -636,7 +636,7 @@ function renderCalorieTrend(rangeDays = 7) {
 
         const barWrapper = document.createElement('div');
         barWrapper.className = 'w-full flex items-end justify-center';
-        barWrapper.style.height = rangeDays === 30 ? '56px' : '72px';
+        barWrapper.style.height = rangeDays === 30 ? '48px' : '62px';
 
         const bar = document.createElement('div');
         bar.className = 'w-full rounded-lg';
