@@ -176,6 +176,31 @@ let prevButton;
 let progressBar;
 let currentStep;
 let progressPercent;
+let totalStepsElement;
+
+function getGoalValueFromUserData() {
+    return window.userData?.goalType ?? window.userData?.goal ?? null;
+}
+
+function getActiveQuestions() {
+    const byId = new Map(questions.map((question) => [question.id, question]));
+    const goalValue = getGoalValueFromUserData();
+    const orderedIds = [1, 2, 3, 4, 7];
+
+    if (goalValue === 'lose' || goalValue === 'gain') {
+        orderedIds.push(5, 8);
+    }
+
+    orderedIds.push(6);
+    return orderedIds
+        .map((id) => byId.get(id))
+        .filter(Boolean);
+}
+
+function getQuestionByIndex(index) {
+    const activeQuestions = getActiveQuestions();
+    return activeQuestions[index] || null;
+}
 
 // Initialize questionnaire
 async function initQuestionnaire() {
@@ -199,10 +224,7 @@ async function initQuestionnaire() {
     progressBar = document.getElementById('progress-bar');
     currentStep = document.getElementById('current-step');
     progressPercent = document.getElementById('progress-percent');
-    const totalSteps = document.getElementById('total-steps');
-    if (totalSteps) {
-        totalSteps.textContent = questions.length.toString();
-    }
+    totalStepsElement = document.getElementById('total-steps');
     
     // Загружаем сохранённые ответы перед отображением первого шага.
     await loadSavedAnswers();
@@ -235,14 +257,25 @@ async function loadSavedAnswers() {
 }
 // Display current question
 function displayQuestion() {
-    const question = questions[currentQuestionIndex];
+    const activeQuestions = getActiveQuestions();
+    if (!activeQuestions.length) {
+        return;
+    }
+    if (currentQuestionIndex > activeQuestions.length - 1) {
+        currentQuestionIndex = activeQuestions.length - 1;
+    }
+
+    const question = activeQuestions[currentQuestionIndex];
     
     // Update UI elements
     questionTitle.textContent = question.title;
-    currentStep.textContent = question.id;
+    currentStep.textContent = String(currentQuestionIndex + 1);
+    if (totalStepsElement) {
+        totalStepsElement.textContent = String(activeQuestions.length);
+    }
     
     // Update progress
-    const progress = ((question.id) / questions.length) * 100;
+    const progress = ((currentQuestionIndex + 1) / activeQuestions.length) * 100;
     progressBar.style.width = `${progress}%`;
     progressPercent.textContent = `${Math.round(progress)}%`;
     
@@ -881,7 +914,13 @@ function selectOption(optionElement, value) {
     // Update user data
     window.userData[getDataKey(currentQuestionIndex)] = value;
     saveUserData();
-    updateButtonStates();
+    const currentQuestion = getQuestionByIndex(currentQuestionIndex);
+    if (currentQuestion?.id === 7) {
+        // Для шага выбора цели динамически перестраиваем ветку вопросов.
+        displayQuestion();
+    } else {
+        updateButtonStates();
+    }
     console.log('[QUESTIONNAIRE_TRACE] шаг обновлён (select option):', window.userData);
     
     // Update feather icons
@@ -892,7 +931,10 @@ function selectOption(optionElement, value) {
 
 // Get data key for current question
 function getDataKey(index) {
-    const question = questions[index];
+    const question = getQuestionByIndex(index);
+    if (!question) {
+        return `question_${index}`;
+    }
     switch (question.id) {
         case 1: return 'gender';
         case 2: return 'birthDate';
@@ -998,7 +1040,8 @@ function buildNumberOptions(question, currentValue, rangeOverride) {
 // Update button states
 function updateButtonStates() {
     const currentValue = window.userData[getDataKey(currentQuestionIndex)];
-    const isOptional = questions[currentQuestionIndex]?.optional;
+    const currentQuestion = getQuestionByIndex(currentQuestionIndex);
+    const isOptional = currentQuestion?.optional;
     const hasAnswer = isOptional ? true : currentValue !== null && currentValue !== '';
     
     // Enable/disable next button
@@ -1007,7 +1050,8 @@ function updateButtonStates() {
     // Enable/disable previous button
     prevButton.disabled = currentQuestionIndex === 0;
     // Update next button text for last question
-    if (currentQuestionIndex === questions.length - 1) {
+    const isLastStep = currentQuestionIndex >= getActiveQuestions().length - 1;
+    if (isLastStep) {
         nextButton.innerHTML = `<span>Завершить</span><i data-feather="check" class="w-5 h-5"></i>`;
     } else {
         nextButton.innerHTML = `<span>Далее</span><i data-feather="arrow-right" class="w-5 h-5"></i>`;
@@ -1129,7 +1173,8 @@ async function saveProfileToServer(profile) {
 function setupEventListeners() {
     // Next button
     nextButton.addEventListener('click', async () => {
-        if (currentQuestionIndex < questions.length - 1) {
+        const activeQuestions = getActiveQuestions();
+        if (currentQuestionIndex < activeQuestions.length - 1) {
             currentQuestionIndex++;
             displayQuestion();
         } else {
