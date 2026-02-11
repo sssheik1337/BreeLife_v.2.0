@@ -1097,26 +1097,22 @@ function validateGoalWeightConsistencyForQuestionnaire(data) {
         };
     }
 
-    if (goal === 'lose' && target >= current) {
+    const consistency = typeof window.validateGoalWeightConsistency === 'function'
+        ? window.validateGoalWeightConsistency(goal, current, target)
+        : { valid: true, blocking: false, warning: false, message: null };
+
+    if (consistency.blocking) {
         return {
             ok: false,
             warning: null,
-            error: 'Цель снижения веса противоречит выбранному желаемому весу'
+            error: consistency.message || 'Проверьте цель и желаемый вес.'
         };
     }
 
-    if (goal === 'gain' && target <= current) {
-        return {
-            ok: false,
-            warning: null,
-            error: 'Цель набора массы противоречит выбранному желаемому весу'
-        };
-    }
-
-    if (goal === 'maintain' && Math.abs(target - current) > 1) {
+    if (consistency.warning) {
         return {
             ok: true,
-            warning: 'Для цели поддержания веса разница между текущим и желаемым весом обычно не превышает 1 кг.',
+            warning: consistency.message || null,
             error: null
         };
     }

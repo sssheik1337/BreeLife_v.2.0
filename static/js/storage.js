@@ -155,6 +155,58 @@
         return null;
     }
 
+    function validateGoalWeightConsistency(goal, currentWeight, targetWeight) {
+        const current = parseNumber(currentWeight);
+        const target = parseNumber(targetWeight);
+        if (!goal || current === null || target === null) {
+            return {
+                valid: true,
+                blocking: false,
+                warning: false,
+                code: null,
+                message: null
+            };
+        }
+
+        if (goal === 'gain' && target <= current) {
+            return {
+                valid: false,
+                blocking: true,
+                warning: false,
+                code: 'GAIN_TARGET_NOT_ABOVE_CURRENT',
+                message: 'Цель набора массы противоречит выбранному желаемому весу'
+            };
+        }
+
+        if (goal === 'lose' && target >= current) {
+            return {
+                valid: false,
+                blocking: true,
+                warning: false,
+                code: 'LOSE_TARGET_NOT_BELOW_CURRENT',
+                message: 'Цель снижения веса противоречит выбранному желаемому весу'
+            };
+        }
+
+        if (goal === 'maintain' && Math.abs(target - current) > 1) {
+            return {
+                valid: true,
+                blocking: false,
+                warning: true,
+                code: 'MAINTAIN_TARGET_TOO_FAR',
+                message: 'Для цели поддержания веса разница между текущим и желаемым весом обычно не превышает 1 кг.'
+            };
+        }
+
+        return {
+            valid: true,
+            blocking: false,
+            warning: false,
+            code: null,
+            message: null
+        };
+    }
+
     function normalizeIdList(value) {
         if (!Array.isArray(value)) {
             return [];
@@ -1138,6 +1190,7 @@
     window.setUserProfile = setUserProfile;
     window.patchUserProfile = patchUserProfile;
     window.normalizeLocalDate = normalizeLocalDate;
+    window.validateGoalWeightConsistency = validateGoalWeightConsistency;
     window.getDiaryEntries = getDiaryEntries;
     window.setDiaryEntries = setDiaryEntries;
     window.getHabitEntries = getHabitEntries;

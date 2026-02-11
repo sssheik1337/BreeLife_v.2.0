@@ -52,7 +52,7 @@ function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
 }
 
-function validateGoalWeightConsistency(goal, currentWeight, targetWeight) {
+function validateGoalWeightConsistencyLocal(goal, currentWeight, targetWeight) {
     const current = Number(currentWeight);
     const target = Number(targetWeight);
     if (!Number.isFinite(current) || !Number.isFinite(target)) {
@@ -87,6 +87,17 @@ function validateGoalWeightConsistency(goal, currentWeight, targetWeight) {
         conflict: false,
         warning: false
     };
+}
+
+function validateGoalWeightConsistency(goal, currentWeight, targetWeight) {
+    if (typeof window.validateGoalWeightConsistency === 'function') {
+        const sharedResult = window.validateGoalWeightConsistency(goal, currentWeight, targetWeight);
+        return {
+            conflict: Boolean(sharedResult?.blocking),
+            warning: Boolean(sharedResult?.warning)
+        };
+    }
+    return validateGoalWeightConsistencyLocal(goal, currentWeight, targetWeight);
 }
 
 function resolveAdaptiveRateLimit(goal, weightKg) {
