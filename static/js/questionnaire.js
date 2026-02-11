@@ -1121,6 +1121,14 @@ function validateGoalWeightConsistencyForQuestionnaire(data) {
         };
     }
 
+    if (goal === 'maintain') {
+        // Для режима поддержания целевой вес и дедлайн должны быть пустыми.
+        data.targetWeight = null;
+        data.target_weight_kg = null;
+        data.deadline = null;
+        data.goal_deadline = null;
+    }
+
     return {
         ok: true,
         warning: null,

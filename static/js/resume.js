@@ -108,6 +108,7 @@ function generateSummary() {
         const profile = getUserProfile();
         Object.assign(data, mapUserProfileToUserData(profile));
     }
+    const isMaintainGoal = data.goalType === 'maintain';
     
     // Create cards for each data point
     const dataPoints = [
@@ -139,14 +140,17 @@ function generateSummary() {
             color: 'amber',
             details: data.currentWeight ? `${kgToLbs(data.currentWeight)} фунтов` : null
         },
-        {
-            label: 'Желаемый вес',
-            value: data.targetWeight ? `${data.targetWeight} кг` : 'Не указано',
-            icon: 'target',
-            color: 'pink',
-            details: data.currentWeight && data.targetWeight ? 
-                `${calculateWeightDifference(data.currentWeight, data.targetWeight)}` : null
-        }
+        ...(isMaintainGoal
+            ? []
+            : [{
+                label: 'Желаемый вес',
+                value: data.targetWeight ? `${data.targetWeight} кг` : 'Не указано',
+                icon: 'target',
+                color: 'pink',
+                details: data.currentWeight && data.targetWeight
+                    ? `${calculateWeightDifference(data.currentWeight, data.targetWeight)}`
+                    : null
+            }])
 ];
     
     // Create and append cards
@@ -220,6 +224,8 @@ function updateCalculatedMetrics() {
             age,
             bmr,
             tdee_calories: tdee,
+            target_weight_kg: profile.goal === 'maintain' ? null : profile.target_weight_kg,
+            goal_deadline: profile.goal === 'maintain' ? null : profile.goal_deadline,
             macros,
             calories_target: weightForecast.calories_target,
             calorie_delta: weightForecast.calorie_delta,

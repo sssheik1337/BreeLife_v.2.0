@@ -143,16 +143,20 @@ function mapUserDataToUserProfile(data) {
     const foodDiaryValue = data.foodDiary ?? data.food_diary ?? null;
     const age = calculateAge(birthDate);
 
+    const normalizedGoal = normalizeGoal(goalValue);
+    const normalizedTargetWeight = parseNumber(targetWeightValue);
+    const normalizedDeadline = deadlineValue || null;
+
     return {
         sex: normalizeSex(rawGender),
         birth_date: birthDate,
         age: age ?? null,
         height_cm: parseNumber(heightValue),
         weight_kg: parseNumber(weightValue),
-        target_weight_kg: parseNumber(targetWeightValue),
-        goal: normalizeGoal(goalValue),
+        target_weight_kg: normalizedGoal === 'maintain' ? null : normalizedTargetWeight,
+        goal: normalizedGoal,
         activity_factor: normalizeActivity(activityValue),
-        goal_deadline: deadlineValue || null,
+        goal_deadline: normalizedGoal === 'maintain' ? null : normalizedDeadline,
         food_diary: foodDiaryValue === true || foodDiaryValue === false
             ? foodDiaryValue
             : foodDiaryValue === 'yes'

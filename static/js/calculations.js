@@ -178,16 +178,20 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         };
     }
 
-    const caloriesTargetRaw = tdee + delta;
-    let caloriesTarget = caloriesTargetRaw;
-    if (sex === 'female') {
-        caloriesTarget = Math.max(caloriesTargetRaw, 1200);
-    }
-    if (sex === 'male') {
-        caloriesTarget = Math.max(caloriesTargetRaw, 1500);
+    let caloriesTarget = tdee + delta;
+    if (goal !== 'maintain') {
+        if (sex === 'female') {
+            caloriesTarget = Math.max(caloriesTarget, 1200);
+        }
+        if (sex === 'male') {
+            caloriesTarget = Math.max(caloriesTarget, 1500);
+        }
+    } else {
+        // Для поддержания фиксируем цель калорий на уровне TDEE.
+        caloriesTarget = tdee;
     }
 
-    const calorieDelta = caloriesTarget - tdee;
+    const calorieDelta = goal === 'maintain' ? 0 : caloriesTarget - tdee;
     const weeklyDeltaKg = (calorieDelta * 7) / 7700;
 
     const consistency = validateGoalWeightConsistency(goal, weight, target);
