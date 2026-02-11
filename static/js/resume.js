@@ -185,7 +185,6 @@ function updateCalculatedMetrics() {
     const tdee = bmr !== null && typeof calculateTDEE === 'function'
         ? calculateTDEE(bmr, profile.activity_factor)
         : null;
-    const macros = tdee !== null && typeof calculateMacros === 'function' ? calculateMacros(tdee) : null;
     const weightForecast = typeof calculateWeightGoalForecast === 'function'
         ? calculateWeightGoalForecast({
             sex: profile.sex,
@@ -201,6 +200,14 @@ function updateCalculatedMetrics() {
             predicted_goal_date: null,
             label: null
         };
+    const macros = Number.isFinite(weight) && weight > 0 && Number.isFinite(weightForecast?.calories_target)
+        && typeof calculateMacros === 'function'
+        ? calculateMacros({
+            goal: profile.goal,
+            weight_kg: weight,
+            calories_target: weightForecast.calories_target
+        })
+        : null;
 
     if (hasValidMetrics && typeof patchUserProfile === 'function') {
         patchUserProfile({

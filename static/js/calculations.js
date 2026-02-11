@@ -89,27 +89,34 @@ function validateGoalWeightConsistency(goal, currentWeight, targetWeight) {
     };
 }
 
-function calculateMacros(tdee_calories) {
-    if (tdee_calories === null) {
+function calculateMacros(payload) {
+    const isLegacyNumber = typeof payload === 'number';
+    const caloriesValue = isLegacyNumber ? payload : payload?.calories_target;
+    const goal = isLegacyNumber ? null : payload?.goal;
+    const weightValue = isLegacyNumber ? null : payload?.weight_kg;
+
+    const caloriesTarget = Number(caloriesValue);
+    const weight = Number(weightValue);
+    if (!Number.isFinite(caloriesTarget) || caloriesTarget <= 0 || !Number.isFinite(weight) || weight <= 0) {
         return null;
     }
-    const calories = Number(tdee_calories);
-    if (!Number.isFinite(calories)) {
-        return null;
+
+    let proteinFactor = 1.6;
+    if (goal === 'lose') {
+        proteinFactor = 1.8;
     }
-    const adminConfig = window.adminConfig || {};
-    const macrosConfig = adminConfig.default_macros || {};
-    const protein_pct = Number.isFinite(macrosConfig.protein_pct) ? macrosConfig.protein_pct : 0.30;
-    const fat_pct = Number.isFinite(macrosConfig.fat_pct) ? macrosConfig.fat_pct : 0.25;
-    const carbs_pct = Number.isFinite(macrosConfig.carbs_pct) ? macrosConfig.carbs_pct : 0.45;
+    const protein_g = proteinFactor * weight;
+    const fat_g = clamp(0.8 * weight, 45, 90);
+    const carbs_kcal = caloriesTarget - (protein_g * 4 + fat_g * 9);
+    const carbs_g = Math.max(carbs_kcal / 4, 0);
 
     return {
-        protein_g: (calories * protein_pct) / 4,
-        fat_g: (calories * fat_pct) / 9,
-        carbs_g: (calories * carbs_pct) / 4,
-        protein_pct,
-        fat_pct,
-        carbs_pct
+        protein_g,
+        fat_g,
+        carbs_g,
+        protein_pct: (protein_g * 4) / caloriesTarget,
+        fat_pct: (fat_g * 9) / caloriesTarget,
+        carbs_pct: (carbs_g * 4) / caloriesTarget
     };
 }
 
