@@ -168,16 +168,9 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         };
     }
 
-    let delta = null;
-    if (goal === 'lose') {
-        delta = -Math.min(0.20 * tdee, 500);
-    } else if (goal === 'gain') {
-        delta = Math.min(0.15 * tdee, 400);
-    } else if (goal === 'maintain') {
-        delta = 0;
-    }
-
-    if (delta === null) {
+    const adaptiveLimit = resolveAdaptiveRateLimit(goal, weight);
+    const hasGoalRate = goal === 'maintain' || Number.isFinite(adaptiveLimit);
+    if (!hasGoalRate) {
         return {
             calories_target: null,
             calorie_delta: null,
@@ -192,20 +185,24 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         };
     }
 
-    let caloriesTarget = tdee + delta;
-    if (goal !== 'maintain') {
-        if (sex === 'female') {
-            caloriesTarget = Math.max(caloriesTarget, 1200);
-        }
-        if (sex === 'male') {
-            caloriesTarget = Math.max(caloriesTarget, 1500);
-        }
-    } else {
+    const baseRate = goal === 'maintain'
+        ? 0
+        : goal === 'lose'
+            ? -adaptiveLimit
+            : adaptiveLimit;
+    const baseCalorieDelta = (baseRate * 7700) / 7;
+    let caloriesTarget = tdee + baseCalorieDelta;
+    if (sex === 'female') {
+        caloriesTarget = Math.max(caloriesTarget, 1200);
+    }
+    if (sex === 'male') {
+        caloriesTarget = Math.max(caloriesTarget, 1500);
+    }
+    if (goal === 'maintain') {
         // Для поддержания фиксируем цель калорий на уровне TDEE.
         caloriesTarget = tdee;
     }
-
-    const calorieDelta = goal === 'maintain' ? 0 : caloriesTarget - tdee;
+    const calorieDelta = goal === 'maintain' ? 0 : (caloriesTarget - tdee);
     const weeklyDeltaKg = (calorieDelta * 7) / 7700;
 
     const consistency = validateGoalWeightConsistency(goal, weight, target);
@@ -240,7 +237,6 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             if (weeksAvailable > 0) {
                 const deadlineDeltaKg = target - weight;
                 requiredRate = deadlineDeltaKg / weeksAvailable;
-                const adaptiveLimit = resolveAdaptiveRateLimit(goal, weight);
                 if (goal === 'lose' && Number.isFinite(adaptiveLimit) && requiredRate < -adaptiveLimit) {
                     warningMessage = 'Выбранный дедлайн требует слишком быстрого снижения веса. Рекомендуется сдвинуть дату цели.';
                 }
@@ -286,7 +282,6 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         };
     }
 
-    const adaptiveLimit = resolveAdaptiveRateLimit(goal, weight);
     let rate = weeklyDeltaKg;
     if (goal === 'lose' && Number.isFinite(adaptiveLimit)) {
         rate = Math.max(weeklyDeltaKg, -adaptiveLimit);
