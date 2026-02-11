@@ -27,11 +27,11 @@ function calculateBMR({ sex, weight_kg, height_cm, age }) {
     if (!Number.isFinite(weight) || !Number.isFinite(height) || !Number.isFinite(years)) {
         return null;
     }
-    // Mifflin–St Jeor equation (male): 10*weight + 6.25*height - 5*age + 5
+    // Уравнение Миффлина—Сан Жеора (мужчины): 10*weight + 6.25*height - 5*age + 5
     if (sex === 'male') {
         return 10 * weight + 6.25 * height - 5 * years + 5;
     }
-    // Mifflin–St Jeor equation (female): 10*weight + 6.25*height - 5*age - 161
+    // Уравнение Миффлина—Сан Жеора (женщины): 10*weight + 6.25*height - 5*age - 161
     if (sex === 'female') {
         return 10 * weight + 6.25 * height - 5 * years - 161;
     }
@@ -47,7 +47,7 @@ function calculateTDEE(bmr, activity_factor) {
     if (!Number.isFinite(base) || !Number.isFinite(factor)) {
         return null;
     }
-    // Daily energy expenditure estimate: TDEE = BMR × activity factor.
+    // Расчёт суточной энергозатраты: TDEE = BMR × коэффициент активности.
     return base * factor;
 }
 
