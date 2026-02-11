@@ -89,6 +89,20 @@ function validateGoalWeightConsistency(goal, currentWeight, targetWeight) {
     };
 }
 
+function resolveAdaptiveRateLimit(goal, weightKg) {
+    const weight = Number(weightKg);
+    if (!Number.isFinite(weight) || weight <= 0) {
+        return null;
+    }
+    if (goal === 'lose') {
+        return Math.min(weight * 0.01, 1.2);
+    }
+    if (goal === 'gain') {
+        return Math.min(weight * 0.005, 0.6);
+    }
+    return null;
+}
+
 function calculateMacros(payload) {
     const isLegacyNumber = typeof payload === 'number';
     const caloriesValue = isLegacyNumber ? payload : payload?.calories_target;
@@ -226,17 +240,18 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             if (weeksAvailable > 0) {
                 const deadlineDeltaKg = target - weight;
                 requiredRate = deadlineDeltaKg / weeksAvailable;
-                if (goal === 'lose' && requiredRate < -1) {
+                const adaptiveLimit = resolveAdaptiveRateLimit(goal, weight);
+                if (goal === 'lose' && Number.isFinite(adaptiveLimit) && requiredRate < -adaptiveLimit) {
                     warningMessage = 'Выбранный дедлайн требует слишком быстрого снижения веса. Рекомендуется сдвинуть дату цели.';
                 }
-                if (goal === 'gain' && requiredRate > 0.5) {
+                if (goal === 'gain' && Number.isFinite(adaptiveLimit) && requiredRate > adaptiveLimit) {
                     warningMessage = 'Выбранный дедлайн требует слишком быстрого набора веса. Рекомендуется сдвинуть дату цели.';
                 }
 
-                if (goal === 'lose') {
-                    requiredRate = clamp(requiredRate, -1.0, -0.25);
-                } else if (goal === 'gain') {
-                    requiredRate = clamp(requiredRate, 0.1, 0.5);
+                if (goal === 'lose' && Number.isFinite(adaptiveLimit)) {
+                    requiredRate = Math.max(requiredRate, -adaptiveLimit);
+                } else if (goal === 'gain' && Number.isFinite(adaptiveLimit)) {
+                    requiredRate = Math.min(requiredRate, adaptiveLimit);
                 } else if (goal === 'maintain') {
                     requiredRate = 0;
                 }
@@ -271,9 +286,14 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         };
     }
 
-    const rate = goal === 'lose'
-        ? clamp(weeklyDeltaKg, -1.0, -0.25)
-        : clamp(weeklyDeltaKg, 0.1, 0.5);
+    const adaptiveLimit = resolveAdaptiveRateLimit(goal, weight);
+    let rate = weeklyDeltaKg;
+    if (goal === 'lose' && Number.isFinite(adaptiveLimit)) {
+        rate = Math.max(weeklyDeltaKg, -adaptiveLimit);
+    }
+    if (goal === 'gain' && Number.isFinite(adaptiveLimit)) {
+        rate = Math.min(weeklyDeltaKg, adaptiveLimit);
+    }
 
     if (!Number.isFinite(weight) || !Number.isFinite(target)) {
         return {
