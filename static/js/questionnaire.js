@@ -1087,6 +1087,19 @@ function validateGoalWeightConsistencyForQuestionnaire(data) {
     }
 
     const goal = profile.goal;
+    if (goal === 'maintain') {
+        // Для режима поддержания целевой вес и дедлайн всегда очищаются автоматически.
+        data.targetWeight = null;
+        data.target_weight_kg = null;
+        data.deadline = null;
+        data.goal_deadline = null;
+        return {
+            ok: true,
+            warning: null,
+            error: null
+        };
+    }
+
     const current = Number(profile.weight_kg);
     const target = Number(profile.target_weight_kg);
     if (!goal || !Number.isFinite(current) || !Number.isFinite(target)) {
@@ -1097,9 +1110,26 @@ function validateGoalWeightConsistencyForQuestionnaire(data) {
         };
     }
 
+    const fallbackConsistency = {
+        valid: true,
+        blocking: false,
+        warning: false,
+        message: null
+    };
+    if (goal === 'lose' && target >= current) {
+        fallbackConsistency.valid = false;
+        fallbackConsistency.blocking = true;
+        fallbackConsistency.message = 'Цель снижения веса противоречит выбранному желаемому весу';
+    }
+    if (goal === 'gain' && target <= current) {
+        fallbackConsistency.valid = false;
+        fallbackConsistency.blocking = true;
+        fallbackConsistency.message = 'Цель набора массы противоречит выбранному желаемому весу';
+    }
+
     const consistency = typeof window.validateGoalWeightConsistency === 'function'
         ? window.validateGoalWeightConsistency(goal, current, target)
-        : { valid: true, blocking: false, warning: false, message: null };
+        : fallbackConsistency;
 
     if (consistency.blocking) {
         return {
@@ -1107,22 +1137,6 @@ function validateGoalWeightConsistencyForQuestionnaire(data) {
             warning: null,
             error: consistency.message || 'Проверьте цель и желаемый вес.'
         };
-    }
-
-    if (consistency.warning) {
-        return {
-            ok: true,
-            warning: consistency.message || null,
-            error: null
-        };
-    }
-
-    if (goal === 'maintain') {
-        // Для режима поддержания целевой вес и дедлайн должны быть пустыми.
-        data.targetWeight = null;
-        data.target_weight_kg = null;
-        data.deadline = null;
-        data.goal_deadline = null;
     }
 
     return {
@@ -1198,7 +1212,10 @@ function setupEventListeners() {
                 console.log('[QUESTIONNAIRE_TRACE] перед mapUserDataToUserProfile:', window.userData);
                 const mappedProfile = mapUserDataToUserProfile(window.userData);
                 console.log('[QUESTIONNAIRE_TRACE] результат mapUserDataToUserProfile:', mappedProfile);
-                const criticalKeys = ['sex', 'birth_date', 'height_cm', 'weight_kg', 'target_weight_kg', 'activity_factor', 'goal'];
+                const criticalKeys = ['sex', 'birth_date', 'height_cm', 'weight_kg', 'activity_factor', 'goal'];
+                if (mappedProfile.goal !== 'maintain') {
+                    criticalKeys.push('target_weight_kg');
+                }
                 if (window.appDebug) {
                     const nullFields = Object.keys(mappedProfile).filter((key) => mappedProfile[key] === null);
                     console.log('[QUESTIONNAIRE_DEBUG] payload перед /api/profile:', {

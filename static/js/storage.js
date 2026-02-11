@@ -188,16 +188,6 @@
             };
         }
 
-        if (goal === 'maintain' && Math.abs(target - current) > 1) {
-            return {
-                valid: true,
-                blocking: false,
-                warning: true,
-                code: 'MAINTAIN_TARGET_TOO_FAR',
-                message: 'Для цели поддержания веса разница между текущим и желаемым весом обычно не превышает 1 кг.'
-            };
-        }
-
         return {
             valid: true,
             blocking: false,
@@ -295,6 +285,11 @@
         merged.weight_kg = parseNumber(merged.weight_kg);
         merged.target_weight_kg = parseNumber(merged.target_weight_kg);
         merged.goal = normalizeGoal(merged.goal);
+        if (merged.goal === 'maintain') {
+            // Для поддержания веса целевой вес и дедлайн не используются.
+            merged.target_weight_kg = null;
+            merged.goal_deadline = null;
+        }
         merged.activity_factor = parseNumber(merged.activity_factor);
         merged.goal_deadline = merged.goal_deadline || null;
         merged.food_diary = parseBoolean(merged.food_diary);
@@ -330,10 +325,12 @@
             merged.birth_date,
             merged.height_cm,
             merged.weight_kg,
-            merged.target_weight_kg,
             merged.goal,
             merged.activity_factor
         ];
+        if (merged.goal !== 'maintain') {
+            requiredFields.push(merged.target_weight_kg);
+        }
         const calculatedCompleted = requiredFields.every((value) => value !== null && value !== undefined && value !== '');
 
         if (merged.completed === null) {
@@ -731,10 +728,32 @@
         }
     }
 
+    function enforceGoalWeightConsistencyInMerge(candidate, fallbackProfile) {
+        const mergedCandidate = { ...(candidate || {}) };
+        const normalizedGoal = normalizeGoal(mergedCandidate.goal);
+        if (normalizedGoal === 'maintain') {
+            mergedCandidate.target_weight_kg = null;
+            mergedCandidate.goal_deadline = null;
+            return mergedCandidate;
+        }
+
+        const consistency = validateGoalWeightConsistency(
+            normalizedGoal,
+            mergedCandidate.weight_kg,
+            mergedCandidate.target_weight_kg
+        );
+        if (consistency.blocking) {
+            return { ...(fallbackProfile || {}) };
+        }
+
+        return mergedCandidate;
+    }
+
     function setUserProfile(profile) {
         const current = getUserProfile();
         const merged = { ...current, ...(profile || {}) };
-        const trialResult = applyTrialStartIfNeeded(current, merged);
+        const consistentMerged = enforceGoalWeightConsistencyInMerge(merged, current);
+        const trialResult = applyTrialStartIfNeeded(current, consistentMerged);
         const normalized = normalizeUserProfile(trialResult.merged);
         cachedProfile = normalized;
         try {
@@ -755,7 +774,8 @@
         if (partial && Object.prototype.hasOwnProperty.call(partial, 'macros')) {
             merged.macros = partial.macros;
         }
-        const trialResult = applyTrialStartIfNeeded(current, merged);
+        const consistentMerged = enforceGoalWeightConsistencyInMerge(merged, current);
+        const trialResult = applyTrialStartIfNeeded(current, consistentMerged);
         const normalized = normalizeUserProfile(trialResult.merged);
         cachedProfile = normalized;
         try {

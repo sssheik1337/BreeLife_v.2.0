@@ -78,14 +78,6 @@ function validateGoalWeightConsistencyLocal(goal, currentWeight, targetWeight) {
             warning: false
         };
     }
-
-    if (goal === 'maintain' && Math.abs(target - current) > 1) {
-        return {
-            conflict: false,
-            warning: true
-        };
-    }
-
     return {
         conflict: false,
         warning: false
