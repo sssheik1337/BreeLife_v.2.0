@@ -103,6 +103,133 @@ function resolveAdaptiveRateLimit(goal, weightKg) {
     return null;
 }
 
+function applyCaloriesSafetyClamp(caloriesTarget, sex) {
+    let safeCaloriesTarget = Number(caloriesTarget);
+    if (!Number.isFinite(safeCaloriesTarget)) {
+        return null;
+    }
+    if (sex === 'female') {
+        safeCaloriesTarget = Math.max(safeCaloriesTarget, 1200);
+    }
+    if (sex === 'male') {
+        safeCaloriesTarget = Math.max(safeCaloriesTarget, 1500);
+    }
+    return safeCaloriesTarget;
+}
+
+function adjustCaloriesByWeeklyProgress(profile, weeklyAverageWeight) {
+    const goal = profile?.goal;
+    const tdee = Number(profile?.tdee_calories);
+    const currentCaloriesTarget = Number(profile?.calories_target);
+    const plannedRate = Number(profile?.weight_rate_kg_per_week);
+    const weight = Number(profile?.weight_kg);
+
+    if (!goal || !Number.isFinite(tdee) || tdee <= 0 || !Number.isFinite(currentCaloriesTarget)) {
+        return {
+            calories_target: Number.isFinite(currentCaloriesTarget) ? currentCaloriesTarget : null,
+            calorie_delta: Number.isFinite(currentCaloriesTarget) ? currentCaloriesTarget - tdee : null,
+            weight_rate_kg_per_week: Number.isFinite(plannedRate) ? plannedRate : null,
+            adjusted: false,
+            warning_message: null
+        };
+    }
+
+    const previousWeekWeight = Number(weeklyAverageWeight?.previous_week_weight ?? weeklyAverageWeight?.previous);
+    const currentWeekWeight = Number(weeklyAverageWeight?.current_week_weight ?? weeklyAverageWeight?.current);
+    if (!Number.isFinite(previousWeekWeight) || !Number.isFinite(currentWeekWeight) || !Number.isFinite(plannedRate) || plannedRate === 0) {
+        return {
+            calories_target: currentCaloriesTarget,
+            calorie_delta: currentCaloriesTarget - tdee,
+            weight_rate_kg_per_week: plannedRate,
+            adjusted: false,
+            warning_message: null
+        };
+    }
+
+    // Фактический темп за неделю: прошлый средний вес минус текущий средний вес.
+    const actualRateRaw = previousWeekWeight - currentWeekWeight;
+    const plannedAbs = Math.abs(plannedRate);
+    const actualAbs = goal === 'gain' ? Math.abs(-actualRateRaw) : Math.abs(actualRateRaw);
+    if (plannedAbs <= 0) {
+        return {
+            calories_target: currentCaloriesTarget,
+            calorie_delta: currentCaloriesTarget - tdee,
+            weight_rate_kg_per_week: plannedRate,
+            adjusted: false,
+            warning_message: null
+        };
+    }
+
+    const deviationRatio = Math.abs(actualAbs - plannedAbs) / plannedAbs;
+    if (deviationRatio <= 0.3) {
+        return {
+            calories_target: currentCaloriesTarget,
+            calorie_delta: currentCaloriesTarget - tdee,
+            weight_rate_kg_per_week: plannedRate,
+            adjusted: false,
+            warning_message: null
+        };
+    }
+
+    let nextCalorieDelta = currentCaloriesTarget - tdee;
+    let warningMessage = null;
+
+    if (goal === 'lose') {
+        const isSlower = actualAbs < plannedAbs;
+        nextCalorieDelta += isSlower ? -100 : 100;
+        warningMessage = isSlower
+            ? 'Снижение идёт медленнее плана. Увеличиваю дефицит на 100 ккал.'
+            : 'Снижение идёт быстрее плана. Уменьшаю дефицит на 100 ккал.';
+    } else if (goal === 'gain') {
+        const isSlower = actualAbs < plannedAbs;
+        nextCalorieDelta += isSlower ? 100 : -100;
+        warningMessage = isSlower
+            ? 'Набор идёт медленнее плана. Увеличиваю профицит на 100 ккал.'
+            : 'Набор идёт быстрее плана. Уменьшаю профицит на 100 ккал.';
+    } else {
+        return {
+            calories_target: tdee,
+            calorie_delta: 0,
+            weight_rate_kg_per_week: 0,
+            adjusted: false,
+            warning_message: null
+        };
+    }
+
+    let nextRate = (nextCalorieDelta * 7) / 7700;
+    const adaptiveLimit = resolveAdaptiveRateLimit(goal, weight);
+    if (goal === 'lose' && Number.isFinite(adaptiveLimit)) {
+        nextRate = Math.min(0, Math.max(nextRate, -adaptiveLimit));
+    }
+    if (goal === 'gain' && Number.isFinite(adaptiveLimit)) {
+        nextRate = Math.max(0, Math.min(nextRate, adaptiveLimit));
+    }
+
+    nextCalorieDelta = (nextRate * 7700) / 7;
+    let nextCaloriesTarget = tdee + nextCalorieDelta;
+    nextCaloriesTarget = applyCaloriesSafetyClamp(nextCaloriesTarget, profile?.sex);
+    if (!Number.isFinite(nextCaloriesTarget)) {
+        return {
+            calories_target: currentCaloriesTarget,
+            calorie_delta: currentCaloriesTarget - tdee,
+            weight_rate_kg_per_week: plannedRate,
+            adjusted: false,
+            warning_message: null
+        };
+    }
+
+    nextCalorieDelta = nextCaloriesTarget - tdee;
+    nextRate = (nextCalorieDelta * 7) / 7700;
+
+    return {
+        calories_target: nextCaloriesTarget,
+        calorie_delta: nextCalorieDelta,
+        weight_rate_kg_per_week: nextRate,
+        adjusted: true,
+        warning_message: warningMessage
+    };
+}
+
 function calculateMacros(payload) {
     const isLegacyNumber = typeof payload === 'number';
     const caloriesValue = isLegacyNumber ? payload : payload?.calories_target;
@@ -142,6 +269,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_rate_kg_per_week: null,
             required_calorie_delta: null,
             required_calories_target: null,
+            safe_weeks_estimate: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
             warning_message: null,
@@ -160,6 +288,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_rate_kg_per_week: null,
             required_calorie_delta: null,
             required_calories_target: null,
+            safe_weeks_estimate: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
             warning_message: null,
@@ -177,6 +306,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_rate_kg_per_week: null,
             required_calorie_delta: null,
             required_calories_target: null,
+            safe_weeks_estimate: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
             warning_message: null,
@@ -192,12 +322,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             : adaptiveLimit;
     const baseCalorieDelta = (baseRate * 7700) / 7;
     let caloriesTarget = tdee + baseCalorieDelta;
-    if (sex === 'female') {
-        caloriesTarget = Math.max(caloriesTarget, 1200);
-    }
-    if (sex === 'male') {
-        caloriesTarget = Math.max(caloriesTarget, 1500);
-    }
+    caloriesTarget = applyCaloriesSafetyClamp(caloriesTarget, sex);
     if (goal === 'maintain') {
         // Для поддержания фиксируем цель калорий на уровне TDEE.
         caloriesTarget = tdee;
@@ -213,6 +338,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_rate_kg_per_week: null,
             required_calorie_delta: null,
             required_calories_target: null,
+            safe_weeks_estimate: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
             warning_message: null,
@@ -224,6 +350,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
     let requiredRate = null;
     let requiredCalorieDelta = null;
     let requiredCaloriesTarget = null;
+    let safeWeeksEstimate = null;
     let warningMessage = null;
 
     if (goal_deadline && Number.isFinite(weight) && Number.isFinite(target)) {
@@ -238,10 +365,12 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
                 const deadlineDeltaKg = target - weight;
                 requiredRate = deadlineDeltaKg / weeksAvailable;
                 if (goal === 'lose' && Number.isFinite(adaptiveLimit) && requiredRate < -adaptiveLimit) {
-                    warningMessage = 'Выбранный дедлайн требует слишком быстрого снижения веса. Рекомендуется сдвинуть дату цели.';
+                    safeWeeksEstimate = Math.ceil(Math.abs(deadlineDeltaKg) / adaptiveLimit);
+                    warningMessage = `Для достижения цели к выбранной дате потребуется темп выше безопасного. Рекомендуемый срок достижения: ${safeWeeksEstimate} недель.`;
                 }
                 if (goal === 'gain' && Number.isFinite(adaptiveLimit) && requiredRate > adaptiveLimit) {
-                    warningMessage = 'Выбранный дедлайн требует слишком быстрого набора веса. Рекомендуется сдвинуть дату цели.';
+                    safeWeeksEstimate = Math.ceil(Math.abs(deadlineDeltaKg) / adaptiveLimit);
+                    warningMessage = `Для достижения цели к выбранной дате потребуется темп выше безопасного. Рекомендуемый срок достижения: ${safeWeeksEstimate} недель.`;
                 }
 
                 if (goal === 'lose' && Number.isFinite(adaptiveLimit)) {
@@ -274,6 +403,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_rate_kg_per_week: requiredRate,
             required_calorie_delta: requiredCalorieDelta,
             required_calories_target: requiredCaloriesTarget,
+            safe_weeks_estimate: safeWeeksEstimate,
             weight_rate_kg_per_week: 0,
             predicted_goal_date: null,
             warning_message: warningMessage,
@@ -297,6 +427,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_rate_kg_per_week: requiredRate,
             required_calorie_delta: requiredCalorieDelta,
             required_calories_target: requiredCaloriesTarget,
+            safe_weeks_estimate: safeWeeksEstimate,
             weight_rate_kg_per_week: rate,
             predicted_goal_date: null,
             warning_message: warningMessage,
@@ -313,6 +444,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_rate_kg_per_week: requiredRate,
             required_calorie_delta: requiredCalorieDelta,
             required_calories_target: requiredCaloriesTarget,
+            safe_weeks_estimate: safeWeeksEstimate,
             weight_rate_kg_per_week: 0,
             predicted_goal_date: null,
             warning_message: warningMessage,
@@ -329,6 +461,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_rate_kg_per_week: requiredRate,
             required_calorie_delta: requiredCalorieDelta,
             required_calories_target: requiredCaloriesTarget,
+            safe_weeks_estimate: safeWeeksEstimate,
             weight_rate_kg_per_week: rate,
             predicted_goal_date: null,
             warning_message: warningMessage,
@@ -350,6 +483,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         required_rate_kg_per_week: requiredRate,
         required_calorie_delta: requiredCalorieDelta,
         required_calories_target: requiredCaloriesTarget,
+        safe_weeks_estimate: safeWeeksEstimate,
         weight_rate_kg_per_week: rate,
         predicted_goal_date: predictedDate,
         warning_message: warningMessage,

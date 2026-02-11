@@ -205,17 +205,30 @@ function updateCalculatedMetrics() {
             required_rate_kg_per_week: null,
             required_calorie_delta: null,
             required_calories_target: null,
+            safe_weeks_estimate: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
             warning_message: null,
             label: null
         };
+    const weeklyAdjustment = typeof adjustCaloriesByWeeklyProgress === 'function'
+        ? adjustCaloriesByWeeklyProgress(profile, profile?.weekly_stats)
+        : null;
+    const effectiveCaloriesTarget = Number.isFinite(weeklyAdjustment?.calories_target)
+        ? weeklyAdjustment.calories_target
+        : weightForecast.calories_target;
+    const effectiveCalorieDelta = Number.isFinite(weeklyAdjustment?.calorie_delta)
+        ? weeklyAdjustment.calorie_delta
+        : weightForecast.calorie_delta;
+    const effectiveWeightRate = Number.isFinite(weeklyAdjustment?.weight_rate_kg_per_week)
+        ? weeklyAdjustment.weight_rate_kg_per_week
+        : weightForecast.weight_rate_kg_per_week;
     const macros = Number.isFinite(weight) && weight > 0 && Number.isFinite(weightForecast?.calories_target)
         && typeof calculateMacros === 'function'
         ? calculateMacros({
             goal: profile.goal,
             weight_kg: weight,
-            calories_target: weightForecast.calories_target
+            calories_target: effectiveCaloriesTarget
         })
         : null;
 
@@ -227,12 +240,13 @@ function updateCalculatedMetrics() {
             target_weight_kg: profile.goal === 'maintain' ? null : profile.target_weight_kg,
             goal_deadline: profile.goal === 'maintain' ? null : profile.goal_deadline,
             macros,
-            calories_target: weightForecast.calories_target,
-            calorie_delta: weightForecast.calorie_delta,
+            calories_target: effectiveCaloriesTarget,
+            calorie_delta: effectiveCalorieDelta,
             required_rate_kg_per_week: weightForecast.required_rate_kg_per_week,
             required_calorie_delta: weightForecast.required_calorie_delta,
             required_calories_target: weightForecast.required_calories_target,
-            weight_rate_kg_per_week: weightForecast.weight_rate_kg_per_week,
+            safe_weeks_estimate: weightForecast.safe_weeks_estimate,
+            weight_rate_kg_per_week: effectiveWeightRate,
             predicted_goal_date: weightForecast.predicted_goal_date
         });
     }
@@ -241,6 +255,11 @@ function updateCalculatedMetrics() {
         if (resumeLastGoalDeadlineWarning !== weightForecast.warning_message) {
             showNotification(weightForecast.warning_message, 'warning');
             resumeLastGoalDeadlineWarning = weightForecast.warning_message;
+        }
+    } else if (weeklyAdjustment?.warning_message && typeof showNotification === 'function') {
+        if (resumeLastGoalDeadlineWarning !== weeklyAdjustment.warning_message) {
+            showNotification(weeklyAdjustment.warning_message, 'warning');
+            resumeLastGoalDeadlineWarning = weeklyAdjustment.warning_message;
         }
     } else {
         resumeLastGoalDeadlineWarning = null;
@@ -300,9 +319,9 @@ function updateCalculatedMetrics() {
         if (weightForecast.label) {
             weightRateElement.textContent = weightForecast.label;
         } else {
-            weightRateElement.textContent = weightForecast.weight_rate_kg_per_week === null
+            weightRateElement.textContent = effectiveWeightRate === null || !Number.isFinite(effectiveWeightRate)
                 ? '--'
-                : `${weightForecast.weight_rate_kg_per_week} кг в неделю`;
+                : `${effectiveWeightRate} кг в неделю`;
         }
     }
     if (weightDateElement) {
