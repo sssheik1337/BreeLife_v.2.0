@@ -520,6 +520,16 @@ function updateWaterRangeButtonState(buttons, activeValue) {
     });
 }
 
+function updateMacroRangeButtonState(buttons, activeValue) {
+    buttons.forEach((button) => {
+        const isActive = button.dataset.macroRange === activeValue;
+        button.classList.toggle('bg-emerald-100', isActive);
+        button.classList.toggle('text-emerald-700', isActive);
+        button.classList.toggle('bg-slate-100', !isActive);
+        button.classList.toggle('text-slate-500', !isActive);
+    });
+}
+
 function summarizeMacrosByDate(entries, range) {
     const totals = new Map();
     range.forEach(({ dateKey }) => {
@@ -617,6 +627,148 @@ function renderWaterHistory(rangeDays = 7) {
         grid.appendChild(item);
     });
 
+}
+
+function renderMacroBalance(rangeKey = 'day') {
+    const chart = document.getElementById('macro-balance-chart');
+    const desc = document.getElementById('macro-balance-desc');
+    const insight = document.getElementById('macro-balance-insight');
+    const proteinLabel = document.getElementById('macro-balance-protein');
+    const fatLabel = document.getElementById('macro-balance-fat');
+    const carbsLabel = document.getElementById('macro-balance-carbs');
+    if (!chart || !desc || !insight || !proteinLabel || !fatLabel || !carbsLabel) {
+        return;
+    }
+
+    const entries = readDiaryEntries();
+    let protein = 0;
+    let fat = 0;
+    let carbs = 0;
+    let label = 'Фактический состав рациона.';
+
+    if (rangeKey === 'week') {
+        const range = buildDateRange(7);
+        const totals = summarizeMacrosByDate(entries, range);
+        let daysWithData = 0;
+        totals.forEach((dayTotals) => {
+            if (dayTotals.protein_g || dayTotals.fat_g || dayTotals.carbs_g) {
+                daysWithData += 1;
+                protein += dayTotals.protein_g;
+                fat += dayTotals.fat_g;
+                carbs += dayTotals.carbs_g;
+            }
+        });
+        if (daysWithData > 0) {
+            protein /= daysWithData;
+            fat /= daysWithData;
+            carbs /= daysWithData;
+        }
+        label = 'Средние значения за неделю.';
+    } else {
+        const today = normalizeDateKey(new Date());
+        entries.forEach((entry) => {
+            const dateKey = normalizeDateKey(entry?.date);
+            if (!today || dateKey !== today) {
+                return;
+            }
+            const resolved = resolveEntryTotals(entry);
+            protein += resolved.protein_g;
+            fat += resolved.fat_g;
+            carbs += resolved.carbs_g;
+        });
+        label = 'Фактические значения за сегодня.';
+    }
+
+    const total = protein + fat + carbs;
+    const safeTotal = total > 0 ? total : 1;
+    const proteinPercent = Math.round((protein / safeTotal) * 100);
+    const fatPercent = Math.round((fat / safeTotal) * 100);
+    const carbsPercent = Math.max(0, 100 - proteinPercent - fatPercent);
+
+    if (total <= 0) {
+        chart.style.background = '#e2e8f0';
+        desc.textContent = 'Нет данных для расчёта.';
+        insight.textContent = 'Пока нет записей, поэтому распределение не видно.';
+        proteinLabel.textContent = 'Белки — 0%';
+        fatLabel.textContent = 'Жиры — 0%';
+        carbsLabel.textContent = 'Углеводы — 0%';
+        return;
+    }
+
+    chart.style.background = `conic-gradient(#10b981 0 ${proteinPercent}%, #f59e0b ${proteinPercent}% ${proteinPercent + fatPercent}%, #38bdf8 ${proteinPercent + fatPercent}% 100%)`;
+    desc.textContent = label;
+    proteinLabel.textContent = `Белки — ${proteinPercent}%`;
+    fatLabel.textContent = `Жиры — ${fatPercent}%`;
+    carbsLabel.textContent = `Углеводы — ${carbsPercent}%`;
+    const maxPercent = Math.max(proteinPercent, fatPercent, carbsPercent);
+    if (maxPercent >= 55) {
+        const dominant = maxPercent === proteinPercent
+            ? 'белков'
+            : maxPercent === fatPercent
+                ? 'жиров'
+                : 'углеводов';
+        insight.textContent = `Сейчас заметный упор на долю ${dominant}. Чтобы выровнять баланс, добавьте продукты других групп.`;
+    } else if (maxPercent <= 45) {
+        insight.textContent = 'Баланс выглядит ровно — хорошо для стабильной энергии.';
+    } else {
+        const dominant = maxPercent === proteinPercent
+            ? 'белкам'
+            : maxPercent === fatPercent
+                ? 'жирам'
+                : 'углеводам';
+        insight.textContent = `Баланс слегка смещён к ${dominant}. Можно добавить продукты других групп для ровного распределения.`;
+    }
+}
+
+function renderCarbSplit(rangeKey = 'day') {
+    const value = document.getElementById('macro-carb-split-value');
+    const desc = document.getElementById('macro-carb-split-desc');
+    if (!value || !desc) {
+        return;
+    }
+
+    const entries = readDiaryEntries();
+    let simple = 0;
+    let complex = 0;
+    let label = 'Фактические значения за сегодня.';
+    const note = 'Сложные углеводы дают стабильную энергию.';
+
+    if (rangeKey === 'week') {
+        const range = buildDateRange(7);
+        const allowedDates = new Set(range.map((item) => item.dateKey).filter(Boolean));
+        entries.forEach((entry) => {
+            const dateKey = normalizeDateKey(entry?.date);
+            if (!dateKey || !allowedDates.has(dateKey)) {
+                return;
+            }
+            const resolved = resolveEntryTotals(entry);
+            simple += resolved.carbs_simple_g;
+            complex += resolved.carbs_complex_g;
+        });
+        label = 'Средние значения за неделю.';
+    } else {
+        const today = normalizeDateKey(new Date());
+        entries.forEach((entry) => {
+            const dateKey = normalizeDateKey(entry?.date);
+            if (!today || dateKey !== today) {
+                return;
+            }
+            const resolved = resolveEntryTotals(entry);
+            simple += resolved.carbs_simple_g;
+            complex += resolved.carbs_complex_g;
+        });
+    }
+
+    const total = simple + complex;
+    if (total <= 0) {
+        value.textContent = 'Нет данных';
+        desc.textContent = `Пока нет данных. ${note}`;
+        return;
+    }
+    const simplePercent = Math.round((simple / total) * 100);
+    const complexPercent = Math.max(0, 100 - simplePercent);
+    value.textContent = `${simplePercent}% / ${complexPercent}%`;
+    desc.textContent = `${label} ${note}`;
 }
 
 function renderCalorieTrend(rangeDays = 7) {
@@ -1633,6 +1785,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const macroRangeButtons = Array.from(document.querySelectorAll('[data-macro-range]'));
+    let activeMacroRange = 'day';
+    if (macroRangeButtons.length) {
+        updateMacroRangeButtonState(macroRangeButtons, activeMacroRange);
+        macroRangeButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                activeMacroRange = button.dataset.macroRange || 'day';
+                updateMacroRangeButtonState(macroRangeButtons, activeMacroRange);
+                renderMacroBalance(activeMacroRange);
+                renderCarbSplit(activeMacroRange);
+            });
+        });
+    }
+
     (async () => {
         await loadProfileFromServer();
         if (typeof window.syncDiaryEntriesWithBackend === 'function') {
@@ -1646,6 +1812,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderWeeklyProgress();
         renderCalorieTrend(Number(activeRange));
         renderWaterHistory(Number(activeWaterRange));
+        renderMacroBalance(activeMacroRange);
+        renderCarbSplit(activeMacroRange);
         renderMonthGrid();
         renderWeeklyAdjustments();
         renderWeeklyReview();
