@@ -440,6 +440,13 @@ function resolveCalorieTone(dayCalories, targetCalories) {
     return { color: '#10b981', label: 'в нужном диапазоне' };
 }
 
+function safeDivide(a, b) {
+    if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) {
+        return 0;
+    }
+    return a / b;
+}
+
 function updateRangeButtonState(buttons, activeValue) {
     buttons.forEach((button) => {
         const isActive = button.dataset.calorieRange === activeValue;
@@ -511,7 +518,8 @@ function renderWaterHistory(rangeDays = 7) {
         const value = dateKey ? (waterByDate.get(dateKey) || 0) : 0;
         return Math.max(maxValue, value);
     }, 0);
-    const scale = Math.max(maxWater, Number.isFinite(target) ? target : 0, 0.5);
+    const hasValidTarget = Number.isFinite(target) && target > 0;
+    const scale = Math.max(maxWater, hasValidTarget ? target : 0, 1);
 
     grid.innerHTML = '';
     grid.classList.remove('grid-cols-7');
@@ -520,7 +528,7 @@ function renderWaterHistory(rangeDays = 7) {
 
     range.forEach(({ date, dateKey }) => {
         const dayWater = dateKey ? (waterByDate.get(dateKey) || 0) : 0;
-        const height = Math.round((dayWater / scale) * 100);
+        const height = Math.round(Math.min(Math.max(safeDivide(dayWater, scale) * 100, 0), 100));
         const dayLabel = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}`;
         const meetsTarget = Number.isFinite(target) && target > 0 && dayWater >= target;
         const barColor = meetsTarget ? '#10b981' : '#7dd3fc';
@@ -584,7 +592,8 @@ function renderCalorieTrend(rangeDays = 7) {
         const value = dateKey ? (caloriesByDate.get(dateKey) || 0) : 0;
         return Math.max(maxValue, value);
     }, 0);
-    const scale = Math.max(maxCalories, Number.isFinite(targetCalories) ? targetCalories : 0, 1);
+    const hasValidTarget = Number.isFinite(targetCalories) && targetCalories > 0;
+    const scale = Math.max(maxCalories, hasValidTarget ? targetCalories : 0, 1);
 
     grid.innerHTML = '';
     grid.classList.remove('grid-cols-7');
@@ -593,8 +602,10 @@ function renderCalorieTrend(rangeDays = 7) {
 
     range.forEach(({ date, dateKey }) => {
         const dayCalories = dateKey ? (caloriesByDate.get(dateKey) || 0) : 0;
-        const height = Math.round((dayCalories / scale) * 100);
-        const tone = resolveCalorieTone(dayCalories, targetCalories);
+        const height = Math.round(Math.min(Math.max(safeDivide(dayCalories, scale) * 100, 0), 100));
+        const tone = hasValidTarget
+            ? resolveCalorieTone(dayCalories, targetCalories)
+            : { color: '#e2e8f0', label: 'ориентир не рассчитан' };
         const dayLabel = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}`;
 
         const item = document.createElement('div');
@@ -866,9 +877,10 @@ function renderProfileRings() {
     const activityToday = getActivityForDate(entries, todayKey);
     const sleepTargetRaw = window.adminConfig?.reminders?.sleep_target;
     const sleepTargetMinutes = parseSleepMinutes(sleepTargetRaw);
-    const caloriesPercent = todayTotals.hasEntries && Number.isFinite(tdee) && tdee > 0
-        ? (todayTotals.calories / tdee) * 100
-        : null;
+    const hasCaloriesTarget = Number.isFinite(tdee) && tdee > 0;
+    const caloriesPercent = todayTotals.hasEntries && hasCaloriesTarget
+        ? Math.min(Math.max(safeDivide(todayTotals.calories, tdee) * 100, 0), 100)
+        : 0;
     const caloriesValue = todayTotals.hasEntries
         ? Number.isFinite(tdee)
             ? `Сегодня: ${Math.round(todayTotals.calories)} из ${Math.round(tdee)} ккал`
@@ -888,10 +900,10 @@ function renderProfileRings() {
     const waterTarget = Number(window.adminConfig?.reminders?.water_min_l);
     const waterTotal = Number(todayTotals.water_l) || 0;
     const hasWater = todayTotals.hasEntries && Number.isFinite(waterTotal);
-    const waterPercent = hasWater && Number.isFinite(waterTarget) && waterTarget > 0
-        ? Math.round((waterTotal / waterTarget) * 100)
-        : null;
     const hasWaterTarget = Number.isFinite(waterTarget) && waterTarget > 0;
+    const waterPercent = hasWater && hasWaterTarget
+        ? Math.min(Math.max(safeDivide(waterTotal, waterTarget) * 100, 0), 100)
+        : 0;
     const waterValue = hasWater
         ? hasWaterTarget
             ? `Факт / цель: ${Number(waterTotal).toFixed(1)} / ${Number(waterTarget).toFixed(1)} л`
@@ -910,7 +922,7 @@ function renderProfileRings() {
 
     const hasSleepTarget = sleepTargetMinutes !== null;
     const sleepPercent = sleepMinutes !== null && hasSleepTarget
-        ? Math.max(0, Math.min((sleepTargetMinutes / sleepMinutes) * 100, 120))
+        ? Math.max(0, Math.min(safeDivide(sleepTargetMinutes, sleepMinutes) * 100, 120))
         : null;
     const sleepValue = sleepMinutes !== null
         ? hasSleepTarget
@@ -1088,18 +1100,10 @@ function renderWeeklyProgress() {
             : null;
         weekDates.push({ dateKey, date: currentDate });
     }
-    const maxWeekCalories = weekDates.reduce((maxValue, { dateKey }) => {
-        if (!dateKey) {
-            return maxValue;
-        }
-        return Math.max(maxValue, caloriesByDate.get(dateKey) || 0);
-    }, 0);
-    const fallbackTarget = maxWeekCalories > 0 ? maxWeekCalories : null;
-
     let totalPercent = 0;
     let loggedDays = 0;
     let totalCalories = 0;
-    const shouldAverageLoggedDays = !(Number.isFinite(targetCalories) && targetCalories > 0);
+    const hasValidTarget = Number.isFinite(targetCalories) && targetCalories > 0;
     for (let i = 0; i < 7; i += 1) {
         const { dateKey, date: currentDate } = weekDates[i];
         const dateLabel = dateKey
@@ -1107,11 +1111,8 @@ function renderWeeklyProgress() {
             : '';
         const dayCalories = dateKey ? (caloriesByDate.get(dateKey) || 0) : 0;
         const hasData = dateKey ? caloriesByDate.has(dateKey) : false;
-        const target = Number.isFinite(targetCalories) && targetCalories > 0
-            ? targetCalories
-            : fallbackTarget;
-        const dayPercent = target
-            ? Math.min(Math.max(dayCalories / target, 0), 1)
+        const dayPercent = hasValidTarget
+            ? Math.min(Math.max(safeDivide(dayCalories, targetCalories), 0), 1)
             : 0;
         totalPercent += dayPercent;
         if (hasData) {
@@ -1158,8 +1159,10 @@ function renderWeeklyProgress() {
         }
     }
 
-    const denominator = shouldAverageLoggedDays ? loggedDays : 7;
-    const percent = denominator ? Math.round((totalPercent / denominator) * 100) : 0;
+    const denominator = hasValidTarget ? 7 : 0;
+    const percent = hasValidTarget
+        ? Math.round(Math.min(Math.max(safeDivide(totalPercent, denominator) * 100, 0), 100))
+        : 0;
     percentElement.textContent = `${percent}%`;
     if (descElement) {
         descElement.textContent = 'Учитываются записи дневника питания.';
@@ -1176,7 +1179,7 @@ function renderWeeklyProgress() {
         }
         return;
     }
-    if (!Number.isFinite(targetCalories) || targetCalories <= 0) {
+    if (!hasValidTarget) {
         if (insight) {
             insight.textContent = 'Есть записи за неделю, но ориентир не задан. Старайтесь держать дни более ровными.';
         }
