@@ -427,17 +427,67 @@ function initReminderControls() {
     });
 }
 
+function resolveStatusTone({ type, ratio }) {
+    if (type === 'calories') {
+        if (!Number.isFinite(ratio)) {
+            return { tone: 'neutral', color: '#e2e8f0', bgClass: 'bg-slate-300' };
+        }
+        if (ratio < 0.9) {
+            return { tone: 'warning', color: '#facc15', bgClass: 'bg-yellow-400' };
+        }
+        if (ratio > 1.1) {
+            return { tone: 'danger', color: '#f43f5e', bgClass: 'bg-rose-500' };
+        }
+        return { tone: 'success', color: '#10b981', bgClass: 'bg-emerald-400' };
+    }
+    if (type === 'water') {
+        if (!Number.isFinite(ratio)) {
+            return { tone: 'neutral', color: '#e2e8f0', bgClass: 'bg-slate-300' };
+        }
+        if (ratio >= 1) {
+            return { tone: 'success', color: '#10b981', bgClass: 'bg-emerald-400' };
+        }
+        return { tone: 'warning', color: '#7dd3fc', bgClass: 'bg-sky-300' };
+    }
+    if (type === 'weekly') {
+        if (ratio === 'overeat') {
+            return { tone: 'danger', color: '#f43f5e', bgClass: 'bg-rose-500' };
+        }
+        if (ratio === 'low_protein' || ratio === 'undereat' || ratio === 'low_discipline') {
+            return { tone: 'warning', color: '#facc15', bgClass: 'bg-yellow-400' };
+        }
+        if (ratio === 'ok') {
+            return { tone: 'success', color: '#10b981', bgClass: 'bg-emerald-400' };
+        }
+        return { tone: 'neutral', color: '#e2e8f0', bgClass: 'bg-slate-300' };
+    }
+    if (type === 'month') {
+        if (ratio === 'good' || ratio === 1 || ratio === true) {
+            return { tone: 'success', color: '#10b981', bgClass: 'bg-emerald-400' };
+        }
+        if (ratio === 'bad' || ratio === -1 || ratio === false) {
+            return { tone: 'danger', color: '#ef4444', bgClass: 'bg-rose-500' };
+        }
+        return { tone: 'neutral', color: '#e2e8f0', bgClass: 'bg-slate-300' };
+    }
+    return { tone: 'neutral', color: '#e2e8f0', bgClass: 'bg-slate-300' };
+}
+
 function resolveCalorieTone(dayCalories, targetCalories) {
-    if (!Number.isFinite(targetCalories) || targetCalories <= 0) {
-        return { color: '#e2e8f0', label: 'ориентир не рассчитан' };
+    const ratio = Number.isFinite(targetCalories) && targetCalories > 0
+        ? safeDivide(dayCalories, targetCalories)
+        : NaN;
+    const tone = resolveStatusTone({ type: 'calories', ratio });
+    if (tone.tone === 'warning') {
+        return { color: tone.color, label: 'меньше нужного' };
     }
-    if (dayCalories < targetCalories * 0.9) {
-        return { color: '#facc15', label: 'меньше нужного' };
+    if (tone.tone === 'danger') {
+        return { color: tone.color, label: 'больше нужного' };
     }
-    if (dayCalories > targetCalories * 1.1) {
-        return { color: '#f43f5e', label: 'больше нужного' };
+    if (tone.tone === 'success') {
+        return { color: tone.color, label: 'в нужном диапазоне' };
     }
-    return { color: '#10b981', label: 'в нужном диапазоне' };
+    return { color: tone.color, label: 'ориентир не рассчитан' };
 }
 
 function safeDivide(a, b) {
@@ -530,8 +580,9 @@ function renderWaterHistory(rangeDays = 7) {
         const dayWater = dateKey ? (waterByDate.get(dateKey) || 0) : 0;
         const height = Math.round(Math.min(Math.max(safeDivide(dayWater, scale) * 100, 0), 100));
         const dayLabel = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}`;
-        const meetsTarget = Number.isFinite(target) && target > 0 && dayWater >= target;
-        const barColor = meetsTarget ? '#10b981' : '#7dd3fc';
+        const waterRatio = hasValidTarget ? safeDivide(dayWater, target) : NaN;
+        const waterTone = resolveStatusTone({ type: 'water', ratio: waterRatio });
+        const barColor = waterTone.color;
 
         const item = document.createElement('div');
         item.className = 'flex flex-col items-center gap-1';
@@ -605,7 +656,7 @@ function renderCalorieTrend(rangeDays = 7) {
         const height = Math.round(Math.min(Math.max(safeDivide(dayCalories, scale) * 100, 0), 100));
         const tone = hasValidTarget
             ? resolveCalorieTone(dayCalories, targetCalories)
-            : { color: '#e2e8f0', label: 'ориентир не рассчитан' };
+            : resolveStatusTone({ type: 'calories', ratio: NaN });
         const dayLabel = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}`;
 
         const item = document.createElement('div');
@@ -888,10 +939,11 @@ function renderProfileRings() {
         : 'Пока нет данных';
 
     caloriesContainer.innerHTML = '';
+    const caloriesRingTone = resolveStatusTone({ type: 'calories', ratio: 1 });
     caloriesContainer.appendChild(
         createProgressRing({
             percent: caloriesPercent,
-            color: '#10b981',
+            color: caloriesRingTone.color,
             label: 'Съедено сегодня',
             value: caloriesValue,
             emphasize: true
@@ -911,10 +963,11 @@ function renderProfileRings() {
         : 'Нет данных';
 
     waterContainer.innerHTML = '';
+    const waterRingTone = resolveStatusTone({ type: 'water', ratio: 0 });
     waterContainer.appendChild(
         createProgressRing({
             percent: waterPercent,
-            color: '#38bdf8',
+            color: waterRingTone.color,
             label: 'Вода',
             value: waterValue
         })
@@ -941,10 +994,11 @@ function renderProfileRings() {
 
     const activityValue = activityToday ? 'Да' : 'Нет';
     activityContainer.innerHTML = '';
+    const activityTone = resolveStatusTone({ type: 'month', ratio: activityToday ? 'good' : 'empty' });
     activityContainer.appendChild(
         createProgressRing({
             percent: activityToday ? 100 : 0,
-            color: activityToday ? '#10b981' : '#e2e8f0',
+            color: activityToday ? activityTone.color : '#e2e8f0',
             label: 'Активность сегодня',
             value: activityValue
         })
@@ -1023,11 +1077,8 @@ function renderMonthGrid() {
         });
         const habitsOk = habitStatus?.water && habitStatus?.sleep && habitStatus?.diary && habitStatus?.activity;
         if (hasData && habitStatus) {
-            if (habitsOk) {
-                day.classList.add('month-day--good');
-            } else {
-                day.classList.add('month-day--bad');
-            }
+            const monthTone = resolveStatusTone({ type: 'month', ratio: habitsOk ? 'good' : 'bad' });
+            day.classList.add(monthTone.tone === 'success' ? 'month-day--good' : 'month-day--bad');
         } else if (hasData && Number.isFinite(targetCalories) && targetCalories > 0
             && Number.isFinite(waterTarget) && waterTarget > 0
             && sleepTargetMinutes !== null) {
@@ -1035,11 +1086,8 @@ function renderMonthGrid() {
             const waterOk = dayWater >= waterTarget;
             const sleepOk = daySleep !== undefined && daySleep <= sleepTargetMinutes;
             const activityOk = dayActivity === true;
-            if (caloriesOk && waterOk && sleepOk && activityOk) {
-                day.classList.add('month-day--good');
-            } else {
-                day.classList.add('month-day--bad');
-            }
+            const monthTone = resolveStatusTone({ type: 'month', ratio: caloriesOk && waterOk && sleepOk && activityOk ? 'good' : 'bad' });
+            day.classList.add(monthTone.tone === 'success' ? 'month-day--good' : 'month-day--bad');
         } else if (hasData) {
             day.classList.add('month-day--empty');
         } else {
@@ -1159,10 +1207,13 @@ function renderWeeklyProgress() {
         }
     }
 
-    const denominator = hasValidTarget ? 7 : 0;
-    const percent = hasValidTarget
-        ? Math.round(Math.min(Math.max(safeDivide(totalPercent, denominator) * 100, 0), 100))
-        : 0;
+    const resolveWeeklyPercent = () => {
+        if (!hasValidTarget) {
+            return 0;
+        }
+        return Math.round(Math.min(Math.max(safeDivide(totalPercent, 7) * 100, 0), 100));
+    };
+    const percent = resolveWeeklyPercent();
     percentElement.textContent = `${percent}%`;
     if (descElement) {
         descElement.textContent = 'Учитываются записи дневника питания.';
@@ -1446,15 +1497,9 @@ function renderWeeklyReview() {
         low_discipline: 'Записей мало',
         ok: 'Ритм стабильный'
     };
-    const statusColors = {
-        overeat: 'bg-rose-500',
-        undereat: 'bg-yellow-400',
-        low_protein: 'bg-amber-500',
-        low_discipline: 'bg-yellow-400',
-        ok: 'bg-emerald-400'
-    };
+    const weeklyTone = resolveStatusTone({ type: 'weekly', ratio: review.status });
 
-    indicator.className = `inline-flex h-3 w-3 rounded-full ${statusColors[review.status] || 'bg-slate-300'}`;
+    indicator.className = `inline-flex h-3 w-3 rounded-full ${weeklyTone.bgClass || 'bg-slate-300'}`;
     statusText.textContent = statusLabels[review.status] || 'Статус недели';
     messageText.textContent = review.message || '';
 }
