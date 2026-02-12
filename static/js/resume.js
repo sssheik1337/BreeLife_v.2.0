@@ -5,6 +5,7 @@ const apiFetch = window.apiFetch || fetch;
 let resumeInitialProfileSnapshot = null;
 let resumeIsDirty = false;
 let resumeHasUserEdits = false;
+let resumeLastGoalDeadlineWarning = null;
 
 
 function hasMeaningfulUserData(data) {
@@ -94,6 +95,55 @@ function setupResumeDirtyTracking() {
     });
 }
 
+function resolveResumeComputationProfile() {
+    const profile = typeof getUserProfile === 'function'
+        ? (getUserProfile() || {})
+        : {};
+
+    const mapped = (typeof mapUserDataToUserProfile === 'function' && hasMeaningfulUserData(window.userData))
+        ? (mapUserDataToUserProfile(window.userData || {}) || {})
+        : {};
+
+    const pickString = (key) => {
+        const profileValue = profile?.[key];
+        if (typeof profileValue === 'string' && profileValue.trim() !== '') {
+            return profileValue;
+        }
+        const mappedValue = mapped?.[key];
+        if (typeof mappedValue === 'string' && mappedValue.trim() !== '') {
+            return mappedValue;
+        }
+        return null;
+    };
+
+    const pickNumber = (key) => {
+        const profileValue = Number(profile?.[key]);
+        if (Number.isFinite(profileValue)) {
+            return profileValue;
+        }
+        const mappedValue = Number(mapped?.[key]);
+        if (Number.isFinite(mappedValue)) {
+            return mappedValue;
+        }
+        return null;
+    };
+
+    return {
+        ...profile,
+        sex: pickString('sex'),
+        birth_date: pickString('birth_date'),
+        goal: pickString('goal'),
+        goal_deadline: pickString('goal_deadline'),
+        activity_factor: pickNumber('activity_factor'),
+        weight_kg: pickNumber('weight_kg'),
+        height_cm: pickNumber('height_cm'),
+        target_weight_kg: pickNumber('target_weight_kg'),
+        food_diary: typeof profile?.food_diary === 'boolean'
+            ? profile.food_diary
+            : (typeof mapped?.food_diary === 'boolean' ? mapped.food_diary : null)
+    };
+}
+
 // Initialize summary page
 function generateSummary() {
     const cardsContainer = document.getElementById('data-cards');
@@ -104,9 +154,10 @@ function generateSummary() {
     // Get user data
     const data = {};
     if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
-        const profile = getUserProfile();
+        const profile = resolveResumeComputationProfile();
         Object.assign(data, mapUserProfileToUserData(profile));
     }
+    const isMaintainGoal = data.goalType === 'maintain';
     
     // Create cards for each data point
     const dataPoints = [
@@ -138,14 +189,17 @@ function generateSummary() {
             color: 'amber',
             details: data.currentWeight ? `${kgToLbs(data.currentWeight)} фунтов` : null
         },
-        {
-            label: 'Желаемый вес',
-            value: data.targetWeight ? `${data.targetWeight} кг` : 'Не указано',
-            icon: 'target',
-            color: 'pink',
-            details: data.currentWeight && data.targetWeight ? 
-                `${calculateWeightDifference(data.currentWeight, data.targetWeight)}` : null
-        }
+        ...(isMaintainGoal
+            ? []
+            : [{
+                label: 'Желаемый вес',
+                value: data.targetWeight ? `${data.targetWeight} кг` : 'Не указано',
+                icon: 'target',
+                color: 'pink',
+                details: data.currentWeight && data.targetWeight
+                    ? `${calculateWeightDifference(data.currentWeight, data.targetWeight)}`
+                    : null
+            }])
 ];
     
     // Create and append cards
@@ -166,7 +220,7 @@ function updateCalculatedMetrics() {
         return;
     }
 
-    const profile = getUserProfile();
+    const profile = resolveResumeComputationProfile();
     const age = typeof calculateAge === 'function' ? calculateAge(profile.birth_date) : null;
     const weight = Number(profile.weight_kg);
     const height = Number(profile.height_cm);
@@ -174,6 +228,14 @@ function updateCalculatedMetrics() {
     const hasValidHeight = Number.isFinite(height) && height > 0;
     const hasValidAge = age !== null && age > 0;
     const hasValidMetrics = hasValidWeight && hasValidHeight && hasValidAge;
+
+    // Итоговая цепочка расчётов:
+    // Анкета -> Валидация цели/веса -> BMR -> TDEE -> Безопасный темп -> Энергетическая модель
+    // -> Safety clamp -> Дата прогноза -> Weekly автокоррекция.
+    const consistency = typeof validateGoalWeightConsistency === 'function'
+        ? validateGoalWeightConsistency(profile.goal, profile.weight_kg, profile.target_weight_kg)
+        : { conflict: false };
+
     const bmr = hasValidMetrics && typeof calculateBMR === 'function'
         ? calculateBMR({
             sex: profile.sex,
@@ -185,28 +247,102 @@ function updateCalculatedMetrics() {
     const tdee = bmr !== null && typeof calculateTDEE === 'function'
         ? calculateTDEE(bmr, profile.activity_factor)
         : null;
-    const macros = tdee !== null && typeof calculateMacros === 'function' ? calculateMacros(tdee) : null;
-    const weightForecast = typeof calculateWeightGoalForecast === 'function'
-        ? calculateWeightGoalForecast({
-            goal: profile.goal,
-            weight_kg: hasValidWeight ? weight : null,
-            target_weight_kg: profile.target_weight_kg
-        })
-        : {
+
+    const weightForecast = (consistency?.conflict === true)
+        ? {
+            calories_target: null,
+            calorie_delta: null,
+            required_rate_kg_per_week: null,
+            required_calorie_delta: null,
+            required_calories_target: null,
+            safe_weeks_estimate: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
+            warning_message: null,
+            error: 'LOGICAL_INCONSISTENCY',
             label: null
-        };
+        }
+        : (typeof calculateWeightGoalForecast === 'function'
+            ? calculateWeightGoalForecast({
+                sex: profile.sex,
+                goal: profile.goal,
+                tdee_calories: tdee,
+                weight_kg: hasValidWeight ? weight : null,
+                target_weight_kg: profile.target_weight_kg,
+                goal_deadline: profile.goal_deadline
+            })
+            : {
+                calories_target: null,
+                calorie_delta: null,
+                required_rate_kg_per_week: null,
+                required_calorie_delta: null,
+                required_calories_target: null,
+                safe_weeks_estimate: null,
+                weight_rate_kg_per_week: null,
+                predicted_goal_date: null,
+                warning_message: null,
+                label: null
+            });
+
+    const weeklySourceProfile = {
+        ...profile,
+        tdee_calories: tdee,
+        calories_target: weightForecast.calories_target,
+        weight_rate_kg_per_week: weightForecast.weight_rate_kg_per_week
+    };
+    const weeklyAdjustment = typeof adjustCaloriesByWeeklyProgress === 'function'
+        ? adjustCaloriesByWeeklyProgress(weeklySourceProfile, profile?.weekly_stats)
+        : null;
+
+    const effectiveCaloriesTarget = Number.isFinite(weeklyAdjustment?.calories_target)
+        ? weeklyAdjustment.calories_target
+        : weightForecast.calories_target;
+    const effectiveCalorieDelta = Number.isFinite(weeklyAdjustment?.calorie_delta)
+        ? weeklyAdjustment.calorie_delta
+        : weightForecast.calorie_delta;
+    const effectiveWeightRate = Number.isFinite(weeklyAdjustment?.weight_rate_kg_per_week)
+        ? weeklyAdjustment.weight_rate_kg_per_week
+        : weightForecast.weight_rate_kg_per_week;
+    const macros = Number.isFinite(weight) && weight > 0 && Number.isFinite(effectiveCaloriesTarget)
+        && typeof calculateMacros === 'function'
+        ? calculateMacros({
+            goal: profile.goal,
+            weight_kg: weight,
+            calories_target: effectiveCaloriesTarget
+        })
+        : null;
 
     if (hasValidMetrics && typeof patchUserProfile === 'function') {
         patchUserProfile({
             age,
             bmr,
             tdee_calories: tdee,
+            target_weight_kg: profile.goal === 'maintain' ? null : profile.target_weight_kg,
+            goal_deadline: profile.goal === 'maintain' ? null : profile.goal_deadline,
             macros,
-            weight_rate_kg_per_week: weightForecast.weight_rate_kg_per_week,
+            calories_target: effectiveCaloriesTarget,
+            calorie_delta: effectiveCalorieDelta,
+            required_rate_kg_per_week: weightForecast.required_rate_kg_per_week,
+            required_calorie_delta: weightForecast.required_calorie_delta,
+            required_calories_target: weightForecast.required_calories_target,
+            safe_weeks_estimate: weightForecast.safe_weeks_estimate,
+            weight_rate_kg_per_week: effectiveWeightRate,
             predicted_goal_date: weightForecast.predicted_goal_date
         });
+    }
+
+    if (weightForecast.warning_message && typeof showNotification === 'function') {
+        if (resumeLastGoalDeadlineWarning !== weightForecast.warning_message) {
+            showNotification(weightForecast.warning_message, 'warning');
+            resumeLastGoalDeadlineWarning = weightForecast.warning_message;
+        }
+    } else if (weeklyAdjustment?.warning_message && typeof showNotification === 'function') {
+        if (resumeLastGoalDeadlineWarning !== weeklyAdjustment.warning_message) {
+            showNotification(weeklyAdjustment.warning_message, 'warning');
+            resumeLastGoalDeadlineWarning = weeklyAdjustment.warning_message;
+        }
+    } else {
+        resumeLastGoalDeadlineWarning = null;
     }
 
     const ageElement = document.getElementById('age-value');
@@ -236,7 +372,9 @@ function updateCalculatedMetrics() {
         tdeeElement.textContent = tdee === null ? '--' : `${Math.round(tdee)} ккал`;
     }
     if (caloriesElement) {
-        caloriesElement.textContent = tdee === null ? '--' : `${Math.round(tdee)} ккал`;
+        caloriesElement.textContent = Number.isFinite(effectiveCaloriesTarget)
+            ? `${Math.round(effectiveCaloriesTarget)} ккал`
+            : '--';
     }
     if (proteinElement) {
         proteinElement.textContent = macros === null
@@ -263,9 +401,9 @@ function updateCalculatedMetrics() {
         if (weightForecast.label) {
             weightRateElement.textContent = weightForecast.label;
         } else {
-            weightRateElement.textContent = weightForecast.weight_rate_kg_per_week === null
+            weightRateElement.textContent = effectiveWeightRate === null || !Number.isFinite(effectiveWeightRate)
                 ? '--'
-                : `${weightForecast.weight_rate_kg_per_week} кг в неделю`;
+                : `${effectiveWeightRate} кг в неделю`;
         }
     }
     if (weightDateElement) {
@@ -389,7 +527,7 @@ async function applyAiRecommendationToResume() {
             return;
         }
         const data = await response.json();
-        const text = data?.text;
+        const text = data?.text || data?.recommendation;
         if (!text) {
             return;
         }
@@ -1037,11 +1175,9 @@ async function persistResumeProfile(profile) {
     }
     try {
         const fetcher = window.apiFetch || fetch;
-        const response = await fetcher('/api/profile', {
+        const response = await fetcher('/api/profile/save', {
             method: 'POST',
-            body: JSON.stringify({
-                user_profile: profile
-            })
+            body: JSON.stringify(profile)
         });
         return response.ok;
     } catch (error) {

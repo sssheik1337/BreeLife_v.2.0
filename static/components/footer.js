@@ -221,6 +221,26 @@ class CustomFooter extends HTMLElement {
       }
     };
 
+    if (bottomFab) {
+      bottomFab.addEventListener('click', (event) => {
+        const isDisabled = bottomFab.classList.contains('bottom-link--disabled');
+        if (isDisabled) {
+          return;
+        }
+
+        const currentPath = window.location.pathname || '/';
+        const isDiaryPage = currentPath.startsWith('/diary');
+        if (!isDiaryPage) {
+          return;
+        }
+
+        // На странице дневника не уходим на новую навигацию,
+        // а просим дневник открыть выезжающее FAB-меню сразу.
+        event.preventDefault();
+        window.dispatchEvent(new CustomEvent('diary-open-fab-menu'));
+      });
+    }
+
     applyBottomNavState(hasCompletedProfile);
     window.addEventListener('profile-status-updated', (event) => {
       const profileCompleted = Boolean(event?.detail?.profileCompleted);

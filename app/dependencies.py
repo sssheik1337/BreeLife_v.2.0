@@ -46,7 +46,7 @@ def optional_current_user(request: Request) -> int | None:
 
 
 def require_completed_profile(telegram_user_id: int) -> dict[str, object]:
-    profile = read_payload("profiles", telegram_user_id)
+    profile = normalize_profile_payload_shape(read_payload("profiles", telegram_user_id))
     if not profile:
         raise HTTPException(status_code=404, detail="PROFILE_NOT_FOUND")
     if not profile.get("is_completed"):
@@ -55,17 +55,26 @@ def require_completed_profile(telegram_user_id: int) -> dict[str, object]:
 
 
 def load_profile(telegram_user_id: int) -> dict[str, object]:
-    return read_payload("profiles", telegram_user_id) or {}
+    return normalize_profile_payload_shape(read_payload("profiles", telegram_user_id))
 
 
 def update_profile(telegram_user_id: int, data: dict[str, object]) -> None:
-    write_payload("profiles", telegram_user_id, data)
+    write_payload("profiles", telegram_user_id, normalize_profile_payload_shape(data))
 
 
 def apply_profile_patch(profile: dict[str, object], patch: dict[str, object]) -> dict[str, object]:
-    updated = dict(profile)
-    updated.update(patch)
-    updated["is_completed"] = bool(patch.get("is_completed") or profile.get("is_completed"))
+    normalized_current = normalize_profile_payload_shape(profile)
+    normalized_patch = normalize_profile_payload_shape(patch)
+    updated = dict(normalized_current)
+    updated.update(normalized_patch)
+    updated["is_completed"] = bool(
+        normalized_patch.get("is_completed")
+        or normalized_patch.get("completed")
+        or normalized_patch.get("profile_completed")
+        or normalized_current.get("is_completed")
+    )
+    updated["completed"] = updated["is_completed"]
+    updated["profile_completed"] = updated["is_completed"]
     updated["last_updated"] = datetime.now(timezone.utc).isoformat()
     return updated
 
@@ -84,7 +93,7 @@ def maybe_set_admin_session(response: Response, token: str | None) -> None:
 
 
 def get_profile_and_admin_config(telegram_user_id: int | None) -> dict[str, object]:
-    profile = read_payload("profiles", telegram_user_id) if telegram_user_id is not None else {}
+    profile = load_profile(telegram_user_id) if telegram_user_id is not None else {}
     admin_config = load_admin_config()
     if not isinstance(admin_config, dict):
         admin_config = {}
@@ -92,3 +101,32 @@ def get_profile_and_admin_config(telegram_user_id: int | None) -> dict[str, obje
         "profile": profile,
         "admin_config": admin_config,
     }
+
+
+def normalize_profile_payload_shape(raw_profile: dict[str, object] | None) -> dict[str, object]:
+    """Нормализовать профиль к плоской структуре и поддержать старые форматы payload."""
+    if not isinstance(raw_profile, dict):
+        return {}
+
+    profile = dict(raw_profile)
+    nested = profile.get("user_profile")
+    if isinstance(nested, dict):
+        # Старые версии клиента сохраняли профиль во вложенном ключе user_profile.
+        # Разворачиваем его в корень, чтобы фронт и расчёты получали ожидаемую структуру.
+        profile = {
+            **profile,
+            **nested,
+        }
+        profile.pop("user_profile", None)
+
+    is_completed = profile.get("is_completed")
+    if is_completed is None:
+        is_completed = bool(profile.get("completed") or profile.get("profile_completed"))
+    profile["is_completed"] = bool(is_completed)
+
+    if "completed" not in profile:
+        profile["completed"] = profile["is_completed"]
+    if "profile_completed" not in profile:
+        profile["profile_completed"] = profile["is_completed"]
+
+    return profile
