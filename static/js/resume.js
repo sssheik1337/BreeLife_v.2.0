@@ -95,6 +95,55 @@ function setupResumeDirtyTracking() {
     });
 }
 
+function resolveResumeComputationProfile() {
+    const profile = typeof getUserProfile === 'function'
+        ? (getUserProfile() || {})
+        : {};
+
+    const mapped = (typeof mapUserDataToUserProfile === 'function' && hasMeaningfulUserData(window.userData))
+        ? (mapUserDataToUserProfile(window.userData || {}) || {})
+        : {};
+
+    const pickString = (key) => {
+        const profileValue = profile?.[key];
+        if (typeof profileValue === 'string' && profileValue.trim() !== '') {
+            return profileValue;
+        }
+        const mappedValue = mapped?.[key];
+        if (typeof mappedValue === 'string' && mappedValue.trim() !== '') {
+            return mappedValue;
+        }
+        return null;
+    };
+
+    const pickNumber = (key) => {
+        const profileValue = Number(profile?.[key]);
+        if (Number.isFinite(profileValue)) {
+            return profileValue;
+        }
+        const mappedValue = Number(mapped?.[key]);
+        if (Number.isFinite(mappedValue)) {
+            return mappedValue;
+        }
+        return null;
+    };
+
+    return {
+        ...profile,
+        sex: pickString('sex'),
+        birth_date: pickString('birth_date'),
+        goal: pickString('goal'),
+        goal_deadline: pickString('goal_deadline'),
+        activity_factor: pickNumber('activity_factor'),
+        weight_kg: pickNumber('weight_kg'),
+        height_cm: pickNumber('height_cm'),
+        target_weight_kg: pickNumber('target_weight_kg'),
+        food_diary: typeof profile?.food_diary === 'boolean'
+            ? profile.food_diary
+            : (typeof mapped?.food_diary === 'boolean' ? mapped.food_diary : null)
+    };
+}
+
 // Initialize summary page
 function generateSummary() {
     const cardsContainer = document.getElementById('data-cards');
@@ -105,7 +154,7 @@ function generateSummary() {
     // Get user data
     const data = {};
     if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
-        const profile = getUserProfile();
+        const profile = resolveResumeComputationProfile();
         Object.assign(data, mapUserProfileToUserData(profile));
     }
     const isMaintainGoal = data.goalType === 'maintain';
@@ -171,7 +220,7 @@ function updateCalculatedMetrics() {
         return;
     }
 
-    const profile = getUserProfile();
+    const profile = resolveResumeComputationProfile();
     const age = typeof calculateAge === 'function' ? calculateAge(profile.birth_date) : null;
     const weight = Number(profile.weight_kg);
     const height = Number(profile.height_cm);
@@ -323,7 +372,9 @@ function updateCalculatedMetrics() {
         tdeeElement.textContent = tdee === null ? '--' : `${Math.round(tdee)} ккал`;
     }
     if (caloriesElement) {
-        caloriesElement.textContent = tdee === null ? '--' : `${Math.round(tdee)} ккал`;
+        caloriesElement.textContent = Number.isFinite(effectiveCaloriesTarget)
+            ? `${Math.round(effectiveCaloriesTarget)} ккал`
+            : '--';
     }
     if (proteinElement) {
         proteinElement.textContent = macros === null
