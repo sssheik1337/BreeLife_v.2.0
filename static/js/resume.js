@@ -104,14 +104,37 @@ function resolveResumeComputationProfile() {
         ? (mapUserDataToUserProfile(window.userData || {}) || {})
         : {};
 
-    const pickString = (key) => {
-        const profileValue = profile?.[key];
+    const pickString = (key, normalizer = null) => {
+        const normalize = typeof normalizer === 'function' ? normalizer : (value) => value;
+        const profileValue = normalize(profile?.[key]);
         if (typeof profileValue === 'string' && profileValue.trim() !== '') {
             return profileValue;
         }
-        const mappedValue = mapped?.[key];
+        const mappedValue = normalize(mapped?.[key]);
         if (typeof mappedValue === 'string' && mappedValue.trim() !== '') {
             return mappedValue;
+        }
+        return null;
+    };
+
+    const normalizeSexValue = (value) => {
+        if (typeof value !== 'string') {
+            return null;
+        }
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'male' || normalized === 'female') {
+            return normalized;
+        }
+        return null;
+    };
+
+    const normalizeGoalValue = (value) => {
+        if (typeof value !== 'string') {
+            return null;
+        }
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'lose' || normalized === 'maintain' || normalized === 'gain') {
+            return normalized;
         }
         return null;
     };
@@ -130,9 +153,9 @@ function resolveResumeComputationProfile() {
 
     return {
         ...profile,
-        sex: pickString('sex'),
-        birth_date: pickString('birth_date'),
-        goal: pickString('goal'),
+        sex: pickString('sex', normalizeSexValue),
+        birth_date: normalizeDateOnly(pickString('birth_date')),
+        goal: pickString('goal', normalizeGoalValue),
         goal_deadline: pickString('goal_deadline'),
         activity_factor: pickNumber('activity_factor'),
         weight_kg: pickNumber('weight_kg'),
@@ -142,6 +165,22 @@ function resolveResumeComputationProfile() {
             ? profile.food_diary
             : (typeof mapped?.food_diary === 'boolean' ? mapped.food_diary : null)
     };
+}
+
+function mergeUserDataSafely(currentUserData, mappedProfileData) {
+    const base = (currentUserData && typeof currentUserData === 'object') ? { ...currentUserData } : {};
+    const mapped = (mappedProfileData && typeof mappedProfileData === 'object') ? mappedProfileData : {};
+
+    Object.keys(mapped).forEach((key) => {
+        const value = mapped[key];
+        // Не затираем уже введённые пользователем значения пустыми полями профиля.
+        if (value === null || value === undefined || value === '') {
+            return;
+        }
+        base[key] = value;
+    });
+
+    return base;
 }
 
 // Initialize summary page
@@ -1238,10 +1277,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         await syncProfileWithBackend();
     }
     if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
-        window.userData = {
-            ...(window.userData || {}),
-            ...mapUserProfileToUserData(getUserProfile())
-        };
+        const mappedData = mapUserProfileToUserData(getUserProfile());
+        window.userData = mergeUserDataSafely(window.userData, mappedData);
     }
     generateSummary();
     calculateBMI();
