@@ -51,15 +51,43 @@
     }
 
     function memoryGet(key) {
-        return memoryStore.has(key) ? memoryStore.get(key) : null;
+        if (memoryStore.has(key)) {
+            return memoryStore.get(key);
+        }
+        try {
+            if (typeof localStorage !== 'undefined') {
+                const value = localStorage.getItem(key);
+                if (value !== null) {
+                    memoryStore.set(key, value);
+                }
+                return value;
+            }
+        } catch (error) {
+            // Если localStorage недоступен (например, режим приватности), используем только память.
+        }
+        return null;
     }
 
     function memorySet(key, value) {
         memoryStore.set(key, value);
+        try {
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(key, value);
+            }
+        } catch (error) {
+            // Если localStorage недоступен, сохраняем хотя бы в памяти текущей вкладки.
+        }
     }
 
     function memoryRemove(key) {
         memoryStore.delete(key);
+        try {
+            if (typeof localStorage !== 'undefined') {
+                localStorage.removeItem(key);
+            }
+        } catch (error) {
+            // Ошибку удаления localStorage игнорируем, чтобы не ломать поток пользователя.
+        }
     }
 
     function getDefaultUserProfile() {
@@ -873,19 +901,24 @@
                 profile?.birth_date,
                 profile?.height_cm,
                 profile?.weight_kg,
-                profile?.target_weight_kg,
                 profile?.goal,
                 profile?.activity_factor
             ];
+            if (profile?.goal !== 'maintain') {
+                requiredFields.push(profile?.target_weight_kg);
+            }
             const missingFields = requiredFields.filter((value) => value === null || value === undefined || value === '');
             if (window.appDebug) {
-                const fieldNames = ['sex', 'birth_date', 'height_cm', 'weight_kg', 'target_weight_kg', 'goal', 'activity_factor'];
+                const fieldNames = ['sex', 'birth_date', 'height_cm', 'weight_kg', 'goal', 'activity_factor'];
+                if (profile?.goal !== 'maintain') {
+                    fieldNames.push('target_weight_kg');
+                }
                 const missingFieldNames = fieldNames.filter((name, index) => {
                     const value = requiredFields[index];
                     return value === null || value === undefined || value === '';
                 });
-                console.log('Проверка payload перед /api/profile', {
-                    user_profile: profile,
+                console.log('Проверка payload перед /api/profile/save', {
+                    profile,
                     missing_required_fields: missingFieldNames
                 });
             }
@@ -896,25 +929,22 @@
                 });
                 return;
             }
-            const response = await apiFetch('/api/profile', {
+            const response = await apiFetch('/api/profile/save', {
                 method: 'POST',
-                body: JSON.stringify({
-                    user_profile: profile
-                })
+                body: JSON.stringify(profile)
             });
             if (!response.ok) {
                 return;
             }
+            const responseData = await response.json();
             try {
                 localStorage.removeItem('userData');
             } catch (error) {
                 console.warn('Не удалось очистить userData', error);
             }
-            const refreshed = await apiFetch('/api/profile');
-            if (!refreshed.ok) {
-                return;
-            }
-            const data = await refreshed.json();
+            const data = responseData && typeof responseData === 'object'
+                ? responseData
+                : null;
             if (!data || typeof data !== 'object') {
                 throw new Error('Profile payload invalid');
             }

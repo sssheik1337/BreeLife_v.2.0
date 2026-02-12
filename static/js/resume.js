@@ -527,7 +527,7 @@ async function applyAiRecommendationToResume() {
             return;
         }
         const data = await response.json();
-        const text = data?.text;
+        const text = data?.text || data?.recommendation;
         if (!text) {
             return;
         }
@@ -1175,11 +1175,9 @@ async function persistResumeProfile(profile) {
     }
     try {
         const fetcher = window.apiFetch || fetch;
-        const response = await fetcher('/api/profile', {
+        const response = await fetcher('/api/profile/save', {
             method: 'POST',
-            body: JSON.stringify({
-                user_profile: profile
-            })
+            body: JSON.stringify(profile)
         });
         return response.ok;
     } catch (error) {
