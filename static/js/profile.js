@@ -468,6 +468,9 @@ function resolveStatusTone({ type, ratio }) {
         if (ratio === 'bad' || ratio === -1 || ratio === false) {
             return { tone: 'danger', color: '#ef4444', bgClass: 'bg-rose-500' };
         }
+        if (ratio === 'neutral' || ratio === 'empty' || ratio === null) {
+            return { tone: 'neutral', color: '#e2e8f0', bgClass: 'bg-slate-300' };
+        }
         return { tone: 'neutral', color: '#e2e8f0', bgClass: 'bg-slate-300' };
     }
     return { tone: 'neutral', color: '#e2e8f0', bgClass: 'bg-slate-300' };
@@ -939,7 +942,8 @@ function renderProfileRings() {
         : 'Пока нет данных';
 
     caloriesContainer.innerHTML = '';
-    const caloriesRingTone = resolveStatusTone({ type: 'calories', ratio: 1 });
+    const caloriesRatio = hasCaloriesTarget ? safeDivide(todayTotals.calories, tdee) : NaN;
+    const caloriesRingTone = resolveStatusTone({ type: 'calories', ratio: caloriesRatio });
     caloriesContainer.appendChild(
         createProgressRing({
             percent: caloriesPercent,
@@ -963,7 +967,8 @@ function renderProfileRings() {
         : 'Нет данных';
 
     waterContainer.innerHTML = '';
-    const waterRingTone = resolveStatusTone({ type: 'water', ratio: 0 });
+    const waterRatio = hasWaterTarget ? safeDivide(waterTotal, waterTarget) : NaN;
+    const waterRingTone = resolveStatusTone({ type: 'water', ratio: waterRatio });
     waterContainer.appendChild(
         createProgressRing({
             percent: waterPercent,
@@ -994,11 +999,11 @@ function renderProfileRings() {
 
     const activityValue = activityToday ? 'Да' : 'Нет';
     activityContainer.innerHTML = '';
-    const activityTone = resolveStatusTone({ type: 'month', ratio: activityToday ? 'good' : 'empty' });
+    const activityTone = resolveStatusTone({ type: 'month', ratio: activityToday ? 'good' : 'neutral' });
     activityContainer.appendChild(
         createProgressRing({
             percent: activityToday ? 100 : 0,
-            color: activityToday ? activityTone.color : '#e2e8f0',
+            color: activityTone.color,
             label: 'Активность сегодня',
             value: activityValue
         })
@@ -1078,7 +1083,13 @@ function renderMonthGrid() {
         const habitsOk = habitStatus?.water && habitStatus?.sleep && habitStatus?.diary && habitStatus?.activity;
         if (hasData && habitStatus) {
             const monthTone = resolveStatusTone({ type: 'month', ratio: habitsOk ? 'good' : 'bad' });
-            day.classList.add(monthTone.tone === 'success' ? 'month-day--good' : 'month-day--bad');
+            if (monthTone.tone === 'success') {
+                day.classList.add('month-day--good');
+            } else if (monthTone.tone === 'danger') {
+                day.classList.add('month-day--bad');
+            } else {
+                day.classList.add('month-day--empty');
+            }
         } else if (hasData && Number.isFinite(targetCalories) && targetCalories > 0
             && Number.isFinite(waterTarget) && waterTarget > 0
             && sleepTargetMinutes !== null) {
@@ -1087,7 +1098,13 @@ function renderMonthGrid() {
             const sleepOk = daySleep !== undefined && daySleep <= sleepTargetMinutes;
             const activityOk = dayActivity === true;
             const monthTone = resolveStatusTone({ type: 'month', ratio: caloriesOk && waterOk && sleepOk && activityOk ? 'good' : 'bad' });
-            day.classList.add(monthTone.tone === 'success' ? 'month-day--good' : 'month-day--bad');
+            if (monthTone.tone === 'success') {
+                day.classList.add('month-day--good');
+            } else if (monthTone.tone === 'danger') {
+                day.classList.add('month-day--bad');
+            } else {
+                day.classList.add('month-day--empty');
+            }
         } else if (hasData) {
             day.classList.add('month-day--empty');
         } else {
