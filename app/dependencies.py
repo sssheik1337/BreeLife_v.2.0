@@ -108,6 +108,41 @@ def normalize_profile_payload_shape(raw_profile: dict[str, object] | None) -> di
     if not isinstance(raw_profile, dict):
         return {}
 
+    def pick_existing(*values: object) -> object | None:
+        for value in values:
+            if value is None:
+                continue
+            if isinstance(value, str) and value.strip() == "":
+                continue
+            return value
+        return None
+
+    def parse_number(value: object) -> float | None:
+        if value is None:
+            return None
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return None
+        return parsed
+
+    def normalize_goal(value: object) -> str | None:
+        if value is None:
+            return None
+        normalized = str(value).strip().lower()
+        goal_map = {
+            "loss": "lose",
+            "lose": "lose",
+            "weight_loss": "lose",
+            "maintain": "maintain",
+            "maintenance": "maintain",
+            "keep": "maintain",
+            "gain": "gain",
+            "muscle": "gain",
+            "mass": "gain",
+        }
+        return goal_map.get(normalized, normalized if normalized in {"lose", "maintain", "gain"} else None)
+
     profile = dict(raw_profile)
     nested = profile.get("user_profile")
     if isinstance(nested, dict):
@@ -118,6 +153,23 @@ def normalize_profile_payload_shape(raw_profile: dict[str, object] | None) -> di
             **nested,
         }
         profile.pop("user_profile", None)
+
+    # Поддержка legacy-ключей, которые могли быть сохранены в БД ранее.
+    profile["sex"] = pick_existing(profile.get("sex"), profile.get("gender"))
+    profile["birth_date"] = pick_existing(profile.get("birth_date"), profile.get("birthDate"))
+    profile["height_cm"] = pick_existing(profile.get("height_cm"), profile.get("height"))
+    profile["weight_kg"] = pick_existing(profile.get("weight_kg"), profile.get("currentWeight"))
+    profile["target_weight_kg"] = pick_existing(profile.get("target_weight_kg"), profile.get("targetWeight"))
+    profile["activity_factor"] = pick_existing(profile.get("activity_factor"), profile.get("activityLevel"))
+    profile["goal"] = pick_existing(profile.get("goal"), profile.get("goalType"))
+    profile["goal_deadline"] = pick_existing(profile.get("goal_deadline"), profile.get("deadline"))
+    profile["food_diary"] = pick_existing(profile.get("food_diary"), profile.get("foodDiary"))
+
+    profile["height_cm"] = parse_number(profile.get("height_cm"))
+    profile["weight_kg"] = parse_number(profile.get("weight_kg"))
+    profile["target_weight_kg"] = parse_number(profile.get("target_weight_kg"))
+    profile["activity_factor"] = parse_number(profile.get("activity_factor"))
+    profile["goal"] = normalize_goal(profile.get("goal"))
 
     is_completed = profile.get("is_completed")
     if is_completed is None:
