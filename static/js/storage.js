@@ -50,6 +50,12 @@
         });
     }
 
+    function logStorageDebug(stage, payload) {
+        if (window.appDebug === true) {
+            console.log(`[PROFILE_DEBUG][storage] ${stage}`, payload);
+        }
+    }
+
     function memoryGet(key) {
         if (memoryStore.has(key)) {
             return memoryStore.get(key);
@@ -303,6 +309,10 @@
         const base = getDefaultUserProfile();
         const merged = { ...base, ...(profile || {}) };
 
+        logStorageDebug('normalizeUserProfile:input', {
+            profile
+        });
+
         merged.sex = normalizeSex(merged.sex);
         merged.birth_date = merged.birth_date || null;
         merged.age = parseNumber(merged.age);
@@ -372,6 +382,23 @@
         if (merged.profile_completed !== merged.completed) {
             merged.completed = merged.profile_completed;
         }
+
+        logStorageDebug('normalizeUserProfile:output', {
+            merged,
+            required_inputs: {
+                sex: merged.sex,
+                birth_date: merged.birth_date,
+                height_cm: merged.height_cm,
+                weight_kg: merged.weight_kg,
+                goal: merged.goal,
+                activity_factor: merged.activity_factor,
+                target_weight_kg: merged.target_weight_kg
+            },
+            completion_flags: {
+                completed: merged.completed,
+                profile_completed: merged.profile_completed
+            }
+        });
 
         return merged;
     }
@@ -653,11 +680,17 @@
 
     function getUserProfile() {
         if (cachedProfile) {
+            logStorageDebug('getUserProfile:from_cache', {
+                cachedProfile
+            });
             return cachedProfile;
         }
         let storedProfile = null;
         try {
             const raw = memoryGet(STORAGE_KEY);
+            logStorageDebug('getUserProfile:raw_storage_value', {
+                raw
+            });
             storedProfile = raw ? JSON.parse(raw) : null;
         } catch (error) {
             storedProfile = null;
@@ -670,6 +703,10 @@
 
         const normalized = normalizeUserProfile(storedProfile);
         cachedProfile = normalized;
+        logStorageDebug('getUserProfile:normalized_result', {
+            storedProfile,
+            normalized
+        });
         try {
             memorySet(STORAGE_KEY, JSON.stringify(normalized));
         } catch (error) {
@@ -965,14 +1002,23 @@
 
     async function syncProfileWithBackend() {
         if (window.serverUser?.authorized !== true) {
+            logStorageDebug('syncProfileWithBackend:skip_unauthorized', {
+                serverUser: window.serverUser
+            });
             return getUserProfile();
         }
         try {
             const response = await apiFetch('/api/profile');
             if (!response.ok) {
+                logStorageDebug('syncProfileWithBackend:response_not_ok', {
+                    status: response.status
+                });
                 return getUserProfile();
             }
             const data = await response.json();
+            logStorageDebug('syncProfileWithBackend:raw_backend_payload', {
+                data
+            });
             if (!data || typeof data !== 'object') {
                 throw new Error('Profile payload invalid');
             }
@@ -987,6 +1033,9 @@
             if (data && typeof data === 'object') {
                 const normalized = normalizeUserProfile(data);
                 cachedProfile = normalized;
+                logStorageDebug('syncProfileWithBackend:normalized_backend_payload', {
+                    normalized
+                });
                 try {
                     memorySet(STORAGE_KEY, JSON.stringify(normalized));
                 } catch (error) {

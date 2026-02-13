@@ -7,6 +7,12 @@ let resumeIsDirty = false;
 let resumeHasUserEdits = false;
 let resumeLastGoalDeadlineWarning = null;
 
+function logResumeDebug(stage, payload) {
+    if (window.appDebug === true) {
+        console.log(`[PROFILE_DEBUG][resume] ${stage}`, payload);
+    }
+}
+
 
 function hasMeaningfulUserData(data) {
     if (!data || typeof data !== 'object') {
@@ -128,7 +134,7 @@ function resolveResumeComputationProfile() {
         return null;
     };
 
-    return {
+    const resolvedProfile = {
         ...profile,
         sex: pickString('sex'),
         birth_date: pickString('birth_date'),
@@ -142,6 +148,14 @@ function resolveResumeComputationProfile() {
             ? profile.food_diary
             : (typeof mapped?.food_diary === 'boolean' ? mapped.food_diary : null)
     };
+
+    logResumeDebug('resolveResumeComputationProfile', {
+        profile,
+        mapped,
+        resolvedProfile
+    });
+
+    return resolvedProfile;
 }
 
 // Initialize summary page
@@ -229,6 +243,14 @@ function updateCalculatedMetrics() {
     const hasValidAge = age !== null && age > 0;
     const hasValidMetrics = hasValidWeight && hasValidHeight && hasValidAge;
 
+    logResumeDebug('updateCalculatedMetrics:inputs', {
+        profile,
+        hasValidWeight,
+        hasValidHeight,
+        hasValidAge,
+        hasValidMetrics
+    });
+
     // Итоговая цепочка расчётов:
     // Анкета -> Валидация цели/веса -> BMR -> TDEE -> Безопасный темп -> Энергетическая модель
     // -> Safety clamp -> Дата прогноза -> Weekly автокоррекция.
@@ -311,6 +333,16 @@ function updateCalculatedMetrics() {
             calories_target: effectiveCaloriesTarget
         })
         : null;
+
+    logResumeDebug('updateCalculatedMetrics:calculation_result', {
+        age,
+        bmr,
+        tdee,
+        effectiveCaloriesTarget,
+        effectiveCalorieDelta,
+        effectiveWeightRate,
+        macros
+    });
 
     if (hasValidMetrics && typeof patchUserProfile === 'function') {
         patchUserProfile({
