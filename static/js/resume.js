@@ -583,15 +583,95 @@ function updateCalculatedMetrics() {
 }
 
 // Рендер персональных рекомендаций
+function updateRecommendationsState(state, message) {
+    const stateElement = document.getElementById('recommendations-state');
+    if (!stateElement) {
+        return;
+    }
+    const labels = {
+        loading: 'Состояние: загрузка',
+        partial: 'Состояние: частично',
+        ready: 'Состояние: готово',
+        error: 'Состояние: ошибка'
+    };
+    stateElement.textContent = message || labels[state] || labels.partial;
+    stateElement.className = 'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium';
+    if (state === 'loading') {
+        stateElement.classList.add('bg-amber-100', 'text-amber-700');
+        return;
+    }
+    if (state === 'ready') {
+        stateElement.classList.add('bg-emerald-100', 'text-emerald-700');
+        return;
+    }
+    if (state === 'error') {
+        stateElement.classList.add('bg-rose-100', 'text-rose-700');
+        return;
+    }
+    stateElement.classList.add('bg-slate-100', 'text-slate-600');
+}
+
+function getBaselineRecommendations(profile) {
+    const baseline = [
+        'Пейте воду равномерно в течение дня и не ждите сильной жажды.',
+        'Старайтесь держать стабильный режим сна: это помогает контролировать аппетит и энергию.'
+    ];
+    if (profile?.food_diary !== true) {
+        baseline.push('Добавьте 1–2 записи в дневник питания на этой неделе для более точной персонализации.');
+    }
+    return baseline.slice(0, 2);
+}
+
+function normalizeAiRecommendationResponse(data) {
+    if (!data || typeof data !== 'object') {
+        return {
+            text: '',
+            source: 'empty'
+        };
+    }
+    const text = typeof data.text === 'string' && data.text.trim()
+        ? data.text.trim()
+        : (typeof data.recommendation === 'string' && data.recommendation.trim() ? data.recommendation.trim() : '');
+    return {
+        text,
+        source: typeof data.text === 'string' ? 'text' : 'recommendation'
+    };
+}
+
+function getPersonalizationMissingFields(profile) {
+    const required = [
+        { key: 'sex', label: 'пол' },
+        { key: 'birth_date', label: 'дата рождения' },
+        { key: 'height_cm', label: 'рост' },
+        { key: 'weight_kg', label: 'текущий вес' },
+        { key: 'activity_factor', label: 'активность' },
+        { key: 'goal', label: 'цель' }
+    ];
+    if (profile?.goal && profile.goal !== 'maintain') {
+        required.push({ key: 'target_weight_kg', label: 'желаемый вес' });
+    }
+    return required
+        .filter((item) => {
+            const value = profile?.[item.key];
+            return value === null || value === undefined || value === '';
+        })
+        .map((item) => item.label);
+}
+
 function renderPersonalRecommendations() {
     if (typeof getUserProfile !== 'function') {
         return;
     }
 
     const profile = getUserProfile();
+    const baseline = getBaselineRecommendations(profile);
     const recommendations = typeof getRecommendations === 'function'
         ? getRecommendations(profile)
         : [];
+    const combinedRecommendations = [...baseline, ...recommendations]
+        .filter((item, index, arr) => typeof item === 'string' && item.trim() && arr.indexOf(item) === index)
+        .slice(0, 6);
+
     const diaryExplanation = typeof getDiaryExplanation === 'function'
         ? getDiaryExplanation(profile)
         : '';
@@ -614,10 +694,10 @@ function renderPersonalRecommendations() {
 
     if (listElement) {
         listElement.innerHTML = '';
-        recommendations.forEach((item) => {
+        combinedRecommendations.forEach((item) => {
             const listItem = document.createElement('li');
             listItem.className = 'flex items-start space-x-2';
-            listItem.innerHTML = '<span class=\"text-emerald-500\">•</span>';
+            listItem.innerHTML = '<span class="text-emerald-500">•</span>';
             const textNode = document.createElement('span');
             textNode.textContent = item;
             listItem.appendChild(textNode);
@@ -662,14 +742,18 @@ function renderPersonalRecommendations() {
             deadlineWarning.classList.add('hidden');
         }
     }
+
+    const missingForPersonalization = getPersonalizationMissingFields(profile);
+    if (missingForPersonalization.length > 0) {
+        updateRecommendationsState('partial', `Состояние: частично — для персонализации добавьте: ${missingForPersonalization.join(', ')}`);
+    } else {
+        updateRecommendationsState('ready', 'Состояние: готово — рекомендации персонализированы.');
+    }
 }
 
 // Получить AI-рекомендацию и обновить текстовые блоки
 async function applyAiRecommendationToResume() {
     if (typeof getUserProfile !== 'function') {
-        return;
-    }
-    if (window.profileCompleted !== true) {
         return;
     }
 
@@ -682,21 +766,34 @@ async function applyAiRecommendationToResume() {
         return;
     }
 
+    if (window.profileCompleted !== true) {
+        const missingForPersonalization = getPersonalizationMissingFields(profile);
+        updateRecommendationsState(
+            'partial',
+            `Состояние: частично — заполните поля для персонализации: ${missingForPersonalization.join(', ') || 'основные данные профиля'}`
+        );
+        return;
+    }
+
+    updateRecommendationsState('loading', 'Состояние: загрузка — получаем AI-рекомендации...');
+
     try {
         const response = await apiFetch('/api/ai/recommendation', {
             method: 'POST',
             body: JSON.stringify(profile)
         });
         if (!response.ok) {
+            updateRecommendationsState('error', 'Состояние: ошибка — не удалось получить AI-рекомендации.');
             return;
         }
         const data = await response.json();
-        const text = data?.text || data?.recommendation;
-        if (!text) {
+        const normalized = normalizeAiRecommendationResponse(data);
+        if (!normalized.text) {
+            updateRecommendationsState('partial', 'Состояние: частично — используем базовые рекомендации без AI.');
             return;
         }
 
-        const sentences = text
+        const sentences = normalized.text
             .split(/(?<=[.!?])\s+/)
             .map((part) => part.trim())
             .filter(Boolean);
@@ -717,8 +814,10 @@ async function applyAiRecommendationToResume() {
             deadlineElement.textContent = deadlineSentence;
             deadlineElement.classList.remove('hidden');
         }
+
+        updateRecommendationsState('ready', 'Состояние: готово — AI-рекомендации применены.');
     } catch (error) {
-        return;
+        updateRecommendationsState('error', 'Состояние: ошибка — не удалось применить AI-рекомендации.');
     }
 }
 
