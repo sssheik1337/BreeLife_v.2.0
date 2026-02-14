@@ -235,40 +235,103 @@ function updateCalculatedMetrics() {
     }
 
     const profile = resolveResumeComputationProfile();
-    const age = typeof calculateAge === 'function' ? calculateAge(profile.birth_date) : null;
     const weight = Number(profile.weight_kg);
     const height = Number(profile.height_cm);
-    const hasValidWeight = Number.isFinite(weight) && weight > 0;
-    const hasValidHeight = Number.isFinite(height) && height > 0;
-    const hasValidAge = age !== null && age > 0;
-    const hasValidMetrics = hasValidWeight && hasValidHeight && hasValidAge;
+    const activityFactor = Number(profile.activity_factor);
 
-    logResumeDebug('updateCalculatedMetrics:inputs', {
-        profile,
-        hasValidWeight,
-        hasValidHeight,
-        hasValidAge,
-        hasValidMetrics
-    });
+    const normalizeFieldTitle = (field) => {
+        const titles = {
+            birth_date: 'дата рождения',
+            sex: 'пол',
+            weight_kg: 'текущий вес',
+            height_cm: 'рост',
+            age: 'возраст',
+            activity_factor: 'уровень активности',
+            calories_target: 'целевые калории',
+            goal: 'цель',
+            target_weight_kg: 'желаемый вес',
+            goal_deadline: 'дедлайн'
+        };
+        return titles[field] || field;
+    };
 
-    // Итоговая цепочка расчётов:
-    // Анкета -> Валидация цели/веса -> BMR -> TDEE -> Безопасный темп -> Энергетическая модель
-    // -> Safety clamp -> Дата прогноза -> Weekly автокоррекция.
-    const consistency = typeof validateGoalWeightConsistency === 'function'
-        ? validateGoalWeightConsistency(profile.goal, profile.weight_kg, profile.target_weight_kg)
-        : { conflict: false };
+    const formatMissingFields = (fields) => {
+        if (!Array.isArray(fields) || fields.length === 0) {
+            return '';
+        }
+        return fields.map((field) => normalizeFieldTitle(field)).join(', ');
+    };
 
-    const bmr = hasValidMetrics && typeof calculateBMR === 'function'
-        ? calculateBMR({
+    const levelA = {
+        name: 'A',
+        missing: [],
+        age: null,
+        status: ''
+    };
+    if (!profile.birth_date) {
+        levelA.missing.push('birth_date');
+        levelA.status = `Не хватает: ${formatMissingFields(levelA.missing)}`;
+    } else {
+        levelA.age = typeof calculateAge === 'function' ? calculateAge(profile.birth_date) : null;
+        if (levelA.age === null || levelA.age <= 0) {
+            levelA.status = 'Проверьте корректность даты рождения';
+        } else {
+            levelA.status = 'Возраст рассчитан';
+        }
+    }
+
+    const levelB = {
+        name: 'B',
+        missing: [],
+        bmr: null,
+        status: ''
+    };
+    if (!profile.sex) {
+        levelB.missing.push('sex');
+    }
+    if (!(Number.isFinite(levelA.age) && levelA.age > 0)) {
+        levelB.missing.push('age');
+    }
+    if (!(Number.isFinite(weight) && weight > 0)) {
+        levelB.missing.push('weight_kg');
+    }
+    if (!(Number.isFinite(height) && height > 0)) {
+        levelB.missing.push('height_cm');
+    }
+    if (levelB.missing.length === 0 && typeof calculateBMR === 'function') {
+        levelB.bmr = calculateBMR({
             sex: profile.sex,
             weight_kg: weight,
             height_cm: height,
-            age
-        })
-        : null;
-    const tdee = bmr !== null && typeof calculateTDEE === 'function'
-        ? calculateTDEE(bmr, profile.activity_factor)
-        : null;
+            age: levelA.age
+        });
+    }
+    levelB.status = levelB.missing.length > 0
+        ? `Не хватает: ${formatMissingFields(levelB.missing)}`
+        : 'BMR рассчитан';
+
+    const levelC = {
+        name: 'C',
+        missing: [],
+        tdee: null,
+        status: ''
+    };
+    if (!Number.isFinite(levelB.bmr)) {
+        levelC.missing.push('bmr');
+    }
+    if (!(Number.isFinite(activityFactor) && activityFactor > 0)) {
+        levelC.missing.push('activity_factor');
+    }
+    if (levelC.missing.length === 0 && typeof calculateTDEE === 'function') {
+        levelC.tdee = calculateTDEE(levelB.bmr, profile.activity_factor);
+    }
+    levelC.status = levelC.missing.length > 0
+        ? `Не хватает: ${formatMissingFields(levelC.missing)}`
+        : 'TDEE рассчитан';
+
+    const consistency = typeof validateGoalWeightConsistency === 'function'
+        ? validateGoalWeightConsistency(profile.goal, profile.weight_kg, profile.target_weight_kg)
+        : { conflict: false };
 
     const weightForecast = (consistency?.conflict === true)
         ? {
@@ -288,8 +351,8 @@ function updateCalculatedMetrics() {
             ? calculateWeightGoalForecast({
                 sex: profile.sex,
                 goal: profile.goal,
-                tdee_calories: tdee,
-                weight_kg: hasValidWeight ? weight : null,
+                tdee_calories: levelC.tdee,
+                weight_kg: Number.isFinite(weight) && weight > 0 ? weight : null,
                 target_weight_kg: profile.target_weight_kg,
                 goal_deadline: profile.goal_deadline
             })
@@ -308,7 +371,7 @@ function updateCalculatedMetrics() {
 
     const weeklySourceProfile = {
         ...profile,
-        tdee_calories: tdee,
+        tdee_calories: levelC.tdee,
         calories_target: weightForecast.calories_target,
         weight_rate_kg_per_week: weightForecast.weight_rate_kg_per_week
     };
@@ -325,40 +388,88 @@ function updateCalculatedMetrics() {
     const effectiveWeightRate = Number.isFinite(weeklyAdjustment?.weight_rate_kg_per_week)
         ? weeklyAdjustment.weight_rate_kg_per_week
         : weightForecast.weight_rate_kg_per_week;
-    const macros = Number.isFinite(weight) && weight > 0 && Number.isFinite(effectiveCaloriesTarget)
-        && typeof calculateMacros === 'function'
-        ? calculateMacros({
+
+    const levelD = {
+        name: 'D',
+        missing: [],
+        macros: null,
+        status: ''
+    };
+    if (!Number.isFinite(effectiveCaloriesTarget)) {
+        levelD.missing.push('calories_target');
+    }
+    if (!(Number.isFinite(weight) && weight > 0)) {
+        levelD.missing.push('weight_kg');
+    }
+    if (!profile.goal) {
+        levelD.missing.push('goal');
+    }
+    if (levelD.missing.length === 0 && typeof calculateMacros === 'function') {
+        levelD.macros = calculateMacros({
             goal: profile.goal,
             weight_kg: weight,
             calories_target: effectiveCaloriesTarget
-        })
-        : null;
+        });
+    }
+    levelD.status = levelD.missing.length > 0
+        ? `Не хватает: ${formatMissingFields(levelD.missing)}`
+        : 'Макросы рассчитаны';
 
-    logResumeDebug('updateCalculatedMetrics:calculation_result', {
-        age,
-        bmr,
-        tdee,
+    const levelE = {
+        name: 'E',
+        missing: [],
+        status: ''
+    };
+    if (!profile.goal) {
+        levelE.missing.push('goal');
+    }
+    if (!(Number.isFinite(weight) && weight > 0)) {
+        levelE.missing.push('weight_kg');
+    }
+    if (!Number.isFinite(levelC.tdee)) {
+        levelE.missing.push('tdee');
+    }
+    if (profile.goal && profile.goal !== 'maintain' && !(Number.isFinite(Number(profile.target_weight_kg)) && Number(profile.target_weight_kg) > 0)) {
+        levelE.missing.push('target_weight_kg');
+    }
+    if (profile.goal && profile.goal !== 'maintain' && profile.goal_deadline === '') {
+        levelE.missing.push('goal_deadline');
+    }
+    if (consistency?.conflict === true) {
+        levelE.status = consistency?.message || 'Цель и желаемый вес противоречат друг другу';
+    } else {
+        levelE.status = levelE.missing.length > 0
+            ? `Не хватает: ${formatMissingFields(levelE.missing)}`
+            : 'Прогноз рассчитан';
+    }
+
+    logResumeDebug('updateCalculatedMetrics:levels', {
+        profile,
+        levelA,
+        levelB,
+        levelC,
+        levelD,
+        levelE,
         effectiveCaloriesTarget,
         effectiveCalorieDelta,
-        effectiveWeightRate,
-        macros
+        effectiveWeightRate
     });
 
-    if (hasValidMetrics && typeof patchUserProfile === 'function') {
+    if (typeof patchUserProfile === 'function') {
         patchUserProfile({
-            age,
-            bmr,
-            tdee_calories: tdee,
+            age: Number.isFinite(levelA.age) ? levelA.age : null,
+            bmr: Number.isFinite(levelB.bmr) ? levelB.bmr : null,
+            tdee_calories: Number.isFinite(levelC.tdee) ? levelC.tdee : null,
             target_weight_kg: profile.goal === 'maintain' ? null : profile.target_weight_kg,
             goal_deadline: profile.goal === 'maintain' ? null : profile.goal_deadline,
-            macros,
-            calories_target: effectiveCaloriesTarget,
-            calorie_delta: effectiveCalorieDelta,
+            macros: levelD.macros,
+            calories_target: Number.isFinite(effectiveCaloriesTarget) ? effectiveCaloriesTarget : null,
+            calorie_delta: Number.isFinite(effectiveCalorieDelta) ? effectiveCalorieDelta : null,
             required_rate_kg_per_week: weightForecast.required_rate_kg_per_week,
             required_calorie_delta: weightForecast.required_calorie_delta,
             required_calories_target: weightForecast.required_calories_target,
             safe_weeks_estimate: weightForecast.safe_weeks_estimate,
-            weight_rate_kg_per_week: effectiveWeightRate,
+            weight_rate_kg_per_week: Number.isFinite(effectiveWeightRate) ? effectiveWeightRate : null,
             predicted_goal_date: weightForecast.predicted_goal_date
         });
     }
@@ -387,66 +498,87 @@ function updateCalculatedMetrics() {
     const fiberElement = document.getElementById('fiber-value');
     const weightRateElement = document.getElementById('weight-rate-value');
     const weightDateElement = document.getElementById('weight-date-value');
+    const levelAStatusElement = document.getElementById('level-a-status');
+    const levelBStatusElement = document.getElementById('level-b-status');
+    const levelCStatusElement = document.getElementById('level-c-status');
+    const levelDStatusElement = document.getElementById('level-d-status');
+    const levelEStatusElement = document.getElementById('level-e-status');
 
     if (ageElement) {
-        if (age === null) {
-            ageElement.textContent = '--';
-        } else if (!hasValidAge) {
-            ageElement.textContent = 'Проверьте дату рождения';
-        } else {
-            ageElement.textContent = `${age} лет`;
-        }
+        ageElement.textContent = Number.isFinite(levelA.age) && levelA.age > 0
+            ? `${levelA.age} лет`
+            : 'Нет расчёта';
     }
     if (bmrElement) {
-        bmrElement.textContent = bmr === null ? '--' : `${Math.round(bmr)} ккал`;
+        bmrElement.textContent = Number.isFinite(levelB.bmr)
+            ? `${Math.round(levelB.bmr)} ккал`
+            : 'Нет расчёта';
     }
     if (tdeeElement) {
-        tdeeElement.textContent = tdee === null ? '--' : `${Math.round(tdee)} ккал`;
+        tdeeElement.textContent = Number.isFinite(levelC.tdee)
+            ? `${Math.round(levelC.tdee)} ккал`
+            : 'Нет расчёта';
     }
     if (caloriesElement) {
         caloriesElement.textContent = Number.isFinite(effectiveCaloriesTarget)
             ? `${Math.round(effectiveCaloriesTarget)} ккал`
-            : '--';
+            : 'Нет расчёта';
     }
     if (proteinElement) {
-        proteinElement.textContent = macros === null
-            ? '--'
-            : `${Math.round(macros.protein_g)} г • ${Math.round(macros.protein_pct * 100)}%`;
+        proteinElement.textContent = levelD.macros === null
+            ? 'Нет расчёта'
+            : `${Math.round(levelD.macros.protein_g)} г • ${Math.round(levelD.macros.protein_pct * 100)}%`;
     }
     if (fatElement) {
-        fatElement.textContent = macros === null
-            ? '--'
-            : `${Math.round(macros.fat_g)} г • ${Math.round(macros.fat_pct * 100)}%`;
+        fatElement.textContent = levelD.macros === null
+            ? 'Нет расчёта'
+            : `${Math.round(levelD.macros.fat_g)} г • ${Math.round(levelD.macros.fat_pct * 100)}%`;
     }
     if (carbsElement) {
-        carbsElement.textContent = macros === null
-            ? '--'
-            : `${Math.round(macros.carbs_g)} г • ${Math.round(macros.carbs_pct * 100)}%`;
+        carbsElement.textContent = levelD.macros === null
+            ? 'Нет расчёта'
+            : `${Math.round(levelD.macros.carbs_g)} г • ${Math.round(levelD.macros.carbs_pct * 100)}%`;
     }
     if (fiberElement) {
         const fiberTarget = Number(window.adminConfig?.reminders?.fiber_target_g);
         fiberElement.textContent = Number.isFinite(fiberTarget) && fiberTarget > 0
             ? `${Math.round(fiberTarget)} г`
-            : '--';
+            : 'Нет цели';
     }
     if (weightRateElement) {
         if (weightForecast.label) {
             weightRateElement.textContent = weightForecast.label;
         } else {
-            weightRateElement.textContent = effectiveWeightRate === null || !Number.isFinite(effectiveWeightRate)
-                ? '--'
-                : `${effectiveWeightRate} кг в неделю`;
+            weightRateElement.textContent = Number.isFinite(effectiveWeightRate)
+                ? `${effectiveWeightRate} кг в неделю`
+                : 'Нет расчёта';
         }
     }
     if (weightDateElement) {
         if (weightForecast.predicted_goal_date === null) {
-            weightDateElement.textContent = '--';
+            weightDateElement.textContent = 'Нет расчёта';
         } else {
             const date = new Date(weightForecast.predicted_goal_date);
             weightDateElement.textContent = Number.isNaN(date.getTime())
                 ? weightForecast.predicted_goal_date
                 : date.toLocaleDateString('ru-RU');
         }
+    }
+
+    if (levelAStatusElement) {
+        levelAStatusElement.textContent = `Уровень A: ${levelA.status}`;
+    }
+    if (levelBStatusElement) {
+        levelBStatusElement.textContent = `Уровень B: ${levelB.status}`;
+    }
+    if (levelCStatusElement) {
+        levelCStatusElement.textContent = `Уровень C: ${levelC.status}`;
+    }
+    if (levelDStatusElement) {
+        levelDStatusElement.textContent = `Уровень D: ${levelD.status}`;
+    }
+    if (levelEStatusElement) {
+        levelEStatusElement.textContent = `Уровень E: ${levelE.status}`;
     }
 }
 

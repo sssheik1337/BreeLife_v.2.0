@@ -64,15 +64,18 @@
                             <span>Энергия в покое</span>
                             <span id="bmr-value" class="font-semibold">--</span>
                         </div>
-                        <p class="text-xs text-slate-500">
-                            Это то, сколько энергии тратит тело, когда вы отдыхаете.
+                        <p class="text-xs text-slate-500" id="level-b-status">
+                            Уровень B: ждём данные для расчёта BMR
                         </p>
                         <div class="flex items-center justify-between">
                             <span>Сколько калорий потреблять в день</span>
                             <span id="tdee-value" class="font-semibold">--</span>
                         </div>
-                        <p class="text-xs text-slate-500">
-                            Это ориентир по потреблению, чтобы вес двигался к цели. Это не про «сжигать», а про то, сколько есть в день.
+                        <p class="text-xs text-slate-500" id="level-c-status">
+                            Уровень C: ждём данные для расчёта TDEE
+                        </p>
+                        <p class="text-xs text-slate-500" id="level-a-status">
+                            Уровень A: ждём дату рождения
                         </p>
                     </div>
                 </div>
@@ -106,8 +109,8 @@
                             <span>Клетчатка</span>
                             <span id="fiber-value" class="font-semibold">--</span>
                         </div>
-                        <p class="text-xs text-slate-500">
-                            Это ориентир по дневному потреблению калорий и БЖУ. Так проще держать выбранный темп без лишних ограничений.
+                        <p class="text-xs text-slate-500" id="level-d-status">
+                            Уровень D: ждём данные для расчёта макросов
                         </p>
                     </div>
                 </div>
@@ -129,6 +132,9 @@
                             <span>Примерная дата достижения</span>
                             <span id="weight-date-value" class="font-semibold">--</span>
                         </div>
+                        <p class="text-xs text-slate-500" id="level-e-status">
+                            Уровень E: ждём данные для прогноза
+                        </p>
                     </div>
                 </div>
 
