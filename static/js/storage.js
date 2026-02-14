@@ -166,6 +166,25 @@
     }
 
     function normalizeSex(value) {
+        if (typeof value === 'string') {
+            const normalized = value.trim().toLowerCase();
+            const sexMap = {
+                male: 'male',
+                man: 'male',
+                'мужской': 'male',
+                'муж': 'male',
+                'м': 'male',
+                female: 'female',
+                woman: 'female',
+                'женский': 'female',
+                'жен': 'female',
+                'ж': 'female'
+            };
+            const mapped = sexMap[normalized] || null;
+            if (mapped && ALLOWED_SEX.has(mapped)) {
+                return mapped;
+            }
+        }
         if (ALLOWED_SEX.has(value)) {
             return value;
         }
