@@ -209,7 +209,7 @@ async function initQuestionnaire() {
 
     if (!isEditMode && typeof getUserProfile === 'function') {
         const profile = getUserProfile();
-        if (profile?.completed === true || hasProfileData(profile)) {
+        if (profile?.is_completed === true || hasProfileData(profile)) {
             window.location.replace('/profile');
             return;
         }
@@ -1238,7 +1238,7 @@ function setupEventListeners() {
                     console.log('[QUESTIONNAIRE_DEBUG] payload перед /api/profile:', {
                         mappedProfile,
                         nullFields,
-                        profile_completed: mappedProfile.profile_completed ?? mappedProfile.completed ?? null
+                        is_completed: mappedProfile.is_completed ?? null
                     });
                 }
                 const missingCritical = criticalKeys.filter((key) => mappedProfile[key] === null || mappedProfile[key] === undefined || mappedProfile[key] === '');
@@ -1254,8 +1254,6 @@ function setupEventListeners() {
                     return;
                 }
                 mappedProfile.is_completed = true;
-                mappedProfile.completed = true;
-                mappedProfile.profile_completed = true;
                 profile = patchUserProfile(mappedProfile);
             }
             if (!profile && typeof getUserProfile === 'function') {

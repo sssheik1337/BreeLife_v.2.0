@@ -1,6 +1,48 @@
 // Хранилище профиля пользователя и нормализация данных
 
 (function() {
+    // Единый canonical-формат профиля между фронтендом и бэкендом.
+    // Все чтения/записи профиля должны использовать только эти ключи.
+    const CANONICAL_PROFILE_KEYS = [
+        'sex',
+        'birth_date',
+        'age',
+        'height_cm',
+        'weight_kg',
+        'target_weight_kg',
+        'goal',
+        'activity_factor',
+        'goal_deadline',
+        'food_diary',
+        'bmr',
+        'tdee_calories',
+        'calories_target',
+        'calorie_delta',
+        'required_rate_kg_per_week',
+        'required_calorie_delta',
+        'required_calories_target',
+        'safe_weeks_estimate',
+        'macros',
+        'weight_rate_kg_per_week',
+        'predicted_goal_date',
+        'weekly_stats',
+        'weekly_adjustments',
+        'weekly_review',
+        'deviation_risk',
+        'deviation_comment',
+        'subscription',
+        'subscription_until',
+        'subscription_status',
+        'subscription_started_at',
+        'trial_started_at',
+        'trial_welcome_seen',
+        'favorite_product_ids',
+        'excluded_product_ids',
+        'is_completed',
+        'last_updated'
+    ];
+    const CANONICAL_PROFILE_KEY_SET = new Set(CANONICAL_PROFILE_KEYS);
+
     const normalizeTelegramInitData = (value) => {
         if (typeof value !== 'string') {
             return '';
@@ -133,14 +175,16 @@
             weekly_review: null,
             deviation_risk: null,
             deviation_comment: null,
+            subscription: null,
             subscription_until: null,
             subscription_status: null,
             subscription_started_at: null,
             trial_started_at: null,
-            completed: false,
-            profile_completed: false,
+            trial_welcome_seen: null,
             favorite_product_ids: [],
-            excluded_product_ids: []
+            excluded_product_ids: [],
+            is_completed: false,
+            last_updated: null
         };
     }
 
@@ -326,7 +370,13 @@
 
     function normalizeUserProfile(profile) {
         const base = getDefaultUserProfile();
-        const merged = { ...base, ...(profile || {}) };
+        const sourceProfile = profile && typeof profile === 'object' ? profile : {};
+        const merged = { ...base };
+        CANONICAL_PROFILE_KEYS.forEach((key) => {
+            if (Object.prototype.hasOwnProperty.call(sourceProfile, key)) {
+                merged[key] = sourceProfile[key];
+            }
+        });
 
         logStorageDebug('normalizeUserProfile:input', {
             profile
@@ -378,16 +428,20 @@
         merged.weekly_review = normalizeWeeklyReview(merged.weekly_review);
         merged.deviation_risk = normalizeRisk(merged.deviation_risk);
         merged.deviation_comment = merged.deviation_comment || null;
+        merged.subscription = merged.subscription && typeof merged.subscription === 'object'
+            ? merged.subscription
+            : null;
         merged.subscription_until = merged.subscription_until || null;
         merged.subscription_status = merged.subscription_status || null;
         merged.subscription_started_at = merged.subscription_started_at || null;
         merged.trial_started_at = merged.trial_started_at || null;
-        const normalizedCompleted = parseBoolean(merged.completed);
-        const normalizedProfileCompleted = parseBoolean(merged.profile_completed);
-        merged.completed = normalizedCompleted;
-        merged.profile_completed = normalizedProfileCompleted;
+        merged.trial_welcome_seen = parseBoolean(merged.trial_welcome_seen);
+        merged.is_completed = parseBoolean(merged.is_completed);
         merged.favorite_product_ids = normalizeIdList(merged.favorite_product_ids);
         merged.excluded_product_ids = normalizeIdList(merged.excluded_product_ids);
+        merged.last_updated = typeof merged.last_updated === 'string' && merged.last_updated.trim()
+            ? merged.last_updated
+            : null;
 
         const requiredFields = [
             merged.sex,
@@ -402,16 +456,8 @@
         }
         const calculatedCompleted = requiredFields.every((value) => value !== null && value !== undefined && value !== '');
 
-        if (merged.completed === null) {
-            merged.completed = calculatedCompleted;
-        }
-        if (merged.profile_completed === null) {
-            merged.profile_completed = merged.completed;
-        }
-
-        // В спорной ситуации приоритет у подтверждённого сервером profile_completed.
-        if (merged.profile_completed !== merged.completed) {
-            merged.completed = merged.profile_completed;
+        if (merged.is_completed === null) {
+            merged.is_completed = calculatedCompleted;
         }
 
         logStorageDebug('normalizeUserProfile:output', {
@@ -426,8 +472,7 @@
                 target_weight_kg: merged.target_weight_kg
             },
             completion_flags: {
-                completed: merged.completed,
-                profile_completed: merged.profile_completed
+                is_completed: merged.is_completed
             }
         });
 
@@ -469,7 +514,8 @@
             subscription_until: null,
             subscription_status: null,
             subscription_started_at: null,
-            trial_started_at: null
+            trial_started_at: null,
+            is_completed: false
         };
         return profile;
     }
@@ -744,6 +790,37 @@
             // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
         return normalized;
+    }
+
+    function validateCanonicalProfilePayload(payload) {
+        if (!payload || typeof payload !== 'object') {
+            return {
+                isCanonical: false,
+                reason: 'PAYLOAD_NOT_OBJECT',
+                conflictingKeys: []
+            };
+        }
+        const keys = Object.keys(payload);
+        const conflictingKeys = keys.filter((key) => !CANONICAL_PROFILE_KEY_SET.has(key));
+        if (conflictingKeys.length > 0) {
+            return {
+                isCanonical: false,
+                reason: 'UNSUPPORTED_KEYS',
+                conflictingKeys
+            };
+        }
+        if (!Object.prototype.hasOwnProperty.call(payload, 'is_completed')) {
+            return {
+                isCanonical: false,
+                reason: 'MISSING_REQUIRED_IS_COMPLETED',
+                conflictingKeys: ['is_completed']
+            };
+        }
+        return {
+            isCanonical: true,
+            reason: null,
+            conflictingKeys: []
+        };
     }
 
     function addTrialDays(startedAtIso, days) {
@@ -1062,6 +1139,14 @@
                 return localProfile;
             }
             if (data && typeof data === 'object') {
+                const validation = validateCanonicalProfilePayload(data);
+                if (!validation.isCanonical) {
+                    console.warn('[PROFILE_CANONICAL] Получен некорректный формат профиля от сервера', {
+                        reason: validation.reason,
+                        conflictingKeys: validation.conflictingKeys,
+                        payload: data
+                    });
+                }
                 const normalized = normalizeUserProfile(data);
                 cachedProfile = normalized;
                 logStorageDebug('syncProfileWithBackend:normalized_backend_payload', {

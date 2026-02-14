@@ -658,7 +658,7 @@ function getLocalProfileCompletedFlag() {
     if (!profile || typeof profile !== 'object') {
         return false;
     }
-    return profile.profile_completed === true || profile.completed === true;
+    return profile.is_completed === true;
 }
 
 function redirectToQuestionnaireIfNeeded(status) {
@@ -701,8 +701,7 @@ function syncLocalProfileCompletion(status) {
         // Если Telegram-сессия временно недоступна, не затираем локально подтверждённый профиль.
         const safeCompleted = isAuthorized ? mergedCompleted : localCompleted;
         patchUserProfile({
-            completed: safeCompleted,
-            profile_completed: safeCompleted
+            is_completed: safeCompleted
         });
     }
 }

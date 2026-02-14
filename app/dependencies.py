@@ -69,12 +69,8 @@ def apply_profile_patch(profile: dict[str, object], patch: dict[str, object]) ->
     updated.update(normalized_patch)
     updated["is_completed"] = bool(
         normalized_patch.get("is_completed")
-        or normalized_patch.get("completed")
-        or normalized_patch.get("profile_completed")
         or normalized_current.get("is_completed")
     )
-    updated["completed"] = updated["is_completed"]
-    updated["profile_completed"] = updated["is_completed"]
     updated["last_updated"] = datetime.now(timezone.utc).isoformat()
     return updated
 
@@ -104,7 +100,25 @@ def get_profile_and_admin_config(telegram_user_id: int | None) -> dict[str, obje
 
 
 def normalize_profile_payload_shape(raw_profile: dict[str, object] | None) -> dict[str, object]:
-    """Нормализовать профиль к плоской структуре и поддержать старые форматы payload."""
+    """
+    Нормализовать профиль к единому canonical-формату и привести legacy-ключи.
+
+    Canonical-поля и типы:
+    - sex: str | null (male/female)
+    - birth_date: str | null (YYYY-MM-DD)
+    - age: int | null
+    - height_cm, weight_kg, target_weight_kg: float | null
+    - goal: str | null (lose/maintain/gain)
+    - activity_factor: float | null
+    - goal_deadline, predicted_goal_date: str | null
+    - food_diary, trial_welcome_seen, is_completed: bool | null
+    - вычисляемые поля калорий/динамики: float | null
+    - macros, weekly_stats, weekly_adjustments, weekly_review, subscription: object | null
+    - favorite_product_ids, excluded_product_ids: list[int]
+    - subscription_until/subscription_status/subscription_started_at/trial_started_at/last_updated: str | null
+
+    На выходе возвращаются только canonical-ключи.
+    """
     if not isinstance(raw_profile, dict):
         return {}
 
@@ -125,6 +139,36 @@ def normalize_profile_payload_shape(raw_profile: dict[str, object] | None) -> di
         except (TypeError, ValueError):
             return None
         return parsed
+
+    def parse_bool(value: object) -> bool | None:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"true", "1", "yes", "y", "да"}:
+                return True
+            if normalized in {"false", "0", "no", "n", "нет"}:
+                return False
+        if isinstance(value, (int, float)):
+            if value == 1:
+                return True
+            if value == 0:
+                return False
+        return None
+
+    def parse_int_list(value: object) -> list[int]:
+        if not isinstance(value, list):
+            return []
+        normalized: list[int] = []
+        for item in value:
+            parsed = parse_number(item)
+            if parsed is None:
+                continue
+            integer = int(parsed)
+            if float(integer) != parsed:
+                continue
+            normalized.append(integer)
+        return list(dict.fromkeys(normalized))
 
     def normalize_goal(value: object) -> str | None:
         if value is None:
@@ -154,31 +198,86 @@ def normalize_profile_payload_shape(raw_profile: dict[str, object] | None) -> di
         }
         profile.pop("user_profile", None)
 
-    # Поддержка legacy-ключей, которые могли быть сохранены в БД ранее.
-    profile["sex"] = pick_existing(profile.get("sex"), profile.get("gender"))
-    profile["birth_date"] = pick_existing(profile.get("birth_date"), profile.get("birthDate"))
-    profile["height_cm"] = pick_existing(profile.get("height_cm"), profile.get("height"))
-    profile["weight_kg"] = pick_existing(profile.get("weight_kg"), profile.get("currentWeight"))
-    profile["target_weight_kg"] = pick_existing(profile.get("target_weight_kg"), profile.get("targetWeight"))
-    profile["activity_factor"] = pick_existing(profile.get("activity_factor"), profile.get("activityLevel"))
-    profile["goal"] = pick_existing(profile.get("goal"), profile.get("goalType"))
-    profile["goal_deadline"] = pick_existing(profile.get("goal_deadline"), profile.get("deadline"))
-    profile["food_diary"] = pick_existing(profile.get("food_diary"), profile.get("foodDiary"))
+    canonical: dict[str, object] = {
+        "sex": pick_existing(profile.get("sex"), profile.get("gender")),
+        "birth_date": pick_existing(profile.get("birth_date"), profile.get("birthDate")),
+        "age": parse_number(profile.get("age")),
+        "height_cm": parse_number(pick_existing(profile.get("height_cm"), profile.get("height"))),
+        "weight_kg": parse_number(pick_existing(profile.get("weight_kg"), profile.get("currentWeight"))),
+        "target_weight_kg": parse_number(pick_existing(profile.get("target_weight_kg"), profile.get("targetWeight"))),
+        "goal": normalize_goal(pick_existing(profile.get("goal"), profile.get("goalType"))),
+        "activity_factor": parse_number(pick_existing(profile.get("activity_factor"), profile.get("activityLevel"))),
+        "goal_deadline": pick_existing(profile.get("goal_deadline"), profile.get("deadline")),
+        "food_diary": parse_bool(pick_existing(profile.get("food_diary"), profile.get("foodDiary"))),
+        "bmr": parse_number(profile.get("bmr")),
+        "tdee_calories": parse_number(profile.get("tdee_calories")),
+        "calories_target": parse_number(profile.get("calories_target")),
+        "calorie_delta": parse_number(profile.get("calorie_delta")),
+        "required_rate_kg_per_week": parse_number(profile.get("required_rate_kg_per_week")),
+        "required_calorie_delta": parse_number(profile.get("required_calorie_delta")),
+        "required_calories_target": parse_number(profile.get("required_calories_target")),
+        "safe_weeks_estimate": parse_number(profile.get("safe_weeks_estimate")),
+        "macros": profile.get("macros") if isinstance(profile.get("macros"), dict) else None,
+        "weight_rate_kg_per_week": parse_number(profile.get("weight_rate_kg_per_week")),
+        "predicted_goal_date": profile.get("predicted_goal_date") if isinstance(profile.get("predicted_goal_date"), str) else None,
+        "weekly_stats": profile.get("weekly_stats") if isinstance(profile.get("weekly_stats"), dict) else None,
+        "weekly_adjustments": profile.get("weekly_adjustments") if isinstance(profile.get("weekly_adjustments"), dict) else None,
+        "weekly_review": profile.get("weekly_review") if isinstance(profile.get("weekly_review"), dict) else None,
+        "deviation_risk": profile.get("deviation_risk") if isinstance(profile.get("deviation_risk"), str) else None,
+        "deviation_comment": profile.get("deviation_comment") if isinstance(profile.get("deviation_comment"), str) else None,
+        "subscription": profile.get("subscription") if isinstance(profile.get("subscription"), dict) else None,
+        "subscription_until": profile.get("subscription_until") if isinstance(profile.get("subscription_until"), str) else None,
+        "subscription_status": profile.get("subscription_status") if isinstance(profile.get("subscription_status"), str) else None,
+        "subscription_started_at": profile.get("subscription_started_at") if isinstance(profile.get("subscription_started_at"), str) else None,
+        "trial_started_at": profile.get("trial_started_at") if isinstance(profile.get("trial_started_at"), str) else None,
+        "trial_welcome_seen": parse_bool(profile.get("trial_welcome_seen")),
+        "favorite_product_ids": parse_int_list(profile.get("favorite_product_ids")),
+        "excluded_product_ids": parse_int_list(profile.get("excluded_product_ids")),
+        "is_completed": parse_bool(
+            pick_existing(profile.get("is_completed"), profile.get("completed"), profile.get("profile_completed"))
+        ),
+        "last_updated": profile.get("last_updated") if isinstance(profile.get("last_updated"), str) else None,
+    }
 
-    profile["height_cm"] = parse_number(profile.get("height_cm"))
-    profile["weight_kg"] = parse_number(profile.get("weight_kg"))
-    profile["target_weight_kg"] = parse_number(profile.get("target_weight_kg"))
-    profile["activity_factor"] = parse_number(profile.get("activity_factor"))
-    profile["goal"] = normalize_goal(profile.get("goal"))
+    if canonical["is_completed"] is None:
+        canonical["is_completed"] = False
 
-    is_completed = profile.get("is_completed")
-    if is_completed is None:
-        is_completed = bool(profile.get("completed") or profile.get("profile_completed"))
-    profile["is_completed"] = bool(is_completed)
-
-    if "completed" not in profile:
-        profile["completed"] = profile["is_completed"]
-    if "profile_completed" not in profile:
-        profile["profile_completed"] = profile["is_completed"]
-
-    return profile
+    return {key: value for key, value in canonical.items() if key in CANONICAL_PROFILE_FIELDS}
+CANONICAL_PROFILE_FIELDS = {
+    "sex",
+    "birth_date",
+    "age",
+    "height_cm",
+    "weight_kg",
+    "target_weight_kg",
+    "goal",
+    "activity_factor",
+    "goal_deadline",
+    "food_diary",
+    "bmr",
+    "tdee_calories",
+    "calories_target",
+    "calorie_delta",
+    "required_rate_kg_per_week",
+    "required_calorie_delta",
+    "required_calories_target",
+    "safe_weeks_estimate",
+    "macros",
+    "weight_rate_kg_per_week",
+    "predicted_goal_date",
+    "weekly_stats",
+    "weekly_adjustments",
+    "weekly_review",
+    "deviation_risk",
+    "deviation_comment",
+    "subscription",
+    "subscription_until",
+    "subscription_status",
+    "subscription_started_at",
+    "trial_started_at",
+    "trial_welcome_seen",
+    "favorite_product_ids",
+    "excluded_product_ids",
+    "is_completed",
+    "last_updated",
+}

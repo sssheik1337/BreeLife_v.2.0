@@ -1230,11 +1230,10 @@ async function saveAndContinue() {
     if (typeof patchUserProfile === 'function') {
         if (typeof mapUserDataToUserProfile === 'function') {
             const mappedProfile = mapUserDataToUserProfile(window.userData || {});
-            mappedProfile.completed = true;
-            mappedProfile.profile_completed = true;
+            mappedProfile.is_completed = true;
             profileForSave = patchUserProfile(mappedProfile);
         } else {
-            profileForSave = patchUserProfile({ completed: true, profile_completed: true });
+            profileForSave = patchUserProfile({ is_completed: true });
         }
     }
 
