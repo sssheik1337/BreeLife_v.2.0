@@ -314,7 +314,19 @@
         });
 
         merged.sex = normalizeSex(merged.sex);
-        merged.birth_date = merged.birth_date || null;
+        const rawBirthDate = merged.birth_date;
+        if (rawBirthDate === null || rawBirthDate === undefined || rawBirthDate === '') {
+            merged.birth_date = null;
+        } else if (typeof window.normalizeLocalDate === 'function') {
+            const normalizedBirthDate = window.normalizeLocalDate(rawBirthDate);
+            merged.birth_date = typeof normalizedBirthDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(normalizedBirthDate)
+                ? normalizedBirthDate
+                : null;
+        } else {
+            merged.birth_date = typeof rawBirthDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawBirthDate)
+                ? rawBirthDate
+                : null;
+        }
         merged.age = parseNumber(merged.age);
         if (merged.age === null) {
             merged.age = getAgeFromBirthDate(merged.birth_date);
