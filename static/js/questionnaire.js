@@ -249,7 +249,17 @@ async function loadSavedAnswers() {
 
     if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
         const profile = getUserProfile();
-        Object.assign(window.userData, mapUserProfileToUserData(profile));
+        const mapped = mapUserProfileToUserData(profile);
+        Object.entries(mapped || {}).forEach(([key, value]) => {
+            const current = window.userData?.[key];
+            const hasCurrentValue = current !== null && current !== undefined && current !== '';
+            const hasIncomingValue = value !== null && value !== undefined && value !== '';
+
+            // Не перезаписываем уже выбранный пользователем ответ (например, пол) пустыми данными из профиля.
+            if (!hasCurrentValue && hasIncomingValue) {
+                window.userData[key] = value;
+            }
+        });
         return;
     }
 

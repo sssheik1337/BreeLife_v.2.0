@@ -750,6 +750,22 @@ function restoreUserDataFromLocalStorage() {
     }
 }
 
+function mergeUserDataWithoutLosingAnswers(target, source) {
+    if (!target || typeof target !== 'object' || !source || typeof source !== 'object') {
+        return;
+    }
+    Object.entries(source).forEach(([key, value]) => {
+        const current = target[key];
+        const hasCurrentValue = current !== null && current !== undefined && current !== '';
+        const hasIncomingValue = value !== null && value !== undefined && value !== '';
+
+        // Не затираем уже введённый пользователем ответ более поздней асинхронной подгрузкой.
+        if (!hasCurrentValue && hasIncomingValue) {
+            target[key] = value;
+        }
+    });
+}
+
 // Применение темы Telegram WebApp к CSS-переменным
 function applyTelegramTheme() {
     const tg = window.Telegram?.WebApp;
@@ -895,11 +911,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Load saved data if available
     if (typeof getUserProfile === 'function') {
         const profile = getUserProfile();
-        Object.assign(userData, mapUserProfileToUserData(profile));
+        mergeUserDataWithoutLosingAnswers(userData, mapUserProfileToUserData(profile));
     } else {
         const savedData = storage.get('user_data');
         if (savedData) {
-            Object.assign(userData, savedData);
+            mergeUserDataWithoutLosingAnswers(userData, savedData);
         }
     }
 
