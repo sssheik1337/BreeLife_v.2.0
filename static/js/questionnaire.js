@@ -250,16 +250,9 @@ async function loadSavedAnswers() {
     if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
         const profile = getUserProfile();
         const mapped = mapUserProfileToUserData(profile);
-        Object.entries(mapped || {}).forEach(([key, value]) => {
-            const current = window.userData?.[key];
-            const hasCurrentValue = current !== null && current !== undefined && current !== '';
-            const hasIncomingValue = value !== null && value !== undefined && value !== '';
-
-            // Не перезаписываем уже выбранный пользователем ответ (например, пол) пустыми данными из профиля.
-            if (!hasCurrentValue && hasIncomingValue) {
-                window.userData[key] = value;
-            }
-        });
+        if (typeof mergeUserDataWithoutLosingAnswers === 'function') {
+            mergeUserDataWithoutLosingAnswers(window.userData, mapped, { source: 'server' });
+        }
         return;
     }
 
@@ -475,8 +468,8 @@ function renderHeightRuler(currentValue) {
         ticks.forEach((tick) => {
             tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === virtualIndex);
         });
-        window.userData[dataKey] = value;
-        window.userData.height = value;
+        setUserDataField(dataKey, value, { source: 'form', markDirty: true });
+        setUserDataField('height', value, { source: 'form', markDirty: true });
         saveUserData();
         updateButtonStates();
         updateHeightMagnifier(virtualIndex);
@@ -613,11 +606,11 @@ function renderWeightRuler(currentValue) {
         ticks.forEach((tick) => {
             tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === virtualIndex);
         });
-        window.userData[dataKey] = value;
+        setUserDataField(dataKey, value, { source: 'form', markDirty: true });
         // Не затираем текущий вес на шаге "Желаемый вес".
         // Синхронизируем currentWeight только когда пользователь редактирует именно текущий вес.
         if (dataKey === 'currentWeight') {
-            window.userData.currentWeight = value;
+            setUserDataField('currentWeight', value, { source: 'form', markDirty: true });
         }
         saveUserData();
         updateButtonStates();
@@ -794,9 +787,9 @@ function displayInput(question) {
                 const hasAllFields = Boolean(year && month && day);
                 if (hasAllFields) {
                     const formatted = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    window.userData[getDataKey(currentQuestionIndex)] = formatted;
+                    setUserDataField(getDataKey(currentQuestionIndex), formatted, { source: 'form', markDirty: true });
                 } else {
-                    window.userData[getDataKey(currentQuestionIndex)] = '';
+                    setUserDataField(getDataKey(currentQuestionIndex), '', { source: 'form', markDirty: true });
                 }
                 saveUserData();
                 updateButtonStates();
@@ -811,7 +804,7 @@ function displayInput(question) {
                         defaultDeadline.setMonth(defaultDeadline.getMonth() + 3);
                         const defaultValue = formatDateValue(defaultDeadline);
                         currentValue = defaultValue;
-                        window.userData[getDataKey(currentQuestionIndex)] = defaultValue;
+                        setUserDataField(getDataKey(currentQuestionIndex), defaultValue, { source: 'form', markDirty: true });
                         saveUserData();
                     }
                     if (!currentValue) {
@@ -839,7 +832,7 @@ function displayInput(question) {
                 }
                 if (isDeadlinePicker) {
                     const formatted = `${clamped.year}-${String(clamped.month).padStart(2, '0')}-${String(clamped.day).padStart(2, '0')}`;
-                    window.userData[getDataKey(currentQuestionIndex)] = formatted;
+                    setUserDataField(getDataKey(currentQuestionIndex), formatted, { source: 'form', markDirty: true });
                     saveUserData();
                 }
             };
@@ -869,7 +862,7 @@ function displayInput(question) {
         const resolved = resolveNumberPickerState(question, currentValue);
         currentValue = resolved.value;
         if (resolved.shouldPersist) {
-            window.userData[getDataKey(currentQuestionIndex)] = currentValue;
+            setUserDataField(getDataKey(currentQuestionIndex), currentValue, { source: 'form', markDirty: true });
             saveUserData();
         }
         const options = buildNumberOptions(question, currentValue, resolved.range);
@@ -888,14 +881,14 @@ function displayInput(question) {
             input.value = currentValue || '';
             input.addEventListener('input', () => {
                 const value = input.value;
-                window.userData[getDataKey(currentQuestionIndex)] = value;
+                setUserDataField(getDataKey(currentQuestionIndex), value, { source: 'form', markDirty: true });
                 saveUserData();
                 updateButtonStates();
                 console.log('[QUESTIONNAIRE_TRACE] шаг обновлён (number input):', window.userData);
             });
             input.addEventListener('change', () => {
                 const value = input.value;
-                window.userData[getDataKey(currentQuestionIndex)] = value;
+                setUserDataField(getDataKey(currentQuestionIndex), value, { source: 'form', markDirty: true });
                 saveUserData();
                 updateButtonStates();
                 console.log('[QUESTIONNAIRE_TRACE] шаг обновлён (number change):', window.userData);
@@ -922,7 +915,7 @@ function selectOption(optionElement, value) {
     optionElement.querySelector('.checkmark').style.display = 'block';
     
     // Update user data
-    window.userData[getDataKey(currentQuestionIndex)] = value;
+    setUserDataField(getDataKey(currentQuestionIndex), value, { source: 'form', markDirty: true });
     saveUserData();
     const currentQuestion = getQuestionByIndex(currentQuestionIndex);
     if (currentQuestion?.id === 7) {
@@ -1266,6 +1259,9 @@ function setupEventListeners() {
                     showNotification('Не удалось сохранить профиль. Проверьте подключение и повторите попытку.', 'error');
                 }
                 return;
+            }
+            if (typeof resetUserDataDirtyMap === 'function') {
+                resetUserDataDirtyMap('profile_saved');
             }
             // Все вопросы заполнены, переходим на экран прогресса.
             window.location.href = '/trial-start';

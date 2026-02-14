@@ -1103,6 +1103,9 @@
             } catch (error) {
                 // Игнорируем ошибку сохранения, данные остаются в памяти.
             }
+            if (typeof window.resetUserDataDirtyMap === 'function') {
+                window.resetUserDataDirtyMap('profile_saved');
+            }
         } catch (error) {
             // Ошибки синхронизации игнорируем, данные остаются локально.
         }
@@ -1156,6 +1159,17 @@
                     memorySet(STORAGE_KEY, JSON.stringify(normalized));
                 } catch (error) {
                     // Игнорируем ошибку сохранения, данные остаются в памяти.
+                }
+                if (
+                    typeof window.mergeUserDataWithoutLosingAnswers === 'function'
+                    && typeof window.mapUserProfileToUserData === 'function'
+                    && window.userData
+                ) {
+                    window.mergeUserDataWithoutLosingAnswers(
+                        window.userData,
+                        window.mapUserProfileToUserData(normalized),
+                        { source: 'server' }
+                    );
                 }
                 return normalized;
             }

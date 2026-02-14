@@ -16,6 +16,92 @@ const userData = {
 
 window.userData = userData;
 
+const USER_DATA_DIRTY_KEYS = ['gender', 'birthDate', 'height', 'currentWeight', 'activityLevel', 'goalType'];
+const userDataDirtyMap = {};
+USER_DATA_DIRTY_KEYS.forEach((key) => {
+    userDataDirtyMap[key] = false;
+});
+window.userDataDirtyMap = userDataDirtyMap;
+
+function shouldTrackDirtyKey(key) {
+    return USER_DATA_DIRTY_KEYS.includes(key);
+}
+
+function logUserDataOverwriteEvent(payload) {
+    console.log('[USERDATA_OVERWRITE_EVENT]', payload);
+}
+
+function markUserDataFieldDirty(key, source = 'form') {
+    if (!shouldTrackDirtyKey(key)) {
+        return;
+    }
+    userDataDirtyMap[key] = true;
+    logUserDataOverwriteEvent({
+        action: 'mark_dirty',
+        key,
+        source
+    });
+}
+
+function isUserDataFieldDirty(key) {
+    if (!shouldTrackDirtyKey(key)) {
+        return false;
+    }
+    return userDataDirtyMap[key] === true;
+}
+
+function resetUserDataDirtyMap(reason = 'unknown') {
+    USER_DATA_DIRTY_KEYS.forEach((key) => {
+        userDataDirtyMap[key] = false;
+    });
+    logUserDataOverwriteEvent({
+        action: 'reset_dirty_map',
+        reason
+    });
+}
+
+function setUserDataField(key, value, options = {}) {
+    if (!window.userData || typeof window.userData !== 'object') {
+        window.userData = userData;
+    }
+    const source = options.source || 'unknown';
+    const markDirty = options.markDirty === true;
+    const ignoreDirty = options.ignoreDirty === true;
+    const dirty = isUserDataFieldDirty(key);
+
+    if (dirty && !ignoreDirty && source !== 'form') {
+        logUserDataOverwriteEvent({
+            action: 'skip_overwrite',
+            key,
+            source,
+            reason: 'FIELD_IS_DIRTY',
+            current: window.userData[key],
+            incoming: value
+        });
+        return false;
+    }
+
+    window.userData[key] = value;
+
+    if (markDirty && source === 'form') {
+        markUserDataFieldDirty(key, source);
+    }
+
+    logUserDataOverwriteEvent({
+        action: 'set_value',
+        key,
+        source,
+        dirty: isUserDataFieldDirty(key),
+        value
+    });
+    return true;
+}
+
+window.markUserDataFieldDirty = markUserDataFieldDirty;
+window.isUserDataFieldDirty = isUserDataFieldDirty;
+window.resetUserDataDirtyMap = resetUserDataDirtyMap;
+window.setUserDataField = setUserDataField;
+
 // Преобразование user_profile в данные анкеты
 function mapUserProfileToUserData(profile) {
     if (!profile) {
@@ -741,29 +827,44 @@ function restoreUserDataFromLocalStorage() {
         }
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
-            window.userData = parsed;
-            console.log('[USERDATA] восстановлено из localStorage');
+            mergeUserDataWithoutLosingAnswers(window.userData, parsed, { source: 'local' });
+            console.log('[USERDATA] восстановлено из localStorage без перезаписи dirty-полей');
         }
     } catch (error) {
         console.warn('Не удалось восстановить userData', error);
     }
 }
 
-function mergeUserDataWithoutLosingAnswers(target, source) {
+function mergeUserDataWithoutLosingAnswers(target, source, options = {}) {
     if (!target || typeof target !== 'object' || !source || typeof source !== 'object') {
         return;
     }
+    const sourceName = options.source || 'unknown';
     Object.entries(source).forEach(([key, value]) => {
+        const hasIncomingValue = value !== null && value !== undefined && value !== '';
+        if (!hasIncomingValue) {
+            return;
+        }
+        const dirty = typeof isUserDataFieldDirty === 'function' && isUserDataFieldDirty(key);
+        if (dirty) {
+            logUserDataOverwriteEvent({
+                action: 'skip_merge',
+                key,
+                source: sourceName,
+                reason: 'FIELD_IS_DIRTY',
+                current: target[key],
+                incoming: value
+            });
+            return;
+        }
         const current = target[key];
         const hasCurrentValue = current !== null && current !== undefined && current !== '';
-        const hasIncomingValue = value !== null && value !== undefined && value !== '';
-
-        // Не затираем уже введённый пользователем ответ более поздней асинхронной подгрузкой.
-        if (!hasCurrentValue && hasIncomingValue) {
-            target[key] = value;
+        if (!hasCurrentValue) {
+            setUserDataField(key, value, { source: sourceName });
         }
     });
 }
+window.mergeUserDataWithoutLosingAnswers = mergeUserDataWithoutLosingAnswers;
 
 // Применение темы Telegram WebApp к CSS-переменным
 function applyTelegramTheme() {
@@ -910,11 +1011,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Load saved data if available
     if (typeof getUserProfile === 'function') {
         const profile = getUserProfile();
-        mergeUserDataWithoutLosingAnswers(userData, mapUserProfileToUserData(profile));
+        mergeUserDataWithoutLosingAnswers(userData, mapUserProfileToUserData(profile), { source: 'server' });
     } else {
         const savedData = storage.get('user_data');
         if (savedData) {
-            mergeUserDataWithoutLosingAnswers(userData, savedData);
+            mergeUserDataWithoutLosingAnswers(userData, savedData, { source: 'local' });
         }
     }
 
