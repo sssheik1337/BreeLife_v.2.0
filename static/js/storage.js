@@ -77,6 +77,28 @@
     let cachedDiaryEntries = null;
     let cachedHabitEntries = null;
 
+    function createProfileTraceId() {
+        const randomPart = Math.random().toString(36).slice(2, 8);
+        return `trace-${Date.now()}-${randomPart}`;
+    }
+
+    function beginProfileTrace(source = 'unknown') {
+        const trace = {
+            id: createProfileTraceId(),
+            source,
+            started_at: new Date().toISOString()
+        };
+        window.__profileTrace = trace;
+        return trace.id;
+    }
+
+    function getProfileTraceId() {
+        if (window.__profileTrace?.id) {
+            return window.__profileTrace.id;
+        }
+        return beginProfileTrace('getUserProfile');
+    }
+
     function apiFetch(url, options = {}) {
         const headers = {
             'Content-Type': 'application/json',
@@ -756,8 +778,10 @@
     }
 
     function getUserProfile() {
+        const traceId = getProfileTraceId();
         if (cachedProfile) {
             logStorageDebug('getUserProfile:from_cache', {
+                traceId,
                 cachedProfile
             });
             return cachedProfile;
@@ -766,6 +790,7 @@
         try {
             const raw = memoryGet(STORAGE_KEY);
             logStorageDebug('getUserProfile:raw_storage_value', {
+                traceId,
                 raw
             });
             storedProfile = raw ? JSON.parse(raw) : null;
@@ -781,6 +806,7 @@
         const normalized = normalizeUserProfile(storedProfile);
         cachedProfile = normalized;
         logStorageDebug('getUserProfile:normalized_result', {
+            traceId,
             storedProfile,
             normalized
         });
@@ -1112,8 +1138,10 @@
     }
 
     async function syncProfileWithBackend() {
+        const traceId = beginProfileTrace('syncProfileWithBackend');
         if (window.serverUser?.authorized !== true) {
             logStorageDebug('syncProfileWithBackend:skip_unauthorized', {
+                traceId,
                 serverUser: window.serverUser
             });
             return getUserProfile();
@@ -1122,12 +1150,14 @@
             const response = await apiFetch('/api/profile');
             if (!response.ok) {
                 logStorageDebug('syncProfileWithBackend:response_not_ok', {
+                    traceId,
                     status: response.status
                 });
                 return getUserProfile();
             }
             const data = await response.json();
             logStorageDebug('syncProfileWithBackend:raw_backend_payload', {
+                traceId,
                 data
             });
             if (!data || typeof data !== 'object') {
@@ -1153,6 +1183,7 @@
                 const normalized = normalizeUserProfile(data);
                 cachedProfile = normalized;
                 logStorageDebug('syncProfileWithBackend:normalized_backend_payload', {
+                    traceId,
                     normalized
                 });
                 try {
@@ -1423,6 +1454,8 @@
         return localHabits;
     }
 
+    window.beginProfileTrace = beginProfileTrace;
+    window.getProfileTraceId = getProfileTraceId;
     window.getUserProfile = getUserProfile;
     window.setUserProfile = setUserProfile;
     window.patchUserProfile = patchUserProfile;

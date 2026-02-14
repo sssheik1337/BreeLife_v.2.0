@@ -6,6 +6,7 @@ let resumeInitialProfileSnapshot = null;
 let resumeIsDirty = false;
 let resumeHasUserEdits = false;
 let resumeLastGoalDeadlineWarning = null;
+let resumeLastDiagnostics = null;
 
 function logResumeDebug(stage, payload) {
     if (window.appDebug === true) {
@@ -13,6 +14,140 @@ function logResumeDebug(stage, payload) {
     }
 }
 
+function getResumeTraceId() {
+    if (typeof window.getProfileTraceId === 'function') {
+        return window.getProfileTraceId();
+    }
+    if (window.__profileTrace?.id) {
+        return window.__profileTrace.id;
+    }
+    const fallback = `resume-${Date.now()}`;
+    window.__profileTrace = { id: fallback, source: 'resume' };
+    return fallback;
+}
+
+function buildResumeDiagnostics(profile) {
+    const toNumber = (value) => {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : null;
+    };
+    const age = typeof calculateAge === 'function' ? calculateAge(profile?.birth_date) : null;
+    const weight = toNumber(profile?.weight_kg);
+    const height = toNumber(profile?.height_cm);
+    const activityFactor = toNumber(profile?.activity_factor);
+    const goal = profile?.goal || null;
+    const targetWeight = toNumber(profile?.target_weight_kg);
+
+    const stages = {
+        age: {
+            valid: Number.isFinite(age) && age > 0,
+            reason: null
+        },
+        bmr: {
+            valid: Boolean(profile?.sex) && Number.isFinite(age) && age > 0 && Number.isFinite(weight) && weight > 0 && Number.isFinite(height) && height > 0,
+            reason: null
+        },
+        tdee: {
+            valid: false,
+            reason: null
+        },
+        macros: {
+            valid: false,
+            reason: null
+        },
+        forecast: {
+            valid: false,
+            reason: null
+        }
+    };
+
+    if (!stages.age.valid) {
+        stages.age.reason = 'Некорректная или отсутствующая дата рождения';
+    }
+    if (!stages.bmr.valid) {
+        const missing = [];
+        if (!profile?.sex) missing.push('sex');
+        if (!(Number.isFinite(age) && age > 0)) missing.push('age');
+        if (!(Number.isFinite(weight) && weight > 0)) missing.push('weight_kg');
+        if (!(Number.isFinite(height) && height > 0)) missing.push('height_cm');
+        stages.bmr.reason = `Не хватает полей: ${missing.join(', ')}`;
+    }
+
+    stages.tdee.valid = stages.bmr.valid && Number.isFinite(activityFactor) && activityFactor > 0;
+    if (!stages.tdee.valid) {
+        stages.tdee.reason = stages.bmr.valid
+            ? 'Не хватает activity_factor'
+            : 'TDEE недоступен, пока невалиден BMR';
+    }
+
+    const caloriesTarget = toNumber(profile?.calories_target);
+    stages.macros.valid = Boolean(goal) && Number.isFinite(weight) && weight > 0 && Number.isFinite(caloriesTarget) && caloriesTarget > 0;
+    if (!stages.macros.valid) {
+        const missing = [];
+        if (!goal) missing.push('goal');
+        if (!(Number.isFinite(weight) && weight > 0)) missing.push('weight_kg');
+        if (!(Number.isFinite(caloriesTarget) && caloriesTarget > 0)) missing.push('calories_target');
+        stages.macros.reason = `Не хватает полей: ${missing.join(', ')}`;
+    }
+
+    stages.forecast.valid = Boolean(goal) && Number.isFinite(weight) && weight > 0 && stages.tdee.valid;
+    if (stages.forecast.valid && goal !== 'maintain' && !(Number.isFinite(targetWeight) && targetWeight > 0)) {
+        stages.forecast.valid = false;
+        stages.forecast.reason = 'Для прогноза нужен target_weight_kg';
+    }
+    if (!stages.forecast.valid && !stages.forecast.reason) {
+        stages.forecast.reason = 'Не хватает данных для прогноза';
+    }
+
+    const firstFailureReason = stages.age.reason || stages.bmr.reason || stages.tdee.reason || stages.macros.reason || stages.forecast.reason || null;
+
+    return {
+        critical_fields: {
+            sex: profile?.sex ?? null,
+            birth_date: profile?.birth_date ?? null,
+            age,
+            height_cm: height,
+            weight_kg: weight,
+            activity_factor: activityFactor,
+            goal,
+            target_weight_kg: targetWeight,
+            calories_target: caloriesTarget,
+            goal_deadline: profile?.goal_deadline ?? null
+        },
+        stages,
+        first_failure_reason: firstFailureReason
+    };
+}
+
+function copyResumeDiagnosticsToClipboard() {
+    const diagnostics = resumeLastDiagnostics || buildResumeDiagnostics(resolveResumeComputationProfile());
+    const payload = JSON.stringify(diagnostics, null, 2);
+    const notify = (message, type = 'success') => {
+        if (typeof showNotification === 'function') {
+            showNotification(message, type);
+        }
+    };
+
+    if (navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(payload)
+            .then(() => notify('Диагностика скопирована в буфер обмена.'))
+            .catch(() => notify('Не удалось скопировать диагностику.', 'error'));
+        return;
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = payload;
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        notify('Диагностика скопирована в буфер обмена.');
+    } catch (error) {
+        notify('Не удалось скопировать диагностику.', 'error');
+    } finally {
+        document.body.removeChild(textarea);
+    }
+}
 
 function hasMeaningfulUserData(data) {
     if (!data || typeof data !== 'object') {
@@ -234,6 +369,7 @@ function updateCalculatedMetrics() {
         return;
     }
 
+    const traceId = getResumeTraceId();
     const profile = resolveResumeComputationProfile();
     const weight = Number(profile.weight_kg);
     const height = Number(profile.height_cm);
@@ -443,7 +579,21 @@ function updateCalculatedMetrics() {
             : 'Прогноз рассчитан';
     }
 
+    const diagnostics = buildResumeDiagnostics({
+        ...profile,
+        age: levelA.age,
+        bmr: levelB.bmr,
+        tdee_calories: levelC.tdee,
+        calories_target: effectiveCaloriesTarget,
+        weight_rate_kg_per_week: effectiveWeightRate
+    });
+    resumeLastDiagnostics = {
+        trace_id: traceId,
+        diagnostics
+    };
+
     logResumeDebug('updateCalculatedMetrics:levels', {
+        traceId,
         profile,
         levelA,
         levelB,
@@ -454,6 +604,12 @@ function updateCalculatedMetrics() {
         effectiveCalorieDelta,
         effectiveWeightRate
     });
+
+    if (window.appDebug === true) {
+        console.groupCollapsed(`[RESUME_DIAGNOSTICS] ${traceId}`);
+        console.log(resumeLastDiagnostics);
+        console.groupEnd();
+    }
 
     if (typeof patchUserProfile === 'function') {
         patchUserProfile({
@@ -1511,6 +1667,14 @@ document.addEventListener('DOMContentLoaded', async function() {
     renderPersonalRecommendations();
     applyAiRecommendationToResume();
     renderNutritionRings();
+
+    const copyDiagnosticsButton = document.getElementById('resume-copy-diagnostics-button');
+    if (copyDiagnosticsButton) {
+        copyDiagnosticsButton.classList.toggle('hidden', window.appDebug !== true);
+        copyDiagnosticsButton.addEventListener('click', () => {
+            copyResumeDiagnosticsToClipboard();
+        });
+    }
     renderTrialStatus();
     
     resumeInitialProfileSnapshot = buildComparableResumeProfileState('initial');
