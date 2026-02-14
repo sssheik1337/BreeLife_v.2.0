@@ -16,10 +16,58 @@ function calculateAge(birth_date) {
     if (!birth_date) {
         return null;
     }
-    const birthDate = new Date(birth_date);
-    if (Number.isNaN(birthDate.getTime())) {
+
+    let year = null;
+    let month = null;
+    let day = null;
+
+    if (birth_date instanceof Date) {
+        if (Number.isNaN(birth_date.getTime())) {
+            return null;
+        }
+        year = birth_date.getFullYear();
+        month = birth_date.getMonth() + 1;
+        day = birth_date.getDate();
+    } else {
+        const raw = String(birth_date).trim();
+        if (!raw) {
+            return null;
+        }
+
+        let normalized = raw;
+        if (typeof window.normalizeLocalDate === 'function') {
+            // Сначала пробуем штатный нормализатор даты приложения.
+            normalized = window.normalizeLocalDate(raw) || raw;
+        }
+
+        let match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!match) {
+            // Поддержка формата DD.MM.YYYY.
+            const ddmmyyyy = raw.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+            if (ddmmyyyy) {
+                year = Number(ddmmyyyy[3]);
+                month = Number(ddmmyyyy[2]);
+                day = Number(ddmmyyyy[1]);
+            } else {
+                return null;
+            }
+        } else {
+            year = Number(match[1]);
+            month = Number(match[2]);
+            day = Number(match[3]);
+        }
+    }
+
+    const birthDate = new Date(year, month - 1, day);
+    if (
+        Number.isNaN(birthDate.getTime())
+        || birthDate.getFullYear() !== year
+        || birthDate.getMonth() !== month - 1
+        || birthDate.getDate() !== day
+    ) {
         return null;
     }
+
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
