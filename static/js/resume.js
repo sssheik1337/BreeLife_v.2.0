@@ -409,7 +409,7 @@ function updateCalculatedMetrics() {
         levelA.status = `Не хватает: ${formatMissingFields(levelA.missing)}`;
     } else {
         levelA.age = typeof calculateAge === 'function' ? calculateAge(profile.birth_date) : null;
-        if (levelA.age === null || levelA.age <= 0) {
+        if (!Number.isFinite(levelA.age) || levelA.age <= 0) {
             levelA.status = 'Проверьте корректность даты рождения';
         } else {
             levelA.status = 'Возраст рассчитан';

@@ -254,9 +254,38 @@ function mapUserDataToUserProfile(data) {
 }
 
 // Форматировать дату для отображения на русском языке
+function normalizeBirthDateInput(value) {
+    if (!value) {
+        return null;
+    }
+    if (typeof window.normalizeLocalDate === 'function') {
+        const normalized = window.normalizeLocalDate(value);
+        if (typeof normalized === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+            return normalized;
+        }
+    }
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        const dot = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+        if (dot) {
+            const [, day, month, year] = dot;
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+        const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (iso) {
+            return `${iso[1]}-${iso[2]}-${iso[3]}`;
+        }
+    }
+    return null;
+}
+
 function formatDate(dateString) {
     if (!dateString) return 'Не указано';
-    const date = new Date(dateString);
+    const normalized = normalizeBirthDateInput(dateString);
+    if (!normalized) {
+        return 'Не указано';
+    }
+    const date = new Date(`${normalized}T00:00:00`);
     if (Number.isNaN(date.getTime())) {
         return 'Не указано';
     }
@@ -267,19 +296,23 @@ function formatDate(dateString) {
     });
 }
 
-// Calculate age from birth date
+// Рассчитать возраст по дате рождения в устойчивом формате.
 function calculateAge(birthDate) {
-    if (!birthDate) return null;
+    const normalized = normalizeBirthDateInput(birthDate);
+    if (!normalized) return null;
     const today = new Date();
-    const birth = new Date(birthDate);
+    const birth = new Date(`${normalized}T00:00:00`);
+    if (Number.isNaN(birth.getTime())) {
+        return null;
+    }
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-        age--;
+        age -= 1;
     }
-    
-    return age;
+
+    return Number.isFinite(age) && age >= 0 ? age : null;
 }
 
 // Validate form inputs
