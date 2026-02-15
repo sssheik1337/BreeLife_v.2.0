@@ -343,6 +343,14 @@ function updateCalculatedMetrics(profile) {
     if (!(Number.isFinite(activityFactor) && activityFactor > 0)) {
         levelC.missing.push('activity_factor');
     }
+    if (window.appDebug === true) {
+        console.log('LEVEL C DEBUG', {
+            bmr: levelB.bmr,
+            activity_factor: safeProfile.activity_factor,
+            type_activity: typeof safeProfile.activity_factor,
+            missing: levelC.missing
+        });
+    }
     if (levelC.missing.length === 0 && typeof calculateTDEE === 'function') {
         levelC.tdee = calculateTDEE(levelB.bmr, safeProfile.activity_factor);
     }
