@@ -253,6 +253,8 @@ function updateCalculatedMetrics(profile) {
     const weight = Number(safeProfile.weight_kg);
     const height = Number(safeProfile.height_cm);
     const activityFactor = Number(safeProfile.activity_factor);
+    const hasValidWeight = Number.isFinite(weight) && weight > 0;
+    const hasValidHeight = Number.isFinite(height) && height > 0;
 
     const normalizeFieldTitle = (field) => {
         const titles = {
@@ -295,6 +297,10 @@ function updateCalculatedMetrics(profile) {
         }
     }
 
+    const hasValidAge = Number.isFinite(levelA.age) && levelA.age > 0;
+    // Технический флаг диагностики: не блокирует расчёты сам по себе, только отражает полноту входа.
+    const hasValidMetrics = hasValidWeight && hasValidHeight && hasValidAge;
+
     const levelB = {
         name: 'B',
         missing: [],
@@ -304,13 +310,13 @@ function updateCalculatedMetrics(profile) {
     if (!safeProfile.sex) {
         levelB.missing.push('sex');
     }
-    if (!(Number.isFinite(levelA.age) && levelA.age > 0)) {
+    if (!hasValidAge) {
         levelB.missing.push('age');
     }
-    if (!(Number.isFinite(weight) && weight > 0)) {
+    if (!hasValidWeight) {
         levelB.missing.push('weight_kg');
     }
-    if (!(Number.isFinite(height) && height > 0)) {
+    if (!hasValidHeight) {
         levelB.missing.push('height_cm');
     }
     if (levelB.missing.length === 0 && typeof calculateBMR === 'function') {
@@ -399,7 +405,7 @@ function updateCalculatedMetrics(profile) {
     if (!Number.isFinite(effectiveCaloriesTarget)) {
         levelD.missing.push('calories_target');
     }
-    if (!(Number.isFinite(weight) && weight > 0)) {
+    if (!hasValidWeight) {
         levelD.missing.push('weight_kg');
     }
     if (!safeProfile.goal) {
@@ -424,7 +430,7 @@ function updateCalculatedMetrics(profile) {
     if (!safeProfile.goal) {
         levelE.missing.push('goal');
     }
-    if (!(Number.isFinite(weight) && weight > 0)) {
+    if (!hasValidWeight) {
         levelE.missing.push('weight_kg');
     }
     if (!Number.isFinite(levelC.tdee)) {
@@ -480,13 +486,47 @@ function updateCalculatedMetrics(profile) {
         };
         console.groupCollapsed(`[RESUME_DEBUG][pipeline] ${traceId}`);
         console.log('Входной профиль', safeProfile);
-        console.log('Возраст (age)', levelA.age);
-        console.log('BMR', levelB.bmr);
-        console.log('TDEE', levelC.tdee);
+        console.log('Входной профиль (сырые значения)', {
+            profile: safeProfile,
+            weight,
+            height,
+            activityFactor
+        });
+        console.log('Возраст (age)', {
+            called: typeof calculateAge === 'function',
+            value: levelA.age,
+            valid: hasValidAge
+        });
+        console.log('BMR', {
+            called: typeof calculateBMR === 'function' && levelB.missing.length === 0,
+            value: levelB.bmr,
+            valid: Number.isFinite(levelB.bmr)
+        });
+        console.log('TDEE', {
+            called: typeof calculateTDEE === 'function' && levelC.missing.length === 0,
+            value: levelC.tdee,
+            valid: Number.isFinite(levelC.tdee),
+            // Сигнатура ожидается как calculateTDEE(bmr, activity_factor).
+            args: { bmr: levelB.bmr, activity_factor: safeProfile.activity_factor }
+        });
+        console.log('Флаги валидности метрик', {
+            hasValidWeight,
+            hasValidHeight,
+            hasValidAge,
+            hasValidMetrics
+        });
         console.log('Weight forecast', weightForecast);
         console.log('Effective calories target', effectiveCaloriesTarget);
         console.log('Macros', levelD.macros);
         console.log('Missing fields', missingFields);
+        if (!Number.isFinite(levelC.tdee)) {
+            console.log('Причина null TDEE', {
+                line: 'static/js/resume.js:levelC.tdee = calculateTDEE(levelB.bmr, safeProfile.activity_factor)',
+                levelCMissing: [...levelC.missing],
+                bmr: levelB.bmr,
+                activity_factor: safeProfile.activity_factor
+            });
+        }
         console.groupEnd();
     }
 
