@@ -348,8 +348,16 @@ function updateCalculatedMetrics(profile) {
         ? validateGoalWeightConsistency(safeProfile.goal, safeProfile.weight_kg, safeProfile.target_weight_kg)
         : { conflict: false };
 
-    const weightForecast = (consistency?.conflict === true)
-        ? {
+    const weightForecast = typeof calculateWeightGoalForecast === 'function'
+        ? calculateWeightGoalForecast({
+            sex: safeProfile.sex,
+            goal: safeProfile.goal,
+            tdee_calories: levelC.tdee,
+            weight_kg: Number.isFinite(weight) && weight > 0 ? weight : null,
+            target_weight_kg: safeProfile.target_weight_kg,
+            goal_deadline: safeProfile.goal_deadline
+        })
+        : {
             calories_target: null,
             calorie_delta: null,
             required_rate_kg_per_week: null,
@@ -359,30 +367,8 @@ function updateCalculatedMetrics(profile) {
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
             warning_message: null,
-            error: 'LOGICAL_INCONSISTENCY',
             label: null
-        }
-        : (typeof calculateWeightGoalForecast === 'function'
-            ? calculateWeightGoalForecast({
-                sex: safeProfile.sex,
-                goal: safeProfile.goal,
-                tdee_calories: levelC.tdee,
-                weight_kg: Number.isFinite(weight) && weight > 0 ? weight : null,
-                target_weight_kg: safeProfile.target_weight_kg,
-                goal_deadline: safeProfile.goal_deadline
-            })
-            : {
-                calories_target: null,
-                calorie_delta: null,
-                required_rate_kg_per_week: null,
-                required_calorie_delta: null,
-                required_calories_target: null,
-                safe_weeks_estimate: null,
-                weight_rate_kg_per_week: null,
-                predicted_goal_date: null,
-                warning_message: null,
-                label: null
-            });
+        };
 
     const weeklySourceProfile = {
         ...safeProfile,
@@ -483,6 +469,26 @@ function updateCalculatedMetrics(profile) {
         effectiveCalorieDelta,
         effectiveWeightRate
     });
+
+    if (window.appDebug === true) {
+        const missingFields = {
+            levelA: [...levelA.missing],
+            levelB: [...levelB.missing],
+            levelC: [...levelC.missing],
+            levelD: [...levelD.missing],
+            levelE: [...levelE.missing]
+        };
+        console.groupCollapsed(`[RESUME_DEBUG][pipeline] ${traceId}`);
+        console.log('Входной профиль', safeProfile);
+        console.log('Возраст (age)', levelA.age);
+        console.log('BMR', levelB.bmr);
+        console.log('TDEE', levelC.tdee);
+        console.log('Weight forecast', weightForecast);
+        console.log('Effective calories target', effectiveCaloriesTarget);
+        console.log('Macros', levelD.macros);
+        console.log('Missing fields', missingFields);
+        console.groupEnd();
+    }
 
     if (window.appDebug === true) {
         console.groupCollapsed(`[RESUME_DIAGNOSTICS] ${traceId}`);

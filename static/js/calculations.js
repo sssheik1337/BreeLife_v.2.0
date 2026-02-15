@@ -313,7 +313,14 @@ function calculateMacros(payload) {
 }
 
 function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, target_weight_kg, goal_deadline }) {
+    const debugInput = { sex, goal, tdee_calories, weight_kg, target_weight_kg, goal_deadline };
+    const logForecastPipeline = (stage, payload = {}) => {
+        if (window.appDebug === true) {
+            console.log('[MODEL_DEBUG] forecast:pipeline', { stage, ...payload });
+        }
+    };
     if (!goal || tdee_calories === null || tdee_calories === undefined) {
+        logForecastPipeline('blocked', { reason: 'MISSING_GOAL_OR_TDEE', input: debugInput });
         return {
             calories_target: null,
             calorie_delta: null,
@@ -333,6 +340,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
     const weight = Number(weight_kg);
     const target = Number(target_weight_kg);
     if (!Number.isFinite(tdee)) {
+        logForecastPipeline('blocked', { reason: 'TDEE_NOT_FINITE', input: debugInput, tdee });
         return {
             calories_target: null,
             calorie_delta: null,
@@ -349,6 +357,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
     }
 
     if (goal === 'maintain') {
+        logForecastPipeline('maintain', { input: debugInput, tdee });
         // Режим поддержания полностью изолирован: без расчётов deltaKg/rate и без учёта дедлайна.
         logForecastDebug({
             deltaKg: null,
@@ -375,6 +384,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
 
     const adaptiveLimit = resolveAdaptiveRateLimit(goal, weight);
     if (!Number.isFinite(adaptiveLimit)) {
+        logForecastPipeline('blocked', { reason: 'ADAPTIVE_LIMIT_NOT_FINITE', input: debugInput, adaptiveLimit });
         return {
             calories_target: null,
             calorie_delta: null,
@@ -393,6 +403,13 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
     const deltaKg = Number.isFinite(weight) && Number.isFinite(target)
         ? target - weight
         : null;
+    logForecastPipeline('input_normalized', {
+        input: debugInput,
+        tdee,
+        weight,
+        target,
+        weightDiff: deltaKg
+    });
     const direction = Number.isFinite(deltaKg) ? Math.sign(deltaKg) : 0;
     // Безопасный темп задаётся сразу от направления цели и адаптивного лимита.
     const plannedRate = direction * adaptiveLimit;
@@ -404,6 +421,13 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
 
     const consistency = validateGoalWeightConsistency(goal, weight, target);
     if (consistency.conflict) {
+        logForecastPipeline('consistency_conflict', {
+            input: debugInput,
+            weightDiff: deltaKg,
+            consistency,
+            caloriesTarget,
+            calorieDelta
+        });
         logForecastDebug({
             deltaKg,
             plannedRate,
@@ -447,6 +471,12 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
                 todayDate.setHours(0, 0, 0, 0);
                 const diffMs = deadlineDate.getTime() - todayDate.getTime();
                 const weeksAvailable = diffMs / (1000 * 60 * 60 * 24 * 7);
+                logForecastPipeline('deadline_check', {
+                    goal_deadline,
+                    weeksAvailable,
+                    weightDiff: deltaKg,
+                    safe_weeks_estimate: safeWeeksEstimate
+                });
 
                 if (weeksAvailable <= 0) {
                     warningMessage = 'Дедлайн цели уже прошёл или слишком близко. Укажите более реалистичную дату.';
@@ -524,6 +554,18 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
     const predictedDate = Number.isNaN(targetDate.getTime())
         ? null
         : targetDate.toISOString().split('T')[0];
+
+    logForecastPipeline('result', {
+        input: debugInput,
+        weightDiff: deltaKg,
+        requiredRate,
+        requiredCalorieDelta,
+        safeWeeksEstimate,
+        caloriesTarget,
+        calorieDelta,
+        predictedDate,
+        warningMessage
+    });
 
     return {
         calories_target: caloriesTarget,
