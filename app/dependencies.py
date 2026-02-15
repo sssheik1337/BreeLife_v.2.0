@@ -67,6 +67,12 @@ def apply_profile_patch(profile: dict[str, object], patch: dict[str, object]) ->
     normalized_patch = normalize_profile_payload_shape(patch)
     updated = dict(normalized_current)
     updated.update(normalized_patch)
+
+    # Флаг приветственного экрана триала должен фиксироваться один раз и
+    # не сбрасываться при последующих частичных сохранениях профиля.
+    if "trial_welcome_seen" not in patch and normalized_current.get("trial_welcome_seen") is True:
+        updated["trial_welcome_seen"] = True
+
     updated["is_completed"] = bool(
         normalized_patch.get("is_completed")
         or normalized_current.get("is_completed")
