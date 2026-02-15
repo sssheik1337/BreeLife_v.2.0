@@ -115,44 +115,43 @@ function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
 }
 
-function validateGoalWeightConsistencyLocal(goal, currentWeight, targetWeight) {
+function validateGoalWeightConsistency(goal, currentWeight, targetWeight, goalDeadline = null) {
     const current = Number(currentWeight);
     const target = Number(targetWeight);
-    if (!Number.isFinite(current) || !Number.isFinite(target)) {
-        return {
-            conflict: false,
-            warning: false
-        };
+
+    if (!goal) {
+        return { conflict: false };
     }
 
-    if (goal === 'lose' && target >= current) {
+    if (goal === 'lose' && Number.isFinite(current) && Number.isFinite(target) && target >= current) {
         return {
             conflict: true,
-            warning: false
+            reason: 'Цель снижения веса противоречит желаемому весу'
         };
     }
 
-    if (goal === 'gain' && target <= current) {
+    if (goal === 'gain' && Number.isFinite(current) && Number.isFinite(target) && target <= current) {
         return {
             conflict: true,
-            warning: false
+            reason: 'Цель набора веса противоречит желаемому весу'
         };
     }
-    return {
-        conflict: false,
-        warning: false
-    };
-}
 
-function validateGoalWeightConsistency(goal, currentWeight, targetWeight) {
-    if (typeof window.validateGoalWeightConsistency === 'function') {
-        const sharedResult = window.validateGoalWeightConsistency(goal, currentWeight, targetWeight);
-        return {
-            conflict: Boolean(sharedResult?.blocking),
-            warning: Boolean(sharedResult?.warning)
-        };
+    if (goalDeadline) {
+        const deadlineDate = new Date(`${goalDeadline}T00:00:00`);
+        if (!Number.isNaN(deadlineDate.getTime())) {
+            const todayDate = new Date();
+            todayDate.setHours(0, 0, 0, 0);
+            if (deadlineDate.getTime() <= todayDate.getTime()) {
+                return {
+                    conflict: true,
+                    reason: 'Дедлайн цели уже прошёл или наступает сегодня'
+                };
+            }
+        }
     }
-    return validateGoalWeightConsistencyLocal(goal, currentWeight, targetWeight);
+
+    return { conflict: false };
 }
 
 function resolveAdaptiveRateLimit(goal, weightKg) {
@@ -419,7 +418,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
     caloriesTarget = applyCaloriesSafetyClamp(caloriesTarget, sex);
     const calorieDelta = caloriesTarget - tdee;
 
-    const consistency = validateGoalWeightConsistency(goal, weight, target);
+    const consistency = validateGoalWeightConsistency(goal, weight, target, goal_deadline);
     if (consistency.conflict) {
         logForecastPipeline('consistency_conflict', {
             input: debugInput,

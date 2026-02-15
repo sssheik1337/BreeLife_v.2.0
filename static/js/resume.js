@@ -359,7 +359,7 @@ function updateCalculatedMetrics(profile) {
         : 'TDEE рассчитан';
 
     const consistency = typeof validateGoalWeightConsistency === 'function'
-        ? validateGoalWeightConsistency(safeProfile.goal, safeProfile.weight_kg, safeProfile.target_weight_kg)
+        ? validateGoalWeightConsistency(safeProfile.goal, safeProfile.weight_kg, safeProfile.target_weight_kg, safeProfile.goal_deadline)
         : { conflict: false };
 
     const weightForecast = typeof calculateWeightGoalForecast === 'function'
@@ -451,7 +451,7 @@ function updateCalculatedMetrics(profile) {
         levelE.missing.push('goal_deadline');
     }
     if (consistency?.conflict === true) {
-        levelE.status = consistency?.message || 'Цель и желаемый вес противоречат друг другу';
+        levelE.status = consistency?.reason || 'Цель и желаемый вес противоречат друг другу';
     } else {
         levelE.status = levelE.missing.length > 0
             ? `Не хватает: ${formatMissingFields(levelE.missing)}`
