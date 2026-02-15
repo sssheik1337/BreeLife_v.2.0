@@ -62,13 +62,109 @@ function generateSummary() {
     }
 }
 
+// Разрешение источника профиля для расчётов на summary-странице
+function resolveResumeComputationProfile() {
+    const localProfile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const mappedFromUserData = typeof mapUserDataToUserProfile === 'function'
+        ? mapUserDataToUserProfile(window.userData || {})
+        : {};
+
+    const resolved = {
+        ...mappedFromUserData,
+        ...localProfile,
+        // Принудительно берём поля анкеты, если профиль в storage ещё пустой.
+        sex: localProfile.sex ?? mappedFromUserData.sex ?? null,
+        birth_date: localProfile.birth_date ?? mappedFromUserData.birth_date ?? null,
+        height_cm: localProfile.height_cm ?? mappedFromUserData.height_cm ?? null,
+        weight_kg: localProfile.weight_kg ?? mappedFromUserData.weight_kg ?? null,
+        target_weight_kg: localProfile.target_weight_kg ?? mappedFromUserData.target_weight_kg ?? null,
+        goal: localProfile.goal ?? mappedFromUserData.goal ?? null,
+        activity_factor: localProfile.activity_factor ?? mappedFromUserData.activity_factor ?? null,
+        goal_deadline: localProfile.goal_deadline ?? mappedFromUserData.goal_deadline ?? null,
+        food_diary: localProfile.food_diary ?? mappedFromUserData.food_diary ?? null,
+    };
+
+    const shouldHydrateStorage = typeof patchUserProfile === 'function' && (
+        (localProfile.sex === null && resolved.sex !== null) ||
+        (localProfile.birth_date === null && resolved.birth_date !== null) ||
+        (localProfile.height_cm === null && resolved.height_cm !== null) ||
+        (localProfile.weight_kg === null && resolved.weight_kg !== null) ||
+        (localProfile.target_weight_kg === null && resolved.target_weight_kg !== null) ||
+        (localProfile.goal === null && resolved.goal !== null) ||
+        (localProfile.activity_factor === null && resolved.activity_factor !== null)
+    );
+
+    if (shouldHydrateStorage) {
+        patchUserProfile({
+            sex: resolved.sex,
+            birth_date: resolved.birth_date,
+            height_cm: resolved.height_cm,
+            weight_kg: resolved.weight_kg,
+            target_weight_kg: resolved.target_weight_kg,
+            goal: resolved.goal,
+            activity_factor: resolved.activity_factor,
+            goal_deadline: resolved.goal_deadline,
+            food_diary: resolved.food_diary,
+        });
+    }
+
+    if (window.appDebug) {
+        console.log('[resume][debug] resolved computation profile', {
+            localProfile,
+            mappedFromUserData,
+            resolved,
+            shouldHydrateStorage,
+        });
+    }
+
+    return resolved;
+}
+
+// Синхронизация профиля с бэкендом до запуска расчётов
+async function syncProfileWithBackendForResume() {
+    if (typeof getUserProfile !== 'function' || typeof setUserProfile !== 'function') {
+        return;
+    }
+
+    const current = getUserProfile();
+    const telegramUserId = current.telegram_user_id;
+    if (!telegramUserId) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/profile/get?telegram_user_id=${telegramUserId}`);
+        if (!response.ok) {
+            if (window.appDebug) {
+                console.log('[resume][debug] profile sync skipped: non-ok response', response.status);
+            }
+            return;
+        }
+        const data = await response.json();
+        if (!data || data.status === 'not_found') {
+            if (window.appDebug) {
+                console.log('[resume][debug] profile sync skipped: empty payload or not_found');
+            }
+            return;
+        }
+        setUserProfile(data);
+        if (window.appDebug) {
+            console.log('[resume][debug] profile synced from backend', data);
+        }
+    } catch (error) {
+        if (window.appDebug) {
+            console.log('[resume][debug] profile sync failed', error);
+        }
+    }
+}
+
 // Обновление расчётных показателей профиля
 function updateCalculatedMetrics() {
     if (typeof getUserProfile !== 'function') {
         return;
     }
 
-    const profile = getUserProfile();
+    const profile = resolveResumeComputationProfile();
     const age = typeof calculateAge === 'function' ? calculateAge(profile.birth_date) : null;
     const weight = Number(profile.weight_kg);
     const height = Number(profile.height_cm);
@@ -76,6 +172,10 @@ function updateCalculatedMetrics() {
     const hasValidHeight = Number.isFinite(height) && height > 0;
     const hasValidAge = age !== null && age > 0;
     const hasValidMetrics = hasValidWeight && hasValidHeight && hasValidAge;
+    const invalidReasons = [];
+    if (!hasValidWeight) invalidReasons.push('weight_kg отсутствует или невалиден');
+    if (!hasValidHeight) invalidReasons.push('height_cm отсутствует или невалиден');
+    if (!hasValidAge) invalidReasons.push('age отсутствует или невалиден');
     const bmr = hasValidMetrics && typeof calculateBMR === 'function'
         ? calculateBMR({
             sex: profile.sex,
@@ -99,6 +199,19 @@ function updateCalculatedMetrics() {
             predicted_goal_date: null,
             label: null
         };
+
+    if (window.appDebug) {
+        console.log('[resume][debug] calculations', {
+            inputProfile: profile,
+            age,
+            bmr,
+            tdee,
+            macros,
+            weightForecast,
+            hasValidMetrics,
+            invalidReasons,
+        });
+    }
 
     if (hasValidMetrics && typeof patchUserProfile === 'function') {
         patchUserProfile({
@@ -1021,7 +1134,8 @@ function saveAndContinue() {
 }
 
 // Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+    await syncProfileWithBackendForResume();
     generateSummary();
     calculateBMI();
     updateCalculatedMetrics();
