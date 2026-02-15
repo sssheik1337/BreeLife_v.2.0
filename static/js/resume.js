@@ -2,11 +2,9 @@
 
 const apiFetch = window.apiFetch || fetch;
 
-let resumeInitialProfileSnapshot = null;
-let resumeIsDirty = false;
-let resumeHasUserEdits = false;
 let resumeLastGoalDeadlineWarning = null;
 let resumeLastDiagnostics = null;
+let resumeBackendProfile = null;
 
 function logResumeDebug(stage, payload) {
     if (window.appDebug === true) {
@@ -120,7 +118,7 @@ function buildResumeDiagnostics(profile) {
 }
 
 function copyResumeDiagnosticsToClipboard() {
-    const diagnostics = resumeLastDiagnostics || buildResumeDiagnostics(resolveResumeComputationProfile());
+    const diagnostics = resumeLastDiagnostics || buildResumeDiagnostics(resumeBackendProfile || {});
     const payload = JSON.stringify(diagnostics, null, 2);
     const notify = (message, type = 'success') => {
         if (typeof showNotification === 'function') {
@@ -149,163 +147,48 @@ function copyResumeDiagnosticsToClipboard() {
     }
 }
 
-function hasMeaningfulUserData(data) {
-    if (!data || typeof data !== 'object') {
-        return false;
-    }
-    const keys = ['gender', 'birthDate', 'height', 'currentWeight', 'targetWeight', 'activityLevel', 'goalType'];
-    return keys.some((key) => {
-        const value = data[key];
-        return value !== null && value !== undefined && value !== '';
-    });
-}
-
-
-function normalizeDateOnly(value) {
-    if (!value) {
-        return null;
-    }
-    // Уже ISO YYYY-MM-DD
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
-        return value.trim();
-    }
-    // Попытка распарсить (в т.ч. "DD.MM.YYYY" / "YYYY/MM/DD" и т.п.)
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) {
-        return typeof value === 'string' ? value.trim() : String(value);
-    }
-    // Нам нужна только дата без времени
-    return d.toISOString().slice(0, 10);
-}
-
-function buildComparableResumeProfileState(source = 'current') {
-    let candidate = null;
-
-    if (source === 'initial') {
-        if (typeof getUserProfile === 'function') {
-            candidate = getUserProfile() || {};
+async function loadProfileFromBackend() {
+    try {
+        const response = await apiFetch('/api/profile');
+        if (!response.ok) {
+            if (window.appDebug === true) {
+                console.error('[RESUME][backend] Ошибка загрузки профиля', { status: response.status });
+            }
+            return null;
         }
-    } else if (typeof mapUserDataToUserProfile === 'function' && hasMeaningfulUserData(window.userData)) {
-        candidate = mapUserDataToUserProfile(window.userData || {});
-    }
-
-    if (!candidate && typeof getUserProfile === 'function') {
-        candidate = getUserProfile() || {};
-    }
-
-    const profile = candidate && typeof candidate === 'object' ? candidate : {};
-    return {
-        sex: profile.sex ?? null,
-        birth_date: normalizeDateOnly(profile.birth_date),
-        height_cm: Number(profile.height_cm) || null,
-        weight_kg: Number(profile.weight_kg) || null,
-        target_weight_kg: Number(profile.target_weight_kg) || null,
-        goal: profile.goal ?? null,
-        activity_factor: Number(profile.activity_factor) || null,
-        goal_deadline: normalizeDateOnly(profile.goal_deadline),
-        food_diary: typeof profile.food_diary === 'boolean' ? profile.food_diary : null
-    };
-}
-
-function updateResumeActionButtons() {
-    const saveButton = document.getElementById('resume-save-button');
-    const goProgressButton = document.getElementById('resume-go-progress-button');
-    if (!saveButton || !goProgressButton) {
-        return;
-    }
-
-    saveButton.classList.toggle('hidden', !resumeIsDirty);
-    goProgressButton.classList.toggle('hidden', resumeIsDirty);
-}
-
-function refreshResumeDirtyState() {
-    const currentSnapshot = buildComparableResumeProfileState('current');
-    if (!resumeInitialProfileSnapshot) {
-        resumeInitialProfileSnapshot = buildComparableResumeProfileState('initial');
-    }
-    resumeIsDirty = resumeHasUserEdits && JSON.stringify(currentSnapshot) !== JSON.stringify(resumeInitialProfileSnapshot);
-    updateResumeActionButtons();
-}
-
-
-function setupResumeDirtyTracking() {
-    document.addEventListener('resume-profile-edited', () => {
-        // Помечаем только явные пользовательские правки, чтобы кнопка сохранения не мигала от фоновых пересчётов.
-        resumeHasUserEdits = true;
-        refreshResumeDirtyState();
-    });
-}
-
-function resolveResumeComputationProfile() {
-    const profile = typeof getUserProfile === 'function'
-        ? (getUserProfile() || {})
-        : {};
-
-    const mapped = (typeof mapUserDataToUserProfile === 'function' && hasMeaningfulUserData(window.userData))
-        ? (mapUserDataToUserProfile(window.userData || {}) || {})
-        : {};
-
-    const pickString = (key) => {
-        const profileValue = profile?.[key];
-        if (typeof profileValue === 'string' && profileValue.trim() !== '') {
-            return profileValue;
+        const data = await response.json();
+        if (!data || typeof data !== 'object') {
+            if (window.appDebug === true) {
+                console.error('[RESUME][backend] Некорректный payload профиля', { data });
+            }
+            return null;
         }
-        const mappedValue = mapped?.[key];
-        if (typeof mappedValue === 'string' && mappedValue.trim() !== '') {
-            return mappedValue;
+        if (data.status === 'not_found') {
+            if (window.appDebug === true) {
+                console.warn('[RESUME][backend] Профиль не найден');
+            }
+            return null;
+        }
+        return data;
+    } catch (error) {
+        if (window.appDebug === true) {
+            console.error('[RESUME][backend] Исключение при загрузке профиля', error);
         }
         return null;
-    };
-
-    const pickNumber = (key) => {
-        const profileValue = Number(profile?.[key]);
-        if (Number.isFinite(profileValue)) {
-            return profileValue;
-        }
-        const mappedValue = Number(mapped?.[key]);
-        if (Number.isFinite(mappedValue)) {
-            return mappedValue;
-        }
-        return null;
-    };
-
-    const resolvedProfile = {
-        ...profile,
-        sex: pickString('sex'),
-        birth_date: pickString('birth_date'),
-        goal: pickString('goal'),
-        goal_deadline: pickString('goal_deadline'),
-        activity_factor: pickNumber('activity_factor'),
-        weight_kg: pickNumber('weight_kg'),
-        height_cm: pickNumber('height_cm'),
-        target_weight_kg: pickNumber('target_weight_kg'),
-        food_diary: typeof profile?.food_diary === 'boolean'
-            ? profile.food_diary
-            : (typeof mapped?.food_diary === 'boolean' ? mapped.food_diary : null)
-    };
-
-    logResumeDebug('resolveResumeComputationProfile', {
-        profile,
-        mapped,
-        resolvedProfile
-    });
-
-    return resolvedProfile;
+    }
 }
 
 // Initialize summary page
-function generateSummary() {
+function generateSummary(profile) {
     const cardsContainer = document.getElementById('data-cards');
     
     // Clear container
     cardsContainer.innerHTML = '';
     
     // Get user data
-    const data = {};
-    if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
-        const profile = resolveResumeComputationProfile();
-        Object.assign(data, mapUserProfileToUserData(profile));
-    }
+    const data = typeof mapUserProfileToUserData === 'function'
+        ? mapUserProfileToUserData(profile || {})
+        : {};
     const isMaintainGoal = data.goalType === 'maintain';
     
     // Create cards for each data point
@@ -364,16 +247,12 @@ function generateSummary() {
 }
 
 // Обновление расчётных показателей профиля
-function updateCalculatedMetrics() {
-    if (typeof getUserProfile !== 'function') {
-        return;
-    }
-
+function updateCalculatedMetrics(profile) {
     const traceId = getResumeTraceId();
-    const profile = resolveResumeComputationProfile();
-    const weight = Number(profile.weight_kg);
-    const height = Number(profile.height_cm);
-    const activityFactor = Number(profile.activity_factor);
+    const safeProfile = profile && typeof profile === 'object' ? profile : {};
+    const weight = Number(safeProfile.weight_kg);
+    const height = Number(safeProfile.height_cm);
+    const activityFactor = Number(safeProfile.activity_factor);
 
     const normalizeFieldTitle = (field) => {
         const titles = {
@@ -404,11 +283,11 @@ function updateCalculatedMetrics() {
         age: null,
         status: ''
     };
-    if (!profile.birth_date) {
+    if (!safeProfile.birth_date) {
         levelA.missing.push('birth_date');
         levelA.status = `Не хватает: ${formatMissingFields(levelA.missing)}`;
     } else {
-        levelA.age = typeof calculateAge === 'function' ? calculateAge(profile.birth_date) : null;
+        levelA.age = typeof calculateAge === 'function' ? calculateAge(safeProfile.birth_date) : null;
         if (!Number.isFinite(levelA.age) || levelA.age <= 0) {
             levelA.status = 'Проверьте корректность даты рождения';
         } else {
@@ -422,7 +301,7 @@ function updateCalculatedMetrics() {
         bmr: null,
         status: ''
     };
-    if (!profile.sex) {
+    if (!safeProfile.sex) {
         levelB.missing.push('sex');
     }
     if (!(Number.isFinite(levelA.age) && levelA.age > 0)) {
@@ -436,7 +315,7 @@ function updateCalculatedMetrics() {
     }
     if (levelB.missing.length === 0 && typeof calculateBMR === 'function') {
         levelB.bmr = calculateBMR({
-            sex: profile.sex,
+            sex: safeProfile.sex,
             weight_kg: weight,
             height_cm: height,
             age: levelA.age
@@ -459,14 +338,14 @@ function updateCalculatedMetrics() {
         levelC.missing.push('activity_factor');
     }
     if (levelC.missing.length === 0 && typeof calculateTDEE === 'function') {
-        levelC.tdee = calculateTDEE(levelB.bmr, profile.activity_factor);
+        levelC.tdee = calculateTDEE(levelB.bmr, safeProfile.activity_factor);
     }
     levelC.status = levelC.missing.length > 0
         ? `Не хватает: ${formatMissingFields(levelC.missing)}`
         : 'TDEE рассчитан';
 
     const consistency = typeof validateGoalWeightConsistency === 'function'
-        ? validateGoalWeightConsistency(profile.goal, profile.weight_kg, profile.target_weight_kg)
+        ? validateGoalWeightConsistency(safeProfile.goal, safeProfile.weight_kg, safeProfile.target_weight_kg)
         : { conflict: false };
 
     const weightForecast = (consistency?.conflict === true)
@@ -485,12 +364,12 @@ function updateCalculatedMetrics() {
         }
         : (typeof calculateWeightGoalForecast === 'function'
             ? calculateWeightGoalForecast({
-                sex: profile.sex,
-                goal: profile.goal,
+                sex: safeProfile.sex,
+                goal: safeProfile.goal,
                 tdee_calories: levelC.tdee,
                 weight_kg: Number.isFinite(weight) && weight > 0 ? weight : null,
-                target_weight_kg: profile.target_weight_kg,
-                goal_deadline: profile.goal_deadline
+                target_weight_kg: safeProfile.target_weight_kg,
+                goal_deadline: safeProfile.goal_deadline
             })
             : {
                 calories_target: null,
@@ -506,13 +385,13 @@ function updateCalculatedMetrics() {
             });
 
     const weeklySourceProfile = {
-        ...profile,
+        ...safeProfile,
         tdee_calories: levelC.tdee,
         calories_target: weightForecast.calories_target,
         weight_rate_kg_per_week: weightForecast.weight_rate_kg_per_week
     };
     const weeklyAdjustment = typeof adjustCaloriesByWeeklyProgress === 'function'
-        ? adjustCaloriesByWeeklyProgress(weeklySourceProfile, profile?.weekly_stats)
+        ? adjustCaloriesByWeeklyProgress(weeklySourceProfile, safeProfile?.weekly_stats)
         : null;
 
     const effectiveCaloriesTarget = Number.isFinite(weeklyAdjustment?.calories_target)
@@ -537,12 +416,12 @@ function updateCalculatedMetrics() {
     if (!(Number.isFinite(weight) && weight > 0)) {
         levelD.missing.push('weight_kg');
     }
-    if (!profile.goal) {
+    if (!safeProfile.goal) {
         levelD.missing.push('goal');
     }
     if (levelD.missing.length === 0 && typeof calculateMacros === 'function') {
         levelD.macros = calculateMacros({
-            goal: profile.goal,
+            goal: safeProfile.goal,
             weight_kg: weight,
             calories_target: effectiveCaloriesTarget
         });
@@ -556,7 +435,7 @@ function updateCalculatedMetrics() {
         missing: [],
         status: ''
     };
-    if (!profile.goal) {
+    if (!safeProfile.goal) {
         levelE.missing.push('goal');
     }
     if (!(Number.isFinite(weight) && weight > 0)) {
@@ -565,10 +444,10 @@ function updateCalculatedMetrics() {
     if (!Number.isFinite(levelC.tdee)) {
         levelE.missing.push('tdee');
     }
-    if (profile.goal && profile.goal !== 'maintain' && !(Number.isFinite(Number(profile.target_weight_kg)) && Number(profile.target_weight_kg) > 0)) {
+    if (safeProfile.goal && safeProfile.goal !== 'maintain' && !(Number.isFinite(Number(safeProfile.target_weight_kg)) && Number(safeProfile.target_weight_kg) > 0)) {
         levelE.missing.push('target_weight_kg');
     }
-    if (profile.goal && profile.goal !== 'maintain' && profile.goal_deadline === '') {
+    if (safeProfile.goal && safeProfile.goal !== 'maintain' && safeProfile.goal_deadline === '') {
         levelE.missing.push('goal_deadline');
     }
     if (consistency?.conflict === true) {
@@ -580,7 +459,7 @@ function updateCalculatedMetrics() {
     }
 
     const diagnostics = buildResumeDiagnostics({
-        ...profile,
+        ...safeProfile,
         age: levelA.age,
         bmr: levelB.bmr,
         tdee_calories: levelC.tdee,
@@ -594,7 +473,7 @@ function updateCalculatedMetrics() {
 
     logResumeDebug('updateCalculatedMetrics:levels', {
         traceId,
-        profile,
+        safeProfile,
         levelA,
         levelB,
         levelC,
@@ -609,25 +488,6 @@ function updateCalculatedMetrics() {
         console.groupCollapsed(`[RESUME_DIAGNOSTICS] ${traceId}`);
         console.log(resumeLastDiagnostics);
         console.groupEnd();
-    }
-
-    if (typeof patchUserProfile === 'function') {
-        patchUserProfile({
-            age: Number.isFinite(levelA.age) ? levelA.age : null,
-            bmr: Number.isFinite(levelB.bmr) ? levelB.bmr : null,
-            tdee_calories: Number.isFinite(levelC.tdee) ? levelC.tdee : null,
-            target_weight_kg: profile.goal === 'maintain' ? null : profile.target_weight_kg,
-            goal_deadline: profile.goal === 'maintain' ? null : profile.goal_deadline,
-            macros: levelD.macros,
-            calories_target: Number.isFinite(effectiveCaloriesTarget) ? effectiveCaloriesTarget : null,
-            calorie_delta: Number.isFinite(effectiveCalorieDelta) ? effectiveCalorieDelta : null,
-            required_rate_kg_per_week: weightForecast.required_rate_kg_per_week,
-            required_calorie_delta: weightForecast.required_calorie_delta,
-            required_calories_target: weightForecast.required_calories_target,
-            safe_weeks_estimate: weightForecast.safe_weeks_estimate,
-            weight_rate_kg_per_week: Number.isFinite(effectiveWeightRate) ? effectiveWeightRate : null,
-            predicted_goal_date: weightForecast.predicted_goal_date
-        });
     }
 
     if (weightForecast.warning_message && typeof showNotification === 'function') {
@@ -814,31 +674,27 @@ function getPersonalizationMissingFields(profile) {
         .map((item) => item.label);
 }
 
-function renderPersonalRecommendations() {
-    if (typeof getUserProfile !== 'function') {
-        return;
-    }
-
-    const profile = getUserProfile();
-    const baseline = getBaselineRecommendations(profile);
+function renderPersonalRecommendations(profile) {
+    const safeProfile = profile && typeof profile === 'object' ? profile : {};
+    const baseline = getBaselineRecommendations(safeProfile);
     const recommendations = typeof getRecommendations === 'function'
-        ? getRecommendations(profile)
+        ? getRecommendations(safeProfile)
         : [];
     const combinedRecommendations = [...baseline, ...recommendations]
         .filter((item, index, arr) => typeof item === 'string' && item.trim() && arr.indexOf(item) === index)
         .slice(0, 6);
 
     const diaryExplanation = typeof getDiaryExplanation === 'function'
-        ? getDiaryExplanation(profile)
+        ? getDiaryExplanation(safeProfile)
         : '';
     const caloriesExplanation = typeof getCaloriesExplanation === 'function'
-        ? getCaloriesExplanation(profile)
+        ? getCaloriesExplanation(safeProfile)
         : '';
     const macrosExplanation = typeof getMacrosExplanation === 'function'
-        ? getMacrosExplanation(profile)
+        ? getMacrosExplanation(safeProfile)
         : '';
     const deadlineMotivation = typeof getDeadlineMotivation === 'function'
-        ? getDeadlineMotivation(profile)
+        ? getDeadlineMotivation(safeProfile)
         : '';
 
     const listElement = document.getElementById('recommendations-list');
@@ -880,7 +736,7 @@ function renderPersonalRecommendations() {
         }
     }
     if (deadlineWarning) {
-        const deadlineRaw = profile.goal_deadline;
+        const deadlineRaw = safeProfile.goal_deadline;
         if (deadlineRaw) {
             const deadlineDate = new Date(deadlineRaw);
             const today = new Date();
@@ -899,7 +755,7 @@ function renderPersonalRecommendations() {
         }
     }
 
-    const missingForPersonalization = getPersonalizationMissingFields(profile);
+    const missingForPersonalization = getPersonalizationMissingFields(safeProfile);
     if (missingForPersonalization.length > 0) {
         updateRecommendationsState('partial', `Состояние: частично — для персонализации добавьте: ${missingForPersonalization.join(', ')}`);
     } else {
@@ -908,12 +764,8 @@ function renderPersonalRecommendations() {
 }
 
 // Получить AI-рекомендацию и обновить текстовые блоки
-async function applyAiRecommendationToResume() {
-    if (typeof getUserProfile !== 'function') {
-        return;
-    }
-
-    const profile = getUserProfile();
+async function applyAiRecommendationToResume(profile) {
+    const safeProfile = profile && typeof profile === 'object' ? profile : {};
     const caloriesElement = document.getElementById('calories-explanation');
     const macrosElement = document.getElementById('macros-explanation');
     const deadlineElement = document.getElementById('deadline-motivation');
@@ -923,7 +775,7 @@ async function applyAiRecommendationToResume() {
     }
 
     if (window.profileCompleted !== true) {
-        const missingForPersonalization = getPersonalizationMissingFields(profile);
+        const missingForPersonalization = getPersonalizationMissingFields(safeProfile);
         updateRecommendationsState(
             'partial',
             `Состояние: частично — заполните поля для персонализации: ${missingForPersonalization.join(', ') || 'основные данные профиля'}`
@@ -1046,12 +898,10 @@ function calculateWeightDifference(current, target) {
 }
 
 // Calculate and display BMI
-function calculateBMI() {
-    const data = window.userData || {};
-    if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
-        const profile = getUserProfile();
-        Object.assign(data, mapUserProfileToUserData(profile));
-    }
+function calculateBMI(profile) {
+    const data = typeof mapUserProfileToUserData === 'function'
+        ? mapUserProfileToUserData(profile || {})
+        : {};
     const height = parseFloat(data.height);
     const weight = parseFloat(data.currentWeight);
     
@@ -1112,7 +962,7 @@ function updateBMIProgress(bmi) {
 }
 
 // Рендер круговых индикаторов питания
-function renderNutritionRings() {
+function renderNutritionRings(profile) {
     const resolveCarbTotals = (totalValue, simpleValue, complexValue) => {
         const total = Number(totalValue) || 0;
         let simple = Number(simpleValue) || 0;
@@ -1205,12 +1055,12 @@ function renderNutritionRings() {
 
     const hasEntriesToday = totals.calories > 0 || totals.protein > 0 || totals.fat > 0 || totals.carbs > 0 || totals.fiber > 0 || totals.water > 0;
 
-    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const safeProfile = profile && typeof profile === 'object' ? profile : {};
     const recommended = {
-        calories: Number(profile?.tdee_calories) || null,
-        protein: Number(profile?.macros?.protein_g) || null,
-        fat: Number(profile?.macros?.fat_g) || null,
-        carbs: Number(profile?.macros?.carbs_g) || null,
+        calories: Number(safeProfile?.tdee_calories) || null,
+        protein: Number(safeProfile?.macros?.protein_g) || null,
+        fat: Number(safeProfile?.macros?.fat_g) || null,
+        carbs: Number(safeProfile?.macros?.carbs_g) || null,
         fiber: Number(window.adminConfig?.reminders?.fiber_target_g) || null,
         water: Number(window.adminConfig?.reminders?.water_min_l) || null,
     };
@@ -1375,7 +1225,8 @@ function createProgressRing({ percent, value, label, color }) {
 }
 
 // Рендер статуса пробного периода
-async function renderTrialStatus() {
+async function renderTrialStatus(profile) {
+    const safeProfile = profile && typeof profile === 'object' ? profile : {};
     const datesElement = document.getElementById('trial-dates');
     const badgeElement = document.getElementById('trial-badge');
     const warningElement = document.getElementById('trial-warning');
@@ -1390,12 +1241,6 @@ async function renderTrialStatus() {
         return;
     }
 
-    if (typeof getUserProfile !== 'function') {
-        datesElement.textContent = 'Повторите попытку позже.';
-        return;
-    }
-
-    const profile = getUserProfile();
     const isDevMode = window.appIsDev === true || window.appMode === 'development';
     if (window.serverUser?.authorized !== true) {
         datesElement.textContent = 'Откройте приложение через кнопку бота.';
@@ -1552,9 +1397,9 @@ async function renderTrialStatus() {
         badgeElement.textContent = 'Пробный период завершён';
         if (paymentMotivation && typeof getPaymentMotivation === 'function') {
             const deviations = typeof getFoodDiaryDeviationStatus === 'function'
-                ? getFoodDiaryDeviationStatus(profile)
+                ? getFoodDiaryDeviationStatus(safeProfile)
                 : null;
-            paymentMotivation.textContent = await getPaymentMotivation(profile, deviations);
+            paymentMotivation.textContent = await getPaymentMotivation(safeProfile, deviations);
         }
     } else {
         datesElement.textContent = 'Попробуйте обновить страницу.';
@@ -1570,13 +1415,11 @@ async function renderTrialStatus() {
                 }
                 payButton.classList.add('btn-confirmed');
                 setTimeout(() => payButton.classList.remove('btn-confirmed'), 900);
-                if (typeof patchUserProfile === 'function') {
-                    patchUserProfile({
-                        subscription_status: result.subscription_status ?? 'active',
-                        subscription_until: result.subscription_until ?? subscription.subscription_until
-                    });
-                }
-                await renderTrialStatus();
+                await renderTrialStatus({
+                    ...safeProfile,
+                    subscription_status: result.subscription_status ?? 'active',
+                    subscription_until: result.subscription_until ?? subscription.subscription_until
+                });
             }
         } catch (error) {
             if (typeof showNotification === 'function') {
@@ -1605,24 +1448,11 @@ async function persistResumeProfile(profile) {
 }
 
 // Сохранить изменения и перейти в прогресс
-async function saveAndContinue() {
-    if (!resumeIsDirty) {
-        window.location.href = '/profile';
-        return;
-    }
-
-    let profileForSave = null;
-
-    // Сначала обновляем локальный профиль, затем дожидаемся записи на сервер.
-    if (typeof patchUserProfile === 'function') {
-        if (typeof mapUserDataToUserProfile === 'function') {
-            const mappedProfile = mapUserDataToUserProfile(window.userData || {});
-            mappedProfile.is_completed = true;
-            profileForSave = patchUserProfile(mappedProfile);
-        } else {
-            profileForSave = patchUserProfile({ is_completed: true });
-        }
-    }
+async function saveAndContinue(profile) {
+    const profileForSave = {
+        ...(profile || {}),
+        is_completed: true
+    };
 
     const saved = await persistResumeProfile(profileForSave);
     if (!saved) {
@@ -1652,21 +1482,23 @@ document.addEventListener('DOMContentLoaded', async function() {
         };
         window.profileCompleted = status.profile_completed;
     }
-    if (typeof syncProfileWithBackend === 'function') {
-        await syncProfileWithBackend();
+
+    const profile = await loadProfileFromBackend();
+    if (!profile) {
+        if (window.appDebug === true) {
+            console.warn('[RESUME] Профиль не загружен, рендер пропущен.');
+        }
+        return;
     }
-    if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
-        window.userData = {
-            ...(window.userData || {}),
-            ...mapUserProfileToUserData(getUserProfile())
-        };
-    }
-    generateSummary();
-    calculateBMI();
-    updateCalculatedMetrics();
-    renderPersonalRecommendations();
-    applyAiRecommendationToResume();
-    renderNutritionRings();
+
+    resumeBackendProfile = profile;
+
+    generateSummary(profile);
+    calculateBMI(profile);
+    updateCalculatedMetrics(profile);
+    renderPersonalRecommendations(profile);
+    applyAiRecommendationToResume(profile);
+    renderNutritionRings(profile);
 
     const copyDiagnosticsButton = document.getElementById('resume-copy-diagnostics-button');
     if (copyDiagnosticsButton) {
@@ -1675,19 +1507,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             copyResumeDiagnosticsToClipboard();
         });
     }
-    renderTrialStatus();
-    
-    resumeInitialProfileSnapshot = buildComparableResumeProfileState('initial');
-    resumeHasUserEdits = false;
-    refreshResumeDirtyState();
-
-    setupResumeDirtyTracking();
+    await renderTrialStatus(profile);
 
     const saveButton = document.getElementById('resume-save-button');
     if (saveButton) {
         saveButton.addEventListener('click', function(event) {
             event.preventDefault();
-            saveAndContinue();
+            saveAndContinue(profile);
         });
     }
 });
