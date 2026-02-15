@@ -18,6 +18,81 @@ const REMINDER_TYPES = {
 let diaryEntriesMemory = [];
 let habitsEntriesMemory = {};
 
+
+function getResolvedProfileForDisplay() {
+    const baseProfile = typeof getUserProfile === 'function' ? (getUserProfile() || {}) : {};
+    const profile = { ...baseProfile };
+
+    const weight = Number(profile.weight_kg);
+    const height = Number(profile.height_cm);
+    const activityFactor = Number(profile.activity_factor);
+    const hasWeight = Number.isFinite(weight) && weight > 0;
+    const hasHeight = Number.isFinite(height) && height > 0;
+
+    if (!Number.isFinite(Number(profile.age)) && typeof calculateAge === 'function' && profile.birth_date) {
+        const calculatedAge = calculateAge(profile.birth_date);
+        if (Number.isFinite(calculatedAge) && calculatedAge > 0) {
+            profile.age = calculatedAge;
+        }
+    }
+
+    const age = Number(profile.age);
+    const hasAge = Number.isFinite(age) && age > 0;
+
+    if (!Number.isFinite(Number(profile.bmr)) && typeof calculateBMR === 'function' && profile.sex && hasWeight && hasHeight && hasAge) {
+        const bmr = calculateBMR({
+            sex: profile.sex,
+            weight_kg: weight,
+            height_cm: height,
+            age
+        });
+        if (Number.isFinite(bmr)) {
+            profile.bmr = bmr;
+        }
+    }
+
+    const bmr = Number(profile.bmr);
+    if (!Number.isFinite(Number(profile.tdee_calories)) && typeof calculateTDEE === 'function' && Number.isFinite(bmr) && Number.isFinite(activityFactor) && activityFactor > 0) {
+        const tdee = calculateTDEE(bmr, activityFactor);
+        if (Number.isFinite(tdee)) {
+            profile.tdee_calories = tdee;
+        }
+    }
+
+    const tdee = Number(profile.tdee_calories);
+    const caloriesTarget = Number(profile.calories_target);
+    if (!Number.isFinite(caloriesTarget) && typeof calculateWeightGoalForecast === 'function') {
+        const forecast = calculateWeightGoalForecast({
+            sex: profile.sex,
+            goal: profile.goal,
+            tdee_calories: Number.isFinite(tdee) ? tdee : null,
+            weight_kg: hasWeight ? weight : null,
+            target_weight_kg: profile.target_weight_kg,
+            goal_deadline: profile.goal_deadline
+        });
+        const forecastCalories = Number(forecast?.calories_target);
+        if (Number.isFinite(forecastCalories) && forecastCalories > 0) {
+            profile.calories_target = forecastCalories;
+        }
+    }
+
+    if ((!profile.macros || typeof profile.macros !== 'object') && typeof calculateMacros === 'function') {
+        const resolvedCalories = Number(profile.calories_target);
+        if (Number.isFinite(resolvedCalories) && resolvedCalories > 0 && hasWeight && profile.goal) {
+            const macros = calculateMacros({
+                goal: profile.goal,
+                weight_kg: weight,
+                calories_target: resolvedCalories
+            });
+            if (macros) {
+                profile.macros = macros;
+            }
+        }
+    }
+
+    return profile;
+}
+
 function createProgressRing({ percent, size = 120, stroke = 10, color = '#10b981', label, value, emphasize = false }) {
     const radius = (size - stroke) / 2;
     const circumference = 2 * Math.PI * radius;
@@ -284,7 +359,7 @@ function renderHabitsPlanner() {
 }
 
 function getReminderSettings() {
-    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const profile = getResolvedProfileForDisplay();
     const stored = profile?.reminder_settings && typeof profile.reminder_settings === 'object'
         ? profile.reminder_settings
         : {};
@@ -332,7 +407,7 @@ function buildReminderIso(timeValue, frequency) {
 }
 
 async function scheduleReminder(type, timeValue, frequency) {
-    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const profile = getResolvedProfileForDisplay();
     if (window.serverUser?.authorized !== true) {
         return;
     }
@@ -777,7 +852,7 @@ function renderCalorieTrend(rangeDays = 7) {
         return;
     }
 
-    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const profile = getResolvedProfileForDisplay();
     const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
     const entries = readDiaryEntries();
     const caloriesByDate = new Map();
@@ -1047,7 +1122,7 @@ function renderTodayPlanCard() {
         return;
     }
 
-    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const profile = getResolvedProfileForDisplay();
     const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
 
     if (Number.isFinite(targetCalories) && targetCalories > 0) {
@@ -1072,7 +1147,7 @@ function renderProfileRings() {
         return;
     }
 
-    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const profile = getResolvedProfileForDisplay();
     const tdee = Number(profile?.calories_target ?? profile?.tdee_calories);
     const entries = readDiaryEntries();
     const todayTotals = getTodayDiaryTotals();
@@ -1205,7 +1280,7 @@ function renderMonthGrid() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayDate = normalizeDateKey(today);
-    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const profile = getResolvedProfileForDisplay();
     const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
     const waterTarget = Number(window.adminConfig?.reminders?.water_min_l);
     const sleepTargetMinutes = parseSleepMinutes(window.adminConfig?.reminders?.sleep_target);
@@ -1289,7 +1364,7 @@ function renderWeeklyProgress() {
     const startDate = new Date(today);
     startDate.setHours(0, 0, 0, 0);
     startDate.setDate(today.getDate() - dayIndex);
-    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const profile = getResolvedProfileForDisplay();
     const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
 
     const entries = readDiaryEntries();
@@ -1432,7 +1507,7 @@ function renderWeeklyAdjustments() {
         return;
     }
 
-    const profile = getUserProfile();
+    const profile = getResolvedProfileForDisplay();
     const entries = readDiaryEntries();
     const analysis = analyzeWeeklyStats(profile, entries);
     if (!analysis || !Array.isArray(analysis.adjustments)) {
@@ -1472,7 +1547,7 @@ async function applySubscriptionAccess() {
         return;
     }
 
-    const profile = getUserProfile();
+    const profile = getResolvedProfileForDisplay();
 
     const isDevMode = window.appIsDev === true || window.appMode === 'development';
     if (isDevMode) {
@@ -1564,7 +1639,7 @@ async function renderProfileRecommendations() {
         return;
     }
 
-    const profile = getUserProfile();
+    const profile = getResolvedProfileForDisplay();
     list.innerHTML = '';
     const skeletonItems = Array.from({ length: 3 }).map(() => {
         const item = document.createElement('li');
@@ -1648,7 +1723,7 @@ function renderWeeklyReview() {
         return;
     }
 
-    const profile = getUserProfile();
+    const profile = getResolvedProfileForDisplay();
     let review = profile.weekly_review;
 
     if (shouldRefreshWeeklyReview(review)) {
@@ -1681,7 +1756,7 @@ function renderProfileReminderStatus() {
         return;
     }
 
-    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+    const profile = getResolvedProfileForDisplay();
     const settings = profile?.reminder_settings && typeof profile.reminder_settings === 'object'
         ? profile.reminder_settings
         : {};
