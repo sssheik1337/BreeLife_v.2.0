@@ -1,6 +1,48 @@
 // Хранилище профиля пользователя и нормализация данных
 
 (function() {
+    // Единый canonical-формат профиля между фронтендом и бэкендом.
+    // Все чтения/записи профиля должны использовать только эти ключи.
+    const CANONICAL_PROFILE_KEYS = [
+        'sex',
+        'birth_date',
+        'age',
+        'height_cm',
+        'weight_kg',
+        'target_weight_kg',
+        'goal',
+        'activity_factor',
+        'goal_deadline',
+        'food_diary',
+        'bmr',
+        'tdee_calories',
+        'calories_target',
+        'calorie_delta',
+        'required_rate_kg_per_week',
+        'required_calorie_delta',
+        'required_calories_target',
+        'safe_weeks_estimate',
+        'macros',
+        'weight_rate_kg_per_week',
+        'predicted_goal_date',
+        'weekly_stats',
+        'weekly_adjustments',
+        'weekly_review',
+        'deviation_risk',
+        'deviation_comment',
+        'subscription',
+        'subscription_until',
+        'subscription_status',
+        'subscription_started_at',
+        'trial_started_at',
+        'trial_welcome_seen',
+        'favorite_product_ids',
+        'excluded_product_ids',
+        'is_completed',
+        'last_updated'
+    ];
+    const CANONICAL_PROFILE_KEY_SET = new Set(CANONICAL_PROFILE_KEYS);
+
     const normalizeTelegramInitData = (value) => {
         if (typeof value !== 'string') {
             return '';
@@ -35,6 +77,28 @@
     let cachedDiaryEntries = null;
     let cachedHabitEntries = null;
 
+    function createProfileTraceId() {
+        const randomPart = Math.random().toString(36).slice(2, 8);
+        return `trace-${Date.now()}-${randomPart}`;
+    }
+
+    function beginProfileTrace(source = 'unknown') {
+        const trace = {
+            id: createProfileTraceId(),
+            source,
+            started_at: new Date().toISOString()
+        };
+        window.__profileTrace = trace;
+        return trace.id;
+    }
+
+    function getProfileTraceId() {
+        if (window.__profileTrace?.id) {
+            return window.__profileTrace.id;
+        }
+        return beginProfileTrace('getUserProfile');
+    }
+
     function apiFetch(url, options = {}) {
         const headers = {
             'Content-Type': 'application/json',
@@ -50,16 +114,50 @@
         });
     }
 
+    function logStorageDebug(stage, payload) {
+        if (window.appDebug === true) {
+            console.log(`[PROFILE_DEBUG][storage] ${stage}`, payload);
+        }
+    }
+
     function memoryGet(key) {
-        return memoryStore.has(key) ? memoryStore.get(key) : null;
+        if (memoryStore.has(key)) {
+            return memoryStore.get(key);
+        }
+        try {
+            if (typeof localStorage !== 'undefined') {
+                const value = localStorage.getItem(key);
+                if (value !== null) {
+                    memoryStore.set(key, value);
+                }
+                return value;
+            }
+        } catch (error) {
+            // Если localStorage недоступен (например, режим приватности), используем только память.
+        }
+        return null;
     }
 
     function memorySet(key, value) {
         memoryStore.set(key, value);
+        try {
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem(key, value);
+            }
+        } catch (error) {
+            // Если localStorage недоступен, сохраняем хотя бы в памяти текущей вкладки.
+        }
     }
 
     function memoryRemove(key) {
         memoryStore.delete(key);
+        try {
+            if (typeof localStorage !== 'undefined') {
+                localStorage.removeItem(key);
+            }
+        } catch (error) {
+            // Ошибку удаления localStorage игнорируем, чтобы не ломать поток пользователя.
+        }
     }
 
     function getDefaultUserProfile() {
@@ -76,6 +174,12 @@
             food_diary: null,
             bmr: null,
             tdee_calories: null,
+            calories_target: null,
+            calorie_delta: null,
+            required_rate_kg_per_week: null,
+            required_calorie_delta: null,
+            required_calories_target: null,
+            safe_weeks_estimate: null,
             macros: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
@@ -93,14 +197,16 @@
             weekly_review: null,
             deviation_risk: null,
             deviation_comment: null,
+            subscription: null,
             subscription_until: null,
             subscription_status: null,
             subscription_started_at: null,
             trial_started_at: null,
-            completed: false,
-            profile_completed: false,
+            trial_welcome_seen: null,
             favorite_product_ids: [],
-            excluded_product_ids: []
+            excluded_product_ids: [],
+            is_completed: false,
+            last_updated: null
         };
     }
 
@@ -126,6 +232,25 @@
     }
 
     function normalizeSex(value) {
+        if (typeof value === 'string') {
+            const normalized = value.trim().toLowerCase();
+            const sexMap = {
+                male: 'male',
+                man: 'male',
+                'мужской': 'male',
+                'муж': 'male',
+                'м': 'male',
+                female: 'female',
+                woman: 'female',
+                'женский': 'female',
+                'жен': 'female',
+                'ж': 'female'
+            };
+            const mapped = sexMap[normalized] || null;
+            if (mapped && ALLOWED_SEX.has(mapped)) {
+                return mapped;
+            }
+        }
         if (ALLOWED_SEX.has(value)) {
             return value;
         }
@@ -147,6 +272,48 @@
             return value;
         }
         return null;
+    }
+
+    function validateGoalWeightConsistency(goal, currentWeight, targetWeight) {
+        const current = parseNumber(currentWeight);
+        const target = parseNumber(targetWeight);
+        if (!goal || current === null || target === null) {
+            return {
+                valid: true,
+                blocking: false,
+                warning: false,
+                code: null,
+                message: null
+            };
+        }
+
+        if (goal === 'gain' && target <= current) {
+            return {
+                valid: false,
+                blocking: true,
+                warning: false,
+                code: 'GAIN_TARGET_NOT_ABOVE_CURRENT',
+                message: 'Цель набора массы противоречит выбранному желаемому весу'
+            };
+        }
+
+        if (goal === 'lose' && target >= current) {
+            return {
+                valid: false,
+                blocking: true,
+                warning: false,
+                code: 'LOSE_TARGET_NOT_BELOW_CURRENT',
+                message: 'Цель снижения веса противоречит выбранному желаемому весу'
+            };
+        }
+
+        return {
+            valid: true,
+            blocking: false,
+            warning: false,
+            code: null,
+            message: null
+        };
     }
 
     function normalizeIdList(value) {
@@ -225,10 +392,32 @@
 
     function normalizeUserProfile(profile) {
         const base = getDefaultUserProfile();
-        const merged = { ...base, ...(profile || {}) };
+        const sourceProfile = profile && typeof profile === 'object' ? profile : {};
+        const merged = { ...base };
+        CANONICAL_PROFILE_KEYS.forEach((key) => {
+            if (Object.prototype.hasOwnProperty.call(sourceProfile, key)) {
+                merged[key] = sourceProfile[key];
+            }
+        });
+
+        logStorageDebug('normalizeUserProfile:input', {
+            profile
+        });
 
         merged.sex = normalizeSex(merged.sex);
-        merged.birth_date = merged.birth_date || null;
+        const rawBirthDate = merged.birth_date;
+        if (rawBirthDate === null || rawBirthDate === undefined || rawBirthDate === '') {
+            merged.birth_date = null;
+        } else if (typeof window.normalizeLocalDate === 'function') {
+            const normalizedBirthDate = window.normalizeLocalDate(rawBirthDate);
+            merged.birth_date = typeof normalizedBirthDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(normalizedBirthDate)
+                ? normalizedBirthDate
+                : null;
+        } else {
+            merged.birth_date = typeof rawBirthDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawBirthDate)
+                ? rawBirthDate
+                : null;
+        }
         merged.age = parseNumber(merged.age);
         if (merged.age === null) {
             merged.age = getAgeFromBirthDate(merged.birth_date);
@@ -237,11 +426,22 @@
         merged.weight_kg = parseNumber(merged.weight_kg);
         merged.target_weight_kg = parseNumber(merged.target_weight_kg);
         merged.goal = normalizeGoal(merged.goal);
+        if (merged.goal === 'maintain') {
+            // Для поддержания веса целевой вес и дедлайн не используются.
+            merged.target_weight_kg = null;
+            merged.goal_deadline = null;
+        }
         merged.activity_factor = parseNumber(merged.activity_factor);
         merged.goal_deadline = merged.goal_deadline || null;
         merged.food_diary = parseBoolean(merged.food_diary);
         merged.bmr = parseNumber(merged.bmr);
         merged.tdee_calories = parseNumber(merged.tdee_calories);
+        merged.calories_target = parseNumber(merged.calories_target);
+        merged.calorie_delta = parseNumber(merged.calorie_delta);
+        merged.required_rate_kg_per_week = parseNumber(merged.required_rate_kg_per_week);
+        merged.required_calorie_delta = parseNumber(merged.required_calorie_delta);
+        merged.required_calories_target = parseNumber(merged.required_calories_target);
+        merged.safe_weeks_estimate = parseNumber(merged.safe_weeks_estimate);
         merged.macros = normalizeMacros(merged.macros);
         merged.weight_rate_kg_per_week = parseNumber(merged.weight_rate_kg_per_week);
         merged.predicted_goal_date = merged.predicted_goal_date || null;
@@ -250,39 +450,53 @@
         merged.weekly_review = normalizeWeeklyReview(merged.weekly_review);
         merged.deviation_risk = normalizeRisk(merged.deviation_risk);
         merged.deviation_comment = merged.deviation_comment || null;
+        merged.subscription = merged.subscription && typeof merged.subscription === 'object'
+            ? merged.subscription
+            : null;
         merged.subscription_until = merged.subscription_until || null;
         merged.subscription_status = merged.subscription_status || null;
         merged.subscription_started_at = merged.subscription_started_at || null;
         merged.trial_started_at = merged.trial_started_at || null;
-        const normalizedCompleted = parseBoolean(merged.completed);
-        const normalizedProfileCompleted = parseBoolean(merged.profile_completed);
-        merged.completed = normalizedCompleted;
-        merged.profile_completed = normalizedProfileCompleted;
+        merged.trial_welcome_seen = parseBoolean(merged.trial_welcome_seen);
+        merged.is_completed = parseBoolean(merged.is_completed);
         merged.favorite_product_ids = normalizeIdList(merged.favorite_product_ids);
         merged.excluded_product_ids = normalizeIdList(merged.excluded_product_ids);
+        merged.last_updated = typeof merged.last_updated === 'string' && merged.last_updated.trim()
+            ? merged.last_updated
+            : null;
 
         const requiredFields = [
             merged.sex,
             merged.birth_date,
             merged.height_cm,
             merged.weight_kg,
-            merged.target_weight_kg,
             merged.goal,
             merged.activity_factor
         ];
+        if (merged.goal !== 'maintain') {
+            requiredFields.push(merged.target_weight_kg);
+        }
         const calculatedCompleted = requiredFields.every((value) => value !== null && value !== undefined && value !== '');
 
-        if (merged.completed === null) {
-            merged.completed = calculatedCompleted;
-        }
-        if (merged.profile_completed === null) {
-            merged.profile_completed = merged.completed;
+        if (merged.is_completed === null) {
+            merged.is_completed = calculatedCompleted;
         }
 
-        // В спорной ситуации приоритет у подтверждённого сервером profile_completed.
-        if (merged.profile_completed !== merged.completed) {
-            merged.completed = merged.profile_completed;
-        }
+        logStorageDebug('normalizeUserProfile:output', {
+            merged,
+            required_inputs: {
+                sex: merged.sex,
+                birth_date: merged.birth_date,
+                height_cm: merged.height_cm,
+                weight_kg: merged.weight_kg,
+                goal: merged.goal,
+                activity_factor: merged.activity_factor,
+                target_weight_kg: merged.target_weight_kg
+            },
+            completion_flags: {
+                is_completed: merged.is_completed
+            }
+        });
 
         return merged;
     }
@@ -322,7 +536,8 @@
             subscription_until: null,
             subscription_status: null,
             subscription_started_at: null,
-            trial_started_at: null
+            trial_started_at: null,
+            is_completed: false
         };
         return profile;
     }
@@ -563,12 +778,21 @@
     }
 
     function getUserProfile() {
+        const traceId = getProfileTraceId();
         if (cachedProfile) {
+            logStorageDebug('getUserProfile:from_cache', {
+                traceId,
+                cachedProfile
+            });
             return cachedProfile;
         }
         let storedProfile = null;
         try {
             const raw = memoryGet(STORAGE_KEY);
+            logStorageDebug('getUserProfile:raw_storage_value', {
+                traceId,
+                raw
+            });
             storedProfile = raw ? JSON.parse(raw) : null;
         } catch (error) {
             storedProfile = null;
@@ -581,12 +805,48 @@
 
         const normalized = normalizeUserProfile(storedProfile);
         cachedProfile = normalized;
+        logStorageDebug('getUserProfile:normalized_result', {
+            traceId,
+            storedProfile,
+            normalized
+        });
         try {
             memorySet(STORAGE_KEY, JSON.stringify(normalized));
         } catch (error) {
             // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
         return normalized;
+    }
+
+    function validateCanonicalProfilePayload(payload) {
+        if (!payload || typeof payload !== 'object') {
+            return {
+                isCanonical: false,
+                reason: 'PAYLOAD_NOT_OBJECT',
+                conflictingKeys: []
+            };
+        }
+        const keys = Object.keys(payload);
+        const conflictingKeys = keys.filter((key) => !CANONICAL_PROFILE_KEY_SET.has(key));
+        if (conflictingKeys.length > 0) {
+            return {
+                isCanonical: false,
+                reason: 'UNSUPPORTED_KEYS',
+                conflictingKeys
+            };
+        }
+        if (!Object.prototype.hasOwnProperty.call(payload, 'is_completed')) {
+            return {
+                isCanonical: false,
+                reason: 'MISSING_REQUIRED_IS_COMPLETED',
+                conflictingKeys: ['is_completed']
+            };
+        }
+        return {
+            isCanonical: true,
+            reason: null,
+            conflictingKeys: []
+        };
     }
 
     function addTrialDays(startedAtIso, days) {
@@ -667,10 +927,40 @@
         }
     }
 
+    function enforceGoalWeightConsistencyInMerge(candidate, fallbackProfile) {
+        const mergedCandidate = { ...(candidate || {}) };
+        const normalizedGoal = normalizeGoal(mergedCandidate.goal);
+        if (normalizedGoal === 'maintain') {
+            mergedCandidate.target_weight_kg = null;
+            mergedCandidate.goal_deadline = null;
+            return mergedCandidate;
+        }
+
+        const consistency = validateGoalWeightConsistency(
+            normalizedGoal,
+            mergedCandidate.weight_kg,
+            mergedCandidate.target_weight_kg
+        );
+        if (consistency.blocking) {
+            // При конфликте цели и веса не теряем остальные обновления профиля:
+            // откатываем только конфликтующие поля до последнего валидного состояния.
+            const fallback = { ...(fallbackProfile || {}) };
+            return {
+                ...mergedCandidate,
+                goal: fallback.goal ?? null,
+                target_weight_kg: fallback.target_weight_kg ?? null,
+                goal_deadline: fallback.goal_deadline ?? null
+            };
+        }
+
+        return mergedCandidate;
+    }
+
     function setUserProfile(profile) {
         const current = getUserProfile();
         const merged = { ...current, ...(profile || {}) };
-        const trialResult = applyTrialStartIfNeeded(current, merged);
+        const consistentMerged = enforceGoalWeightConsistencyInMerge(merged, current);
+        const trialResult = applyTrialStartIfNeeded(current, consistentMerged);
         const normalized = normalizeUserProfile(trialResult.merged);
         cachedProfile = normalized;
         try {
@@ -691,7 +981,8 @@
         if (partial && Object.prototype.hasOwnProperty.call(partial, 'macros')) {
             merged.macros = partial.macros;
         }
-        const trialResult = applyTrialStartIfNeeded(current, merged);
+        const consistentMerged = enforceGoalWeightConsistencyInMerge(merged, current);
+        const trialResult = applyTrialStartIfNeeded(current, consistentMerged);
         const normalized = normalizeUserProfile(trialResult.merged);
         cachedProfile = normalized;
         try {
@@ -781,19 +1072,24 @@
                 profile?.birth_date,
                 profile?.height_cm,
                 profile?.weight_kg,
-                profile?.target_weight_kg,
                 profile?.goal,
                 profile?.activity_factor
             ];
+            if (profile?.goal !== 'maintain') {
+                requiredFields.push(profile?.target_weight_kg);
+            }
             const missingFields = requiredFields.filter((value) => value === null || value === undefined || value === '');
             if (window.appDebug) {
-                const fieldNames = ['sex', 'birth_date', 'height_cm', 'weight_kg', 'target_weight_kg', 'goal', 'activity_factor'];
+                const fieldNames = ['sex', 'birth_date', 'height_cm', 'weight_kg', 'goal', 'activity_factor'];
+                if (profile?.goal !== 'maintain') {
+                    fieldNames.push('target_weight_kg');
+                }
                 const missingFieldNames = fieldNames.filter((name, index) => {
                     const value = requiredFields[index];
                     return value === null || value === undefined || value === '';
                 });
-                console.log('Проверка payload перед /api/profile', {
-                    user_profile: profile,
+                console.log('Проверка payload перед /api/profile/save', {
+                    profile,
                     missing_required_fields: missingFieldNames
                 });
             }
@@ -804,25 +1100,22 @@
                 });
                 return;
             }
-            const response = await apiFetch('/api/profile', {
+            const response = await apiFetch('/api/profile/save', {
                 method: 'POST',
-                body: JSON.stringify({
-                    user_profile: profile
-                })
+                body: JSON.stringify(profile)
             });
             if (!response.ok) {
                 return;
             }
+            const responseData = await response.json();
             try {
                 localStorage.removeItem('userData');
             } catch (error) {
                 console.warn('Не удалось очистить userData', error);
             }
-            const refreshed = await apiFetch('/api/profile');
-            if (!refreshed.ok) {
-                return;
-            }
-            const data = await refreshed.json();
+            const data = responseData && typeof responseData === 'object'
+                ? responseData
+                : null;
             if (!data || typeof data !== 'object') {
                 throw new Error('Profile payload invalid');
             }
@@ -836,21 +1129,37 @@
             } catch (error) {
                 // Игнорируем ошибку сохранения, данные остаются в памяти.
             }
+            if (typeof window.resetUserDataDirtyMap === 'function') {
+                window.resetUserDataDirtyMap('profile_saved');
+            }
         } catch (error) {
             // Ошибки синхронизации игнорируем, данные остаются локально.
         }
     }
 
     async function syncProfileWithBackend() {
+        const traceId = beginProfileTrace('syncProfileWithBackend');
         if (window.serverUser?.authorized !== true) {
+            logStorageDebug('syncProfileWithBackend:skip_unauthorized', {
+                traceId,
+                serverUser: window.serverUser
+            });
             return getUserProfile();
         }
         try {
             const response = await apiFetch('/api/profile');
             if (!response.ok) {
+                logStorageDebug('syncProfileWithBackend:response_not_ok', {
+                    traceId,
+                    status: response.status
+                });
                 return getUserProfile();
             }
             const data = await response.json();
+            logStorageDebug('syncProfileWithBackend:raw_backend_payload', {
+                traceId,
+                data
+            });
             if (!data || typeof data !== 'object') {
                 throw new Error('Profile payload invalid');
             }
@@ -863,12 +1172,35 @@
                 return localProfile;
             }
             if (data && typeof data === 'object') {
+                const validation = validateCanonicalProfilePayload(data);
+                if (!validation.isCanonical) {
+                    console.warn('[PROFILE_CANONICAL] Получен некорректный формат профиля от сервера', {
+                        reason: validation.reason,
+                        conflictingKeys: validation.conflictingKeys,
+                        payload: data
+                    });
+                }
                 const normalized = normalizeUserProfile(data);
                 cachedProfile = normalized;
+                logStorageDebug('syncProfileWithBackend:normalized_backend_payload', {
+                    traceId,
+                    normalized
+                });
                 try {
                     memorySet(STORAGE_KEY, JSON.stringify(normalized));
                 } catch (error) {
                     // Игнорируем ошибку сохранения, данные остаются в памяти.
+                }
+                if (
+                    typeof window.mergeUserDataWithoutLosingAnswers === 'function'
+                    && typeof window.mapUserProfileToUserData === 'function'
+                    && window.userData
+                ) {
+                    window.mergeUserDataWithoutLosingAnswers(
+                        window.userData,
+                        window.mapUserProfileToUserData(normalized),
+                        { source: 'server' }
+                    );
                 }
                 return normalized;
             }
@@ -1122,10 +1454,13 @@
         return localHabits;
     }
 
+    window.beginProfileTrace = beginProfileTrace;
+    window.getProfileTraceId = getProfileTraceId;
     window.getUserProfile = getUserProfile;
     window.setUserProfile = setUserProfile;
     window.patchUserProfile = patchUserProfile;
     window.normalizeLocalDate = normalizeLocalDate;
+    window.validateGoalWeightConsistency = validateGoalWeightConsistency;
     window.getDiaryEntries = getDiaryEntries;
     window.setDiaryEntries = setDiaryEntries;
     window.getHabitEntries = getHabitEntries;

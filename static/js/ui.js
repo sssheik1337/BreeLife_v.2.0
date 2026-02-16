@@ -16,6 +16,92 @@ const userData = {
 
 window.userData = userData;
 
+const USER_DATA_DIRTY_KEYS = ['gender', 'birthDate', 'height', 'currentWeight', 'activityLevel', 'goalType'];
+const userDataDirtyMap = {};
+USER_DATA_DIRTY_KEYS.forEach((key) => {
+    userDataDirtyMap[key] = false;
+});
+window.userDataDirtyMap = userDataDirtyMap;
+
+function shouldTrackDirtyKey(key) {
+    return USER_DATA_DIRTY_KEYS.includes(key);
+}
+
+function logUserDataOverwriteEvent(payload) {
+    console.log('[USERDATA_OVERWRITE_EVENT]', payload);
+}
+
+function markUserDataFieldDirty(key, source = 'form') {
+    if (!shouldTrackDirtyKey(key)) {
+        return;
+    }
+    userDataDirtyMap[key] = true;
+    logUserDataOverwriteEvent({
+        action: 'mark_dirty',
+        key,
+        source
+    });
+}
+
+function isUserDataFieldDirty(key) {
+    if (!shouldTrackDirtyKey(key)) {
+        return false;
+    }
+    return userDataDirtyMap[key] === true;
+}
+
+function resetUserDataDirtyMap(reason = 'unknown') {
+    USER_DATA_DIRTY_KEYS.forEach((key) => {
+        userDataDirtyMap[key] = false;
+    });
+    logUserDataOverwriteEvent({
+        action: 'reset_dirty_map',
+        reason
+    });
+}
+
+function setUserDataField(key, value, options = {}) {
+    if (!window.userData || typeof window.userData !== 'object') {
+        window.userData = userData;
+    }
+    const source = options.source || 'unknown';
+    const markDirty = options.markDirty === true;
+    const ignoreDirty = options.ignoreDirty === true;
+    const dirty = isUserDataFieldDirty(key);
+
+    if (dirty && !ignoreDirty && source !== 'form') {
+        logUserDataOverwriteEvent({
+            action: 'skip_overwrite',
+            key,
+            source,
+            reason: 'FIELD_IS_DIRTY',
+            current: window.userData[key],
+            incoming: value
+        });
+        return false;
+    }
+
+    window.userData[key] = value;
+
+    if (markDirty && source === 'form') {
+        markUserDataFieldDirty(key, source);
+    }
+
+    logUserDataOverwriteEvent({
+        action: 'set_value',
+        key,
+        source,
+        dirty: isUserDataFieldDirty(key),
+        value
+    });
+    return true;
+}
+
+window.markUserDataFieldDirty = markUserDataFieldDirty;
+window.isUserDataFieldDirty = isUserDataFieldDirty;
+window.resetUserDataDirtyMap = resetUserDataDirtyMap;
+window.setUserDataField = setUserDataField;
+
 // Преобразование user_profile в данные анкеты
 function mapUserProfileToUserData(profile) {
     if (!profile) {
@@ -143,16 +229,20 @@ function mapUserDataToUserProfile(data) {
     const foodDiaryValue = data.foodDiary ?? data.food_diary ?? null;
     const age = calculateAge(birthDate);
 
+    const normalizedGoal = normalizeGoal(goalValue);
+    const normalizedTargetWeight = parseNumber(targetWeightValue);
+    const normalizedDeadline = deadlineValue || null;
+
     return {
         sex: normalizeSex(rawGender),
         birth_date: birthDate,
         age: age ?? null,
         height_cm: parseNumber(heightValue),
         weight_kg: parseNumber(weightValue),
-        target_weight_kg: parseNumber(targetWeightValue),
-        goal: normalizeGoal(goalValue),
+        target_weight_kg: normalizedGoal === 'maintain' ? null : normalizedTargetWeight,
+        goal: normalizedGoal,
         activity_factor: normalizeActivity(activityValue),
-        goal_deadline: deadlineValue || null,
+        goal_deadline: normalizedGoal === 'maintain' ? null : normalizedDeadline,
         food_diary: foodDiaryValue === true || foodDiaryValue === false
             ? foodDiaryValue
             : foodDiaryValue === 'yes'
@@ -164,9 +254,38 @@ function mapUserDataToUserProfile(data) {
 }
 
 // Форматировать дату для отображения на русском языке
+function normalizeBirthDateInput(value) {
+    if (!value) {
+        return null;
+    }
+    if (typeof window.normalizeLocalDate === 'function') {
+        const normalized = window.normalizeLocalDate(value);
+        if (typeof normalized === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+            return normalized;
+        }
+    }
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        const dot = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+        if (dot) {
+            const [, day, month, year] = dot;
+            return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+        const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (iso) {
+            return `${iso[1]}-${iso[2]}-${iso[3]}`;
+        }
+    }
+    return null;
+}
+
 function formatDate(dateString) {
     if (!dateString) return 'Не указано';
-    const date = new Date(dateString);
+    const normalized = normalizeBirthDateInput(dateString);
+    if (!normalized) {
+        return 'Не указано';
+    }
+    const date = new Date(`${normalized}T00:00:00`);
     if (Number.isNaN(date.getTime())) {
         return 'Не указано';
     }
@@ -177,19 +296,23 @@ function formatDate(dateString) {
     });
 }
 
-// Calculate age from birth date
+// Рассчитать возраст по дате рождения в устойчивом формате.
 function calculateAge(birthDate) {
-    if (!birthDate) return null;
+    const normalized = normalizeBirthDateInput(birthDate);
+    if (!normalized) return null;
     const today = new Date();
-    const birth = new Date(birthDate);
+    const birth = new Date(`${normalized}T00:00:00`);
+    if (Number.isNaN(birth.getTime())) {
+        return null;
+    }
     let age = today.getFullYear() - birth.getFullYear();
     const monthDiff = today.getMonth() - birth.getMonth();
-    
+
     if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-        age--;
+        age -= 1;
     }
-    
-    return age;
+
+    return Number.isFinite(age) && age >= 0 ? age : null;
 }
 
 // Validate form inputs
@@ -654,7 +777,7 @@ function getLocalProfileCompletedFlag() {
     if (!profile || typeof profile !== 'object') {
         return false;
     }
-    return profile.profile_completed === true || profile.completed === true;
+    return profile.is_completed === true;
 }
 
 function redirectToQuestionnaireIfNeeded(status) {
@@ -697,8 +820,7 @@ function syncLocalProfileCompletion(status) {
         // Если Telegram-сессия временно недоступна, не затираем локально подтверждённый профиль.
         const safeCompleted = isAuthorized ? mergedCompleted : localCompleted;
         patchUserProfile({
-            completed: safeCompleted,
-            profile_completed: safeCompleted
+            is_completed: safeCompleted
         });
     }
 }
@@ -738,13 +860,44 @@ function restoreUserDataFromLocalStorage() {
         }
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
-            window.userData = parsed;
-            console.log('[USERDATA] восстановлено из localStorage');
+            mergeUserDataWithoutLosingAnswers(window.userData, parsed, { source: 'local' });
+            console.log('[USERDATA] восстановлено из localStorage без перезаписи dirty-полей');
         }
     } catch (error) {
         console.warn('Не удалось восстановить userData', error);
     }
 }
+
+function mergeUserDataWithoutLosingAnswers(target, source, options = {}) {
+    if (!target || typeof target !== 'object' || !source || typeof source !== 'object') {
+        return;
+    }
+    const sourceName = options.source || 'unknown';
+    Object.entries(source).forEach(([key, value]) => {
+        const hasIncomingValue = value !== null && value !== undefined && value !== '';
+        if (!hasIncomingValue) {
+            return;
+        }
+        const dirty = typeof isUserDataFieldDirty === 'function' && isUserDataFieldDirty(key);
+        if (dirty) {
+            logUserDataOverwriteEvent({
+                action: 'skip_merge',
+                key,
+                source: sourceName,
+                reason: 'FIELD_IS_DIRTY',
+                current: target[key],
+                incoming: value
+            });
+            return;
+        }
+        const current = target[key];
+        const hasCurrentValue = current !== null && current !== undefined && current !== '';
+        if (!hasCurrentValue) {
+            setUserDataField(key, value, { source: sourceName });
+        }
+    });
+}
+window.mergeUserDataWithoutLosingAnswers = mergeUserDataWithoutLosingAnswers;
 
 // Применение темы Telegram WebApp к CSS-переменным
 function applyTelegramTheme() {
@@ -891,11 +1044,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Load saved data if available
     if (typeof getUserProfile === 'function') {
         const profile = getUserProfile();
-        Object.assign(userData, mapUserProfileToUserData(profile));
+        mergeUserDataWithoutLosingAnswers(userData, mapUserProfileToUserData(profile), { source: 'server' });
     } else {
         const savedData = storage.get('user_data');
         if (savedData) {
-            Object.assign(userData, savedData);
+            mergeUserDataWithoutLosingAnswers(userData, savedData, { source: 'local' });
         }
     }
 

@@ -15,6 +15,20 @@ from app.dependencies import (
 router = APIRouter()
 
 
+def should_redirect_to_trial_start(profile_data: dict[str, object]) -> bool:
+    """Показывать экран trial-start только при первом запуске после анкеты."""
+    if profile_data.get("trial_welcome_seen") is True:
+        return False
+
+    # Если триал/подписка уже были начаты ранее, не форсируем повторный welcome-экран.
+    if profile_data.get("trial_started_at"):
+        return False
+    if profile_data.get("subscription_status") in {"trial", "active", "expired"}:
+        return False
+
+    return True
+
+
 @router.get("/resume", response_class=HTMLResponse)
 async def resume(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
     if telegram_user_id is None:
@@ -37,7 +51,7 @@ async def profile(request: Request, telegram_user_id: int | None = Depends(optio
             {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
         )
     profile_data = require_completed_profile(telegram_user_id)
-    if profile_data.get("trial_welcome_seen") is not True:
+    if should_redirect_to_trial_start(profile_data):
         return RedirectResponse(url="/trial-start", status_code=307)
     return templates.TemplateResponse(
         "profile.html",
@@ -54,7 +68,7 @@ async def profile_alias(request: Request, telegram_user_id: int | None = Depends
 async def trial_start(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
     if telegram_user_id is not None:
         profile_data = require_completed_profile(telegram_user_id)
-        if profile_data.get("trial_welcome_seen") is True:
+        if not should_redirect_to_trial_start(profile_data):
             return RedirectResponse(url="/profile", status_code=307)
     return templates.TemplateResponse(
         "trial_start.html",

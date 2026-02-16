@@ -63,13 +63,13 @@
         appearance: none;
         -webkit-appearance: none;
         padding: 0 12px;
-        box-shadow: none;
         background-clip: padding-box;
+        /* Оставляем стандартную обводку без изменений, добавляем только плавное затухание. */
+        transition: border-color 0.28s ease;
       }
       .wheel-select:focus {
         outline: none;
         border-color: #34d399;
-        box-shadow: none;
       }
       .wheel-select option {
         padding: 6px 0;

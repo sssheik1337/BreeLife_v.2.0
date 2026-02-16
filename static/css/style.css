@@ -104,8 +104,9 @@ body {
 
 /* Button Styles */
 .btn-primary {
-    background: var(--tg-button-color, linear-gradient(135deg, #34d399 0%, #3b82f6 100%));
-    color: var(--tg-button-text-color, white);
+    /* Используем только внутреннюю дизайн-систему, без цветов Telegram-темы. */
+    background: linear-gradient(135deg, #34d399 0%, #3b82f6 100%);
+    color: #ffffff;
     border: none;
     border-radius: 9999px;
     padding: 16px 24px;
