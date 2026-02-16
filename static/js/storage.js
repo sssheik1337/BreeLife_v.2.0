@@ -77,6 +77,14 @@
     let cachedDiaryEntries = null;
     let cachedHabitEntries = null;
 
+    function getProfileStorageKey() {
+        const userId = window.serverUser?.telegram_user_id;
+        if (userId === null || userId === undefined || userId === '') {
+            return STORAGE_KEY;
+        }
+        return `${STORAGE_KEY}:${userId}`;
+    }
+
     function createProfileTraceId() {
         const randomPart = Math.random().toString(36).slice(2, 8);
         return `trace-${Date.now()}-${randomPart}`;
@@ -788,7 +796,7 @@
         }
         let storedProfile = null;
         try {
-            const raw = memoryGet(STORAGE_KEY);
+            const raw = memoryGet(getProfileStorageKey());
             logStorageDebug('getUserProfile:raw_storage_value', {
                 traceId,
                 raw
@@ -811,7 +819,7 @@
             normalized
         });
         try {
-            memorySet(STORAGE_KEY, JSON.stringify(normalized));
+            memorySet(getProfileStorageKey(), JSON.stringify(normalized));
         } catch (error) {
             // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
@@ -964,7 +972,7 @@
         const normalized = normalizeUserProfile(trialResult.merged);
         cachedProfile = normalized;
         try {
-            memorySet(STORAGE_KEY, JSON.stringify(normalized));
+            memorySet(getProfileStorageKey(), JSON.stringify(normalized));
         } catch (error) {
             // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
@@ -986,7 +994,7 @@
         const normalized = normalizeUserProfile(trialResult.merged);
         cachedProfile = normalized;
         try {
-            memorySet(STORAGE_KEY, JSON.stringify(normalized));
+            memorySet(getProfileStorageKey(), JSON.stringify(normalized));
         } catch (error) {
             // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
@@ -1125,7 +1133,7 @@
             const normalized = normalizeUserProfile(data);
             cachedProfile = normalized;
             try {
-                memorySet(STORAGE_KEY, JSON.stringify(normalized));
+                memorySet(getProfileStorageKey(), JSON.stringify(normalized));
             } catch (error) {
                 // Игнорируем ошибку сохранения, данные остаются в памяти.
             }
@@ -1187,7 +1195,7 @@
                     normalized
                 });
                 try {
-                    memorySet(STORAGE_KEY, JSON.stringify(normalized));
+                    memorySet(getProfileStorageKey(), JSON.stringify(normalized));
                 } catch (error) {
                     // Игнорируем ошибку сохранения, данные остаются в памяти.
                 }
