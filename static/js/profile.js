@@ -1024,6 +1024,72 @@ function renderWeeklyProgress() {
     }
 }
 
+function renderMonthGrid() {
+    const grid = document.getElementById('profile-month-grid');
+    if (!grid) {
+        return;
+    }
+
+    grid.innerHTML = '';
+
+    const profile = getResolvedProfileForDisplay();
+    const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
+    const hasValidTarget = Number.isFinite(targetCalories) && targetCalories > 0;
+
+    const entries = readDiaryEntries();
+    const caloriesByDate = new Map();
+    entries.forEach((entry) => {
+        const dateKey = normalizeDateKey(entry?.date);
+        if (!dateKey) {
+            return;
+        }
+        const totals = resolveEntryTotals(entry);
+        const calories = Number(totals.calories) || 0;
+        if (calories <= 0) {
+            return;
+        }
+        const current = caloriesByDate.get(dateKey) || 0;
+        caloriesByDate.set(dateKey, current + calories);
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayKey = normalizeDateKey(today);
+
+    for (let i = 29; i >= 0; i -= 1) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        const dateKey = normalizeDateKey(date);
+
+        const cell = document.createElement('a');
+        cell.className = 'month-day';
+        cell.textContent = String(date.getDate()).padStart(2, '0');
+        cell.href = dateKey ? `/diary?date=${dateKey}&mode=day` : '/diary?mode=day';
+
+        const dayCalories = dateKey ? (caloriesByDate.get(dateKey) || 0) : 0;
+        const hasData = Boolean(dateKey && caloriesByDate.has(dateKey));
+
+        if (!hasData) {
+            cell.classList.add('month-day--empty');
+        } else if (!hasValidTarget) {
+            cell.classList.add('month-day--active');
+        } else {
+            const ratio = safeDivide(dayCalories, targetCalories);
+            if (ratio >= 0.9 && ratio <= 1.1) {
+                cell.classList.add('month-day--good');
+            } else {
+                cell.classList.add('month-day--bad');
+            }
+        }
+
+        if (todayKey && dateKey === todayKey) {
+            cell.classList.add('month-day--today');
+        }
+
+        grid.appendChild(cell);
+    }
+}
+
 function renderWeeklyAdjustments() {
     const weeklyReviewCard = document.getElementById('profile-weekly-review');
     const list = weeklyReviewCard?.querySelector('#profile-weekly-adjustments-list')
@@ -1134,40 +1200,6 @@ function renderWeeklyReview() {
 }
 
 
-function renderProfileReminderStatus() {
-    const badge = document.getElementById('profile-reminders-badge');
-    const summary = document.getElementById('profile-reminders-summary');
-    if (!badge || !summary) {
-        return;
-    }
-
-    const profile = getResolvedProfileForDisplay();
-    const settings = profile?.reminder_settings && typeof profile.reminder_settings === 'object'
-        ? profile.reminder_settings
-        : {};
-
-    const entries = [
-        ['water', 'Вода'],
-        ['sleep', 'Сон'],
-        ['activity', 'Активность']
-    ];
-
-    const enabled = entries
-        .filter(([key]) => settings?.[key]?.enabled === true)
-        .map(([, label]) => label);
-
-    if (!enabled.length) {
-        badge.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600';
-        badge.textContent = 'Выключено';
-        summary.textContent = 'Напоминания пока отключены. Настройте их в отдельном разделе.';
-        return;
-    }
-
-    badge.className = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700';
-    badge.textContent = `Включено: ${enabled.length}`;
-    summary.textContent = `Активны напоминания: ${enabled.join(', ')}.`;
-}
-
 async function loadProfileFromServer() {
     if (typeof window.syncProfileWithBackend === 'function') {
         await window.syncProfileWithBackend();
@@ -1273,8 +1305,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderWaterHistory(Number(activeWaterRange));
         renderMacroBalance(activeMacroRange);
         renderCarbSplit(activeMacroRange);
+        renderMonthGrid();
         renderWeeklyAdjustments();
         renderWeeklyReview();
-        renderProfileReminderStatus();
     })();
 });
