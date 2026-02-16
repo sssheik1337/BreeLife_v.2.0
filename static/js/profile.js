@@ -1038,16 +1038,41 @@ function renderWeeklyAdjustments() {
     const profile = getResolvedProfileForDisplay();
     const entries = readDiaryEntries();
     const analysis = analyzeWeeklyStats(profile, entries);
-    if (!analysis || !Array.isArray(analysis.adjustments)) {
+    const rawAdjustments = Array.isArray(analysis?.adjustments)
+        ? analysis.adjustments
+        : [];
+
+    const uniqueAdjustments = [];
+    const seen = new Set();
+    rawAdjustments.forEach((item) => {
+        if (typeof item !== 'string') {
+            return;
+        }
+        const normalized = item.trim();
+        if (normalized.length < 5) {
+            return;
+        }
+        if (seen.has(normalized)) {
+            return;
+        }
+        seen.add(normalized);
+        uniqueAdjustments.push(normalized);
+    });
+
+    if (!uniqueAdjustments.length) {
+        list.classList.add('hidden');
+        list.innerHTML = '';
         return;
     }
 
+    list.classList.remove('hidden');
+
     if (typeof patchUserProfile === 'function') {
-        patchUserProfile({ weekly_adjustments: analysis.text });
+        patchUserProfile({ weekly_adjustments: analysis?.text });
     }
 
     list.innerHTML = '';
-    analysis.adjustments.slice(0, 3).forEach((item) => {
+    uniqueAdjustments.slice(0, 3).forEach((item) => {
         const li = document.createElement('li');
         li.className = 'flex items-start gap-2';
         li.innerHTML = '<span class="text-amber-500">•</span>';
