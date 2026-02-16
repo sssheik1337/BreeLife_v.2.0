@@ -61,8 +61,14 @@ function renderMealPlan(container, products, rangeKey) {
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
     const filteredProducts = buildPreferredProducts(products, profile);
 
-    const caloriesTarget = Number(profile?.tdee_calories);
-    const macrosTarget = profile?.macros || (typeof calculateMacros === 'function' ? calculateMacros(caloriesTarget) : null);
+    const caloriesTarget = Number(profile?.calories_target ?? profile?.tdee_calories);
+    const macrosTarget = profile?.macros || (typeof calculateMacros === 'function'
+        ? calculateMacros({
+            goal: profile?.goal,
+            weight_kg: profile?.weight_kg,
+            calories_target: caloriesTarget
+        })
+        : null);
     const totalsText = buildTotalsText(caloriesTarget, macrosTarget);
 
     updateSummary(filteredProducts.length, totalsText);

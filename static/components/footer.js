@@ -118,6 +118,48 @@ class CustomFooter extends HTMLElement {
           transform: scale(0.98);
         }
 
+        .fab-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.35);
+          z-index: 55;
+        }
+
+        .fab-overlay.hidden {
+          display: none;
+        }
+
+        .fab-menu {
+          position: fixed;
+          left: 50%;
+          bottom: 90px;
+          transform: translateX(-50%);
+          z-index: 60;
+          background: #ffffff;
+          border-radius: 18px;
+          padding: 8px;
+          min-width: 240px;
+          box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .fab-menu.hidden {
+          display: none;
+        }
+
+        .fab-menu__item {
+          border: none;
+          background: #f8fafc;
+          border-radius: 12px;
+          padding: 10px 12px;
+          text-align: left;
+          font-size: 14px;
+          color: #0f172a;
+          cursor: pointer;
+        }
+
         @media (min-width: 768px) {
           .bottom-nav {
             left: 50%;
@@ -151,7 +193,7 @@ class CustomFooter extends HTMLElement {
             <span class="bottom-link__icon" aria-hidden="true">🍽️</span>
             <span>Дневник</span>
           </a>
-          <a href="/diary?fab=1" class="bottom-fab" aria-label="Добавить запись">+</a>
+          <a href="#" class="bottom-fab" aria-label="Добавить запись">+</a>
           <a href="/meal-plan" class="bottom-link" data-bottom-link="meal-plan">
             <span class="bottom-link__icon" aria-hidden="true">📋</span>
             <span>Рацион</span>
@@ -162,6 +204,15 @@ class CustomFooter extends HTMLElement {
           </a>
         </div>
       </nav>
+
+      <div class="fab-overlay hidden" data-fab-overlay></div>
+      <div class="fab-menu hidden" data-fab-menu>
+        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="breakfast">➕ Добавить завтрак</button>
+        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="lunch">➕ Добавить обед</button>
+        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="dinner">➕ Добавить ужин</button>
+        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="snack">➕ Добавить перекус</button>
+        <button type="button" class="fab-menu__item" data-fab-action="water">💧 Добавить воду</button>
+      </div>
     `;
 
     const hasCompletedProfile = window.profileCompleted === true;
@@ -176,6 +227,30 @@ class CustomFooter extends HTMLElement {
     const bottomFab = this.shadowRoot.querySelector('.bottom-fab');
     const bottomNav = this.shadowRoot.querySelector('.bottom-nav');
     const bottomSpacer = this.shadowRoot.querySelector('.bottom-spacer');
+    const fabOverlay = this.shadowRoot.querySelector('[data-fab-overlay]');
+    const fabMenu = this.shadowRoot.querySelector('[data-fab-menu]');
+
+    const closeFabMenu = () => {
+      fabMenu?.classList.add('hidden');
+      fabOverlay?.classList.add('hidden');
+    };
+
+    const openFabMenu = () => {
+      fabMenu?.classList.remove('hidden');
+      fabOverlay?.classList.remove('hidden');
+    };
+
+    const toggleFabMenu = () => {
+      if (!fabMenu || !fabOverlay) {
+        return;
+      }
+      const isHidden = fabMenu.classList.contains('hidden');
+      if (isHidden) {
+        openFabMenu();
+      } else {
+        closeFabMenu();
+      }
+    };
 
     const applyBottomNavState = (profileCompleted) => {
       const shouldDisable = !profileCompleted;
@@ -220,6 +295,51 @@ class CustomFooter extends HTMLElement {
         }
       }
     };
+
+    if (bottomFab) {
+      bottomFab.addEventListener('click', (event) => {
+        event.preventDefault();
+        const isDisabled = bottomFab.classList.contains('bottom-link--disabled');
+        if (isDisabled) {
+          return;
+        }
+        // На любой странице сначала открываем интерактивное меню,
+        // не переводя пользователя на экран дневника автоматически.
+        toggleFabMenu();
+      });
+    }
+
+    if (fabOverlay) {
+      fabOverlay.addEventListener('click', () => {
+        closeFabMenu();
+      });
+    }
+
+    this.shadowRoot.querySelectorAll('[data-fab-action]').forEach((item) => {
+      item.addEventListener('click', () => {
+        const action = item.dataset.fabAction;
+        const meal = item.dataset.meal || '';
+        closeFabMenu();
+
+        const currentPath = window.location.pathname || '/';
+        const isDiaryPage = currentPath.startsWith('/diary');
+
+        if (isDiaryPage) {
+          window.dispatchEvent(new CustomEvent('diary-fab-action', {
+            detail: { action, meal }
+          }));
+          return;
+        }
+
+        const params = new URLSearchParams();
+        params.set('fab', '1');
+        params.set('action', action || 'meal');
+        if (meal) {
+          params.set('meal', meal);
+        }
+        window.location.href = `/diary?${params.toString()}`;
+      });
+    });
 
     applyBottomNavState(hasCompletedProfile);
     window.addEventListener('profile-status-updated', (event) => {

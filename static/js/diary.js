@@ -1256,6 +1256,29 @@ function getMealFromUrl() {
     return mealLabels[rawMeal] ? rawMeal : '';
 }
 
+function getFabActionFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get('action');
+    return action === 'meal' || action === 'water' ? action : '';
+}
+
+function handleFabAction(action, meal) {
+    if (action === 'meal') {
+        openProductsForm(getSelectedDate(), meal || 'breakfast');
+        return;
+    }
+    if (action === 'water') {
+        openProductsForm(getSelectedDate(), 'breakfast');
+        setTimeout(() => {
+            const waterInput = document.getElementById('diary-products-water');
+            if (waterInput) {
+                waterInput.focus();
+                waterInput.select();
+            }
+        }, 0);
+    }
+}
+
 function setActiveMode(mode) {
     const productsPanel = document.getElementById('diary-products-panel');
     const productsBlock = document.getElementById('diary-mode-products');
@@ -1409,7 +1432,7 @@ function bindGlobalDiaryHandlers() {
     document.addEventListener('click', (event) => {
         const fabToggle = event.target.closest('[data-action="fab-toggle"]');
         if (fabToggle) {
-            openProductsForm(getSelectedDate(), 'breakfast');
+            toggleFabMenu();
             return;
         }
 
@@ -1423,19 +1446,7 @@ function bindGlobalDiaryHandlers() {
         if (fabItem) {
             const action = fabItem.dataset.fabAction;
             closeFabMenu();
-            if (action === 'meal') {
-                openProductsForm(getSelectedDate(), fabItem.dataset.meal || 'breakfast');
-            }
-            if (action === 'water') {
-                openProductsForm(getSelectedDate(), 'breakfast');
-                setTimeout(() => {
-                    const waterInput = document.getElementById('diary-products-water');
-                    if (waterInput) {
-                        waterInput.focus();
-                        waterInput.select();
-                    }
-                }, 0);
-            }
+            handleFabAction(action, fabItem.dataset.meal || 'breakfast');
             return;
         }
 
@@ -1562,6 +1573,22 @@ function bindGlobalDiaryHandlers() {
             updateHabitEntry(dateKey, key, habitToggle.checked);
             renderDayScreen(readDiaryEntries(), dateKey);
         }
+    });
+
+    window.addEventListener('diary-open-fab-menu', () => {
+        // По событию от нижней кнопки "+" открываем именно меню действий,
+        // сохраняя сценарий: список -> выбор пункта -> форма продуктов.
+        setActiveMode(MODE_DAY);
+        closeFabMenu();
+        toggleFabMenu();
+    });
+
+    window.addEventListener('diary-fab-action', (event) => {
+        const action = event?.detail?.action || '';
+        const meal = event?.detail?.meal || 'breakfast';
+        setActiveMode(MODE_DAY);
+        closeFabMenu();
+        handleFabAction(action, meal);
     });
 }
 
@@ -1699,6 +1726,7 @@ async function initDiary() {
     const initialDate = getDateFromUrl();
     const initialMode = getModeFromUrl();
     const initialMeal = getMealFromUrl();
+    const initialFabAction = getFabActionFromUrl();
     const params = new URLSearchParams(window.location.search);
     const openFabOnLoad = params.get('fab') === '1';
 
@@ -1855,8 +1883,16 @@ async function initDiary() {
     renderDayScreen(readDiaryEntries(), resolvedDate);
 
     if (openFabOnLoad) {
-        openProductsForm(getSelectedDate(), getMealFromUrl() || 'breakfast');
+        // Всегда возвращаем режим дня, чтобы сначала показывать именно FAB-меню,
+        // а не форму добавления продуктов.
+        setActiveMode(MODE_DAY);
+        if (initialFabAction) {
+            handleFabAction(initialFabAction, initialMeal || 'breakfast');
+        } else {
+            toggleFabMenu();
+        }
         params.delete('fab');
+        params.delete('action');
         const next = params.toString();
         const nextUrl = next ? `${window.location.pathname}?${next}` : window.location.pathname;
         window.history.replaceState({}, '', nextUrl);

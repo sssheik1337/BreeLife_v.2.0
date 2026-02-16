@@ -176,6 +176,31 @@ let prevButton;
 let progressBar;
 let currentStep;
 let progressPercent;
+let totalStepsElement;
+
+function getGoalValueFromUserData() {
+    return window.userData?.goalType ?? window.userData?.goal ?? null;
+}
+
+function getActiveQuestions() {
+    const byId = new Map(questions.map((question) => [question.id, question]));
+    const goalValue = getGoalValueFromUserData();
+    const orderedIds = [1, 2, 3, 4, 7];
+
+    if (goalValue === 'lose' || goalValue === 'gain') {
+        orderedIds.push(5, 8);
+    }
+
+    orderedIds.push(6);
+    return orderedIds
+        .map((id) => byId.get(id))
+        .filter(Boolean);
+}
+
+function getQuestionByIndex(index) {
+    const activeQuestions = getActiveQuestions();
+    return activeQuestions[index] || null;
+}
 
 // Initialize questionnaire
 async function initQuestionnaire() {
@@ -184,7 +209,7 @@ async function initQuestionnaire() {
 
     if (!isEditMode && typeof getUserProfile === 'function') {
         const profile = getUserProfile();
-        if (profile?.completed === true || hasProfileData(profile)) {
+        if (profile?.is_completed === true || hasProfileData(profile)) {
             window.location.replace('/profile');
             return;
         }
@@ -199,10 +224,7 @@ async function initQuestionnaire() {
     progressBar = document.getElementById('progress-bar');
     currentStep = document.getElementById('current-step');
     progressPercent = document.getElementById('progress-percent');
-    const totalSteps = document.getElementById('total-steps');
-    if (totalSteps) {
-        totalSteps.textContent = questions.length.toString();
-    }
+    totalStepsElement = document.getElementById('total-steps');
     
     // Загружаем сохранённые ответы перед отображением первого шага.
     await loadSavedAnswers();
@@ -227,7 +249,10 @@ async function loadSavedAnswers() {
 
     if (typeof getUserProfile === 'function' && typeof mapUserProfileToUserData === 'function') {
         const profile = getUserProfile();
-        Object.assign(window.userData, mapUserProfileToUserData(profile));
+        const mapped = mapUserProfileToUserData(profile);
+        if (typeof mergeUserDataWithoutLosingAnswers === 'function') {
+            mergeUserDataWithoutLosingAnswers(window.userData, mapped, { source: 'server' });
+        }
         return;
     }
 
@@ -235,14 +260,25 @@ async function loadSavedAnswers() {
 }
 // Display current question
 function displayQuestion() {
-    const question = questions[currentQuestionIndex];
+    const activeQuestions = getActiveQuestions();
+    if (!activeQuestions.length) {
+        return;
+    }
+    if (currentQuestionIndex > activeQuestions.length - 1) {
+        currentQuestionIndex = activeQuestions.length - 1;
+    }
+
+    const question = activeQuestions[currentQuestionIndex];
     
     // Update UI elements
     questionTitle.textContent = question.title;
-    currentStep.textContent = question.id;
+    currentStep.textContent = String(currentQuestionIndex + 1);
+    if (totalStepsElement) {
+        totalStepsElement.textContent = String(activeQuestions.length);
+    }
     
     // Update progress
-    const progress = ((question.id) / questions.length) * 100;
+    const progress = ((currentQuestionIndex + 1) / activeQuestions.length) * 100;
     progressBar.style.width = `${progress}%`;
     progressPercent.textContent = `${Math.round(progress)}%`;
     
@@ -432,8 +468,8 @@ function renderHeightRuler(currentValue) {
         ticks.forEach((tick) => {
             tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === virtualIndex);
         });
-        window.userData[dataKey] = value;
-        window.userData.height = value;
+        setUserDataField(dataKey, value, { source: 'form', markDirty: true });
+        setUserDataField('height', value, { source: 'form', markDirty: true });
         saveUserData();
         updateButtonStates();
         updateHeightMagnifier(virtualIndex);
@@ -570,8 +606,12 @@ function renderWeightRuler(currentValue) {
         ticks.forEach((tick) => {
             tick.classList.toggle('ruler__tick--active', Number(tick.dataset.virtualIndex) === virtualIndex);
         });
-        window.userData[dataKey] = value;
-        window.userData.currentWeight = value;
+        setUserDataField(dataKey, value, { source: 'form', markDirty: true });
+        // Не затираем текущий вес на шаге "Желаемый вес".
+        // Синхронизируем currentWeight только когда пользователь редактирует именно текущий вес.
+        if (dataKey === 'currentWeight') {
+            setUserDataField('currentWeight', value, { source: 'form', markDirty: true });
+        }
         saveUserData();
         updateButtonStates();
         updateWeightMagnifier(virtualIndex);
@@ -747,9 +787,9 @@ function displayInput(question) {
                 const hasAllFields = Boolean(year && month && day);
                 if (hasAllFields) {
                     const formatted = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    window.userData[getDataKey(currentQuestionIndex)] = formatted;
+                    setUserDataField(getDataKey(currentQuestionIndex), formatted, { source: 'form', markDirty: true });
                 } else {
-                    window.userData[getDataKey(currentQuestionIndex)] = '';
+                    setUserDataField(getDataKey(currentQuestionIndex), '', { source: 'form', markDirty: true });
                 }
                 saveUserData();
                 updateButtonStates();
@@ -764,7 +804,7 @@ function displayInput(question) {
                         defaultDeadline.setMonth(defaultDeadline.getMonth() + 3);
                         const defaultValue = formatDateValue(defaultDeadline);
                         currentValue = defaultValue;
-                        window.userData[getDataKey(currentQuestionIndex)] = defaultValue;
+                        setUserDataField(getDataKey(currentQuestionIndex), defaultValue, { source: 'form', markDirty: true });
                         saveUserData();
                     }
                     if (!currentValue) {
@@ -792,7 +832,7 @@ function displayInput(question) {
                 }
                 if (isDeadlinePicker) {
                     const formatted = `${clamped.year}-${String(clamped.month).padStart(2, '0')}-${String(clamped.day).padStart(2, '0')}`;
-                    window.userData[getDataKey(currentQuestionIndex)] = formatted;
+                    setUserDataField(getDataKey(currentQuestionIndex), formatted, { source: 'form', markDirty: true });
                     saveUserData();
                 }
             };
@@ -822,7 +862,7 @@ function displayInput(question) {
         const resolved = resolveNumberPickerState(question, currentValue);
         currentValue = resolved.value;
         if (resolved.shouldPersist) {
-            window.userData[getDataKey(currentQuestionIndex)] = currentValue;
+            setUserDataField(getDataKey(currentQuestionIndex), currentValue, { source: 'form', markDirty: true });
             saveUserData();
         }
         const options = buildNumberOptions(question, currentValue, resolved.range);
@@ -841,14 +881,14 @@ function displayInput(question) {
             input.value = currentValue || '';
             input.addEventListener('input', () => {
                 const value = input.value;
-                window.userData[getDataKey(currentQuestionIndex)] = value;
+                setUserDataField(getDataKey(currentQuestionIndex), value, { source: 'form', markDirty: true });
                 saveUserData();
                 updateButtonStates();
                 console.log('[QUESTIONNAIRE_TRACE] шаг обновлён (number input):', window.userData);
             });
             input.addEventListener('change', () => {
                 const value = input.value;
-                window.userData[getDataKey(currentQuestionIndex)] = value;
+                setUserDataField(getDataKey(currentQuestionIndex), value, { source: 'form', markDirty: true });
                 saveUserData();
                 updateButtonStates();
                 console.log('[QUESTIONNAIRE_TRACE] шаг обновлён (number change):', window.userData);
@@ -875,9 +915,15 @@ function selectOption(optionElement, value) {
     optionElement.querySelector('.checkmark').style.display = 'block';
     
     // Update user data
-    window.userData[getDataKey(currentQuestionIndex)] = value;
+    setUserDataField(getDataKey(currentQuestionIndex), value, { source: 'form', markDirty: true });
     saveUserData();
-    updateButtonStates();
+    const currentQuestion = getQuestionByIndex(currentQuestionIndex);
+    if (currentQuestion?.id === 7) {
+        // Для шага выбора цели динамически перестраиваем ветку вопросов.
+        displayQuestion();
+    } else {
+        updateButtonStates();
+    }
     console.log('[QUESTIONNAIRE_TRACE] шаг обновлён (select option):', window.userData);
     
     // Update feather icons
@@ -888,7 +934,10 @@ function selectOption(optionElement, value) {
 
 // Get data key for current question
 function getDataKey(index) {
-    const question = questions[index];
+    const question = getQuestionByIndex(index);
+    if (!question) {
+        return `question_${index}`;
+    }
     switch (question.id) {
         case 1: return 'gender';
         case 2: return 'birthDate';
@@ -994,7 +1043,8 @@ function buildNumberOptions(question, currentValue, rangeOverride) {
 // Update button states
 function updateButtonStates() {
     const currentValue = window.userData[getDataKey(currentQuestionIndex)];
-    const isOptional = questions[currentQuestionIndex]?.optional;
+    const currentQuestion = getQuestionByIndex(currentQuestionIndex);
+    const isOptional = currentQuestion?.optional;
     const hasAnswer = isOptional ? true : currentValue !== null && currentValue !== '';
     
     // Enable/disable next button
@@ -1003,7 +1053,8 @@ function updateButtonStates() {
     // Enable/disable previous button
     prevButton.disabled = currentQuestionIndex === 0;
     // Update next button text for last question
-    if (currentQuestionIndex === questions.length - 1) {
+    const isLastStep = currentQuestionIndex >= getActiveQuestions().length - 1;
+    if (isLastStep) {
         nextButton.innerHTML = `<span>Завершить</span><i data-feather="check" class="w-5 h-5"></i>`;
     } else {
         nextButton.innerHTML = `<span>Далее</span><i data-feather="arrow-right" class="w-5 h-5"></i>`;
@@ -1024,6 +1075,78 @@ function persistUserData() {
 // Сохраняем данные анкеты локально до завершения
 function saveUserData() {
     persistUserData();
+}
+
+function validateGoalWeightConsistencyForQuestionnaire(data) {
+    const profile = typeof mapUserDataToUserProfile === 'function'
+        ? mapUserDataToUserProfile(data)
+        : null;
+    if (!profile) {
+        return {
+            ok: true,
+            warning: null,
+            error: null
+        };
+    }
+
+    const goal = profile.goal;
+    if (goal === 'maintain') {
+        // Для режима поддержания целевой вес и дедлайн всегда очищаются автоматически.
+        data.targetWeight = null;
+        data.target_weight_kg = null;
+        data.deadline = null;
+        data.goal_deadline = null;
+        return {
+            ok: true,
+            warning: null,
+            error: null
+        };
+    }
+
+    const current = Number(profile.weight_kg);
+    const target = Number(profile.target_weight_kg);
+    if (!goal || !Number.isFinite(current) || !Number.isFinite(target)) {
+        return {
+            ok: true,
+            warning: null,
+            error: null
+        };
+    }
+
+    const fallbackConsistency = {
+        valid: true,
+        blocking: false,
+        warning: false,
+        message: null
+    };
+    if (goal === 'lose' && target >= current) {
+        fallbackConsistency.valid = false;
+        fallbackConsistency.blocking = true;
+        fallbackConsistency.message = 'Цель снижения веса противоречит выбранному желаемому весу';
+    }
+    if (goal === 'gain' && target <= current) {
+        fallbackConsistency.valid = false;
+        fallbackConsistency.blocking = true;
+        fallbackConsistency.message = 'Цель набора массы противоречит выбранному желаемому весу';
+    }
+
+    const consistency = typeof window.validateGoalWeightConsistency === 'function'
+        ? window.validateGoalWeightConsistency(goal, current, target)
+        : fallbackConsistency;
+
+    if (consistency.blocking) {
+        return {
+            ok: false,
+            warning: null,
+            error: consistency.message || 'Проверьте цель и желаемый вес.'
+        };
+    }
+
+    return {
+        ok: true,
+        warning: null,
+        error: null
+    };
 }
 
 async function saveProfileToServer(profile) {
@@ -1071,39 +1194,59 @@ async function saveProfileToServer(profile) {
 function setupEventListeners() {
     // Next button
     nextButton.addEventListener('click', async () => {
-        if (currentQuestionIndex < questions.length - 1) {
+        const activeQuestions = getActiveQuestions();
+        if (currentQuestionIndex < activeQuestions.length - 1) {
             currentQuestionIndex++;
             displayQuestion();
         } else {
             // Сохраняем профиль и отправляем на сервер (если доступен Telegram ID).
             let profile = null;
+            const consistency = validateGoalWeightConsistencyForQuestionnaire(window.userData);
+            if (!consistency.ok) {
+                if (typeof showNotification === 'function' && consistency.error) {
+                    showNotification(consistency.error, 'error');
+                }
+                return;
+            }
+            if (consistency.warning && typeof showNotification === 'function') {
+                showNotification(consistency.warning, 'warning');
+            }
             if (typeof patchUserProfile === 'function' && typeof mapUserDataToUserProfile === 'function') {
                 console.log('[QUESTIONNAIRE_TRACE] перед mapUserDataToUserProfile:', window.userData);
                 const mappedProfile = mapUserDataToUserProfile(window.userData);
                 console.log('[QUESTIONNAIRE_TRACE] результат mapUserDataToUserProfile:', mappedProfile);
-                const criticalKeys = ['sex', 'birth_date', 'height_cm', 'weight_kg', 'target_weight_kg', 'activity_factor', 'goal'];
+
+                // Защита от редкого рассинхрона ключей: если map не вернул пол, пробуем восстановить напрямую из userData.
+                const rawGender = window.userData?.gender ?? window.userData?.sex ?? null;
+                if (!mappedProfile.sex && (rawGender === 'male' || rawGender === 'female')) {
+                    mappedProfile.sex = rawGender;
+                }
+
+                const criticalKeys = ['sex', 'birth_date', 'height_cm', 'weight_kg', 'activity_factor', 'goal'];
+                if (mappedProfile.goal !== 'maintain') {
+                    criticalKeys.push('target_weight_kg');
+                }
                 if (window.appDebug) {
                     const nullFields = Object.keys(mappedProfile).filter((key) => mappedProfile[key] === null);
                     console.log('[QUESTIONNAIRE_DEBUG] payload перед /api/profile:', {
                         mappedProfile,
                         nullFields,
-                        profile_completed: mappedProfile.profile_completed ?? mappedProfile.completed ?? null
+                        is_completed: mappedProfile.is_completed ?? null
                     });
                 }
                 const missingCritical = criticalKeys.filter((key) => mappedProfile[key] === null || mappedProfile[key] === undefined || mappedProfile[key] === '');
                 if (missingCritical.length > 0) {
-                    console.error('[QUESTIONNAIRE_TRACE] Заполняем профиль с неполными полями', {
+                    console.error('[QUESTIONNAIRE_TRACE] Блокирующая неполнота профиля', {
                         missingCritical,
                         userData: window.userData,
                         mappedProfile
                     });
                     if (typeof showNotification === 'function') {
-                        showNotification('Часть полей заполнена нестандартно. Сохраняю профиль и продолжаю.', 'warning');
+                        showNotification('Не удалось сохранить профиль: заполните обязательные поля и повторите.', 'error');
                     }
+                    return;
                 }
                 mappedProfile.is_completed = true;
-                mappedProfile.completed = true;
-                mappedProfile.profile_completed = true;
                 profile = patchUserProfile(mappedProfile);
             }
             if (!profile && typeof getUserProfile === 'function') {
@@ -1116,6 +1259,9 @@ function setupEventListeners() {
                     showNotification('Не удалось сохранить профиль. Проверьте подключение и повторите попытку.', 'error');
                 }
                 return;
+            }
+            if (typeof resetUserDataDirtyMap === 'function') {
+                resetUserDataDirtyMap('profile_saved');
             }
             // Все вопросы заполнены, переходим на экран прогресса.
             window.location.href = '/trial-start';
