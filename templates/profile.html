@@ -201,25 +201,9 @@
                 
                 <section id="profile-today-summary" class="mb-6">
                     <div class="mb-3 px-1">
-                        <h2 class="text-lg font-bold text-slate-800">Today Summary</h2>
+                        <h2 class="text-lg font-bold text-slate-800">Сегодня</h2>
                     </div>
-<div class="profile-card p-5 mb-4" id="profile-today-plan">
-                    <div class="flex items-center justify-between gap-3 mb-3">
-                        <h3 class="font-semibold text-slate-800">План на сегодня</h3>
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">Цели</span>
-                    </div>
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div class="rounded-2xl bg-slate-50 p-3">
-                            <p class="today-plan-label">Калории</p>
-                            <p id="today-plan-calories" class="today-plan-value">—</p>
-                        </div>
-                        <div class="rounded-2xl bg-sky-50 p-3">
-                            <p class="today-plan-label text-sky-700">Вода</p>
-                            <p id="today-plan-water" class="today-plan-value text-sky-700">—</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="profile-card p-5 mb-6" id="profile-daily-rings">
+                <div class="profile-card p-5 mb-6" id="profile-today-kpi">
                     <div class="flex items-center space-x-3 mb-3">
                         <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
                             <i data-feather="activity" class="w-5 h-5 text-emerald-600"></i>
@@ -244,7 +228,10 @@
                         <div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
                             <div class="relative w-36 h-36 min-w-[9rem] min-h-[9rem] shrink-0 rounded-full bg-slate-200" id="macro-balance-chart">
                                 <div class="absolute inset-4 rounded-full bg-white/90"></div>
-                                <div class="absolute inset-0 flex items-center justify-center text-xs font-semibold text-slate-700">Белки/жиры/углеводы</div>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+                                    <span class="text-[11px] font-medium text-slate-500">Съедено сегодня</span>
+                                    <span id="macro-calorie-percent" class="text-sm font-bold text-slate-700">0%</span>
+                                </div>
                             </div>
                             <div class="space-y-2 text-sm text-slate-600">
                                 <div class="flex items-center gap-2">
@@ -267,20 +254,6 @@
                                 <span id="macro-carb-split-value" class="text-slate-600">—</span>
                             </div>
                             <p id="macro-carb-split-desc" class="text-xs text-slate-500 mt-2">Сложные углеводы дают стабильную энергию.</p>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 gap-6 sm:grid-cols-4">
-                        <div class="stat-card flex justify-center">
-                            <div id="profile-calories-ring" class="ring-compact flex justify-center"></div>
-                        </div>
-                        <div class="stat-card flex justify-center">
-                            <div id="profile-water-ring" class="ring-compact flex justify-center"></div>
-                        </div>
-                        <div class="stat-card flex justify-center">
-                            <div id="profile-sleep-ring" class="ring-compact flex justify-center"></div>
-                        </div>
-                        <div class="stat-card flex justify-center">
-                            <div id="profile-activity-ring" class="ring-compact flex justify-center"></div>
                         </div>
                     </div>
                 </div>
@@ -321,7 +294,7 @@
 
                 <section id="profile-weekly-ai" class="mb-6">
                     <div class="mb-3 px-1">
-                        <h2 class="text-lg font-bold text-slate-800">📌 Weekly AI Review</h2>
+                        <h2 class="text-lg font-bold text-slate-800">📌 Итоги недели</h2>
                     </div>
 <div class="profile-card profile-card--secondary p-4 mb-5" id="profile-weekly-review">
                     <div class="flex items-center gap-3 text-sm text-slate-700">
@@ -335,7 +308,7 @@
 
                 <section id="profile-month-activity" class="mb-6">
                     <div class="mb-3 px-1">
-                        <h2 class="text-lg font-bold text-slate-800">Month Activity</h2>
+                        <h2 class="text-lg font-bold text-slate-800">Активность за месяц</h2>
                     </div>
 <div class="profile-card profile-card--compact mb-6" id="profile-month-grid-section">
                     <div id="profile-month-grid" class="month-grid"></div>

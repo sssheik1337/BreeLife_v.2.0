@@ -827,7 +827,8 @@ function renderMacroBalance(rangeKey = 'day') {
     const proteinLabel = document.getElementById('macro-balance-protein');
     const fatLabel = document.getElementById('macro-balance-fat');
     const carbsLabel = document.getElementById('macro-balance-carbs');
-    if (!chart || !desc || !insight || !proteinLabel || !fatLabel || !carbsLabel) {
+    const caloriePercentLabel = document.getElementById('macro-calorie-percent');
+    if (!chart || !desc || !insight || !proteinLabel || !fatLabel || !carbsLabel || !caloriePercentLabel) {
         return;
     }
 
@@ -835,6 +836,7 @@ function renderMacroBalance(rangeKey = 'day') {
     let protein = 0;
     let fat = 0;
     let carbs = 0;
+    let calories = 0;
     let label = 'Фактический состав рациона.';
 
     if (rangeKey === 'week') {
@@ -847,6 +849,7 @@ function renderMacroBalance(rangeKey = 'day') {
                 protein += dayTotals.protein_g;
                 fat += dayTotals.fat_g;
                 carbs += dayTotals.carbs_g;
+                calories += dayTotals.calories;
             }
         });
         if (daysWithData > 0) {
@@ -866,6 +869,7 @@ function renderMacroBalance(rangeKey = 'day') {
             protein += resolved.protein_g;
             fat += resolved.fat_g;
             carbs += resolved.carbs_g;
+            calories += resolved.calories;
         });
         label = 'Фактические значения за сегодня.';
     }
@@ -883,6 +887,7 @@ function renderMacroBalance(rangeKey = 'day') {
         proteinLabel.textContent = 'Белки — 0%';
         fatLabel.textContent = 'Жиры — 0%';
         carbsLabel.textContent = 'Углеводы — 0%';
+        caloriePercentLabel.textContent = '0%';
         return;
     }
 
@@ -891,6 +896,14 @@ function renderMacroBalance(rangeKey = 'day') {
     proteinLabel.textContent = `Белки — ${proteinPercent}%`;
     fatLabel.textContent = `Жиры — ${fatPercent}%`;
     carbsLabel.textContent = `Углеводы — ${carbsPercent}%`;
+    const profile = getResolvedProfileForDisplay();
+    const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
+    const hasCalorieTarget = Number.isFinite(targetCalories) && targetCalories > 0;
+    const caloriePercent = hasCalorieTarget
+        ? Math.round(Math.min(Math.max(safeDivide(calories, targetCalories) * 100, 0), 999))
+        : 0;
+    caloriePercentLabel.textContent = `${caloriePercent}%`;
+
     const maxPercent = Math.max(proteinPercent, fatPercent, carbsPercent);
     if (maxPercent >= 55) {
         const dominant = maxPercent === proteinPercent
@@ -1652,7 +1665,7 @@ async function applySubscriptionAccess() {
     const payButton = document.getElementById('profile-pay-button');
     const paymentMotivation = document.getElementById('profile-payment-motivation');
     const weeklyProgress = document.getElementById('profile-weekly-progress');
-    const dailyRings = document.getElementById('profile-daily-rings');
+    const todayKpi = document.getElementById('profile-today-kpi');
     const monthGrid = document.getElementById('profile-month-grid-section');
 
     if (!paywallElement || !payButton) {
@@ -1675,8 +1688,8 @@ async function applySubscriptionAccess() {
         if (weeklyProgress) {
             weeklyProgress.classList.remove('hidden');
         }
-        if (dailyRings) {
-            dailyRings.classList.remove('hidden');
+        if (todayKpi) {
+            todayKpi.classList.remove('hidden');
         }
         if (monthGrid) {
             monthGrid.classList.remove('hidden');
@@ -1702,8 +1715,8 @@ async function applySubscriptionAccess() {
         if (weeklyProgress) {
             weeklyProgress.classList.toggle('hidden', isExpired);
         }
-        if (dailyRings) {
-            dailyRings.classList.toggle('hidden', isExpired);
+        if (todayKpi) {
+            todayKpi.classList.toggle('hidden', isExpired);
         }
         if (monthGrid) {
             monthGrid.classList.toggle('hidden', isExpired);
@@ -1998,8 +2011,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof window.syncHabitEntriesWithBackend === 'function') {
             await window.syncHabitEntriesWithBackend();
         }
-        renderTodayPlanCard();
-        renderProfileRings();
         renderWeeklyProgress();
         renderCalorieTrend(Number(activeRange));
         renderWaterHistory(Number(activeWaterRange));
