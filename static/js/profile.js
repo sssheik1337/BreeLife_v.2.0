@@ -25,14 +25,67 @@ function getResolvedProfileForDisplay() {
 
     const hasFiniteNumber = (value) => value !== null && value !== undefined && Number.isFinite(Number(value));
 
+    // Локальные безопасные версии расчётов нужны как fallback для мобильного WebView,
+    // если calculations.js ещё не подгрузился из кеша/старого HTML.
+    const calculateAgeSafe = (birthDate) => {
+        if (typeof calculateAge === 'function') {
+            return calculateAge(birthDate);
+        }
+        if (!birthDate) {
+            return null;
+        }
+        const date = new Date(birthDate);
+        if (Number.isNaN(date.getTime())) {
+            return null;
+        }
+        const today = new Date();
+        let age = today.getFullYear() - date.getFullYear();
+        const monthDiff = today.getMonth() - date.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < date.getDate())) {
+            age -= 1;
+        }
+        return age > 0 ? age : null;
+    };
+
+    const calculateBMRSafe = ({ sex, weight_kg, height_cm, age }) => {
+        if (typeof calculateBMR === 'function') {
+            return calculateBMR({ sex, weight_kg, height_cm, age });
+        }
+        const weight = Number(weight_kg);
+        const height = Number(height_cm);
+        const years = Number(age);
+        if (!sex || !Number.isFinite(weight) || !Number.isFinite(height) || !Number.isFinite(years)) {
+            return null;
+        }
+        if (sex === 'male') {
+            return 10 * weight + 6.25 * height - 5 * years + 5;
+        }
+        if (sex === 'female') {
+            return 10 * weight + 6.25 * height - 5 * years - 161;
+        }
+        return null;
+    };
+
+    const calculateTDEESafe = (bmr, activityFactor) => {
+        if (typeof calculateTDEE === 'function') {
+            return calculateTDEE(bmr, activityFactor);
+        }
+        const base = Number(bmr);
+        const factor = Number(activityFactor);
+        if (!Number.isFinite(base) || !Number.isFinite(factor) || factor <= 0) {
+            return null;
+        }
+        return base * factor;
+    };
+
     const weight = Number(profile.weight_kg);
     const height = Number(profile.height_cm);
     const activityFactor = Number(profile.activity_factor);
     const hasWeight = Number.isFinite(weight) && weight > 0;
     const hasHeight = Number.isFinite(height) && height > 0;
 
-    if (!hasFiniteNumber(profile.age) && typeof calculateAge === 'function' && profile.birth_date) {
-        const calculatedAge = calculateAge(profile.birth_date);
+    if (!hasFiniteNumber(profile.age) && profile.birth_date) {
+        const calculatedAge = calculateAgeSafe(profile.birth_date);
         if (Number.isFinite(calculatedAge) && calculatedAge > 0) {
             profile.age = calculatedAge;
         }
@@ -41,8 +94,8 @@ function getResolvedProfileForDisplay() {
     const age = Number(profile.age);
     const hasAge = Number.isFinite(age) && age > 0;
 
-    if (!hasFiniteNumber(profile.bmr) && typeof calculateBMR === 'function' && profile.sex && hasWeight && hasHeight && hasAge) {
-        const bmr = calculateBMR({
+    if (!hasFiniteNumber(profile.bmr) && profile.sex && hasWeight && hasHeight && hasAge) {
+        const bmr = calculateBMRSafe({
             sex: profile.sex,
             weight_kg: weight,
             height_cm: height,
@@ -54,8 +107,8 @@ function getResolvedProfileForDisplay() {
     }
 
     const bmr = Number(profile.bmr);
-    if (!hasFiniteNumber(profile.tdee_calories) && typeof calculateTDEE === 'function' && Number.isFinite(bmr) && Number.isFinite(activityFactor) && activityFactor > 0) {
-        const tdee = calculateTDEE(bmr, activityFactor);
+    if (!hasFiniteNumber(profile.tdee_calories) && Number.isFinite(bmr) && Number.isFinite(activityFactor) && activityFactor > 0) {
+        const tdee = calculateTDEESafe(bmr, activityFactor);
         if (Number.isFinite(tdee)) {
             profile.tdee_calories = tdee;
         }
@@ -63,37 +116,66 @@ function getResolvedProfileForDisplay() {
 
     const tdee = Number(profile.tdee_calories);
     const caloriesTarget = Number(profile.calories_target);
-    if (!hasFiniteNumber(profile.calories_target) && typeof calculateWeightGoalForecast === 'function') {
-        const forecast = calculateWeightGoalForecast({
-            sex: profile.sex,
-            goal: profile.goal,
-            tdee_calories: Number.isFinite(tdee) ? tdee : null,
-            weight_kg: hasWeight ? weight : null,
-            target_weight_kg: profile.target_weight_kg,
-            goal_deadline: profile.goal_deadline
-        });
-        const forecastCalories = Number(forecast?.calories_target);
-        if (Number.isFinite(forecastCalories) && forecastCalories > 0) {
-            profile.calories_target = forecastCalories;
+    if (!hasFiniteNumber(profile.calories_target)) {
+        if (typeof calculateWeightGoalForecast === 'function') {
+            const forecast = calculateWeightGoalForecast({
+                sex: profile.sex,
+                goal: profile.goal,
+                tdee_calories: Number.isFinite(tdee) ? tdee : null,
+                weight_kg: hasWeight ? weight : null,
+                target_weight_kg: profile.target_weight_kg,
+                goal_deadline: profile.goal_deadline
+            });
+            const forecastCalories = Number(forecast?.calories_target);
+            if (Number.isFinite(forecastCalories) && forecastCalories > 0) {
+                profile.calories_target = forecastCalories;
+            }
+        }
+
+        // Резервный расчёт для отображения карточки, если forecast-функция недоступна.
+        if (!hasFiniteNumber(profile.calories_target) && Number.isFinite(tdee) && tdee > 0) {
+            if (profile.goal === 'lose') {
+                profile.calories_target = Math.max(1200, Math.round(tdee * 0.85));
+            } else if (profile.goal === 'gain') {
+                profile.calories_target = Math.round(tdee * 1.1);
+            } else {
+                profile.calories_target = Math.round(tdee);
+            }
         }
     }
 
-    if ((!profile.macros || typeof profile.macros !== 'object') && typeof calculateMacros === 'function') {
+    if ((!profile.macros || typeof profile.macros !== 'object')) {
         const resolvedCalories = Number(profile.calories_target);
         if (Number.isFinite(resolvedCalories) && resolvedCalories > 0 && hasWeight && profile.goal) {
-            const macros = calculateMacros({
-                goal: profile.goal,
-                weight_kg: weight,
-                calories_target: resolvedCalories
-            });
-            if (macros) {
-                profile.macros = macros;
+            if (typeof calculateMacros === 'function') {
+                const macros = calculateMacros({
+                    goal: profile.goal,
+                    weight_kg: weight,
+                    calories_target: resolvedCalories
+                });
+                if (macros) {
+                    profile.macros = macros;
+                }
+            } else {
+                const proteinFactor = profile.goal === 'lose' ? 1.8 : 1.6;
+                const protein_g = proteinFactor * weight;
+                const fat_g = Math.min(90, Math.max(45, 0.8 * weight));
+                const carbs_g = Math.max((resolvedCalories - (protein_g * 4 + fat_g * 9)) / 4, 0);
+                profile.macros = {
+                    protein_g,
+                    fat_g,
+                    carbs_g,
+                    protein_pct: (protein_g * 4) / resolvedCalories,
+                    fat_pct: (fat_g * 9) / resolvedCalories,
+                    carbs_pct: (carbs_g * 4) / resolvedCalories
+                };
             }
         }
     }
 
     return profile;
 }
+
 
 function createProgressRing({ percent, size = 120, stroke = 10, color = '#10b981', label, value, emphasize = false }) {
     const radius = (size - stroke) / 2;
