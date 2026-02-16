@@ -827,8 +827,7 @@ function renderMacroBalance(rangeKey = 'day') {
     const proteinLabel = document.getElementById('macro-balance-protein');
     const fatLabel = document.getElementById('macro-balance-fat');
     const carbsLabel = document.getElementById('macro-balance-carbs');
-    const caloriePercentLabel = document.getElementById('macro-calorie-percent');
-    if (!chart || !desc || !insight || !proteinLabel || !fatLabel || !carbsLabel || !caloriePercentLabel) {
+    if (!chart || !desc || !insight || !proteinLabel || !fatLabel || !carbsLabel) {
         return;
     }
 
@@ -836,7 +835,6 @@ function renderMacroBalance(rangeKey = 'day') {
     let protein = 0;
     let fat = 0;
     let carbs = 0;
-    let calories = 0;
     let label = 'Фактический состав рациона.';
 
     if (rangeKey === 'week') {
@@ -849,7 +847,6 @@ function renderMacroBalance(rangeKey = 'day') {
                 protein += dayTotals.protein_g;
                 fat += dayTotals.fat_g;
                 carbs += dayTotals.carbs_g;
-                calories += dayTotals.calories;
             }
         });
         if (daysWithData > 0) {
@@ -869,7 +866,6 @@ function renderMacroBalance(rangeKey = 'day') {
             protein += resolved.protein_g;
             fat += resolved.fat_g;
             carbs += resolved.carbs_g;
-            calories += resolved.calories;
         });
         label = 'Фактические значения за сегодня.';
     }
@@ -887,7 +883,6 @@ function renderMacroBalance(rangeKey = 'day') {
         proteinLabel.textContent = 'Белки — 0%';
         fatLabel.textContent = 'Жиры — 0%';
         carbsLabel.textContent = 'Углеводы — 0%';
-        caloriePercentLabel.textContent = '0%';
         return;
     }
 
@@ -896,14 +891,6 @@ function renderMacroBalance(rangeKey = 'day') {
     proteinLabel.textContent = `Белки — ${proteinPercent}%`;
     fatLabel.textContent = `Жиры — ${fatPercent}%`;
     carbsLabel.textContent = `Углеводы — ${carbsPercent}%`;
-    const profile = getResolvedProfileForDisplay();
-    const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
-    const hasCalorieTarget = Number.isFinite(targetCalories) && targetCalories > 0;
-    const caloriePercent = hasCalorieTarget
-        ? Math.round(Math.min(Math.max(safeDivide(calories, targetCalories) * 100, 0), 999))
-        : 0;
-    caloriePercentLabel.textContent = `${caloriePercent}%`;
-
     const maxPercent = Math.max(proteinPercent, fatPercent, carbsPercent);
     if (maxPercent >= 55) {
         const dominant = maxPercent === proteinPercent
@@ -1215,260 +1202,47 @@ function getTodayDiaryTotals() {
     return { ...totals, water_l: waterMax, hasEntries };
 }
 
-function getSleepMinutesForDate(entries, dateKey) {
-    if (!dateKey) {
-        return null;
-    }
-    let best = null;
-    entries.forEach((entry) => {
-        if (entry?.date !== dateKey) {
-            return;
-        }
-        const minutes = parseSleepMinutes(entry.sleep_time);
-        if (minutes === null) {
-            return;
-        }
-        if (best === null || minutes < best) {
-            best = minutes;
-        }
-    });
-    return best;
-}
-
-function getActivityForDate(entries, dateKey) {
-    if (!dateKey) {
-        return false;
-    }
-    return entries.some((entry) => entry?.date === dateKey && entry?.activity === true);
-}
-
-
 function renderTodayPlanCard() {
-    const caloriesElement = document.getElementById('today-plan-calories');
-    const waterElement = document.getElementById('today-plan-water');
+    const caloriesElement = document.getElementById('today-fact-calories');
+    const proteinElement = document.getElementById('today-fact-protein');
+    const fatElement = document.getElementById('today-fact-fat');
+    const carbsElement = document.getElementById('today-fact-carbs');
+    const waterElement = document.getElementById('today-fact-water');
 
-    if (!caloriesElement || !waterElement) {
+    if (!caloriesElement || !proteinElement || !fatElement || !carbsElement || !waterElement) {
         return;
     }
 
     const profile = getResolvedProfileForDisplay();
-    const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
-
-    if (Number.isFinite(targetCalories) && targetCalories > 0) {
-        caloriesElement.textContent = `${Math.round(targetCalories)} ккал`;
-    } else {
-        caloriesElement.textContent = '—';
-    }
-
-    const waterTarget = Number(window.adminConfig?.reminders?.water_min_l);
-    waterElement.textContent = Number.isFinite(waterTarget) && waterTarget > 0
-        ? `${waterTarget.toFixed(1)} л`
-        : '—';
-}
-
-function renderProfileRings() {
-    const caloriesContainer = document.getElementById('profile-calories-ring');
-    const waterContainer = document.getElementById('profile-water-ring');
-    const sleepContainer = document.getElementById('profile-sleep-ring');
-    const activityContainer = document.getElementById('profile-activity-ring');
-
-    if (!caloriesContainer || !waterContainer || !sleepContainer || !activityContainer) {
-        return;
-    }
-
-    const profile = getResolvedProfileForDisplay();
-    const tdee = Number(profile?.calories_target ?? profile?.tdee_calories);
-    const entries = readDiaryEntries();
     const todayTotals = getTodayDiaryTotals();
-    const todayKey = typeof window.normalizeLocalDate === 'function'
-        ? window.normalizeLocalDate(new Date())
-        : null;
-    const sleepMinutes = getSleepMinutesForDate(entries, todayKey);
-    const activityToday = getActivityForDate(entries, todayKey);
-    const sleepTargetRaw = window.adminConfig?.reminders?.sleep_target;
-    const sleepTargetMinutes = parseSleepMinutes(sleepTargetRaw);
-    const hasCaloriesTarget = Number.isFinite(tdee) && tdee > 0;
-    const caloriesPercent = todayTotals.hasEntries && hasCaloriesTarget
-        ? Math.min(Math.max(safeDivide(todayTotals.calories, tdee) * 100, 0), 100)
-        : 0;
-    const caloriesValue = todayTotals.hasEntries
-        ? Number.isFinite(tdee)
-            ? `Сегодня: ${Math.round(todayTotals.calories)} из ${Math.round(tdee)} ккал`
-            : `Сегодня: ${Math.round(todayTotals.calories)} ккал`
-        : 'Пока нет данных';
 
-    caloriesContainer.innerHTML = '';
-    const caloriesRatio = hasCaloriesTarget ? safeDivide(todayTotals.calories, tdee) : NaN;
-    const caloriesRingTone = resolveStatusTone({ type: 'calories', ratio: caloriesRatio });
-    caloriesContainer.appendChild(
-        createProgressRing({
-            percent: caloriesPercent,
-            color: caloriesRingTone.color,
-            label: 'Съедено сегодня',
-            value: caloriesValue,
-            emphasize: true
-        })
-    );
-    const waterTarget = Number(window.adminConfig?.reminders?.water_min_l);
-    const waterTotal = Number(todayTotals.water_l) || 0;
-    const hasWater = todayTotals.hasEntries && Number.isFinite(waterTotal);
-    const hasWaterTarget = Number.isFinite(waterTarget) && waterTarget > 0;
-    const waterPercent = hasWater && hasWaterTarget
-        ? Math.min(Math.max(safeDivide(waterTotal, waterTarget) * 100, 0), 100)
-        : 0;
-    const waterValue = hasWater
-        ? hasWaterTarget
-            ? `Факт / цель: ${Number(waterTotal).toFixed(1)} / ${Number(waterTarget).toFixed(1)} л`
-            : `Факт: ${Number(waterTotal).toFixed(1)} л`
-        : 'Нет данных';
-
-    waterContainer.innerHTML = '';
-    const waterRatio = hasWaterTarget ? safeDivide(waterTotal, waterTarget) : NaN;
-    const waterRingTone = resolveStatusTone({ type: 'water', ratio: waterRatio });
-    waterContainer.appendChild(
-        createProgressRing({
-            percent: waterPercent,
-            color: waterRingTone.color,
-            label: 'Вода',
-            value: waterValue
-        })
-    );
-
-    const hasSleepTarget = sleepTargetMinutes !== null;
-    const sleepPercent = sleepMinutes !== null && hasSleepTarget
-        ? Math.max(0, Math.min(safeDivide(sleepTargetMinutes, sleepMinutes) * 100, 120))
-        : null;
-    const sleepValue = sleepMinutes !== null
-        ? hasSleepTarget
-            ? `Факт / цель: ${formatSleepMinutes(sleepMinutes)} / ${formatSleepMinutes(sleepTargetMinutes)}`
-            : `Факт: ${formatSleepMinutes(sleepMinutes)}`
-        : 'Нет данных';
-    sleepContainer.innerHTML = '';
-    sleepContainer.appendChild(
-        createProgressRing({
-            percent: sleepPercent,
-            color: '#8b5cf6',
-            label: 'Сон сегодня',
-            value: sleepValue
-        })
-    );
-
-    const activityValue = activityToday ? 'Да' : 'Нет';
-    activityContainer.innerHTML = '';
-    const activityTone = resolveStatusTone({ type: 'month', ratio: activityToday ? 'good' : 'neutral' });
-    activityContainer.appendChild(
-        createProgressRing({
-            percent: activityToday ? 100 : 0,
-            color: activityTone.color,
-            label: 'Активность сегодня',
-            value: activityValue
-        })
-    );
-
-    animateCountUps(caloriesContainer);
-    animateCountUps(waterContainer);
-    animateCountUps(sleepContainer);
-    animateCountUps(activityContainer);
-}
-
-function renderMonthGrid() {
-    const container = document.getElementById('profile-month-grid');
-    if (!container) {
-        return;
-    }
-
-    container.innerHTML = '';
-    const diaryEntries = readDiaryEntries();
-    const caloriesByDate = new Map();
-    const waterByDate = new Map();
-    const sleepByDate = new Map();
-    const activityByDate = new Map();
-    diaryEntries.forEach((entry) => {
-        const dateKey = normalizeDateKey(entry?.date);
-        if (!dateKey) {
-            return;
-        }
-        const totals = resolveEntryTotals(entry);
-        const currentCalories = caloriesByDate.get(dateKey) || 0;
-        caloriesByDate.set(dateKey, currentCalories + (Number(totals.calories) || 0));
-        const waterValue = Number(entry?.water_l) || 0;
-        const currentWater = waterByDate.get(dateKey) || 0;
-        waterByDate.set(dateKey, Math.max(currentWater, waterValue));
-        const sleepMinutes = parseSleepMinutes(entry?.sleep_time);
-        if (sleepMinutes !== null) {
-            const currentSleep = sleepByDate.get(dateKey);
-            if (currentSleep === undefined || sleepMinutes < currentSleep) {
-                sleepByDate.set(dateKey, sleepMinutes);
-            }
-        }
-        if (entry?.activity === true) {
-            activityByDate.set(dateKey, true);
-        }
-    });
-    const days = 30;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayDate = normalizeDateKey(today);
-    const profile = getResolvedProfileForDisplay();
     const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
-    const waterTarget = Number(window.adminConfig?.reminders?.water_min_l);
-    const sleepTargetMinutes = parseSleepMinutes(window.adminConfig?.reminders?.sleep_target);
-    for (let i = 0; i < days; i += 1) {
-        const date = new Date(today);
-        date.setDate(today.getDate() - (days - 1 - i));
-        const dateKey = normalizeDateKey(date);
-        const day = document.createElement('a');
-        day.className = 'month-day';
-        day.href = dateKey ? `/diary?date=${dateKey}&mode=day` : '/diary?mode=day';
-        if (todayDate && dateKey === todayDate) {
-            day.classList.add('month-day--today');
-        }
-        const dayCalories = dateKey ? (caloriesByDate.get(dateKey) || 0) : 0;
-        const dayWater = dateKey ? (waterByDate.get(dateKey) || 0) : 0;
-        const daySleep = dateKey ? sleepByDate.get(dateKey) : undefined;
-        const dayActivity = dateKey ? activityByDate.get(dateKey) === true : false;
-        const hasData = dateKey
-            ? (caloriesByDate.has(dateKey) || waterByDate.has(dateKey) || sleepByDate.has(dateKey) || activityByDate.has(dateKey))
-            : false;
-        const habitStatus = resolveHabitStatus(dateKey, {
-            water: dayWater,
-            sleepMinutes: daySleep ?? null,
-            hasDiary: hasData,
-            activity: dayActivity
-        });
-        const habitsOk = habitStatus?.water && habitStatus?.sleep && habitStatus?.diary && habitStatus?.activity;
-        if (hasData && habitStatus) {
-            const monthTone = resolveStatusTone({ type: 'month', ratio: habitsOk ? 'good' : 'bad' });
-            if (monthTone.tone === 'success') {
-                day.classList.add('month-day--good');
-            } else if (monthTone.tone === 'danger') {
-                day.classList.add('month-day--bad');
-            } else {
-                day.classList.add('month-day--empty');
-            }
-        } else if (hasData && Number.isFinite(targetCalories) && targetCalories > 0
-            && Number.isFinite(waterTarget) && waterTarget > 0
-            && sleepTargetMinutes !== null) {
-            const caloriesOk = dayCalories >= targetCalories * 0.9 && dayCalories <= targetCalories * 1.1;
-            const waterOk = dayWater >= waterTarget;
-            const sleepOk = daySleep !== undefined && daySleep <= sleepTargetMinutes;
-            const activityOk = dayActivity === true;
-            const monthTone = resolveStatusTone({ type: 'month', ratio: caloriesOk && waterOk && sleepOk && activityOk ? 'good' : 'bad' });
-            if (monthTone.tone === 'success') {
-                day.classList.add('month-day--good');
-            } else if (monthTone.tone === 'danger') {
-                day.classList.add('month-day--bad');
-            } else {
-                day.classList.add('month-day--empty');
-            }
-        } else if (hasData) {
-            day.classList.add('month-day--empty');
-        } else {
-            day.classList.add('month-day--empty');
-        }
-        day.textContent = date.getDate().toString();
-        container.appendChild(day);
-    }
+    const targetProtein = Number(profile?.macros?.protein_g);
+    const targetFat = Number(profile?.macros?.fat_g);
+    const targetCarbs = Number(profile?.macros?.carbs_g);
+    const targetWater = Number(window.adminConfig?.reminders?.water_min_l);
+
+    const caloriesFact = Math.round(todayTotals.calories || 0);
+    const proteinFact = Math.round(todayTotals.protein_g || 0);
+    const fatFact = Math.round(todayTotals.fat_g || 0);
+    const carbsFact = Math.round(todayTotals.carbs_g || 0);
+    const waterFact = Number(todayTotals.water_l) || 0;
+
+    caloriesElement.textContent = Number.isFinite(targetCalories) && targetCalories > 0
+        ? `${caloriesFact} / ${Math.round(targetCalories)} ккал`
+        : `${caloriesFact} ккал`;
+    proteinElement.textContent = Number.isFinite(targetProtein) && targetProtein > 0
+        ? `Б: ${proteinFact} / ${Math.round(targetProtein)} г`
+        : `Б: ${proteinFact} г`;
+    fatElement.textContent = Number.isFinite(targetFat) && targetFat > 0
+        ? `Ж: ${fatFact} / ${Math.round(targetFat)} г`
+        : `Ж: ${fatFact} г`;
+    carbsElement.textContent = Number.isFinite(targetCarbs) && targetCarbs > 0
+        ? `У: ${carbsFact} / ${Math.round(targetCarbs)} г`
+        : `У: ${carbsFact} г`;
+    waterElement.textContent = Number.isFinite(targetWater) && targetWater > 0
+        ? `${waterFact.toFixed(1)} / ${targetWater.toFixed(1)} л`
+        : `${waterFact.toFixed(1)} л`;
 }
 
 function renderWeeklyProgress() {
@@ -2011,6 +1785,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof window.syncHabitEntriesWithBackend === 'function') {
             await window.syncHabitEntriesWithBackend();
         }
+        renderTodayPlanCard();
         renderWeeklyProgress();
         renderCalorieTrend(Number(activeRange));
         renderWaterHistory(Number(activeWaterRange));

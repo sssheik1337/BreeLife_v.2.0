@@ -91,20 +91,6 @@
         padding: 1.25rem;
       }
 
-      .today-plan-value {
-        font-size: 1.25rem;
-        line-height: 1.15;
-        font-weight: 800;
-        color: #0f172a;
-      }
-      .today-plan-label {
-        font-size: 0.7rem;
-        font-weight: 600;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-      }
-
       .weekly-review-clamp {
         display: -webkit-box;
         -webkit-line-clamp: 2;
@@ -201,54 +187,53 @@
                 
                 <section id="profile-today-summary" class="mb-6">
                     <div class="mb-3 px-1">
-                        <h2 class="text-lg font-bold text-slate-800">Сегодня</h2>
+                        <h2 class="text-lg font-bold text-slate-800">План на сегодня</h2>
                     </div>
                 <div class="profile-card p-5 mb-6" id="profile-today-kpi">
-                    <div class="flex items-center space-x-3 mb-3">
-                        <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
-                            <i data-feather="activity" class="w-5 h-5 text-emerald-600"></i>
-                        </div>
-                        <div>
-                            <h3 class="font-semibold text-slate-800">Ежедневные показатели</h3>
-                            <p class="text-sm text-slate-500">Как было сегодня и к чему стремимся</p>
+                    <div class="flex flex-col items-center text-center mb-4">
+                        <h3 class="font-semibold text-slate-800">Факт / цель</h3>
+                        <p class="text-sm text-slate-500">Калории, БЖУ и вода за текущий день</p>
+                    </div>
+                    <div class="mx-auto w-full max-w-md rounded-2xl bg-slate-50 px-4 py-4 sm:px-6">
+                        <div class="grid grid-cols-1 gap-2 text-sm text-slate-700 sm:text-base">
+                            <p id="today-fact-calories" class="text-center font-semibold">—</p>
+                            <p id="today-fact-protein" class="text-center">Б: —</p>
+                            <p id="today-fact-fat" class="text-center">Ж: —</p>
+                            <p id="today-fact-carbs" class="text-center">У: —</p>
+                            <p id="today-fact-water" class="text-center">—</p>
                         </div>
                     </div>
-                    <div class="mb-6">
-                        <div class="flex items-start justify-between gap-3 mb-4">
-                            <div>
-                                <h4 class="font-semibold text-slate-800">Баланс белков, жиров и углеводов</h4>
-                                <p id="macro-balance-desc" class="text-sm text-slate-500">Показывает, как распределилась еда за период.</p>
-                                <p id="macro-balance-insight" class="text-sm text-slate-500 mt-2"></p>
-                            </div>
-                            <div class="flex items-center gap-2">
+                    <div class="mt-6">
+                        <div class="flex flex-col items-center text-center gap-2 mb-4">
+                            <h4 class="font-semibold text-slate-800">Баланс белков, жиров и углеводов</h4>
+                            <p id="macro-balance-desc" class="text-sm text-slate-500">Показывает, как распределилась еда за период.</p>
+                            <p id="macro-balance-insight" class="text-sm text-slate-500"></p>
+                            <div class="flex items-center justify-center gap-2 mt-1">
                                 <button type="button" class="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700" data-macro-range="day">Сегодня</button>
                                 <button type="button" class="text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 text-slate-500" data-macro-range="week">Неделя</button>
                             </div>
                         </div>
-                        <div class="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
+                        <div class="flex flex-col items-center justify-center gap-4 text-center sm:flex-row sm:items-center sm:justify-center">
                             <div class="relative w-36 h-36 min-w-[9rem] min-h-[9rem] shrink-0 rounded-full bg-slate-200" id="macro-balance-chart">
                                 <div class="absolute inset-4 rounded-full bg-white/90"></div>
-                                <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
-                                    <span class="text-[11px] font-medium text-slate-500">Съедено сегодня</span>
-                                    <span id="macro-calorie-percent" class="text-sm font-bold text-slate-700">0%</span>
-                                </div>
+                                <div class="absolute inset-0 flex items-center justify-center text-sm font-semibold text-slate-700">БЖУ</div>
                             </div>
                             <div class="space-y-2 text-sm text-slate-600">
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center justify-center gap-2">
                                     <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
                                     <span id="macro-balance-protein">Белки — 0%</span>
                                 </div>
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center justify-center gap-2">
                                     <span class="h-2 w-2 rounded-full bg-amber-400"></span>
                                     <span id="macro-balance-fat">Жиры — 0%</span>
                                 </div>
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center justify-center gap-2">
                                     <span class="h-2 w-2 rounded-full bg-sky-400"></span>
                                     <span id="macro-balance-carbs">Углеводы — 0%</span>
                                 </div>
                             </div>
                         </div>
-                        <div class="mt-4 rounded-xl bg-slate-50 p-4 text-sm">
+                        <div class="mt-4 mx-auto w-full max-w-md rounded-xl bg-slate-50 p-4 text-sm">
                             <div class="flex items-center justify-between">
                                 <span class="font-semibold text-slate-700">Простые / сложные углеводы</span>
                                 <span id="macro-carb-split-value" class="text-slate-600">—</span>
