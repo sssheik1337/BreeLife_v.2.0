@@ -332,6 +332,7 @@ function createProductCard(product) {
 
   const indicatorClass = getHealthIndicatorClass(product.health_level);
   const hasFiber = Array.isArray(product.tags) && product.tags.includes('клетчатка');
+  const nutritionStats = buildNutritionStats(product);
 
   card.innerHTML = `
     <div class="flex items-center justify-between">
@@ -341,6 +342,14 @@ function createProductCard(product) {
       </div>
       <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${indicatorClass}"></span>
     </div>
+    <div class="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm text-slate-600">
+      ${nutritionStats.map((item) => `
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-slate-500">${item.label}</span>
+          <span class="font-semibold text-slate-700">${item.value}</span>
+        </div>
+      `).join('')}
+    </div>
     <div class="flex flex-wrap gap-2 mt-4">
       ${hasFiber ? '<span class="px-2 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-600">клетчатка</span>' : ''}
       ${renderTags(product.tags)}
@@ -348,6 +357,23 @@ function createProductCard(product) {
   `;
 
   return card;
+}
+
+function buildNutritionStats(product) {
+  return [
+    { label: 'Ккал', value: formatNutritionValue(product.kcal, 'ккал') },
+    { label: 'Белки', value: formatNutritionValue(product.protein_g, 'г') },
+    { label: 'Жиры', value: formatNutritionValue(product.fat_g, 'г') },
+    { label: 'Углеводы', value: formatNutritionValue(product.carbs_g, 'г') }
+  ];
+}
+
+function formatNutritionValue(value, suffix) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return '—';
+  }
+  const normalized = Number.isInteger(value) ? value.toString() : value.toFixed(1);
+  return `${normalized} ${suffix}`;
 }
 
 function getHealthIndicatorClass(level) {

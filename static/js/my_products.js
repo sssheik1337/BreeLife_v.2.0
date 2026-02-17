@@ -380,6 +380,17 @@ function createPreferenceCard(product, favoriteIds, excludedIds, onChange) {
         <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${indicatorClass}"></span>
     `;
 
+    const nutrition = document.createElement('div');
+    nutrition.className = 'mt-4 grid grid-cols-2 gap-2 rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm text-slate-600';
+    nutrition.innerHTML = buildNutritionStats(product)
+        .map((item) => `
+            <div class="flex items-center justify-between gap-2">
+                <span class="text-slate-500">${item.label}</span>
+                <span class="font-semibold text-slate-700">${item.value}</span>
+            </div>
+        `)
+        .join('');
+
     const tags = document.createElement('div');
     tags.className = 'flex flex-wrap gap-2 mt-4';
     tags.innerHTML = `
@@ -449,10 +460,28 @@ function createPreferenceCard(product, favoriteIds, excludedIds, onChange) {
     actions.appendChild(excludeLabel);
 
     card.appendChild(header);
+    card.appendChild(nutrition);
     card.appendChild(tags);
     card.appendChild(actions);
 
     return card;
+}
+
+function buildNutritionStats(product) {
+    return [
+        { label: 'Ккал', value: formatNutritionValue(product.kcal, 'ккал') },
+        { label: 'Белки', value: formatNutritionValue(product.protein_g, 'г') },
+        { label: 'Жиры', value: formatNutritionValue(product.fat_g, 'г') },
+        { label: 'Углеводы', value: formatNutritionValue(product.carbs_g, 'г') }
+    ];
+}
+
+function formatNutritionValue(value, suffix) {
+    if (typeof value !== 'number' || Number.isNaN(value)) {
+        return '—';
+    }
+    const normalized = Number.isInteger(value) ? value.toString() : value.toFixed(1);
+    return `${normalized} ${suffix}`;
 }
 
 function groupBy(items, key) {
