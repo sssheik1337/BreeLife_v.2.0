@@ -82,9 +82,20 @@ function renderMealPlan(container, products, rangeKey) {
     }
 }
 
+function normalizeProfileIdSet(value) {
+    if (!Array.isArray(value)) {
+        return new Set();
+    }
+    const normalized = value
+        .map((item) => Number(item))
+        .filter((item) => Number.isInteger(item));
+    return new Set(normalized);
+}
+
 function buildPreferredProducts(products, profile) {
-    const favorites = new Set(profile?.favorite_product_ids || []);
-    const excluded = new Set(profile?.excluded_product_ids || []);
+    // Безопасно нормализуем id, чтобы учесть legacy-форматы (строки/дубли).
+    const favorites = normalizeProfileIdSet(profile?.favorite_product_ids);
+    const excluded = normalizeProfileIdSet(profile?.excluded_product_ids);
     const available = products.filter((product) => !excluded.has(product.id));
     if (favorites.size > 0) {
         const favoriteProducts = available.filter((product) => favorites.has(product.id));
