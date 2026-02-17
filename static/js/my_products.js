@@ -1,7 +1,6 @@
 // Экран "Мои продукты": любимые и исключённые позиции.
 
 const PRODUCTS_ENDPOINT = '/api/products';
-const DEFAULT_OPEN_GROUPS = 2;
 const GROUP_PAGE_SIZE = 12;
 const SEARCH_DEBOUNCE_MS = 250;
 
@@ -164,7 +163,7 @@ function renderMyProducts(container, products, options = {}) {
             : defaultVisibleCount;
         const isInitiallyOpen = hasActiveSearch
             ? true
-            : pageState.expandedGroups.has(groupName) || index < DEFAULT_OPEN_GROUPS;
+            : pageState.expandedGroups.has(groupName);
         const groupState = {
             visibleCount
         };
