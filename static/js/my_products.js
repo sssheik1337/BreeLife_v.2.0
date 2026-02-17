@@ -3,9 +3,11 @@
 const PRODUCTS_ENDPOINT = '/api/products';
 const DEFAULT_OPEN_GROUPS = 2;
 const GROUP_PAGE_SIZE = 12;
+const SEARCH_DEBOUNCE_MS = 250;
 
 document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('my-products-container');
+    const searchInput = document.getElementById('my-products-search-input');
     if (!container) {
         return;
     }
@@ -20,17 +22,68 @@ document.addEventListener('DOMContentLoaded', () => {
             return response.json();
         })
         .then((products) => {
-            renderMyProducts(container, products);
+            const allProducts = Array.isArray(products) ? products : [];
+            const render = (query = '') => {
+                const filteredProducts = filterProducts(allProducts, query);
+                renderMyProducts(container, filteredProducts, { hasActiveSearch: query.length > 0 });
+            };
+
+            render('');
+            bindSearchInput(searchInput, render);
         })
         .catch(() => {
             container.textContent = 'Не удалось загрузить список продуктов.';
         });
 });
 
-function renderMyProducts(container, products) {
+function bindSearchInput(input, onSearch) {
+    if (!input) {
+        return;
+    }
+    const debouncedSearch = debounce((value) => {
+        onSearch(value);
+    }, SEARCH_DEBOUNCE_MS);
+
+    input.addEventListener('input', (event) => {
+        const query = normalizeSearchValue(event.target?.value);
+        debouncedSearch(query);
+    });
+}
+
+function normalizeSearchValue(value) {
+    return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function filterProducts(products, query) {
+    if (!query) {
+        return products;
+    }
+
+    return products.filter((product) => {
+        const name = String(product?.name || '').toLowerCase();
+        const group = String(product?.group || '').toLowerCase();
+        const brand = String(product?.brand || '').toLowerCase();
+        return name.includes(query) || group.includes(query) || brand.includes(query);
+    });
+}
+
+function debounce(callback, waitMs) {
+    let timeoutId = null;
+    return (...args) => {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+        timeoutId = setTimeout(() => {
+            callback(...args);
+        }, waitMs);
+    };
+}
+
+function renderMyProducts(container, products, options = {}) {
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
     const favoriteIds = new Set(profile.favorite_product_ids || []);
     const excludedIds = new Set(profile.excluded_product_ids || []);
+    const hasActiveSearch = options.hasActiveSearch === true;
 
     container.innerHTML = '';
     updateCounts(products.length, favoriteIds.size, excludedIds.size);
@@ -38,9 +91,14 @@ function renderMyProducts(container, products) {
     const groups = groupBy(products, 'group');
     const groupEntries = Object.entries(groups);
 
+    if (groupEntries.length === 0) {
+        renderEmptyState(container, hasActiveSearch);
+        return;
+    }
+
     groupEntries.forEach(([groupName, groupProducts], index) => {
         const groupId = `my-products-group-${index}`;
-        const isInitiallyOpen = index < DEFAULT_OPEN_GROUPS;
+        const isInitiallyOpen = hasActiveSearch || index < DEFAULT_OPEN_GROUPS;
         const groupState = {
             visibleCount: Math.min(GROUP_PAGE_SIZE, groupProducts.length)
         };
@@ -128,6 +186,20 @@ function renderMyProducts(container, products) {
             setGroupExpanded(groupBody, headerButton, !expanded);
         });
     });
+}
+
+function renderEmptyState(container, hasActiveSearch) {
+    const title = hasActiveSearch ? 'Ничего не найдено' : 'Пока нет продуктов';
+    const description = hasActiveSearch
+        ? 'Попробуйте изменить запрос по названию, группе или бренду.'
+        : 'Список продуктов пока пуст. Вернитесь позже.';
+
+    container.innerHTML = `
+        <div class="rounded-2xl border border-slate-100 bg-white p-6 text-center shadow-sm">
+            <p class="text-base font-semibold text-slate-700">${title}</p>
+            <p class="mt-2 text-sm text-slate-500">${description}</p>
+        </div>
+    `;
 }
 
 function renderGroupSlice(grid, groupProducts, visibleCount, favoriteIds, excludedIds, allProducts, onChange) {
