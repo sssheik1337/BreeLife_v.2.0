@@ -1,6 +1,8 @@
 // Онбординг предпочтений: карточки лайк/не хочу/пропуск.
 
 const ONBOARDING_PRODUCTS_ENDPOINT = '/api/preferences/onboarding-products?limit=30';
+const TARGET_FAVORITES = 10;
+const TARGET_EXCLUDED = 3;
 
 const onboardingState = {
     items: [],
@@ -50,6 +52,9 @@ function getOnboardingElements() {
         doneButton: document.getElementById('preferences-done'),
         softSkipButton: document.getElementById('preferences-soft-skip'),
         emptyState: document.getElementById('preferences-empty-state'),
+        kpiFavorites: document.getElementById('preferences-kpi-favorites'),
+        kpiExcluded: document.getElementById('preferences-kpi-excluded'),
+        softHint: document.getElementById('preferences-soft-hint'),
     };
 }
 
@@ -81,6 +86,33 @@ function updateProgress(elements) {
     }
 }
 
+
+
+function updateKpiHints(elements) {
+    const favoritesCount = onboardingState.favoritesSet.size;
+    const excludedCount = onboardingState.excludedSet.size;
+
+    if (elements.kpiFavorites) {
+        elements.kpiFavorites.textContent = `Желательно выбрать 10 любимых продуктов (${favoritesCount}/10).`;
+    }
+    if (elements.kpiExcluded) {
+        elements.kpiExcluded.textContent = `Можно отметить 3 нежелательных продукта (${excludedCount}/3).`;
+    }
+}
+
+function hasSoftKpiUnderfill() {
+    return onboardingState.favoritesSet.size < TARGET_FAVORITES || onboardingState.excludedSet.size < TARGET_EXCLUDED;
+}
+
+function showSoftFinishHint(elements) {
+    if (elements.softHint) {
+        elements.softHint.classList.remove('hidden');
+    }
+    if (typeof showNotification === 'function') {
+        showNotification('Можно завершить уже сейчас, но ещё пара отметок сделает рацион точнее.', 'warning');
+    }
+}
+
 function setCardEnabled(elements, enabled) {
     [elements.likeButton, elements.skipButton, elements.excludeButton].forEach((button) => {
         if (!button) {
@@ -93,6 +125,7 @@ function setCardEnabled(elements, enabled) {
 
 function renderCurrentCard(elements) {
     updateProgress(elements);
+    updateKpiHints(elements);
 
     if (!elements.card || onboardingState.totalCount === 0) {
         if (elements.emptyState) {
@@ -193,6 +226,9 @@ function setSavingState(elements, saving) {
 }
 
 async function saveOnboardingChoices(elements) {
+    if (hasSoftKpiUnderfill()) {
+        showSoftFinishHint(elements);
+    }
     if (onboardingState.isSaving) {
         return;
     }
