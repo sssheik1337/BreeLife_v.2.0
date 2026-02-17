@@ -179,7 +179,7 @@
           </label>
           <label>
             Ккал на 100 г
-            <input type="number" name="kcal" step="0.1" min="0" required />
+            <input type="number" name="kcal" step="0.1" min="0" required readonly />
           </label>
           <label>
             Белки, г
@@ -244,7 +244,7 @@
                       </label>
                       <label>
                         Ккал
-                        <input type="number" name="kcal" step="0.1" min="0" value="{{ product.kcal or 0 }}" required />
+                        <input type="number" name="kcal" step="0.1" min="0" value="{{ product.kcal or 0 }}" required readonly />
                       </label>
                       <label>
                         Белки, г
@@ -318,6 +318,51 @@
       window.addEventListener("resize", () => {
         groupSections.forEach((section) => updateGroupHeight(section));
       });
+
+      // Автоматический пересчёт калорийности по формуле Атуотера.
+      const productForms = Array.from(
+        document.querySelectorAll('form[action="/admin/products/add"], form[action="/admin/products/update"]')
+      );
+
+      const parseNutrientValue = (input) => {
+        const value = Number(input?.value ?? 0);
+        return Number.isFinite(value) ? value : 0;
+      };
+
+      const recalculateKcal = (form) => {
+        const protein = parseNutrientValue(form.querySelector('input[name="protein_g"]'));
+        const fat = parseNutrientValue(form.querySelector('input[name="fat_g"]'));
+        const carbsSimple = parseNutrientValue(form.querySelector('input[name="carbs_simple_g"]'));
+        const carbsComplex = parseNutrientValue(form.querySelector('input[name="carbs_complex_g"]'));
+        const kcalInput = form.querySelector('input[name="kcal"]');
+
+        if (!kcalInput) {
+          return;
+        }
+
+        const kcal = Math.round(protein * 4 + fat * 9 + (carbsSimple + carbsComplex) * 4);
+        kcalInput.value = String(kcal);
+      };
+
+      productForms.forEach((form) => {
+        const watchedInputs = [
+          form.querySelector('input[name="protein_g"]'),
+          form.querySelector('input[name="fat_g"]'),
+          form.querySelector('input[name="carbs_simple_g"]'),
+          form.querySelector('input[name="carbs_complex_g"]'),
+        ];
+
+        watchedInputs.forEach((input) => {
+          if (!input) {
+            return;
+          }
+          input.addEventListener('input', () => recalculateKcal(form));
+          input.addEventListener('change', () => recalculateKcal(form));
+        });
+
+        recalculateKcal(form);
+      });
+
     </script>
   </body>
 </html>
