@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from config import AI_ENABLED
-from app.context import load_admin_config, templates
+from app.context import templates
 from app.dependencies import (
     apply_profile_patch,
+    get_profile_and_admin_config,
     load_profile,
     optional_current_user,
     require_completed_profile,
@@ -31,31 +32,33 @@ def should_redirect_to_trial_start(profile_data: dict[str, object]) -> bool:
 
 @router.get("/resume", response_class=HTMLResponse)
 async def resume(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    payload = get_profile_and_admin_config(telegram_user_id)
     if telegram_user_id is None:
         return templates.TemplateResponse(
             "resume.html",
-            {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
+            {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
         )
     require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "resume.html",
-        {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
+        {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
     )
 
 
 @router.get("/profile", response_class=HTMLResponse)
 async def profile(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    payload = get_profile_and_admin_config(telegram_user_id)
     if telegram_user_id is None:
         return templates.TemplateResponse(
             "profile.html",
-            {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
+            {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
         )
     profile_data = require_completed_profile(telegram_user_id)
     if should_redirect_to_trial_start(profile_data):
         return RedirectResponse(url="/trial-start", status_code=307)
     return templates.TemplateResponse(
         "profile.html",
-        {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
+        {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
     )
 
 
@@ -66,13 +69,14 @@ async def profile_alias(request: Request, telegram_user_id: int | None = Depends
 
 @router.get("/trial-start", response_class=HTMLResponse)
 async def trial_start(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    payload = get_profile_and_admin_config(telegram_user_id)
     if telegram_user_id is not None:
         profile_data = require_completed_profile(telegram_user_id)
         if not should_redirect_to_trial_start(profile_data):
             return RedirectResponse(url="/profile", status_code=307)
     return templates.TemplateResponse(
         "trial_start.html",
-        {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
+        {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
     )
 
 

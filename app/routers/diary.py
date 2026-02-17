@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from config import AI_ENABLED
-from app.context import load_admin_config, templates
+from app.context import templates
 from app.dependencies import (
+    get_profile_and_admin_config,
     load_profile,
     optional_current_user,
     require_completed_profile,
@@ -19,15 +20,16 @@ router = APIRouter()
 
 @router.get("/diary", response_class=HTMLResponse)
 async def diary(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    payload = get_profile_and_admin_config(telegram_user_id)
     if telegram_user_id is None:
         return templates.TemplateResponse(
             "diary.html",
-            {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
+            {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
         )
     require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "diary.html",
-        {"request": request, "admin_config": load_admin_config(), "ai_enabled": AI_ENABLED},
+        {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
     )
 
 

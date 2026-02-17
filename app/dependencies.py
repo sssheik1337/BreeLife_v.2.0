@@ -1,4 +1,6 @@
+from copy import deepcopy
 from datetime import datetime, timezone
+import logging
 
 from fastapi import HTTPException, Request, Response
 
@@ -10,6 +12,10 @@ from app.context import (
     TELEGRAM_SESSION_COOKIE,
     load_admin_config,
 )
+from services.targets import calculate_fiber_target_g, calculate_tdee_kcal, calculate_water_target_l
+
+
+logger = logging.getLogger(__name__)
 
 
 def require_telegram_user_id(request: Request, response: Response) -> int:
@@ -96,9 +102,41 @@ def maybe_set_admin_session(response: Response, token: str | None) -> None:
 
 def get_profile_and_admin_config(telegram_user_id: int | None) -> dict[str, object]:
     profile = load_profile(telegram_user_id) if telegram_user_id is not None else {}
-    admin_config = load_admin_config()
+    admin_config = deepcopy(load_admin_config())
     if not isinstance(admin_config, dict):
         admin_config = {}
+
+    reminders = admin_config.get("reminders")
+    if not isinstance(reminders, dict):
+        reminders = {}
+        admin_config["reminders"] = reminders
+
+    if telegram_user_id is not None and isinstance(profile, dict) and profile:
+        water_target = calculate_water_target_l(profile)
+        tdee_kcal = calculate_tdee_kcal(profile)
+        fiber_target = calculate_fiber_target_g(profile, tdee_kcal)
+
+        if water_target is not None:
+            reminders["water_min_l"] = water_target
+            if logger.isEnabledFor(logging.DEBUG):
+                water_clamp_applied = water_target in {1.5, 4.5}
+                fiber_clamp_applied = False
+                if isinstance(tdee_kcal, int) and tdee_kcal > 0:
+                    raw_fiber = (tdee_kcal / 1000) * 14
+                    fiber_clamp_applied = raw_fiber < 18 or raw_fiber > 45
+
+                payload = {
+                    "telegram_user_id": telegram_user_id,
+                    "water_target_l": water_target,
+                    "fiber_target_g": fiber_target,
+                    "tdee_kcal": tdee_kcal,
+                    "water_clamp_applied": water_clamp_applied,
+                    "fiber_clamp_applied": fiber_clamp_applied,
+                }
+                logger.debug("Вычислены персональные цели воды/клетчатки: %s", payload)
+
+        reminders["fiber_target_g"] = fiber_target
+
     return {
         "profile": profile,
         "admin_config": admin_config,

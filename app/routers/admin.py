@@ -375,10 +375,13 @@ async def admin_norms_update(
     config = load_admin_config()
     if not isinstance(config, dict):
         config = {}
+    existing_norms = config.get("norms") if isinstance(config.get("norms"), dict) else {}
+    # Нормы воды и клетчатки теперь вычисляются персонально от профиля.
+    # В админке сохраняем только цель по сну, чтобы не ломать текущий flow страницы.
     config["norms"] = {
-        "water_l": water_l,
+        "water_l": existing_norms.get("water_l", water_l),
         "sleep_hours": sleep_hours,
-        "fiber_g": fiber_g,
+        "fiber_g": existing_norms.get("fiber_g", fiber_g),
     }
     update_admin_config(config)
     return render_admin_norms(request, success="Нормы обновлены.")
