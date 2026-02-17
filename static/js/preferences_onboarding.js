@@ -8,7 +8,33 @@ const onboardingState = {
     favoritesSet: new Set(),
     excludedSet: new Set(),
     totalCount: 0,
+    isSaving: false,
 };
+
+function parseIdSet(value) {
+    if (!Array.isArray(value)) {
+        return new Set();
+    }
+    return new Set(value.filter((item) => Number.isInteger(item)));
+}
+
+async function hydrateSelectedSetsFromProfile() {
+    if (typeof window.syncProfileWithBackend === 'function') {
+        try {
+            await window.syncProfileWithBackend();
+        } catch (_) {
+            // Если синхронизация не удалась, используем локально доступный профиль.
+        }
+    }
+    if (typeof getUserProfile !== 'function') {
+        onboardingState.favoritesSet = new Set();
+        onboardingState.excludedSet = new Set();
+        return;
+    }
+    const profile = getUserProfile();
+    onboardingState.favoritesSet = parseIdSet(profile?.favorite_product_ids);
+    onboardingState.excludedSet = parseIdSet(profile?.excluded_product_ids);
+}
 
 function getOnboardingElements() {
     return {
@@ -149,7 +175,57 @@ function handleSkip(elements) {
 }
 
 function finishOnboarding() {
+    if (onboardingState.isSaving) {
+        return;
+    }
     window.location.href = '/trial-start';
+}
+
+function setSavingState(elements, saving) {
+    onboardingState.isSaving = saving;
+    [elements.doneButton, elements.softSkipButton, elements.likeButton, elements.skipButton, elements.excludeButton].forEach((button) => {
+        if (!button) {
+            return;
+        }
+        button.disabled = saving;
+        button.classList.toggle('opacity-60', saving);
+    });
+}
+
+async function saveOnboardingChoices(elements) {
+    if (onboardingState.isSaving) {
+        return;
+    }
+    setSavingState(elements, true);
+
+    const fetcher = window.apiFetch || fetch;
+    const payload = {
+        favorite_product_ids: Array.from(onboardingState.favoritesSet),
+        excluded_product_ids: Array.from(onboardingState.excludedSet),
+        preferences_onboarding_completed: true,
+    };
+
+    try {
+        const response = await fetcher('/api/profile/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            throw new Error('PROFILE_SAVE_FAILED');
+        }
+
+        if (typeof patchUserProfile === 'function') {
+            patchUserProfile(payload);
+        }
+
+        finishOnboarding();
+    } catch (_) {
+        if (typeof showNotification === 'function') {
+            showNotification('Не удалось сохранить выбор. Попробуйте ещё раз.', 'error');
+        }
+        setSavingState(elements, false);
+    }
 }
 
 async function loadOnboardingProducts() {
@@ -166,6 +242,8 @@ async function initPreferencesOnboarding() {
     if (!elements.card) {
         return;
     }
+
+    await hydrateSelectedSetsFromProfile();
 
     try {
         const payload = await loadOnboardingProducts();
@@ -188,7 +266,9 @@ async function initPreferencesOnboarding() {
     elements.likeButton?.addEventListener('click', () => handleLike(elements));
     elements.excludeButton?.addEventListener('click', () => handleExclude(elements));
     elements.skipButton?.addEventListener('click', () => handleSkip(elements));
-    elements.doneButton?.addEventListener('click', finishOnboarding);
+    elements.doneButton?.addEventListener('click', () => {
+        saveOnboardingChoices(elements);
+    });
     elements.softSkipButton?.addEventListener('click', finishOnboarding);
 }
 
