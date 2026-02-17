@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+import logging
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from config import AI_ENABLED
@@ -14,6 +15,7 @@ from app.dependencies import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def should_redirect_to_trial_start(profile_data: dict[str, object]) -> bool:
@@ -102,7 +104,51 @@ async def api_profile_save(request: Request, response: Response):
     profile = load_profile(telegram_user_id)
     updated = apply_profile_patch(profile, payload)
     update_profile(telegram_user_id, updated)
+
+    if payload.get("preferences_onboarding_completed") is True:
+        favorites_count = len(updated.get("favorite_product_ids", [])) if isinstance(updated.get("favorite_product_ids"), list) else 0
+        excluded_count = len(updated.get("excluded_product_ids", [])) if isinstance(updated.get("excluded_product_ids"), list) else 0
+        logger.info(
+            "[analytics] preferences_onboarding_event event=completed telegram_user_id=%s favorites_count=%s excluded_count=%s",
+            telegram_user_id,
+            favorites_count,
+            excluded_count,
+        )
+
     return updated
+
+
+@router.post("/api/preferences/onboarding/event")
+async def api_preferences_onboarding_event(request: Request, response: Response):
+    telegram_user_id = require_telegram_user_id(request, response)
+    payload = await request.json()
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="INVALID_PAYLOAD")
+
+    event = payload.get("event")
+    if event not in {"entered", "completed", "skipped"}:
+        raise HTTPException(status_code=400, detail="INVALID_EVENT")
+
+    favorites_count = payload.get("favorites_count")
+    excluded_count = payload.get("excluded_count")
+    viewed_count = payload.get("viewed_count")
+
+    def _normalize_int(value: object) -> int | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            return max(0, value)
+        return None
+
+    logger.info(
+        "[analytics] preferences_onboarding_event event=%s telegram_user_id=%s favorites_count=%s excluded_count=%s viewed_count=%s",
+        event,
+        telegram_user_id,
+        _normalize_int(favorites_count),
+        _normalize_int(excluded_count),
+        _normalize_int(viewed_count),
+    )
+    return {"ok": True}
 
 
 @router.get("/api/profile/get")

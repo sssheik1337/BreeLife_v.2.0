@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Request
+import logging
 from fastapi.responses import HTMLResponse
 
 from config import AI_ENABLED
@@ -6,6 +7,7 @@ from app.context import templates
 from app.dependencies import get_profile_and_admin_config, optional_current_user, require_completed_profile
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/menu", response_class=HTMLResponse)
@@ -92,6 +94,10 @@ async def preferences_onboarding(request: Request, telegram_user_id: int | None 
             {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
         )
     require_completed_profile(telegram_user_id)
+    logger.info(
+        "[analytics] preferences_onboarding_entered telegram_user_id=%s source=page",
+        telegram_user_id,
+    )
     return templates.TemplateResponse(
         "preferences_onboarding.html",
         {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},

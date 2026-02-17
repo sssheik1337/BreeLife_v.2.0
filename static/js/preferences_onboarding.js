@@ -58,6 +58,26 @@ function getOnboardingElements() {
     };
 }
 
+async function sendOnboardingEvent(eventName) {
+    const fetcher = window.apiFetch || fetch;
+    const payload = {
+        event: eventName,
+        favorites_count: onboardingState.favoritesSet.size,
+        excluded_count: onboardingState.excludedSet.size,
+        viewed_count: Math.min(onboardingState.currentIndex + 1, onboardingState.totalCount),
+    };
+
+    try {
+        await fetcher('/api/preferences/onboarding/event', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+    } catch (_) {
+        // Аналитическое событие не должно ломать пользовательский сценарий.
+    }
+}
+
 function normalizeOnboardingItems(payload) {
     if (!payload || typeof payload !== 'object') {
         return [];
@@ -239,9 +259,12 @@ function showSuccessState(elements) {
     }
 }
 
-function finishOnboarding(elements) {
+function finishOnboarding(elements, eventName = null) {
     if (onboardingState.isSaving) {
         return;
+    }
+    if (eventName) {
+        sendOnboardingEvent(eventName);
     }
     showSuccessState(elements);
 }
@@ -321,6 +344,7 @@ async function initPreferencesOnboarding() {
         onboardingState.totalCount = items.length;
 
         renderCurrentCard(elements);
+        sendOnboardingEvent('entered');
     } catch (error) {
         if (typeof showNotification === 'function') {
             showNotification('Не удалось загрузить карточки продуктов. Попробуйте позже.', 'error');
@@ -329,6 +353,7 @@ async function initPreferencesOnboarding() {
         onboardingState.currentIndex = 0;
         onboardingState.totalCount = 0;
         renderCurrentCard(elements);
+        sendOnboardingEvent('entered');
     }
 
     elements.likeButton?.addEventListener('click', () => handleLike(elements));
@@ -337,7 +362,7 @@ async function initPreferencesOnboarding() {
     elements.doneButton?.addEventListener('click', () => {
         saveOnboardingChoices(elements);
     });
-    elements.softSkipButton?.addEventListener('click', () => finishOnboarding(elements));
+    elements.softSkipButton?.addEventListener('click', () => finishOnboarding(elements, 'skipped'));
 }
 
 document.addEventListener('DOMContentLoaded', initPreferencesOnboarding);
