@@ -167,6 +167,16 @@ function hasProfileData(profile) {
     return fields.some((value) => value !== null && value !== undefined && value !== '');
 }
 
+
+
+// Определяем целевой экран после анкеты с учётом шага предпочтений.
+function resolvePostQuestionnaireRoute(profile) {
+    if (profile?.preferences_onboarding_completed === true) {
+        return '/trial-start';
+    }
+    return '/preferences-onboarding';
+}
+
 // DOM Elements
 let questionTitle;
 let optionsContainer;
@@ -210,7 +220,7 @@ async function initQuestionnaire() {
     if (!isEditMode && typeof getUserProfile === 'function') {
         const profile = getUserProfile();
         if (profile?.is_completed === true || hasProfileData(profile)) {
-            window.location.replace('/profile');
+            window.location.replace(resolvePostQuestionnaireRoute(profile));
             return;
         }
     }
@@ -1263,8 +1273,8 @@ function setupEventListeners() {
             if (typeof resetUserDataDirtyMap === 'function') {
                 resetUserDataDirtyMap('profile_saved');
             }
-            // Все вопросы заполнены, переходим на экран прогресса.
-            window.location.href = '/trial-start';
+            // Все вопросы заполнены, переходим на следующий экран с учётом шага предпочтений.
+            window.location.href = resolvePostQuestionnaireRoute(profile);
         }
     });
     
