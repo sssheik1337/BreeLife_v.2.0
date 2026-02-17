@@ -19,15 +19,86 @@ from services.storage_db import read_payload, write_payload
 router = APIRouter()
 
 
-def resolve_profile_diary_entries(profile: dict) -> list:
-    """Вернуть дневниковые записи из актуального поля, с fallback на legacy-ключ."""
-    diary_entries = profile.get("diary")
-    if isinstance(diary_entries, list) and diary_entries:
-        return diary_entries
-    legacy_entries = profile.get("food_diary")
-    if isinstance(legacy_entries, list):
-        return legacy_entries
-    return []
+def normalize_diary_entries(entries: object) -> list[dict[str, object]]:
+    """
+    Нормализовать записи дневника к минимально необходимой схеме.
+
+    Минимальная схема одной записи:
+    - date: str | None
+    - meals: list
+    - water_l: int | float | None
+    - sleep_time: str | None
+    - activity: bool | None
+    """
+    if not isinstance(entries, list):
+        return []
+
+    normalized: list[dict[str, object]] = []
+    for item in entries:
+        if not isinstance(item, dict):
+            continue
+
+        entry = dict(item)
+        date_value = entry.get("date")
+        entry["date"] = date_value if isinstance(date_value, str) else None
+
+        meals_value = entry.get("meals")
+        entry["meals"] = meals_value if isinstance(meals_value, list) else []
+
+        water_value = entry.get("water_l")
+        entry["water_l"] = water_value if isinstance(water_value, (int, float)) else None
+
+        sleep_value = entry.get("sleep_time")
+        entry["sleep_time"] = sleep_value if isinstance(sleep_value, str) else None
+
+        activity_value = entry.get("activity")
+        entry["activity"] = activity_value if isinstance(activity_value, bool) else None
+
+        normalized.append(entry)
+
+    return normalized
+
+
+def migrate_legacy_diary_if_needed(telegram_user_id: int) -> list[dict[str, object]]:
+    """
+    Перенести legacy-дневник из профиля в diary_entries при первом обращении.
+
+    Идемпотентность:
+    - если в diary_entries уже есть список, миграция не выполняется;
+    - повторные вызовы не создают дубликатов.
+    """
+    stored_entries = read_payload("diary_entries", telegram_user_id)
+    if isinstance(stored_entries, list):
+        return normalize_diary_entries(stored_entries)
+
+    raw_profile = read_payload("profiles", telegram_user_id)
+    if not isinstance(raw_profile, dict):
+        write_payload("diary_entries", telegram_user_id, [])
+        return []
+
+    legacy_entries = raw_profile.get("diary")
+    if not isinstance(legacy_entries, list):
+        legacy_entries = raw_profile.get("food_diary") if isinstance(raw_profile.get("food_diary"), list) else []
+
+    normalized_legacy_entries = normalize_diary_entries(legacy_entries)
+    write_payload("diary_entries", telegram_user_id, normalized_legacy_entries)
+
+    # Очищаем legacy-ключи после успешного переноса.
+    updated_profile = dict(raw_profile)
+    updated_profile.pop("diary", None)
+    if isinstance(updated_profile.get("food_diary"), list):
+        updated_profile.pop("food_diary", None)
+
+    nested_profile = updated_profile.get("user_profile")
+    if isinstance(nested_profile, dict):
+        nested_updated = dict(nested_profile)
+        nested_updated.pop("diary", None)
+        if isinstance(nested_updated.get("food_diary"), list):
+            nested_updated.pop("food_diary", None)
+        updated_profile["user_profile"] = nested_updated
+
+    write_payload("profiles", telegram_user_id, updated_profile)
+    return normalized_legacy_entries
 
 
 @router.get("/diary", response_class=HTMLResponse)
@@ -56,15 +127,8 @@ async def food_diary(request: Request, telegram_user_id: int | None = Depends(op
 @router.get("/api/diary")
 async def api_diary(request: Request, response: Response):
     telegram_user_id = require_telegram_user_id(request, response)
-    stored_entries = read_payload("diary_entries", telegram_user_id)
-    if isinstance(stored_entries, list):
-        return {"entries": stored_entries}
-
-    # Если записи ещё не переносились в отдельную таблицу, читаем legacy-значение из профиля.
-    profile = load_profile(telegram_user_id)
-    diary = resolve_profile_diary_entries(profile)
-    diary = diary if isinstance(diary, list) else []
-    return {"entries": diary}
+    entries = migrate_legacy_diary_if_needed(telegram_user_id)
+    return {"entries": entries}
 
 
 @router.post("/api/diary")
@@ -74,8 +138,7 @@ async def api_diary_save(request: Request, response: Response):
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="INVALID_PAYLOAD")
 
-    entries = payload.get("entries", [])
-    entries = entries if isinstance(entries, list) else []
+    entries = normalize_diary_entries(payload.get("entries", []))
     write_payload("diary_entries", telegram_user_id, entries)
     return {"entries": entries}
 
@@ -164,10 +227,10 @@ async def api_habits_save_alias(request: Request, response: Response):
 async def food_diary_add(request: Request, response: Response, payload: FoodDiaryAddRequest):
     telegram_user_id = require_telegram_user_id(request, response)
     profile = load_profile(telegram_user_id)
-    updated = dict(profile)
-    updated.setdefault("food_diary", [])
-    updated["food_diary"] = [entry for entry in updated["food_diary"] if entry.get("date") != payload.date]
-    updated["food_diary"].append(
+
+    entries = migrate_legacy_diary_if_needed(telegram_user_id)
+    entries = [entry for entry in entries if entry.get("date") != payload.date]
+    entries.append(
         {
             "date": payload.date,
             "meals": payload.meals,
@@ -176,10 +239,8 @@ async def food_diary_add(request: Request, response: Response, payload: FoodDiar
             "activity": payload.activity,
         }
     )
-    # Дублируем в "diary" для совместимости со страницами,
-    # которые читают записи через /api/diary.
-    updated["diary"] = list(updated["food_diary"])
-    update_profile(telegram_user_id, updated)
+    write_payload("diary_entries", telegram_user_id, normalize_diary_entries(entries))
+
     totals = build_food_diary_aggregates(payload.meals)
     recommendation = generate_food_diary_recommendation(profile, totals)
     return {
@@ -192,8 +253,8 @@ async def food_diary_add(request: Request, response: Response, payload: FoodDiar
 @router.get("/api/food-diary/list")
 async def food_diary_list(request: Request, response: Response):
     telegram_user_id = require_telegram_user_id(request, response)
-    profile = load_profile(telegram_user_id)
-    return {"entries": profile.get("food_diary", [])}
+    entries = migrate_legacy_diary_if_needed(telegram_user_id)
+    return {"entries": entries}
 
 
 @router.post("/api/food-diary/analyze")
