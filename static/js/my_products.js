@@ -5,6 +5,13 @@ const DEFAULT_OPEN_GROUPS = 2;
 const GROUP_PAGE_SIZE = 12;
 const SEARCH_DEBOUNCE_MS = 250;
 
+// Состояние интерфейса хранится только в памяти текущей вкладки.
+const pageState = {
+    expandedGroups: new Set(),
+    visibleCountByGroup: {},
+    searchQuery: ''
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('my-products-container');
     const searchInput = document.getElementById('my-products-search-input');
@@ -23,13 +30,16 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .then((products) => {
             const allProducts = Array.isArray(products) ? products : [];
-            const render = (query = '') => {
-                const filteredProducts = filterProducts(allProducts, query);
-                renderMyProducts(container, filteredProducts, { hasActiveSearch: query.length > 0 });
+            pageState.searchQuery = getInitialSearchQuery();
+            const render = () => {
+                const filteredProducts = filterProducts(allProducts, pageState.searchQuery);
+                renderMyProducts(container, filteredProducts, { hasActiveSearch: pageState.searchQuery.length > 0 });
             };
 
-            render('');
+            hydrateExpandedGroupsFromUrl(allProducts);
+            applySearchInputValue(searchInput, pageState.searchQuery);
             bindSearchInput(searchInput, render);
+            render();
         })
         .catch(() => {
             container.textContent = 'Не удалось загрузить список продуктов.';
@@ -46,8 +56,57 @@ function bindSearchInput(input, onSearch) {
 
     input.addEventListener('input', (event) => {
         const query = normalizeSearchValue(event.target?.value);
+        pageState.searchQuery = query;
+        syncStateToUrl();
         debouncedSearch(query);
     });
+}
+
+function getInitialSearchQuery() {
+    const params = new URLSearchParams(window.location.search);
+    return normalizeSearchValue(params.get('q') || '');
+}
+
+function hydrateExpandedGroupsFromUrl(products) {
+    const params = new URLSearchParams(window.location.search);
+    const rawGroups = params.get('groups') || '';
+    if (!rawGroups) {
+        return;
+    }
+
+    const groups = new Set(Object.keys(groupBy(products, 'group')));
+    rawGroups
+        .split(',')
+        .map((value) => decodeURIComponent(value).trim())
+        .filter((value) => value && groups.has(value))
+        .forEach((value) => pageState.expandedGroups.add(value));
+}
+
+function applySearchInputValue(input, value) {
+    if (!input) {
+        return;
+    }
+    input.value = value;
+}
+
+function syncStateToUrl() {
+    const params = new URLSearchParams(window.location.search);
+
+    if (pageState.searchQuery) {
+        params.set('q', pageState.searchQuery);
+    } else {
+        params.delete('q');
+    }
+
+    if (pageState.expandedGroups.size > 0) {
+        params.set('groups', Array.from(pageState.expandedGroups).map(encodeURIComponent).join(','));
+    } else {
+        params.delete('groups');
+    }
+
+    const query = params.toString();
+    const nextUrl = `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`;
+    window.history.replaceState(null, '', nextUrl);
 }
 
 function normalizeSearchValue(value) {
@@ -98,10 +157,18 @@ function renderMyProducts(container, products, options = {}) {
 
     groupEntries.forEach(([groupName, groupProducts], index) => {
         const groupId = `my-products-group-${index}`;
-        const isInitiallyOpen = hasActiveSearch || index < DEFAULT_OPEN_GROUPS;
+        const defaultVisibleCount = Math.min(GROUP_PAGE_SIZE, groupProducts.length);
+        const storedVisibleCount = pageState.visibleCountByGroup[groupName];
+        const visibleCount = Number.isInteger(storedVisibleCount)
+            ? Math.max(defaultVisibleCount, Math.min(storedVisibleCount, groupProducts.length))
+            : defaultVisibleCount;
+        const isInitiallyOpen = hasActiveSearch
+            ? true
+            : pageState.expandedGroups.has(groupName) || index < DEFAULT_OPEN_GROUPS;
         const groupState = {
-            visibleCount: Math.min(GROUP_PAGE_SIZE, groupProducts.length)
+            visibleCount
         };
+        pageState.visibleCountByGroup[groupName] = groupState.visibleCount;
 
         const groupSection = document.createElement('section');
         groupSection.className = 'space-y-3 rounded-2xl border border-slate-100 bg-white/70 p-3 shadow-sm';
@@ -148,6 +215,7 @@ function renderMyProducts(container, products, options = {}) {
         showMoreButton.addEventListener('click', () => {
             const previousCount = groupState.visibleCount;
             groupState.visibleCount = Math.min(groupState.visibleCount + GROUP_PAGE_SIZE, groupProducts.length);
+            pageState.visibleCountByGroup[groupName] = groupState.visibleCount;
 
             for (let i = previousCount; i < groupState.visibleCount; i += 1) {
                 appendAnimatedPreferenceCard(
@@ -183,7 +251,14 @@ function renderMyProducts(container, products, options = {}) {
 
         headerButton.addEventListener('click', () => {
             const expanded = headerButton.getAttribute('aria-expanded') === 'true';
-            setGroupExpanded(groupBody, headerButton, !expanded);
+            const nextExpanded = !expanded;
+            setGroupExpanded(groupBody, headerButton, nextExpanded);
+            if (nextExpanded) {
+                pageState.expandedGroups.add(groupName);
+            } else {
+                pageState.expandedGroups.delete(groupName);
+            }
+            syncStateToUrl();
         });
     });
 }
