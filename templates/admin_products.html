@@ -199,7 +199,7 @@
           </label>
           <label>
             Углеводы всего, г
-            <input type="number" step="0.1" min="0" value="0" readonly />
+            <input type="number" step="0.1" min="0" value="0" readonly data-role="carbs-total" />
           </label>
           <label>
             Клетчатка, г
@@ -264,7 +264,7 @@
                       </label>
                       <label>
                         Углеводы всего, г
-                        <input type="number" step="0.1" min="0" value="{{ (product.carbs_simple_g or 0) + (product.carbs_complex_g or product.carbs_g or 0) }}" readonly />
+                        <input type="number" step="0.1" min="0" value="{{ (product.carbs_simple_g or 0) + (product.carbs_complex_g or product.carbs_g or 0) }}" readonly data-role="carbs-total" />
                       </label>
                       <label>
                         Клетчатка, г
@@ -329,18 +329,24 @@
         return Number.isFinite(value) ? value : 0;
       };
 
-      const recalculateKcal = (form) => {
+      const recalculateNutrition = (form) => {
         const protein = parseNutrientValue(form.querySelector('input[name="protein_g"]'));
         const fat = parseNutrientValue(form.querySelector('input[name="fat_g"]'));
         const carbsSimple = parseNutrientValue(form.querySelector('input[name="carbs_simple_g"]'));
         const carbsComplex = parseNutrientValue(form.querySelector('input[name="carbs_complex_g"]'));
-        const kcalInput = form.querySelector('input[name="kcal"]');
 
+        const carbsTotal = Math.max(0, carbsSimple + carbsComplex);
+        const carbsTotalInput = form.querySelector('[data-role="carbs-total"]');
+        if (carbsTotalInput) {
+          carbsTotalInput.value = carbsTotal.toFixed(1);
+        }
+
+        const kcalInput = form.querySelector('input[name="kcal"]');
         if (!kcalInput) {
           return;
         }
 
-        const kcal = Math.round(protein * 4 + fat * 9 + (carbsSimple + carbsComplex) * 4);
+        const kcal = Math.round(protein * 4 + fat * 9 + carbsTotal * 4);
         kcalInput.value = String(kcal);
       };
 
@@ -356,11 +362,11 @@
           if (!input) {
             return;
           }
-          input.addEventListener('input', () => recalculateKcal(form));
-          input.addEventListener('change', () => recalculateKcal(form));
+          input.addEventListener('input', () => recalculateNutrition(form));
+          input.addEventListener('change', () => recalculateNutrition(form));
         });
 
-        recalculateKcal(form);
+        recalculateNutrition(form);
       });
 
     </script>
