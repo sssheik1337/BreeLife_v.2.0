@@ -1367,10 +1367,15 @@
             return getDiaryEntries();
         }
         const remoteEntries = await fetchDiaryEntriesFromBackend();
-        if (Array.isArray(remoteEntries) && remoteEntries.length) {
-            const merged = setDiaryEntries(remoteEntries, { skipBackend: true });
-            return merged;
+
+        // Если сервер вернул валидный массив (даже пустой),
+        // считаем backend источником истины и синхронизируем локальный кэш один-в-один.
+        if (Array.isArray(remoteEntries)) {
+            const synced = setDiaryEntries(remoteEntries, { skipBackend: true });
+            return synced;
         }
+
+        // В fallback уходим только при ошибке сети/запроса (remoteEntries === null).
         const localEntries = getDiaryEntries();
         if (localEntries.length && !isMigrationDone(DIARY_MIGRATION_KEY)) {
             await saveDiaryEntriesToBackend(localEntries);
