@@ -1,6 +1,7 @@
 // Отрисовка списка продуктов из админской SQLite-базы через API.
 
 const PRODUCTS_ENDPOINT = '/api/products';
+const DEFAULT_OPEN_GROUPS = 2;
 
 document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('foods-container');
@@ -27,30 +28,79 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function renderProducts(container, products) {
   const groups = groupBy(products, 'group');
+  const groupEntries = Object.entries(groups);
+
   container.innerHTML = '';
 
-  Object.keys(groups).forEach((groupName) => {
-    const groupSection = document.createElement('section');
-    groupSection.className = 'space-y-4';
+  groupEntries.forEach(([groupName, groupProducts], index) => {
+    const groupId = `foods-group-${index}`;
+    const isInitiallyOpen = index < DEFAULT_OPEN_GROUPS;
 
-    const header = document.createElement('div');
-    header.className = 'flex items-center justify-between';
-    header.innerHTML = `
-      <h2 class="text-lg font-semibold text-slate-800">${groupName}</h2>
-      <span class="text-sm text-slate-400">${groups[groupName].length} поз.</span>
+    const groupSection = document.createElement('section');
+    groupSection.className = 'space-y-3 rounded-2xl border border-slate-100 bg-white/70 p-3 shadow-sm';
+
+    const headerButton = document.createElement('button');
+    headerButton.type = 'button';
+    headerButton.dataset.action = 'toggle-group';
+    headerButton.setAttribute('aria-controls', groupId);
+    headerButton.className = 'w-full flex items-center justify-between rounded-xl px-2 py-2 transition-colors duration-200 hover:bg-slate-50';
+
+    const chevron = `
+      <svg class="h-4 w-4 text-slate-400 transition-transform duration-300 ease-out" data-group-chevron viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z" clip-rule="evenodd"/>
+      </svg>
     `;
 
-    const grid = document.createElement('div');
-    grid.className = 'grid grid-cols-1 gap-4';
+    headerButton.innerHTML = `
+      <span class="flex items-center gap-3">
+        <span class="text-lg font-semibold text-slate-800">${groupName}</span>
+        <span class="text-sm text-slate-400">${groupProducts.length} поз.</span>
+      </span>
+      ${chevron}
+    `;
 
-    groups[groupName].forEach((product) => {
+    const groupBody = document.createElement('div');
+    groupBody.id = groupId;
+    groupBody.className = 'overflow-hidden transition-all duration-300 ease-out';
+
+    const grid = document.createElement('div');
+    grid.className = 'grid grid-cols-1 gap-4 pt-2';
+
+    groupProducts.forEach((product) => {
       grid.appendChild(createProductCard(product));
     });
 
-    groupSection.appendChild(header);
-    groupSection.appendChild(grid);
+    groupBody.appendChild(grid);
+    groupSection.appendChild(headerButton);
+    groupSection.appendChild(groupBody);
     container.appendChild(groupSection);
+
+    setGroupExpanded(groupBody, headerButton, isInitiallyOpen);
+
+    headerButton.addEventListener('click', () => {
+      const expanded = headerButton.getAttribute('aria-expanded') === 'true';
+      setGroupExpanded(groupBody, headerButton, !expanded);
+    });
   });
+}
+
+function setGroupExpanded(groupBody, headerButton, expanded) {
+  const chevron = headerButton.querySelector('[data-group-chevron]');
+  headerButton.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+
+  if (expanded) {
+    groupBody.style.maxHeight = `${groupBody.scrollHeight}px`;
+    groupBody.style.opacity = '1';
+    groupBody.style.transform = 'translateY(0px)';
+  } else {
+    groupBody.style.maxHeight = '0px';
+    groupBody.style.opacity = '0';
+    groupBody.style.transform = 'translateY(-4px)';
+  }
+
+  if (chevron) {
+    chevron.classList.toggle('rotate-180', expanded);
+  }
 }
 
 function groupBy(items, key) {
