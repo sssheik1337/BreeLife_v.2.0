@@ -81,6 +81,11 @@
                             <div id="diary-products-meta" class="hidden">
                                 <input type="time" id="diary-products-sleep" class="form-input" placeholder="Сон, время отхода">
                                 <input type="number" id="diary-products-water" class="form-input" placeholder="Вода, л" min="0" step="0.01">
+                                <div class="grid grid-cols-3 gap-2 mt-2">
+                                    <button type="button" class="btn-secondary text-xs" data-action="quick-water" data-water-target="products" data-water-add="0.25">+250 мл</button>
+                                    <button type="button" class="btn-secondary text-xs" data-action="quick-water" data-water-target="products" data-water-add="0.5">+500 мл</button>
+                                    <button type="button" class="btn-secondary text-xs" data-action="quick-water" data-water-target="products" data-water-add="1">+1 л</button>
+                                </div>
                                 <label class="flex items-center gap-2 text-sm text-slate-600">
                                     <input type="checkbox" class="form-checkbox" id="diary-products-activity">
                                     <span>Сегодня была активность</span>
