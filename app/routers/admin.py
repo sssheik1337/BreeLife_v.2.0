@@ -270,7 +270,6 @@ async def admin_products_add(
     request: Request,
     name: str = Form(...),
     group: str = Form(...),
-    kcal: float = Form(...),
     protein_g: float = Form(...),
     fat_g: float = Form(...),
     carbs_simple_g: float = Form(...),
@@ -280,6 +279,7 @@ async def admin_products_add(
     if not is_admin_authenticated(request):
         return RedirectResponse(url="/admin", status_code=303)
     carbs_g = max(0, carbs_simple_g + carbs_complex_g)
+    kcal = max(0, round(protein_g * 4 + fat_g * 9 + carbs_g * 4))
     products = load_admin_products()
     next_id = max((item.get("id", 0) for item in products if isinstance(item.get("id"), int)), default=0) + 1
     products.append(
@@ -314,7 +314,6 @@ async def admin_products_update(
     product_id: int = Form(...),
     name: str = Form(...),
     group: str = Form(...),
-    kcal: float = Form(...),
     protein_g: float = Form(...),
     fat_g: float = Form(...),
     carbs_simple_g: float = Form(...),
@@ -324,6 +323,7 @@ async def admin_products_update(
     if not is_admin_authenticated(request):
         return RedirectResponse(url="/admin", status_code=303)
     carbs_g = max(0, carbs_simple_g + carbs_complex_g)
+    kcal = max(0, round(protein_g * 4 + fat_g * 9 + carbs_g * 4))
     products = load_admin_products()
     updated = False
     for item in products:
