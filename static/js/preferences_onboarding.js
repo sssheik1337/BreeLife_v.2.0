@@ -1,0 +1,195 @@
+// Онбординг предпочтений: карточки лайк/не хочу/пропуск.
+
+const ONBOARDING_PRODUCTS_ENDPOINT = '/api/preferences/onboarding-products?limit=30';
+
+const onboardingState = {
+    items: [],
+    currentIndex: 0,
+    favoritesSet: new Set(),
+    excludedSet: new Set(),
+    totalCount: 0,
+};
+
+function getOnboardingElements() {
+    return {
+        card: document.getElementById('preferences-card'),
+        progress: document.getElementById('preferences-progress'),
+        progressBar: document.getElementById('preferences-progress-bar'),
+        name: document.getElementById('preferences-product-name'),
+        group: document.getElementById('preferences-product-group'),
+        kcal: document.getElementById('preferences-product-kcal'),
+        likeButton: document.getElementById('preferences-like'),
+        skipButton: document.getElementById('preferences-skip'),
+        excludeButton: document.getElementById('preferences-exclude'),
+        doneButton: document.getElementById('preferences-done'),
+        softSkipButton: document.getElementById('preferences-soft-skip'),
+        emptyState: document.getElementById('preferences-empty-state'),
+    };
+}
+
+function normalizeOnboardingItems(payload) {
+    if (!payload || typeof payload !== 'object') {
+        return [];
+    }
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    return items
+        .filter((item) => item && typeof item === 'object' && Number.isInteger(item.id))
+        .map((item) => ({
+            id: item.id,
+            name: typeof item.name === 'string' ? item.name : 'Без названия',
+            group: typeof item.group === 'string' && item.group.trim() ? item.group : 'Без группы',
+            kcal: typeof item.kcal === 'number' ? item.kcal : 0,
+        }));
+}
+
+function updateProgress(elements) {
+    const viewed = Math.min(onboardingState.currentIndex + 1, onboardingState.totalCount);
+    const total = onboardingState.totalCount;
+    const percent = total > 0 ? Math.round((viewed / total) * 100) : 0;
+
+    if (elements.progress) {
+        elements.progress.textContent = total > 0 ? `${viewed} из ${total}` : '0 из 0';
+    }
+    if (elements.progressBar) {
+        elements.progressBar.style.width = `${percent}%`;
+    }
+}
+
+function setCardEnabled(elements, enabled) {
+    [elements.likeButton, elements.skipButton, elements.excludeButton].forEach((button) => {
+        if (!button) {
+            return;
+        }
+        button.disabled = !enabled;
+        button.classList.toggle('opacity-60', !enabled);
+    });
+}
+
+function renderCurrentCard(elements) {
+    updateProgress(elements);
+
+    if (!elements.card || onboardingState.totalCount === 0) {
+        if (elements.emptyState) {
+            elements.emptyState.classList.remove('hidden');
+        }
+        setCardEnabled(elements, false);
+        return;
+    }
+
+    const item = onboardingState.items[onboardingState.currentIndex];
+    if (!item) {
+        if (elements.emptyState) {
+            elements.emptyState.classList.remove('hidden');
+        }
+        setCardEnabled(elements, false);
+        return;
+    }
+
+    if (elements.emptyState) {
+        elements.emptyState.classList.add('hidden');
+    }
+    if (elements.name) {
+        elements.name.textContent = item.name;
+    }
+    if (elements.group) {
+        elements.group.textContent = item.group;
+    }
+    if (elements.kcal) {
+        elements.kcal.textContent = `${Math.round(Number(item.kcal) || 0)} ккал / 100 г`;
+    }
+
+    setCardEnabled(elements, true);
+}
+
+function animateCardSwitch(elements, callback) {
+    if (!elements.card) {
+        callback();
+        return;
+    }
+
+    elements.card.classList.add('transition-all', 'duration-300', 'ease-out', 'opacity-0', 'translate-y-2');
+    setTimeout(() => {
+        callback();
+        elements.card.classList.remove('opacity-0', 'translate-y-2');
+    }, 180);
+}
+
+function nextCard(elements) {
+    if (onboardingState.currentIndex >= onboardingState.totalCount - 1) {
+        renderCurrentCard(elements);
+        setCardEnabled(elements, false);
+        return;
+    }
+    onboardingState.currentIndex += 1;
+    renderCurrentCard(elements);
+}
+
+function handleLike(elements) {
+    const item = onboardingState.items[onboardingState.currentIndex];
+    if (!item) {
+        return;
+    }
+    onboardingState.favoritesSet.add(item.id);
+    onboardingState.excludedSet.delete(item.id);
+    animateCardSwitch(elements, () => nextCard(elements));
+}
+
+function handleExclude(elements) {
+    const item = onboardingState.items[onboardingState.currentIndex];
+    if (!item) {
+        return;
+    }
+    onboardingState.excludedSet.add(item.id);
+    onboardingState.favoritesSet.delete(item.id);
+    animateCardSwitch(elements, () => nextCard(elements));
+}
+
+function handleSkip(elements) {
+    animateCardSwitch(elements, () => nextCard(elements));
+}
+
+function finishOnboarding() {
+    window.location.href = '/trial-start';
+}
+
+async function loadOnboardingProducts() {
+    const fetcher = window.apiFetch || fetch;
+    const response = await fetcher(ONBOARDING_PRODUCTS_ENDPOINT);
+    if (!response.ok) {
+        throw new Error('Не удалось загрузить продукты для онбординга.');
+    }
+    return response.json();
+}
+
+async function initPreferencesOnboarding() {
+    const elements = getOnboardingElements();
+    if (!elements.card) {
+        return;
+    }
+
+    try {
+        const payload = await loadOnboardingProducts();
+        const items = normalizeOnboardingItems(payload);
+        onboardingState.items = items;
+        onboardingState.currentIndex = 0;
+        onboardingState.totalCount = items.length;
+
+        renderCurrentCard(elements);
+    } catch (error) {
+        if (typeof showNotification === 'function') {
+            showNotification('Не удалось загрузить карточки продуктов. Попробуйте позже.', 'error');
+        }
+        onboardingState.items = [];
+        onboardingState.currentIndex = 0;
+        onboardingState.totalCount = 0;
+        renderCurrentCard(elements);
+    }
+
+    elements.likeButton?.addEventListener('click', () => handleLike(elements));
+    elements.excludeButton?.addEventListener('click', () => handleExclude(elements));
+    elements.skipButton?.addEventListener('click', () => handleSkip(elements));
+    elements.doneButton?.addEventListener('click', finishOnboarding);
+    elements.softSkipButton?.addEventListener('click', finishOnboarding);
+}
+
+document.addEventListener('DOMContentLoaded', initPreferencesOnboarding);
