@@ -502,11 +502,49 @@ function renderMacroBalance(rangeKey = 'day') {
     const displayFat = rangeKey === 'day' ? Math.max(0, Math.round(fat)) : fat;
     const displayCarbs = rangeKey === 'day' ? Math.max(0, Math.round(carbs)) : carbs;
 
-    const total = displayProtein + displayFat + displayCarbs;
-    const safeTotal = total > 0 ? total : 1;
-    const proteinPercent = Math.round((displayProtein / safeTotal) * 100);
-    const fatPercent = Math.round((displayFat / safeTotal) * 100);
-    const carbsPercent = Math.max(0, 100 - proteinPercent - fatPercent);
+    let proteinPercent = 0;
+    let fatPercent = 0;
+    let carbsPercent = 0;
+    let chartGradient = '#e2e8f0';
+    let total = displayProtein + displayFat + displayCarbs;
+
+    // Для режима "Сегодня" проценты должны отражать выполнение цели,
+    // а не только фактическое распределение между макросами.
+    if (rangeKey === 'day') {
+        const profile = getResolvedProfileForDisplay();
+        const targetProtein = Number(profile?.macros?.protein_g);
+        const targetFat = Number(profile?.macros?.fat_g);
+        const targetCarbs = Number(profile?.macros?.carbs_g);
+        const hasMacroTargets = [targetProtein, targetFat, targetCarbs].every((value) => Number.isFinite(value) && value > 0);
+
+        if (hasMacroTargets) {
+            const progressProtein = Math.max(0, Math.min(safeDivide(displayProtein, targetProtein), 1));
+            const progressFat = Math.max(0, Math.min(safeDivide(displayFat, targetFat), 1));
+            const progressCarbs = Math.max(0, Math.min(safeDivide(displayCarbs, targetCarbs), 1));
+
+            proteinPercent = Math.round(progressProtein * 100);
+            fatPercent = Math.round(progressFat * 100);
+            carbsPercent = Math.round(progressCarbs * 100);
+
+            const totalTarget = targetProtein + targetFat + targetCarbs;
+            const proteinArc = (Math.min(displayProtein, targetProtein) / totalTarget) * 100;
+            const fatArc = (Math.min(displayFat, targetFat) / totalTarget) * 100;
+            const carbsArc = (Math.min(displayCarbs, targetCarbs) / totalTarget) * 100;
+            const usedArc = Math.max(0, Math.min(proteinArc + fatArc + carbsArc, 100));
+
+            chartGradient = `conic-gradient(#10b981 0 ${proteinArc}%, #f59e0b ${proteinArc}% ${proteinArc + fatArc}%, #38bdf8 ${proteinArc + fatArc}% ${usedArc}%, #e2e8f0 ${usedArc}% 100%)`;
+            total = usedArc;
+            desc.textContent = 'Процент выполнения целей БЖУ за сегодня.';
+        }
+    }
+
+    if (total > 0 && chartGradient === '#e2e8f0') {
+        const safeTotal = total > 0 ? total : 1;
+        proteinPercent = Math.round((displayProtein / safeTotal) * 100);
+        fatPercent = Math.round((displayFat / safeTotal) * 100);
+        carbsPercent = Math.max(0, 100 - proteinPercent - fatPercent);
+        chartGradient = `conic-gradient(#10b981 0 ${proteinPercent}%, #f59e0b ${proteinPercent}% ${proteinPercent + fatPercent}%, #38bdf8 ${proteinPercent + fatPercent}% 100%)`;
+    }
 
     if (total <= 0) {
         chart.style.background = '#e2e8f0';
@@ -518,8 +556,10 @@ function renderMacroBalance(rangeKey = 'day') {
         return;
     }
 
-    chart.style.background = `conic-gradient(#10b981 0 ${proteinPercent}%, #f59e0b ${proteinPercent}% ${proteinPercent + fatPercent}%, #38bdf8 ${proteinPercent + fatPercent}% 100%)`;
-    desc.textContent = label;
+    chart.style.background = chartGradient;
+    if (rangeKey !== 'day' || desc.textContent !== 'Процент выполнения целей БЖУ за сегодня.') {
+        desc.textContent = label;
+    }
     proteinLabel.textContent = `Белки — ${proteinPercent}%`;
     fatLabel.textContent = `Жиры — ${fatPercent}%`;
     carbsLabel.textContent = `Углеводы — ${carbsPercent}%`;
