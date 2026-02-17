@@ -848,14 +848,13 @@ function percentToGradientColor(p) {
 }
 
 function getTodayDiaryTotals() {
-    const today = typeof window.normalizeLocalDate === 'function'
-        ? window.normalizeLocalDate(new Date())
-        : null;
+    const today = normalizeDateKey(new Date());
     const entries = readDiaryEntries();
     let waterMax = 0;
     const totals = entries.reduce(
         (acc, entry) => {
-            if (!today || entry?.date !== today) {
+            const entryDateKey = normalizeDateKey(entry?.date);
+            if (!today || !entryDateKey || entryDateKey !== today) {
                 return acc;
             }
             const resolved = resolveEntryTotals(entry);
