@@ -2,6 +2,7 @@
 
 const PRODUCTS_ENDPOINT = '/api/products';
 const DEFAULT_OPEN_GROUPS = 2;
+const GROUP_PAGE_SIZE = 12;
 
 document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('foods-container');
@@ -35,6 +36,9 @@ function renderProducts(container, products) {
   groupEntries.forEach(([groupName, groupProducts], index) => {
     const groupId = `foods-group-${index}`;
     const isInitiallyOpen = index < DEFAULT_OPEN_GROUPS;
+    const groupState = {
+      visibleCount: Math.min(GROUP_PAGE_SIZE, groupProducts.length)
+    };
 
     const groupSection = document.createElement('section');
     groupSection.className = 'space-y-3 rounded-2xl border border-slate-100 bg-white/70 p-3 shadow-sm';
@@ -66,11 +70,32 @@ function renderProducts(container, products) {
     const grid = document.createElement('div');
     grid.className = 'grid grid-cols-1 gap-4 pt-2';
 
-    groupProducts.forEach((product) => {
-      grid.appendChild(createProductCard(product));
+    const showMoreButton = document.createElement('button');
+    showMoreButton.type = 'button';
+    showMoreButton.className = 'btn-secondary w-full text-sm transition-all duration-300 ease-out';
+
+    renderGroupSlice(grid, groupProducts, groupState.visibleCount);
+    updateShowMoreButton(showMoreButton, groupProducts.length, groupState.visibleCount);
+
+    showMoreButton.addEventListener('click', () => {
+      const previousCount = groupState.visibleCount;
+      groupState.visibleCount = Math.min(groupState.visibleCount + GROUP_PAGE_SIZE, groupProducts.length);
+
+      for (let i = previousCount; i < groupState.visibleCount; i += 1) {
+        appendAnimatedProductCard(grid, groupProducts[i]);
+      }
+
+      updateShowMoreButton(showMoreButton, groupProducts.length, groupState.visibleCount);
+
+      if (headerButton.getAttribute('aria-expanded') === 'true') {
+        requestAnimationFrame(() => {
+          groupBody.style.maxHeight = `${groupBody.scrollHeight}px`;
+        });
+      }
     });
 
     groupBody.appendChild(grid);
+    groupBody.appendChild(showMoreButton);
     groupSection.appendChild(headerButton);
     groupSection.appendChild(groupBody);
     container.appendChild(groupSection);
@@ -82,6 +107,34 @@ function renderProducts(container, products) {
       setGroupExpanded(groupBody, headerButton, !expanded);
     });
   });
+}
+
+function renderGroupSlice(grid, products, visibleCount) {
+  grid.innerHTML = '';
+  products.slice(0, visibleCount).forEach((product) => {
+    grid.appendChild(createProductCard(product));
+  });
+}
+
+function appendAnimatedProductCard(grid, product) {
+  const card = createProductCard(product);
+  card.classList.add('opacity-0', 'translate-y-2', 'transition-all', 'duration-300', 'ease-out');
+  grid.appendChild(card);
+
+  requestAnimationFrame(() => {
+    card.classList.remove('opacity-0', 'translate-y-2');
+  });
+}
+
+function updateShowMoreButton(button, totalCount, visibleCount) {
+  const remaining = totalCount - visibleCount;
+  if (remaining <= 0) {
+    button.classList.add('hidden');
+    return;
+  }
+
+  button.classList.remove('hidden');
+  button.textContent = `Показать ещё (${remaining})`;
 }
 
 function setGroupExpanded(groupBody, headerButton, expanded) {
