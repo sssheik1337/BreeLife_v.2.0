@@ -709,16 +709,32 @@ function renderCalorieTrend(rangeDays = 7) {
 
 }
 
-function resolveCarbTotals(totalValue, simpleValue, complexValue) {
+function resolveCarbTotals(totalValue, simpleValue, complexValue, carbTypeValue = null) {
     const total = Number(totalValue) || 0;
     let simple = Number(simpleValue) || 0;
     let complex = Number(complexValue) || 0;
+
+    const carbType = typeof carbTypeValue === 'string' ? carbTypeValue.trim().toLowerCase() : '';
+    const isSimpleType = carbType === 'simple' || carbType === 'simple_carbs' || carbType === 'быстрые' || carbType === 'простые';
+    const isComplexType = carbType === 'complex' || carbType === 'complex_carbs' || carbType === 'медленные' || carbType === 'сложные';
+
     if (simple > 0 && complex === 0 && total > simple) {
         complex = total - simple;
     }
     if (complex > 0 && simple === 0 && total > complex) {
         simple = total - complex;
     }
+
+    // Если в данных нет разбиения, но есть тип углеводов в админке,
+    // раскладываем весь объём в соответствующую категорию.
+    if (simple === 0 && complex === 0 && total > 0) {
+        if (isSimpleType) {
+            simple = total;
+        } else if (isComplexType) {
+            complex = total;
+        }
+    }
+
     if (simple > 0 || complex > 0) {
         return { total: simple + complex, simple, complex };
     }
@@ -726,6 +742,19 @@ function resolveCarbTotals(totalValue, simpleValue, complexValue) {
         return { total, simple: 0, complex: total };
     }
     return { total: 0, simple: 0, complex: 0 };
+}
+
+function resolveCaloriesValue(caloriesValue, proteinValue, fatValue, carbsValue) {
+    const calories = Number(caloriesValue) || 0;
+    if (calories > 0) {
+        return calories;
+    }
+
+    // Если калории не пришли в записи, восстанавливаем их по БЖУ.
+    const protein = Number(proteinValue) || 0;
+    const fat = Number(fatValue) || 0;
+    const carbs = Number(carbsValue) || 0;
+    return protein * 4 + fat * 9 + carbs * 4;
 }
 
 function resolveEntryTotals(entry) {
@@ -746,15 +775,18 @@ function resolveEntryTotals(entry) {
 
     const rootTotals = entry.totals && typeof entry.totals === 'object' ? entry.totals : null;
     if (rootTotals) {
+        const protein = Number(rootTotals.protein_g ?? rootTotals.protein) || 0;
+        const fat = Number(rootTotals.fat_g ?? rootTotals.fat) || 0;
         const resolvedRoot = resolveCarbTotals(
             rootTotals.carbs_g ?? rootTotals.carbs ?? 0,
             rootTotals.carbs_simple_g ?? rootTotals.carbs_simple ?? 0,
-            rootTotals.carbs_complex_g ?? rootTotals.carbs_complex ?? 0
+            rootTotals.carbs_complex_g ?? rootTotals.carbs_complex ?? 0,
+            rootTotals.carb_type ?? rootTotals.carbs_type ?? entry.carb_type ?? entry.carbs_type ?? null
         );
         return {
-            calories: Number(rootTotals.calories) || 0,
-            protein_g: Number(rootTotals.protein_g ?? rootTotals.protein) || 0,
-            fat_g: Number(rootTotals.fat_g ?? rootTotals.fat) || 0,
+            calories: resolveCaloriesValue(rootTotals.calories, protein, fat, resolvedRoot.total),
+            protein_g: protein,
+            fat_g: fat,
             carbs_g: resolvedRoot.total,
             carbs_simple_g: resolvedRoot.simple,
             carbs_complex_g: resolvedRoot.complex,
@@ -769,11 +801,14 @@ function resolveEntryTotals(entry) {
                 const resolved = resolveCarbTotals(
                     item?.carbs ?? item?.carbs_g ?? 0,
                     item?.carbs_simple ?? item?.carbs_simple_g ?? 0,
-                    item?.carbs_complex ?? item?.carbs_complex_g ?? 0
+                    item?.carbs_complex ?? item?.carbs_complex_g ?? 0,
+                    item?.carb_type ?? item?.carbs_type ?? item?.carbohydrate_type ?? null
                 );
-                acc.calories += Number(item?.calories) || 0;
-                acc.protein_g += Number(item?.protein) || Number(item?.protein_g) || 0;
-                acc.fat_g += Number(item?.fat) || Number(item?.fat_g) || 0;
+                const itemProtein = Number(item?.protein) || Number(item?.protein_g) || 0;
+                const itemFat = Number(item?.fat) || Number(item?.fat_g) || 0;
+                acc.calories += resolveCaloriesValue(item?.calories, itemProtein, itemFat, resolved.total);
+                acc.protein_g += itemProtein;
+                acc.fat_g += itemFat;
                 acc.carbs_g += resolved.total;
                 acc.carbs_simple_g += resolved.simple;
                 acc.carbs_complex_g += resolved.complex;
@@ -807,14 +842,17 @@ function resolveEntryTotals(entry) {
                 }
 
                 if (meal.totals && typeof meal.totals === 'object') {
+                    const mealProtein = Number(meal.totals.protein_g ?? meal.totals.protein) || 0;
+                    const mealFat = Number(meal.totals.fat_g ?? meal.totals.fat) || 0;
                     const resolvedMealTotals = resolveCarbTotals(
                         meal.totals.carbs_g ?? meal.totals.carbs ?? 0,
                         meal.totals.carbs_simple_g ?? meal.totals.carbs_simple ?? 0,
-                        meal.totals.carbs_complex_g ?? meal.totals.carbs_complex ?? 0
+                        meal.totals.carbs_complex_g ?? meal.totals.carbs_complex ?? 0,
+                        meal.totals.carb_type ?? meal.totals.carbs_type ?? meal.carb_type ?? meal.carbs_type ?? null
                     );
-                    acc.calories += Number(meal.totals.calories) || 0;
-                    acc.protein_g += Number(meal.totals.protein_g ?? meal.totals.protein) || 0;
-                    acc.fat_g += Number(meal.totals.fat_g ?? meal.totals.fat) || 0;
+                    acc.calories += resolveCaloriesValue(meal.totals.calories, mealProtein, mealFat, resolvedMealTotals.total);
+                    acc.protein_g += mealProtein;
+                    acc.fat_g += mealFat;
                     acc.carbs_g += resolvedMealTotals.total;
                     acc.carbs_simple_g += resolvedMealTotals.simple;
                     acc.carbs_complex_g += resolvedMealTotals.complex;
@@ -827,11 +865,14 @@ function resolveEntryTotals(entry) {
                         const resolvedItemTotals = resolveCarbTotals(
                             item?.carbs ?? item?.carbs_g ?? 0,
                             item?.carbs_simple ?? item?.carbs_simple_g ?? 0,
-                            item?.carbs_complex ?? item?.carbs_complex_g ?? 0
+                            item?.carbs_complex ?? item?.carbs_complex_g ?? 0,
+                            item?.carb_type ?? item?.carbs_type ?? item?.carbohydrate_type ?? null
                         );
-                        acc.calories += Number(item?.calories) || 0;
-                        acc.protein_g += Number(item?.protein) || Number(item?.protein_g) || 0;
-                        acc.fat_g += Number(item?.fat) || Number(item?.fat_g) || 0;
+                        const itemProtein = Number(item?.protein) || Number(item?.protein_g) || 0;
+                        const itemFat = Number(item?.fat) || Number(item?.fat_g) || 0;
+                        acc.calories += resolveCaloriesValue(item?.calories, itemProtein, itemFat, resolvedItemTotals.total);
+                        acc.protein_g += itemProtein;
+                        acc.fat_g += itemFat;
                         acc.carbs_g += resolvedItemTotals.total;
                         acc.carbs_simple_g += resolvedItemTotals.simple;
                         acc.carbs_complex_g += resolvedItemTotals.complex;
@@ -840,14 +881,17 @@ function resolveEntryTotals(entry) {
                     return acc;
                 }
 
+                const mealProtein = Number(meal.protein_g ?? meal.protein) || 0;
+                const mealFat = Number(meal.fat_g ?? meal.fat) || 0;
                 const resolvedMeal = resolveCarbTotals(
                     meal.carbs_g ?? meal.carbs ?? 0,
                     meal.carbs_simple_g ?? meal.carbs_simple ?? 0,
-                    meal.carbs_complex_g ?? meal.carbs_complex ?? 0
+                    meal.carbs_complex_g ?? meal.carbs_complex ?? 0,
+                    meal.carb_type ?? meal.carbs_type ?? null
                 );
-                acc.calories += Number(meal.calories) || 0;
-                acc.protein_g += Number(meal.protein_g ?? meal.protein) || 0;
-                acc.fat_g += Number(meal.fat_g ?? meal.fat) || 0;
+                acc.calories += resolveCaloriesValue(meal.calories, mealProtein, mealFat, resolvedMeal.total);
+                acc.protein_g += mealProtein;
+                acc.fat_g += mealFat;
                 acc.carbs_g += resolvedMeal.total;
                 acc.carbs_simple_g += resolvedMeal.simple;
                 acc.carbs_complex_g += resolvedMeal.complex;
@@ -861,15 +905,18 @@ function resolveEntryTotals(entry) {
         );
     }
 
+    const protein = Number(entry.protein_g ?? entry.protein) || 0;
+    const fat = Number(entry.fat_g ?? entry.fat) || 0;
     const resolved = resolveCarbTotals(
         entry.carbs_g ?? entry.carbs ?? 0,
         entry.carbs_simple_g ?? entry.carbs_simple ?? 0,
-        entry.carbs_complex_g ?? entry.carbs_complex ?? 0
+        entry.carbs_complex_g ?? entry.carbs_complex ?? 0,
+        entry.carb_type ?? entry.carbs_type ?? null
     );
     return {
-        calories: Number(entry.calories) || 0,
-        protein_g: Number(entry.protein_g ?? entry.protein) || 0,
-        fat_g: Number(entry.fat_g ?? entry.fat) || 0,
+        calories: resolveCaloriesValue(entry.calories, protein, fat, resolved.total),
+        protein_g: protein,
+        fat_g: fat,
         carbs_g: resolved.total,
         carbs_simple_g: resolved.simple,
         carbs_complex_g: resolved.complex,
