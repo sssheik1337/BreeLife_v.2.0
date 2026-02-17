@@ -1,4 +1,3 @@
-const DIARY_STORAGE_KEY = window.DIARY_STORAGE_KEY || 'bree_diary_entries';
 const HABITS_STORAGE_KEY = 'bree_habits';
 const apiFetch = window.apiFetch || fetch;
 
