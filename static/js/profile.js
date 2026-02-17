@@ -786,6 +786,76 @@ function resolveEntryTotals(entry) {
             );
         }
     }
+
+    // Поддержка legacy-формата из `food_diary`, где макросы лежат в `meals`.
+    if (Array.isArray(entry.meals)) {
+        return entry.meals.reduce(
+            (acc, meal) => {
+                if (!meal) {
+                    return acc;
+                }
+
+                if (meal.totals && typeof meal.totals === 'object') {
+                    const resolvedMealTotals = resolveCarbTotals(
+                        meal.totals.carbs_g ?? meal.totals.carbs ?? 0,
+                        meal.totals.carbs_simple_g ?? meal.totals.carbs_simple ?? 0,
+                        meal.totals.carbs_complex_g ?? meal.totals.carbs_complex ?? 0
+                    );
+                    acc.calories += Number(meal.totals.calories) || 0;
+                    acc.protein_g += Number(meal.totals.protein_g ?? meal.totals.protein) || 0;
+                    acc.fat_g += Number(meal.totals.fat_g ?? meal.totals.fat) || 0;
+                    acc.carbs_g += resolvedMealTotals.total;
+                    acc.carbs_simple_g += resolvedMealTotals.simple;
+                    acc.carbs_complex_g += resolvedMealTotals.complex;
+                    acc.fiber_g += Number(meal.totals.fiber_g ?? meal.totals.fiber) || 0;
+                    return acc;
+                }
+
+                if (Array.isArray(meal.items)) {
+                    meal.items.forEach((item) => {
+                        const resolvedItemTotals = resolveCarbTotals(
+                            item?.carbs ?? item?.carbs_g ?? 0,
+                            item?.carbs_simple ?? item?.carbs_simple_g ?? 0,
+                            item?.carbs_complex ?? item?.carbs_complex_g ?? 0
+                        );
+                        acc.calories += Number(item?.calories) || 0;
+                        acc.protein_g += Number(item?.protein) || Number(item?.protein_g) || 0;
+                        acc.fat_g += Number(item?.fat) || Number(item?.fat_g) || 0;
+                        acc.carbs_g += resolvedItemTotals.total;
+                        acc.carbs_simple_g += resolvedItemTotals.simple;
+                        acc.carbs_complex_g += resolvedItemTotals.complex;
+                        acc.fiber_g += Number(item?.fiber) || Number(item?.fiber_g) || 0;
+                    });
+                    return acc;
+                }
+
+                const resolvedMeal = resolveCarbTotals(
+                    meal.carbs_g ?? meal.carbs ?? 0,
+                    meal.carbs_simple_g ?? meal.carbs_simple ?? 0,
+                    meal.carbs_complex_g ?? meal.carbs_complex ?? 0
+                );
+                acc.calories += Number(meal.calories) || 0;
+                acc.protein_g += Number(meal.protein_g ?? meal.protein) || 0;
+                acc.fat_g += Number(meal.fat_g ?? meal.fat) || 0;
+                acc.carbs_g += resolvedMeal.total;
+                acc.carbs_simple_g += resolvedMeal.simple;
+                acc.carbs_complex_g += resolvedMeal.complex;
+                acc.fiber_g += Number(meal.fiber_g ?? meal.fiber) || 0;
+                return acc;
+            },
+            {
+                calories: 0,
+                protein_g: 0,
+                fat_g: 0,
+                carbs_g: 0,
+                carbs_simple_g: 0,
+                carbs_complex_g: 0,
+                fiber_g: 0,
+                water_l: Number(entry.water_l) || 0
+            }
+        );
+    }
+
     const resolved = resolveCarbTotals(
         entry.carbs_g ?? 0,
         entry.carbs_simple_g ?? 0,
