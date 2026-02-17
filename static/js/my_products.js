@@ -52,7 +52,7 @@ function renderMyProducts(container, products) {
         headerButton.type = 'button';
         headerButton.dataset.action = 'toggle-group';
         headerButton.setAttribute('aria-controls', groupId);
-        headerButton.className = 'w-full flex items-center justify-between rounded-xl px-2 py-2 transition-colors duration-200 hover:bg-slate-50';
+        headerButton.className = 'sticky top-2 z-10 w-full flex items-center justify-between rounded-xl px-2 py-2 border border-slate-100 bg-white/90 backdrop-blur-sm shadow-sm transition-all duration-300 ease-out hover:bg-white active:scale-[0.99]';
 
         const chevron = `
             <svg class="h-4 w-4 text-slate-400 transition-transform duration-300 ease-out" data-group-chevron viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -64,6 +64,7 @@ function renderMyProducts(container, products) {
             <span class="flex items-center gap-3">
                 <span class="text-lg font-semibold text-slate-800">${groupName}</span>
                 <span class="text-sm text-slate-400">${groupProducts.length} поз.</span>
+                <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500" data-group-progress></span>
             </span>
             ${chevron}
         `;
@@ -84,6 +85,7 @@ function renderMyProducts(container, products) {
             savePreferences(nextFavorites, nextExcluded);
         });
         updateShowMoreButton(showMoreButton, groupProducts.length, groupState.visibleCount);
+        updateGroupProgressBadge(headerButton, groupProducts.length, groupState.visibleCount);
 
         showMoreButton.addEventListener('click', () => {
             const previousCount = groupState.visibleCount;
@@ -104,6 +106,7 @@ function renderMyProducts(container, products) {
             }
 
             updateShowMoreButton(showMoreButton, groupProducts.length, groupState.visibleCount);
+            updateGroupProgressBadge(headerButton, groupProducts.length, groupState.visibleCount);
 
             if (headerButton.getAttribute('aria-expanded') === 'true') {
                 requestAnimationFrame(() => {
@@ -146,6 +149,14 @@ function appendAnimatedPreferenceCard(grid, product, favoriteIds, excludedIds, a
     requestAnimationFrame(() => {
         card.classList.remove('opacity-0', 'translate-y-2');
     });
+}
+
+function updateGroupProgressBadge(headerButton, totalCount, visibleCount) {
+    const badge = headerButton.querySelector('[data-group-progress]');
+    if (!badge) {
+        return;
+    }
+    badge.textContent = `Показано ${visibleCount} из ${totalCount}`;
 }
 
 function updateShowMoreButton(button, totalCount, visibleCount) {
