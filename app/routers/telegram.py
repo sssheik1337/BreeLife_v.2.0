@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from aiogram import types
@@ -10,6 +12,7 @@ from app.schemas import TelegramAuthRequest
 from services.storage_db import create_session
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/api/telegram/bot-info")
@@ -57,6 +60,7 @@ async def telegram_auth(request: Request, response: Response, payload: TelegramA
     user = init_data.user
     if not user:
         raise HTTPException(status_code=400, detail="USER_NOT_FOUND")
+    logger.info("[telegram_auth] initData валиден, telegram_user_id=%s", user.id)
     session = create_session(
         telegram_user_id=user.id,
         telegram_username=user.username,

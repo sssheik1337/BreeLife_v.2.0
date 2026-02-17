@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -16,6 +18,7 @@ from app.utils import build_food_diary_aggregates
 from services.ai_profile import generate_food_diary_recommendation
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def resolve_profile_diary_entries(profile: dict) -> list:
@@ -57,6 +60,7 @@ async def api_diary(request: Request, response: Response):
     telegram_user_id = require_telegram_user_id(request, response)
     profile = load_profile(telegram_user_id)
     diary = resolve_profile_diary_entries(profile)
+    logger.info("[api_diary][GET] telegram_user_id=%s, entries_count=%s", telegram_user_id, len(diary))
     return {"entries": diary}
 
 
@@ -70,6 +74,7 @@ async def api_diary_save(request: Request, response: Response):
     updated = dict(profile)
     entries = payload.get("entries", [])
     entries = entries if isinstance(entries, list) else []
+    logger.info("[api_diary][POST] telegram_user_id=%s, entries_count=%s", telegram_user_id, len(entries))
     updated["diary"] = entries
     # Поддерживаем оба поля синхронно, чтобы не было расхождения между устройствами
     # при чтении старого и нового формата дневника.
