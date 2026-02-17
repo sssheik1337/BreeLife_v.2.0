@@ -18,6 +18,17 @@ from services.ai_profile import generate_food_diary_recommendation
 router = APIRouter()
 
 
+def resolve_profile_diary_entries(profile: dict) -> list:
+    """Вернуть дневниковые записи из актуального поля, с fallback на legacy-ключ."""
+    diary_entries = profile.get("diary")
+    if isinstance(diary_entries, list) and diary_entries:
+        return diary_entries
+    legacy_entries = profile.get("food_diary")
+    if isinstance(legacy_entries, list):
+        return legacy_entries
+    return []
+
+
 @router.get("/diary", response_class=HTMLResponse)
 async def diary(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
     payload = get_profile_and_admin_config(telegram_user_id)
@@ -45,7 +56,7 @@ async def food_diary(request: Request, telegram_user_id: int | None = Depends(op
 async def api_diary(request: Request, response: Response):
     telegram_user_id = require_telegram_user_id(request, response)
     profile = load_profile(telegram_user_id)
-    diary = profile.get("diary", []) if isinstance(profile.get("diary"), list) else []
+    diary = resolve_profile_diary_entries(profile)
     return {"entries": diary}
 
 
@@ -57,7 +68,12 @@ async def api_diary_save(request: Request, response: Response):
         raise HTTPException(status_code=400, detail="INVALID_PAYLOAD")
     profile = load_profile(telegram_user_id)
     updated = dict(profile)
-    updated["diary"] = payload.get("entries", [])
+    entries = payload.get("entries", [])
+    entries = entries if isinstance(entries, list) else []
+    updated["diary"] = entries
+    # Поддерживаем оба поля синхронно, чтобы не было расхождения между устройствами
+    # при чтении старого и нового формата дневника.
+    updated["food_diary"] = entries
     update_profile(telegram_user_id, updated)
     return updated
 
@@ -158,6 +174,9 @@ async def food_diary_add(request: Request, response: Response, payload: FoodDiar
             "activity": payload.activity,
         }
     )
+    # Дублируем в "diary" для совместимости со страницами,
+    # которые читают записи через /api/diary.
+    updated["diary"] = list(updated["food_diary"])
     update_profile(telegram_user_id, updated)
     totals = build_food_diary_aggregates(payload.meals)
     recommendation = generate_food_diary_recommendation(profile, totals)
