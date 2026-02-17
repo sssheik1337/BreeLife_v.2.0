@@ -495,10 +495,17 @@ function renderMacroBalance(rangeKey = 'day') {
         label = 'Фактические значения за сегодня.';
     }
 
-    const total = protein + fat + carbs;
+    // Для режима "Сегодня" проценты круга считаем из тех же округлённых значений,
+    // которые уже показываем пользователю в блоке "Факт / цель".
+    // Иначе возникают визуальные расхождения вида "Ж: 0 г", но в круге есть доля жиров.
+    const displayProtein = rangeKey === 'day' ? Math.max(0, Math.round(protein)) : protein;
+    const displayFat = rangeKey === 'day' ? Math.max(0, Math.round(fat)) : fat;
+    const displayCarbs = rangeKey === 'day' ? Math.max(0, Math.round(carbs)) : carbs;
+
+    const total = displayProtein + displayFat + displayCarbs;
     const safeTotal = total > 0 ? total : 1;
-    const proteinPercent = Math.round((protein / safeTotal) * 100);
-    const fatPercent = Math.round((fat / safeTotal) * 100);
+    const proteinPercent = Math.round((displayProtein / safeTotal) * 100);
+    const fatPercent = Math.round((displayFat / safeTotal) * 100);
     const carbsPercent = Math.max(0, 100 - proteinPercent - fatPercent);
 
     if (total <= 0) {
