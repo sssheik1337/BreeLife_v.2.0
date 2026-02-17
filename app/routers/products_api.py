@@ -1,9 +1,16 @@
-from fastapi import APIRouter, HTTPException
+from collections import defaultdict
 
+from fastapi import APIRouter, HTTPException, Query, Request, Response
+
+from app.dependencies import load_profile, require_telegram_user_id
 from services.nutrition import calculate_bmr, calculate_daily_calories, calculate_goal_calories
 from services.products_db import load_admin_products
 
 router = APIRouter()
+
+ONBOARDING_GROUP_SAMPLE_SIZE = 3
+ONBOARDING_LIMIT_DEFAULT = 30
+ONBOARDING_LIMIT_MAX = 60
 
 
 def normalize_product_name(value: str) -> str:
@@ -27,6 +34,59 @@ def search_products(query: str) -> dict[str, list[dict[str, object]]]:
         elif normalized_query in normalized_name:
             similar.append(item)
     return {"exact": exact, "similar": similar}
+
+
+def normalize_onboarding_item(item: dict[str, object]) -> dict[str, object]:
+    return {
+        "id": item.get("id"),
+        "name": item.get("name"),
+        "group": item.get("group"),
+        "kcal": item.get("kcal") or 0,
+    }
+
+
+def build_onboarding_selection(
+    products: list[dict[str, object]],
+    excluded_ids: set[int],
+    limit: int,
+) -> list[dict[str, object]]:
+    available: list[dict[str, object]] = []
+    for item in products:
+        product_id = item.get("id")
+        if not isinstance(product_id, int) or product_id in excluded_ids:
+            continue
+        available.append(item)
+
+    grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
+    for item in available:
+        group_name = str(item.get("group") or "Без группы").strip() or "Без группы"
+        grouped[group_name].append(item)
+
+    selected: list[dict[str, object]] = []
+    selected_ids: set[int] = set()
+
+    # Сначала берём по несколько продуктов из каждой группы.
+    for group_name in sorted(grouped.keys()):
+        for item in grouped[group_name][:ONBOARDING_GROUP_SAMPLE_SIZE]:
+            product_id = item.get("id")
+            if not isinstance(product_id, int) or product_id in selected_ids:
+                continue
+            selected.append(item)
+            selected_ids.add(product_id)
+            if len(selected) >= limit:
+                return selected
+
+    # Затем добираем первыми доступными до лимита.
+    for item in available:
+        product_id = item.get("id")
+        if not isinstance(product_id, int) or product_id in selected_ids:
+            continue
+        selected.append(item)
+        selected_ids.add(product_id)
+        if len(selected) >= limit:
+            break
+
+    return selected
 
 
 @router.get("/api/products/search")
@@ -76,6 +136,32 @@ async def products_list():
             }
         )
     return normalized
+
+
+@router.get("/api/preferences/onboarding-products")
+async def preferences_onboarding_products(
+    request: Request,
+    response: Response,
+    limit: int = Query(default=ONBOARDING_LIMIT_DEFAULT, ge=1, le=ONBOARDING_LIMIT_MAX),
+):
+    telegram_user_id = require_telegram_user_id(request, response)
+    profile = load_profile(telegram_user_id)
+
+    favorite_ids_raw = profile.get("favorite_product_ids") if isinstance(profile.get("favorite_product_ids"), list) else []
+    excluded_ids_raw = profile.get("excluded_product_ids") if isinstance(profile.get("excluded_product_ids"), list) else []
+
+    favorite_ids = {item for item in favorite_ids_raw if isinstance(item, int)}
+    excluded_ids = {item for item in excluded_ids_raw if isinstance(item, int)}
+    already_chosen_ids = favorite_ids | excluded_ids
+
+    products = load_admin_products()
+    selected = build_onboarding_selection(products, already_chosen_ids, limit)
+
+    return {
+        "items": [normalize_onboarding_item(item) for item in selected],
+        "total": len(selected),
+        "limit": limit,
+    }
 
 
 @router.get("/api/calculate")
