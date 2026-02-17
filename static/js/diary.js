@@ -22,6 +22,39 @@ const mealLabels = {
     snack: 'Перекус'
 };
 
+let diaryProductsFormContext = 'meal';
+
+function setProductsFormContext(context) {
+    diaryProductsFormContext = context === 'water' ? 'water' : 'meal';
+    const metaBlock = document.getElementById('diary-products-meta');
+    const mealSelect = document.getElementById('diary-products-meal');
+    const itemsContainer = document.getElementById('diary-products-items');
+    const addItemButton = document.getElementById('diary-add-item');
+    const submitButton = document.querySelector('#diary-products-form button[type="submit"]');
+    const title = document.querySelector('#diary-products-panel h3');
+
+    if (metaBlock) {
+        metaBlock.classList.toggle('hidden', diaryProductsFormContext !== 'water');
+    }
+    if (mealSelect) {
+        mealSelect.classList.toggle('hidden', diaryProductsFormContext === 'water');
+        mealSelect.required = diaryProductsFormContext !== 'water';
+    }
+    if (itemsContainer) {
+        itemsContainer.classList.toggle('hidden', diaryProductsFormContext === 'water');
+    }
+    if (addItemButton) {
+        addItemButton.classList.toggle('hidden', diaryProductsFormContext === 'water');
+    }
+    if (submitButton) {
+        submitButton.textContent = diaryProductsFormContext === 'water' ? 'Сохранить воду' : 'Сохранить приём пищи';
+    }
+    if (title) {
+        title.textContent = diaryProductsFormContext === 'water' ? 'Добавить воду' : 'Добавить приём пищи';
+    }
+}
+
+
 function readDiaryEntries() {
     if (typeof window.getDiaryEntries === 'function') {
         return window.getDiaryEntries();
@@ -1263,10 +1296,12 @@ function getFabActionFromUrl() {
 
 function handleFabAction(action, meal) {
     if (action === 'meal') {
+        setProductsFormContext('meal');
         openProductsForm(getSelectedDate(), meal || 'breakfast');
         return;
     }
     if (action === 'water') {
+        setProductsFormContext('water');
         openProductsForm(getSelectedDate(), 'breakfast');
         setTimeout(() => {
             const waterInput = document.getElementById('diary-products-water');
@@ -1481,6 +1516,7 @@ function bindGlobalDiaryHandlers() {
 
         const editMealButton = event.target.closest('[data-action="edit-meal"]');
         if (editMealButton) {
+            setProductsFormContext('meal');
             openProductsForm(getSelectedDate(), editMealButton.dataset.meal || 'breakfast');
             return;
         }
@@ -1729,6 +1765,7 @@ async function initDiary() {
     const params = new URLSearchParams(window.location.search);
     const openFabOnLoad = params.get('fab') === '1';
 
+    setProductsFormContext('meal');
     setActiveMode(initialMode);
 
     const resolvedDate = initialDate || ensureDiaryDate();
@@ -1770,14 +1807,30 @@ async function initDiary() {
                 return;
             }
             const items = collectFoodItems(productsItems);
+            const water = Number(document.getElementById('diary-products-water')?.value);
+            const sleepTime = document.getElementById('diary-products-sleep')?.value || null;
+            const activity = Boolean(document.getElementById('diary-products-activity')?.checked);
+
+            if (diaryProductsFormContext === 'water') {
+                const dateKey = getDiaryDateKey(date);
+                const saved = persistDayMeta(
+                    dateKey,
+                    Number.isFinite(water) ? water : 0,
+                    sleepTime,
+                    activity
+                );
+                if (saved && typeof showNotification === 'function') {
+                    showNotification('Вода сохранена.');
+                }
+                closeFabMenu();
+                return;
+            }
+
             if (!items.length) {
                 showNotification('Добавьте хотя бы один продукт.', 'error');
                 return;
             }
             const totals = calculateTotals(items);
-            const water = Number(document.getElementById('diary-products-water')?.value);
-            const sleepTime = document.getElementById('diary-products-sleep')?.value || null;
-            const activity = Boolean(document.getElementById('diary-products-activity')?.checked);
             const entry = normalizeEntry({
                 date,
                 mode: MODE_PRODUCTS,
