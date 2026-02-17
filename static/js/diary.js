@@ -19,7 +19,8 @@ const mealLabels = {
     breakfast: 'Завтрак',
     lunch: 'Обед',
     dinner: 'Ужин',
-    snack: 'Перекус'
+    snack: 'Перекус',
+    water: 'Вода'
 };
 
 let diaryProductsFormContext = 'meal';
@@ -36,9 +37,8 @@ function setProductsFormContext(context) {
     if (metaBlock) {
         metaBlock.classList.toggle('hidden', diaryProductsFormContext !== 'water');
     }
-    if (mealSelect) {
-        mealSelect.classList.toggle('hidden', diaryProductsFormContext === 'water');
-        mealSelect.required = diaryProductsFormContext !== 'water';
+    if (mealSelect && diaryProductsFormContext === 'water') {
+        mealSelect.value = 'water';
     }
     if (itemsContainer) {
         itemsContainer.classList.toggle('hidden', diaryProductsFormContext === 'water');
@@ -898,7 +898,8 @@ function renderDayScreen(entries, dateKey) {
         breakfast: 'завтрак',
         lunch: 'обед',
         dinner: 'ужин',
-        snack: 'перекус'
+        snack: 'перекус',
+        water: 'воду'
     };
 
     const renderMealCard = (mealKey) => {
@@ -1302,7 +1303,7 @@ function handleFabAction(action, meal) {
     }
     if (action === 'water') {
         setProductsFormContext('water');
-        openProductsForm(getSelectedDate(), 'breakfast');
+        openProductsForm(getSelectedDate(), 'water');
         setTimeout(() => {
             const waterInput = document.getElementById('diary-products-water');
             if (waterInput) {
@@ -1780,6 +1781,7 @@ async function initDiary() {
         const mealSelect = document.getElementById('diary-products-meal');
         if (mealSelect) {
             mealSelect.value = initialMeal;
+            setProductsFormContext(initialMeal === 'water' ? 'water' : 'meal');
         }
     }
 
@@ -1897,10 +1899,12 @@ async function initDiary() {
     const mealSelect = document.getElementById('diary-products-meal');
     if (mealSelect) {
         mealSelect.addEventListener('change', () => {
+            const selectedMeal = mealSelect.value;
+            setProductsFormContext(selectedMeal === 'water' ? 'water' : 'meal');
             updateProductsForm(
                 readDiaryEntries(),
                 getSelectedDate(),
-                mealSelect.value
+                selectedMeal
             );
             const params = new URLSearchParams(window.location.search);
             params.set('mode', getModeFromUrl());
@@ -1908,8 +1912,8 @@ async function initDiary() {
             if (dateValue) {
                 params.set('date', dateValue);
             }
-            if (mealSelect.value) {
-                params.set('meal', mealSelect.value);
+            if (selectedMeal) {
+                params.set('meal', selectedMeal);
             }
             window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
         });
