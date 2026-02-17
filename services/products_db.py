@@ -1,4 +1,5 @@
 import json
+import logging
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
@@ -7,6 +8,8 @@ from config import PRODUCTS_DB_PATH
 
 ADMIN_CONFIG_PATH = Path("config/admin_config.json")
 PRODUCTS_DB_PATH = Path(PRODUCTS_DB_PATH)
+
+logger = logging.getLogger(__name__)
 
 
 @contextmanager
@@ -82,6 +85,21 @@ def ensure_products_db() -> None:
             )
         connection.commit()
 
+
+
+def migrate_products_kcal() -> None:
+    """Пересчитать kcal для существующих продуктов, где значение пустое или нулевое."""
+    ensure_products_db()
+    with get_products_connection() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE products
+            SET kcal = ROUND(protein_g * 4 + fat_g * 9 + carbs_g * 4)
+            WHERE kcal IS NULL OR kcal = 0
+            """
+        )
+        connection.commit()
+        logger.info("Обновлено kcal для продуктов: %s", cursor.rowcount)
 
 def load_admin_products() -> list[dict[str, object]]:
     """Загрузить список продуктов из SQLite."""
