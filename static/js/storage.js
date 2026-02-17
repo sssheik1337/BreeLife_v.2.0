@@ -1279,12 +1279,17 @@
     }
 
     async function syncDiaryEntriesWithBackend() {
-        if (window.serverUser?.authorized !== true) {
-            cachedDiaryEntries = [];
-            return [];
+        // На iOS Telegram статус авторизации может заполниться позже,
+        // поэтому для чтения дневника не блокируемся на window.serverUser.authorized.
+        let remoteEntries = await fetchDiaryEntriesFromBackend();
+
+        // Даём один повторный запрос после короткой паузы,
+        // чтобы избежать гонки между init auth и первым чтением дневника.
+        if (!Array.isArray(remoteEntries) && window.serverUser?.authorized !== true) {
+            await new Promise((resolve) => setTimeout(resolve, 250));
+            remoteEntries = await fetchDiaryEntriesFromBackend();
         }
 
-        const remoteEntries = await fetchDiaryEntriesFromBackend();
         if (Array.isArray(remoteEntries)) {
             return setDiaryEntries(remoteEntries, { skipBackend: true });
         }
