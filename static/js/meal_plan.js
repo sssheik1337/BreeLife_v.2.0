@@ -1,6 +1,6 @@
 // Генератор рациона: день или неделя на основе профиля и предпочтений.
 
-const PRODUCTS_ENDPOINT = '/static/data/products.json';
+const PRODUCTS_ENDPOINT = '/api/products';
 
 const MEAL_DISTRIBUTION = [
     { key: 'breakfast', title: 'Завтрак', share: 0.25, items: 2 },

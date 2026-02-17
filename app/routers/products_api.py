@@ -53,6 +53,31 @@ async def products_search(q: str):
     }
 
 
+@router.get("/api/products")
+async def products_list():
+    """Вернуть полный каталог продуктов из админской SQLite-базы."""
+    products = load_admin_products()
+    normalized: list[dict[str, object]] = []
+    for item in products:
+        normalized.append(
+            {
+                "id": item.get("id"),
+                "name": item.get("name"),
+                "group": item.get("group"),
+                "kcal": item.get("kcal") or 0,
+                "protein_g": item.get("protein_g") or 0,
+                "fat_g": item.get("fat_g") or 0,
+                "carbs_g": item.get("carbs_g") or 0,
+                "carbs_simple_g": item.get("carbs_simple_g") or 0,
+                "carbs_complex_g": item.get("carbs_complex_g") or 0,
+                "fiber_g": item.get("fiber_g") or 0,
+                "tags": item.get("tags") if isinstance(item.get("tags"), list) else [],
+                "health_level": item.get("health_level"),
+            }
+        )
+    return normalized
+
+
 @router.get("/api/calculate")
 async def calculate(
     sex: str,

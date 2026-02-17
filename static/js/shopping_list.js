@@ -1,6 +1,6 @@
 // Экран "Список покупок": группировка продуктов и отметки "куплено".
 
-const SHOPPING_PRODUCTS_ENDPOINT = '/static/data/products.json';
+const SHOPPING_PRODUCTS_ENDPOINT = '/api/products';
 const SHOPPING_DEFAULT_WEIGHT = 100;
 let shoppingChecksMemory = {};
 

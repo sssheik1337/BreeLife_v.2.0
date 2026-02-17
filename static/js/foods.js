@@ -1,6 +1,6 @@
-// Отрисовка списка продуктов из JSON
+// Отрисовка списка продуктов из админской SQLite-базы через API.
 
-const PRODUCTS_ENDPOINT = '/static/data/products.json';
+const PRODUCTS_ENDPOINT = '/api/products';
 
 document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('foods-container');

@@ -1,6 +1,6 @@
 // Экран "Мои продукты": любимые и исключённые позиции.
 
-const PRODUCTS_ENDPOINT = '/static/data/products.json';
+const PRODUCTS_ENDPOINT = '/api/products';
 
 document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('my-products-container');
