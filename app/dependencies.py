@@ -28,7 +28,6 @@ def require_telegram_user_id(request: Request, response: Response) -> int:
     telegram_user_id = session.get("telegram_user_id") if isinstance(session, dict) else session
     if telegram_user_id is None:
         raise HTTPException(status_code=401, detail="UNAUTHORIZED")
-    logger.info("[auth] Подтвержден telegram_user_id=%s", telegram_user_id)
     response.set_cookie(
         TELEGRAM_SESSION_COOKIE,
         token,
@@ -243,16 +242,6 @@ def normalize_profile_payload_shape(raw_profile: dict[str, object] | None) -> di
         }
         profile.pop("user_profile", None)
 
-    normalized_diary_entries: list[dict[str, object]] | list[object] = []
-    diary_raw = profile.get("diary")
-    legacy_diary_raw = profile.get("food_diary")
-    if isinstance(diary_raw, list):
-        normalized_diary_entries = diary_raw
-    elif isinstance(legacy_diary_raw, list):
-        # Поддерживаем legacy-формат: если записи были в food_diary,
-        # переносим их в canonical-поле diary.
-        normalized_diary_entries = legacy_diary_raw
-
     canonical: dict[str, object] = {
         "sex": pick_existing(profile.get("sex"), profile.get("gender")),
         "birth_date": pick_existing(profile.get("birth_date"), profile.get("birthDate")),
@@ -264,7 +253,6 @@ def normalize_profile_payload_shape(raw_profile: dict[str, object] | None) -> di
         "activity_factor": parse_number(pick_existing(profile.get("activity_factor"), profile.get("activityLevel"))),
         "goal_deadline": pick_existing(profile.get("goal_deadline"), profile.get("deadline")),
         "food_diary": parse_bool(pick_existing(profile.get("food_diary"), profile.get("foodDiary"))),
-        "diary": normalized_diary_entries,
         "bmr": parse_number(profile.get("bmr")),
         "tdee_calories": parse_number(profile.get("tdee_calories")),
         "calories_target": parse_number(profile.get("calories_target")),
@@ -310,7 +298,6 @@ CANONICAL_PROFILE_FIELDS = {
     "activity_factor",
     "goal_deadline",
     "food_diary",
-    "diary",
     "bmr",
     "tdee_calories",
     "calories_target",

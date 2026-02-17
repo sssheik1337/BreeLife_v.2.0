@@ -1,5 +1,3 @@
-import logging
-
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
@@ -16,9 +14,9 @@ from app.dependencies import (
 from app.schemas import FoodDiaryAddRequest
 from app.utils import build_food_diary_aggregates
 from services.ai_profile import generate_food_diary_recommendation
+from services.storage_db import read_payload, write_payload
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 def resolve_profile_diary_entries(profile: dict) -> list:
@@ -58,9 +56,14 @@ async def food_diary(request: Request, telegram_user_id: int | None = Depends(op
 @router.get("/api/diary")
 async def api_diary(request: Request, response: Response):
     telegram_user_id = require_telegram_user_id(request, response)
+    stored_entries = read_payload("diary_entries", telegram_user_id)
+    if isinstance(stored_entries, list):
+        return {"entries": stored_entries}
+
+    # Если записи ещё не переносились в отдельную таблицу, читаем legacy-значение из профиля.
     profile = load_profile(telegram_user_id)
     diary = resolve_profile_diary_entries(profile)
-    logger.info("[api_diary][GET] telegram_user_id=%s, entries_count=%s", telegram_user_id, len(diary))
+    diary = diary if isinstance(diary, list) else []
     return {"entries": diary}
 
 
@@ -70,17 +73,11 @@ async def api_diary_save(request: Request, response: Response):
     payload = await request.json()
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="INVALID_PAYLOAD")
-    profile = load_profile(telegram_user_id)
-    updated = dict(profile)
+
     entries = payload.get("entries", [])
     entries = entries if isinstance(entries, list) else []
-    logger.info("[api_diary][POST] telegram_user_id=%s, entries_count=%s", telegram_user_id, len(entries))
-    updated["diary"] = entries
-    # Поддерживаем оба поля синхронно, чтобы не было расхождения между устройствами
-    # при чтении старого и нового формата дневника.
-    updated["food_diary"] = entries
-    update_profile(telegram_user_id, updated)
-    return updated
+    write_payload("diary_entries", telegram_user_id, entries)
+    return {"entries": entries}
 
 
 @router.get("/api/water")
