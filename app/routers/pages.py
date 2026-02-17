@@ -81,3 +81,18 @@ async def reminders_settings(request: Request, telegram_user_id: int | None = De
         "reminders_settings.html",
         {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
     )
+
+
+@router.get("/preferences-onboarding", response_class=HTMLResponse)
+async def preferences_onboarding(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    payload = get_profile_and_admin_config(telegram_user_id)
+    if telegram_user_id is None:
+        return templates.TemplateResponse(
+            "preferences_onboarding.html",
+            {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
+        )
+    require_completed_profile(telegram_user_id)
+    return templates.TemplateResponse(
+        "preferences_onboarding.html",
+        {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
+    )
