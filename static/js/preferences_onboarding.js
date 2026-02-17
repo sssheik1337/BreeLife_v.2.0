@@ -207,11 +207,43 @@ function handleSkip(elements) {
     animateCardSwitch(elements, () => nextCard(elements));
 }
 
-function finishOnboarding() {
+function getPostOnboardingRoute() {
+    if (typeof window.resolvePostQuestionnaireRoute === 'function') {
+        return window.resolvePostQuestionnaireRoute({ preferences_onboarding_completed: true });
+    }
+    return '/profile';
+}
+
+function showSuccessState(elements) {
+    const successCard = document.getElementById('preferences-success');
+    const continueButton = document.getElementById('preferences-continue');
+    const nextRoute = getPostOnboardingRoute();
+
+    if (continueButton) {
+        continueButton.setAttribute('href', nextRoute);
+    }
+
+    if (elements.card) {
+        elements.card.classList.add('hidden');
+    }
+    if (elements.doneButton) {
+        elements.doneButton.classList.add('hidden');
+    }
+    if (elements.softSkipButton) {
+        elements.softSkipButton.classList.add('hidden');
+    }
+
+    if (successCard) {
+        successCard.classList.remove('hidden');
+        successCard.classList.add('transition-all', 'duration-300', 'ease-out');
+    }
+}
+
+function finishOnboarding(elements) {
     if (onboardingState.isSaving) {
         return;
     }
-    window.location.href = '/trial-start';
+    showSuccessState(elements);
 }
 
 function setSavingState(elements, saving) {
@@ -255,7 +287,7 @@ async function saveOnboardingChoices(elements) {
             patchUserProfile(payload);
         }
 
-        finishOnboarding();
+        finishOnboarding(elements);
     } catch (_) {
         if (typeof showNotification === 'function') {
             showNotification('Не удалось сохранить выбор. Попробуйте ещё раз.', 'error');
@@ -305,7 +337,7 @@ async function initPreferencesOnboarding() {
     elements.doneButton?.addEventListener('click', () => {
         saveOnboardingChoices(elements);
     });
-    elements.softSkipButton?.addEventListener('click', finishOnboarding);
+    elements.softSkipButton?.addEventListener('click', () => finishOnboarding(elements));
 }
 
 document.addEventListener('DOMContentLoaded', initPreferencesOnboarding);
