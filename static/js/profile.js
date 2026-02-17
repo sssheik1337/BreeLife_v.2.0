@@ -729,69 +729,80 @@ function resolveCarbTotals(totalValue, simpleValue, complexValue) {
 }
 
 function resolveEntryTotals(entry) {
-    if (!entry) {
-        return {
-            calories: 0,
-            protein_g: 0,
-            fat_g: 0,
-            carbs_g: 0,
-            carbs_simple_g: 0,
-            carbs_complex_g: 0,
-            fiber_g: 0,
-            water_l: 0
-        };
-    }
-    if (entry.mode === 'products') {
-        if (entry.totals) {
-            const resolved = resolveCarbTotals(
-                entry.totals.carbs_g,
-                entry.totals.carbs_simple_g,
-                entry.totals.carbs_complex_g
-            );
-            return {
-                ...entry.totals,
-                carbs_g: resolved.total,
-                carbs_simple_g: resolved.simple,
-                carbs_complex_g: resolved.complex,
-                water_l: Number(entry.water_l) || 0
-            };
-        }
-        if (Array.isArray(entry.items)) {
-            return entry.items.reduce(
-                (acc, item) => {
-                    const resolved = resolveCarbTotals(
-                        item?.carbs ?? item?.carbs_g ?? 0,
-                        item?.carbs_simple ?? item?.carbs_simple_g ?? 0,
-                        item?.carbs_complex ?? item?.carbs_complex_g ?? 0
-                    );
-                    acc.calories += Number(item?.calories) || 0;
-                    acc.protein_g += Number(item?.protein) || Number(item?.protein_g) || 0;
-                    acc.fat_g += Number(item?.fat) || Number(item?.fat_g) || 0;
-                    acc.carbs_g += resolved.total;
-                    acc.carbs_simple_g += resolved.simple;
-                    acc.carbs_complex_g += resolved.complex;
-                    acc.fiber_g += Number(item?.fiber) || Number(item?.fiber_g) || 0;
-                    return acc;
-                },
-                {
-                    calories: 0,
-                    protein_g: 0,
-                    fat_g: 0,
-                    carbs_g: 0,
-                    carbs_simple_g: 0,
-                    carbs_complex_g: 0,
-                    fiber_g: 0,
-                    water_l: 0
-                }
-            );
-        }
+    const emptyTotals = {
+        calories: 0,
+        protein_g: 0,
+        fat_g: 0,
+        carbs_g: 0,
+        carbs_simple_g: 0,
+        carbs_complex_g: 0,
+        fiber_g: 0,
+        water_l: 0
+    };
+
+    if (!entry || typeof entry !== 'object') {
+        return emptyTotals;
     }
 
-    // Поддержка legacy-формата из `food_diary`, где макросы лежат в `meals`.
+    const rootTotals = entry.totals && typeof entry.totals === 'object' ? entry.totals : null;
+    if (rootTotals) {
+        const resolvedRoot = resolveCarbTotals(
+            rootTotals.carbs_g ?? rootTotals.carbs ?? 0,
+            rootTotals.carbs_simple_g ?? rootTotals.carbs_simple ?? 0,
+            rootTotals.carbs_complex_g ?? rootTotals.carbs_complex ?? 0
+        );
+        return {
+            calories: Number(rootTotals.calories) || 0,
+            protein_g: Number(rootTotals.protein_g ?? rootTotals.protein) || 0,
+            fat_g: Number(rootTotals.fat_g ?? rootTotals.fat) || 0,
+            carbs_g: resolvedRoot.total,
+            carbs_simple_g: resolvedRoot.simple,
+            carbs_complex_g: resolvedRoot.complex,
+            fiber_g: Number(rootTotals.fiber_g ?? rootTotals.fiber) || 0,
+            water_l: Number(entry.water_l) || 0
+        };
+    }
+
+    if (entry.mode === 'products' && Array.isArray(entry.items)) {
+        return entry.items.reduce(
+            (acc, item) => {
+                const resolved = resolveCarbTotals(
+                    item?.carbs ?? item?.carbs_g ?? 0,
+                    item?.carbs_simple ?? item?.carbs_simple_g ?? 0,
+                    item?.carbs_complex ?? item?.carbs_complex_g ?? 0
+                );
+                acc.calories += Number(item?.calories) || 0;
+                acc.protein_g += Number(item?.protein) || Number(item?.protein_g) || 0;
+                acc.fat_g += Number(item?.fat) || Number(item?.fat_g) || 0;
+                acc.carbs_g += resolved.total;
+                acc.carbs_simple_g += resolved.simple;
+                acc.carbs_complex_g += resolved.complex;
+                acc.fiber_g += Number(item?.fiber) || Number(item?.fiber_g) || 0;
+                return acc;
+            },
+            {
+                ...emptyTotals,
+                water_l: Number(entry.water_l) || 0
+            }
+        );
+    }
+
+    let meals = [];
     if (Array.isArray(entry.meals)) {
-        return entry.meals.reduce(
+        meals = entry.meals;
+    } else if (entry.meals && typeof entry.meals === 'object') {
+        meals = Object.values(entry.meals).flatMap((meal) => {
+            if (Array.isArray(meal)) {
+                return meal;
+            }
+            return meal ? [meal] : [];
+        });
+    }
+
+    if (meals.length > 0) {
+        return meals.reduce(
             (acc, meal) => {
-                if (!meal) {
+                if (!meal || typeof meal !== 'object') {
                     return acc;
                 }
 
@@ -844,32 +855,26 @@ function resolveEntryTotals(entry) {
                 return acc;
             },
             {
-                calories: 0,
-                protein_g: 0,
-                fat_g: 0,
-                carbs_g: 0,
-                carbs_simple_g: 0,
-                carbs_complex_g: 0,
-                fiber_g: 0,
+                ...emptyTotals,
                 water_l: Number(entry.water_l) || 0
             }
         );
     }
 
     const resolved = resolveCarbTotals(
-        entry.carbs_g ?? 0,
-        entry.carbs_simple_g ?? 0,
-        entry.carbs_complex_g ?? 0
+        entry.carbs_g ?? entry.carbs ?? 0,
+        entry.carbs_simple_g ?? entry.carbs_simple ?? 0,
+        entry.carbs_complex_g ?? entry.carbs_complex ?? 0
     );
     return {
         calories: Number(entry.calories) || 0,
-        protein_g: Number(entry.protein_g) || 0,
-        fat_g: Number(entry.fat_g) || 0,
+        protein_g: Number(entry.protein_g ?? entry.protein) || 0,
+        fat_g: Number(entry.fat_g ?? entry.fat) || 0,
         carbs_g: resolved.total,
         carbs_simple_g: resolved.simple,
         carbs_complex_g: resolved.complex,
-        fiber_g: Number(entry.fiber_g) || 0,
-        water_l: Number(entry.water_l) || 0
+        fiber_g: Number(entry.fiber_g ?? entry.fiber) || 0,
+        water_l: Number(entry.water_l ?? entry.water) || 0
     };
 }
 
