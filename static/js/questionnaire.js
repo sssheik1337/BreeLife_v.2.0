@@ -219,7 +219,10 @@ async function initQuestionnaire() {
 
     if (!isEditMode && typeof getUserProfile === 'function') {
         const profile = getUserProfile();
-        if (profile?.is_completed === true || hasProfileData(profile)) {
+        // Перенаправляем только при полностью завершённой анкете.
+        // Частично заполненный или локально устаревший профиль не должен уводить
+        // нового пользователя с первого запуска.
+        if (profile?.is_completed === true) {
             window.location.replace(resolvePostQuestionnaireRoute(profile));
             return;
         }

@@ -791,7 +791,9 @@ function redirectToQuestionnaireIfNeeded(status) {
         }
         return;
     }
-    if (path.startsWith('/questionnaire')) {
+    if (path.startsWith('/questionnaire') || path.startsWith('/preferences-onboarding')) {
+        // На шагах анкеты и онбординга предпочтений не форсируем редирект,
+        // чтобы не создавать циклические переходы между экранами.
         return;
     }
     if (!profileCompleted) {
