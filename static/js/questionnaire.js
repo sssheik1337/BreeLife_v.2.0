@@ -167,6 +167,30 @@ function hasProfileData(profile) {
     return fields.some((value) => value !== null && value !== undefined && value !== '');
 }
 
+
+
+// Определяем целевой экран после анкеты с учётом шага предпочтений.
+function resolvePostQuestionnaireRoute(profile) {
+    if (profile?.preferences_onboarding_completed === true) {
+        return '/trial-start';
+    }
+    return '/preferences-onboarding';
+}
+
+async function isServerProfileCompleted() {
+    try {
+        const fetcher = window.apiFetch || fetch;
+        const response = await fetcher('/api/me/status');
+        if (!response.ok) {
+            return false;
+        }
+        const payload = await response.json();
+        return payload?.profile_completed === true;
+    } catch (error) {
+        return false;
+    }
+}
+
 // DOM Elements
 let questionTitle;
 let optionsContainer;
@@ -208,9 +232,22 @@ async function initQuestionnaire() {
     isEditMode = urlParams.get('edit') === '1';
 
     if (!isEditMode && typeof getUserProfile === 'function') {
+        const serverCompleted = await isServerProfileCompleted();
+
+        if (typeof window.syncProfileWithBackend === 'function') {
+            try {
+                // Подтягиваем профиль с сервера, чтобы актуализировать локальные данные.
+                await window.syncProfileWithBackend();
+            } catch (error) {
+                // При ошибке синхронизации продолжаем без аварийного редиректа.
+            }
+        }
+
         const profile = getUserProfile();
-        if (profile?.is_completed === true || hasProfileData(profile)) {
-            window.location.replace('/profile');
+        // Защита от старого локального кеша: редиректим только если профиль завершён
+        // и это подтверждено сервером в текущей сессии.
+        if (serverCompleted && profile?.is_completed === true) {
+            window.location.replace(resolvePostQuestionnaireRoute(profile));
             return;
         }
     }
@@ -1065,11 +1102,8 @@ if (window.feather) {
 }
 
 function persistUserData() {
-    try {
-        localStorage.setItem('userData', JSON.stringify(window.userData));
-    } catch (error) {
-        console.warn('Не удалось сохранить userData', error);
-    }
+    // Локальное хранилище больше не используем как источник данных профиля.
+    // Состояние анкеты живёт только в памяти вкладки до отправки на backend.
 }
 
 // Сохраняем данные анкеты локально до завершения
@@ -1263,8 +1297,8 @@ function setupEventListeners() {
             if (typeof resetUserDataDirtyMap === 'function') {
                 resetUserDataDirtyMap('profile_saved');
             }
-            // Все вопросы заполнены, переходим на экран прогресса.
-            window.location.href = '/trial-start';
+            // Все вопросы заполнены, переходим на следующий экран с учётом шага предпочтений.
+            window.location.href = resolvePostQuestionnaireRoute(profile);
         }
     });
     

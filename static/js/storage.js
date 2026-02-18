@@ -62,11 +62,8 @@
     const memoryStore = new Map();
     const migrationFlags = new Set();
     const STORAGE_KEY = 'user_profile';
-    const DIARY_STORAGE_KEY = 'bree_diary_entries';
-    const LEGACY_DIARY_KEYS = ['health_bloom_food_entries', 'food_diary_entries'];
     const HABITS_STORAGE_KEY = 'bree_habits';
     const PROFILE_MIGRATION_KEY = 'bree_profile_migrated_v1';
-    const DIARY_MIGRATION_KEY = 'bree_diary_migrated_v1';
     const HABITS_MIGRATION_KEY = 'bree_habits_migrated_v1';
     const WATER_MIGRATION_KEY = 'bree_water_migrated_v1';
     const SLEEP_MIGRATION_KEY = 'bree_sleep_migrated_v1';
@@ -701,78 +698,6 @@
         };
     }
 
-    function readRawDiaryEntries(key) {
-        const raw = memoryGet(key);
-        if (!raw) {
-            return [];
-        }
-        try {
-            const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (error) {
-            return [];
-        }
-    }
-
-    let diaryMigrationDone = false;
-
-    function migrateDiaryEntries() {
-        if (diaryMigrationDone) {
-            return readRawDiaryEntries(DIARY_STORAGE_KEY)
-                .map(normalizeDiaryEntry)
-                .filter(Boolean);
-        }
-        const unified = [];
-        const seen = new Set();
-
-        const collect = (entry) => {
-            const normalized = normalizeDiaryEntry(entry);
-            if (!normalized) {
-                return;
-            }
-            const totals = normalized.mode === 'products'
-                ? normalized.totals
-                : {
-                    calories: normalized.calories,
-                    protein_g: normalized.protein_g,
-                    fat_g: normalized.fat_g,
-                    carbs_g: normalized.carbs_g,
-                    carbs_simple_g: normalized.carbs_simple_g,
-                    carbs_complex_g: normalized.carbs_complex_g
-                };
-            const key = `${normalized.date}-${normalized.mode}-${normalized.meal || ''}-${totals.calories}-${totals.protein_g}-${totals.fat_g}-${totals.carbs_g}-${totals.carbs_simple_g || 0}-${totals.carbs_complex_g || 0}-${normalized.items?.length || 0}`;
-            if (seen.has(key)) {
-                return;
-            }
-            seen.add(key);
-            unified.push(normalized);
-        };
-
-        readRawDiaryEntries(DIARY_STORAGE_KEY).forEach(collect);
-        readRawDiaryEntries(LEGACY_DIARY_KEYS[0]).forEach((entry) => {
-            collect({
-                date: entry.date,
-                mode: 'summary',
-                calories: entry.calories,
-                protein: entry.protein_g,
-                fat: entry.fat_g,
-                carbs: entry.carbs_g
-            });
-        });
-        readRawDiaryEntries(LEGACY_DIARY_KEYS[1]).forEach((entry) => {
-            collect({
-                date: entry.date,
-                mode: 'products',
-                meal: entry.meal,
-                items: Array.isArray(entry.items) ? entry.items : []
-            });
-        });
-
-        memorySet(DIARY_STORAGE_KEY, JSON.stringify(unified));
-        diaryMigrationDone = true;
-        return unified;
-    }
-
     function readLegacyUserData() {
         const raw = memoryGet('health_bloom_user_data');
         if (!raw) {
@@ -1006,20 +931,11 @@
     }
 
     function getDiaryEntries() {
-        if (cachedDiaryEntries) {
-            return cachedDiaryEntries;
-        }
-        cachedDiaryEntries = migrateDiaryEntries();
-        return cachedDiaryEntries;
+        return Array.isArray(cachedDiaryEntries) ? cachedDiaryEntries : [];
     }
 
     function setDiaryEntries(entries, { skipBackend = false } = {}) {
         cachedDiaryEntries = Array.isArray(entries) ? entries : [];
-        try {
-            memorySet(DIARY_STORAGE_KEY, JSON.stringify(cachedDiaryEntries));
-        } catch (error) {
-            // Игнорируем ошибку сохранения, данные остаются в памяти.
-        }
         if (!skipBackend) {
             void saveDiaryEntriesToBackend(cachedDiaryEntries);
             const waterEntries = buildWaterEntriesFromDiary(cachedDiaryEntries);
@@ -1172,12 +1088,17 @@
                 throw new Error('Profile payload invalid');
             }
             if (data?.status === 'not_found') {
-                const localProfile = getUserProfile();
-                if (localProfile && !isMigrationDone(PROFILE_MIGRATION_KEY)) {
-                    await saveProfileToBackend(localProfile);
-                    markMigrationDone(PROFILE_MIGRATION_KEY);
+                // Сервер — единственный источник истины для профиля.
+                // Если профиль в backend отсутствует, очищаем локальный кеш
+                // и возвращаем профиль по умолчанию без автозаливки старых данных.
+                const emptyProfile = normalizeUserProfile(getDefaultUserProfile());
+                cachedProfile = emptyProfile;
+                try {
+                    memorySet(getProfileStorageKey(), JSON.stringify(emptyProfile));
+                } catch (error) {
+                    // Игнорируем ошибку сохранения, данные остаются в памяти.
                 }
-                return localProfile;
+                return emptyProfile;
             }
             if (data && typeof data === 'object') {
                 const validation = validateCanonicalProfilePayload(data);
@@ -1363,25 +1284,23 @@
     }
 
     async function syncDiaryEntriesWithBackend() {
-        if (window.serverUser?.authorized !== true) {
-            return getDiaryEntries();
-        }
-        const remoteEntries = await fetchDiaryEntriesFromBackend();
+        // На iOS Telegram статус авторизации может заполниться позже,
+        // поэтому для чтения дневника не блокируемся на window.serverUser.authorized.
+        let remoteEntries = await fetchDiaryEntriesFromBackend();
 
-        // Если сервер вернул валидный массив (даже пустой),
-        // считаем backend источником истины и синхронизируем локальный кэш один-в-один.
+        // Даём один повторный запрос после короткой паузы,
+        // чтобы избежать гонки между init auth и первым чтением дневника.
+        if (!Array.isArray(remoteEntries) && window.serverUser?.authorized !== true) {
+            await new Promise((resolve) => setTimeout(resolve, 250));
+            remoteEntries = await fetchDiaryEntriesFromBackend();
+        }
+
         if (Array.isArray(remoteEntries)) {
-            const synced = setDiaryEntries(remoteEntries, { skipBackend: true });
-            return synced;
+            return setDiaryEntries(remoteEntries, { skipBackend: true });
         }
 
-        // В fallback уходим только при ошибке сети/запроса (remoteEntries === null).
-        const localEntries = getDiaryEntries();
-        if (localEntries.length && !isMigrationDone(DIARY_MIGRATION_KEY)) {
-            await saveDiaryEntriesToBackend(localEntries);
-            markMigrationDone(DIARY_MIGRATION_KEY);
-        }
-        return localEntries;
+        cachedDiaryEntries = [];
+        return [];
     }
 
     async function syncWaterEntriesWithBackend(entries) {
@@ -1483,7 +1402,6 @@
     window.syncWaterEntriesWithBackend = syncWaterEntriesWithBackend;
     window.syncSleepEntriesWithBackend = syncSleepEntriesWithBackend;
     window.syncHabitEntriesWithBackend = syncHabitEntriesWithBackend;
-    window.DIARY_STORAGE_KEY = DIARY_STORAGE_KEY;
     window.apiFetch = apiFetch;
 
 })();

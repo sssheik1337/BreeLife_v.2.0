@@ -1,4 +1,3 @@
-const DIARY_STORAGE_KEY = window.DIARY_STORAGE_KEY || 'bree_diary_entries';
 const HABITS_STORAGE_KEY = 'bree_habits';
 const apiFetch = window.apiFetch || fetch;
 
@@ -20,8 +19,41 @@ const mealLabels = {
     breakfast: 'Завтрак',
     lunch: 'Обед',
     dinner: 'Ужин',
-    snack: 'Перекус'
+    snack: 'Перекус',
+    water: 'Вода'
 };
+
+let diaryProductsFormContext = 'meal';
+
+function setProductsFormContext(context) {
+    diaryProductsFormContext = context === 'water' ? 'water' : 'meal';
+    const metaBlock = document.getElementById('diary-products-meta');
+    const mealSelect = document.getElementById('diary-products-meal');
+    const itemsContainer = document.getElementById('diary-products-items');
+    const addItemButton = document.getElementById('diary-add-item');
+    const submitButton = document.querySelector('#diary-products-form button[type="submit"]');
+    const title = document.querySelector('#diary-products-panel h3');
+
+    if (metaBlock) {
+        metaBlock.classList.toggle('hidden', diaryProductsFormContext !== 'water');
+    }
+    if (mealSelect && diaryProductsFormContext === 'water') {
+        mealSelect.value = 'water';
+    }
+    if (itemsContainer) {
+        itemsContainer.classList.toggle('hidden', diaryProductsFormContext === 'water');
+    }
+    if (addItemButton) {
+        addItemButton.classList.toggle('hidden', diaryProductsFormContext === 'water');
+    }
+    if (submitButton) {
+        submitButton.textContent = diaryProductsFormContext === 'water' ? 'Сохранить воду' : 'Сохранить приём пищи';
+    }
+    if (title) {
+        title.textContent = diaryProductsFormContext === 'water' ? 'Добавить воду' : 'Добавить приём пищи';
+    }
+}
+
 
 function readDiaryEntries() {
     if (typeof window.getDiaryEntries === 'function') {
@@ -866,7 +898,8 @@ function renderDayScreen(entries, dateKey) {
         breakfast: 'завтрак',
         lunch: 'обед',
         dinner: 'ужин',
-        snack: 'перекус'
+        snack: 'перекус',
+        water: 'воду'
     };
 
     const renderMealCard = (mealKey) => {
@@ -1264,11 +1297,13 @@ function getFabActionFromUrl() {
 
 function handleFabAction(action, meal) {
     if (action === 'meal') {
+        setProductsFormContext('meal');
         openProductsForm(getSelectedDate(), meal || 'breakfast');
         return;
     }
     if (action === 'water') {
-        openProductsForm(getSelectedDate(), 'breakfast');
+        setProductsFormContext('water');
+        openProductsForm(getSelectedDate(), 'water');
         setTimeout(() => {
             const waterInput = document.getElementById('diary-products-water');
             if (waterInput) {
@@ -1482,6 +1517,7 @@ function bindGlobalDiaryHandlers() {
 
         const editMealButton = event.target.closest('[data-action="edit-meal"]');
         if (editMealButton) {
+            setProductsFormContext('meal');
             openProductsForm(getSelectedDate(), editMealButton.dataset.meal || 'breakfast');
             return;
         }
@@ -1730,6 +1766,7 @@ async function initDiary() {
     const params = new URLSearchParams(window.location.search);
     const openFabOnLoad = params.get('fab') === '1';
 
+    setProductsFormContext('meal');
     setActiveMode(initialMode);
 
     const resolvedDate = initialDate || ensureDiaryDate();
@@ -1744,6 +1781,7 @@ async function initDiary() {
         const mealSelect = document.getElementById('diary-products-meal');
         if (mealSelect) {
             mealSelect.value = initialMeal;
+            setProductsFormContext(initialMeal === 'water' ? 'water' : 'meal');
         }
     }
 
@@ -1771,14 +1809,30 @@ async function initDiary() {
                 return;
             }
             const items = collectFoodItems(productsItems);
+            const water = Number(document.getElementById('diary-products-water')?.value);
+            const sleepTime = document.getElementById('diary-products-sleep')?.value || null;
+            const activity = Boolean(document.getElementById('diary-products-activity')?.checked);
+
+            if (diaryProductsFormContext === 'water') {
+                const dateKey = getDiaryDateKey(date);
+                const saved = persistDayMeta(
+                    dateKey,
+                    Number.isFinite(water) ? water : 0,
+                    sleepTime,
+                    activity
+                );
+                if (saved && typeof showNotification === 'function') {
+                    showNotification('Вода сохранена.');
+                }
+                closeFabMenu();
+                return;
+            }
+
             if (!items.length) {
                 showNotification('Добавьте хотя бы один продукт.', 'error');
                 return;
             }
             const totals = calculateTotals(items);
-            const water = Number(document.getElementById('diary-products-water')?.value);
-            const sleepTime = document.getElementById('diary-products-sleep')?.value || null;
-            const activity = Boolean(document.getElementById('diary-products-activity')?.checked);
             const entry = normalizeEntry({
                 date,
                 mode: MODE_PRODUCTS,
@@ -1845,10 +1899,12 @@ async function initDiary() {
     const mealSelect = document.getElementById('diary-products-meal');
     if (mealSelect) {
         mealSelect.addEventListener('change', () => {
+            const selectedMeal = mealSelect.value;
+            setProductsFormContext(selectedMeal === 'water' ? 'water' : 'meal');
             updateProductsForm(
                 readDiaryEntries(),
                 getSelectedDate(),
-                mealSelect.value
+                selectedMeal
             );
             const params = new URLSearchParams(window.location.search);
             params.set('mode', getModeFromUrl());
@@ -1856,8 +1912,8 @@ async function initDiary() {
             if (dateValue) {
                 params.set('date', dateValue);
             }
-            if (mealSelect.value) {
-                params.set('meal', mealSelect.value);
+            if (selectedMeal) {
+                params.set('meal', selectedMeal);
             }
             window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
         });
