@@ -1102,11 +1102,8 @@ if (window.feather) {
 }
 
 function persistUserData() {
-    try {
-        localStorage.setItem('userData', JSON.stringify(window.userData));
-    } catch (error) {
-        console.warn('Не удалось сохранить userData', error);
-    }
+    // Локальное хранилище больше не используем как источник данных профиля.
+    // Состояние анкеты живёт только в памяти вкладки до отправки на backend.
 }
 
 // Сохраняем данные анкеты локально до завершения

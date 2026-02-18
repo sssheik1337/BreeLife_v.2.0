@@ -854,22 +854,6 @@ function updateWelcomeGreeting(status) {
     greetingElement.textContent = `Привет, ${displayName}, это твой персональный спутник здоровья 👋`;
 }
 
-function restoreUserDataFromLocalStorage() {
-    try {
-        const raw = localStorage.getItem('userData');
-        if (!raw) {
-            return;
-        }
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === 'object') {
-            mergeUserDataWithoutLosingAnswers(window.userData, parsed, { source: 'local' });
-            console.log('[USERDATA] восстановлено из localStorage без перезаписи dirty-полей');
-        }
-    } catch (error) {
-        console.warn('Не удалось восстановить userData', error);
-    }
-}
-
 function mergeUserDataWithoutLosingAnswers(target, source, options = {}) {
     if (!target || typeof target !== 'object' || !source || typeof source !== 'object') {
         return;
@@ -939,7 +923,6 @@ function applyTelegramTheme() {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async function() {
     animatePageTransition();
-    restoreUserDataFromLocalStorage();
     const appConfig = await loadAppConfig();
     window.appMode = appConfig?.mode || 'production';
     window.appIsDev = Boolean(appConfig?.is_dev);
@@ -1047,11 +1030,6 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (typeof getUserProfile === 'function') {
         const profile = getUserProfile();
         mergeUserDataWithoutLosingAnswers(userData, mapUserProfileToUserData(profile), { source: 'server' });
-    } else {
-        const savedData = storage.get('user_data');
-        if (savedData) {
-            mergeUserDataWithoutLosingAnswers(userData, savedData, { source: 'local' });
-        }
     }
 
     if (!userData.registrationDate) {

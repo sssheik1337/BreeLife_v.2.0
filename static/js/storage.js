@@ -1088,12 +1088,17 @@
                 throw new Error('Profile payload invalid');
             }
             if (data?.status === 'not_found') {
-                const localProfile = getUserProfile();
-                if (localProfile && !isMigrationDone(PROFILE_MIGRATION_KEY)) {
-                    await saveProfileToBackend(localProfile);
-                    markMigrationDone(PROFILE_MIGRATION_KEY);
+                // Сервер — единственный источник истины для профиля.
+                // Если профиль в backend отсутствует, очищаем локальный кеш
+                // и возвращаем профиль по умолчанию без автозаливки старых данных.
+                const emptyProfile = normalizeUserProfile(getDefaultUserProfile());
+                cachedProfile = emptyProfile;
+                try {
+                    memorySet(getProfileStorageKey(), JSON.stringify(emptyProfile));
+                } catch (error) {
+                    // Игнорируем ошибку сохранения, данные остаются в памяти.
                 }
-                return localProfile;
+                return emptyProfile;
             }
             if (data && typeof data === 'object') {
                 const validation = validateCanonicalProfilePayload(data);
