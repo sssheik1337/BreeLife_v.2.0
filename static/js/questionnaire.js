@@ -218,10 +218,16 @@ async function initQuestionnaire() {
     isEditMode = urlParams.get('edit') === '1';
 
     if (!isEditMode && typeof getUserProfile === 'function') {
+        if (typeof window.syncProfileWithBackend === 'function') {
+            try {
+                // Сначала подтягиваем профиль с сервера, чтобы не опираться на устаревший локальный кеш.
+                await window.syncProfileWithBackend();
+            } catch (error) {
+                // При ошибке синхронизации оставляем текущий сценарий без аварийного редиректа.
+            }
+        }
+
         const profile = getUserProfile();
-        // Перенаправляем только при полностью завершённой анкете.
-        // Частично заполненный или локально устаревший профиль не должен уводить
-        // нового пользователя с первого запуска.
         if (profile?.is_completed === true) {
             window.location.replace(resolvePostQuestionnaireRoute(profile));
             return;

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Request
 import logging
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from config import AI_ENABLED
 from app.context import templates
@@ -93,13 +93,15 @@ async def preferences_onboarding(request: Request, telegram_user_id: int | None 
             "preferences_onboarding.html",
             {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
         )
-    # Для экрана предпочтений не требуем завершённую анкету,
-    # чтобы не ловить 404/409 в промежуточных состояниях профиля.
     profile = load_profile(telegram_user_id)
+    if not isinstance(profile, dict) or profile.get("is_completed") is not True:
+        # Онбординг предпочтений доступен только после завершения основной анкеты.
+        return RedirectResponse(url="/questionnaire", status_code=307)
+
     logger.info(
         "[analytics] preferences_onboarding_entered telegram_user_id=%s source=page is_completed=%s",
         telegram_user_id,
-        bool(profile.get("is_completed")) if isinstance(profile, dict) else False,
+        True,
     )
     return templates.TemplateResponse(
         "preferences_onboarding.html",
