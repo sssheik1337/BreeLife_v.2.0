@@ -234,13 +234,37 @@ function getPostOnboardingRoute() {
     return '/profile';
 }
 
-function showSuccessState(elements) {
+function hasAnyChoices() {
+    return onboardingState.favoritesSet.size > 0 || onboardingState.excludedSet.size > 0;
+}
+
+function resolveCompletionType(preferredType = null) {
+    if (preferredType === 'completed_without_choices') {
+        return 'completed_without_choices';
+    }
+    if (preferredType === 'completed_with_choices') {
+        return 'completed_with_choices';
+    }
+    return hasAnyChoices() ? 'completed_with_choices' : 'completed_without_choices';
+}
+
+function showSuccessState(elements, completionType) {
     const successCard = document.getElementById('preferences-success');
     const continueButton = document.getElementById('preferences-continue');
+    const successWithChoices = document.getElementById('preferences-success-with-choices');
+    const successWithoutChoices = document.getElementById('preferences-success-without-choices');
     const nextRoute = getPostOnboardingRoute();
 
     if (continueButton) {
         continueButton.setAttribute('href', nextRoute);
+    }
+
+    const isWithChoices = completionType === 'completed_with_choices';
+    if (successWithChoices) {
+        successWithChoices.classList.toggle('hidden', !isWithChoices);
+    }
+    if (successWithoutChoices) {
+        successWithoutChoices.classList.toggle('hidden', isWithChoices);
     }
 
     if (elements.card) {
@@ -259,14 +283,15 @@ function showSuccessState(elements) {
     }
 }
 
-function finishOnboarding(elements, eventName = null) {
+function finishOnboarding(elements, completionType = null, eventName = null) {
     if (onboardingState.isSaving) {
         return;
     }
+    const resolvedCompletionType = resolveCompletionType(completionType);
     if (eventName) {
         sendOnboardingEvent(eventName);
     }
-    showSuccessState(elements);
+    showSuccessState(elements, resolvedCompletionType);
 }
 
 function setSavingState(elements, saving) {
@@ -310,7 +335,7 @@ async function saveOnboardingChoices(elements) {
             patchUserProfile(payload);
         }
 
-        finishOnboarding(elements);
+        finishOnboarding(elements, resolveCompletionType(), null);
     } catch (_) {
         if (typeof showNotification === 'function') {
             showNotification('Не удалось сохранить выбор. Попробуйте ещё раз.', 'error');
@@ -362,7 +387,7 @@ async function initPreferencesOnboarding() {
     elements.doneButton?.addEventListener('click', () => {
         saveOnboardingChoices(elements);
     });
-    elements.softSkipButton?.addEventListener('click', () => finishOnboarding(elements, 'skipped'));
+    elements.softSkipButton?.addEventListener('click', () => finishOnboarding(elements, 'completed_without_choices', 'skipped'));
 }
 
 document.addEventListener('DOMContentLoaded', initPreferencesOnboarding);
