@@ -177,6 +177,20 @@ function resolvePostQuestionnaireRoute(profile) {
     return '/preferences-onboarding';
 }
 
+async function isServerProfileCompleted() {
+    try {
+        const fetcher = window.apiFetch || fetch;
+        const response = await fetcher('/api/me/status');
+        if (!response.ok) {
+            return false;
+        }
+        const payload = await response.json();
+        return payload?.profile_completed === true;
+    } catch (error) {
+        return false;
+    }
+}
+
 // DOM Elements
 let questionTitle;
 let optionsContainer;
@@ -218,17 +232,21 @@ async function initQuestionnaire() {
     isEditMode = urlParams.get('edit') === '1';
 
     if (!isEditMode && typeof getUserProfile === 'function') {
+        const serverCompleted = await isServerProfileCompleted();
+
         if (typeof window.syncProfileWithBackend === 'function') {
             try {
-                // Сначала подтягиваем профиль с сервера, чтобы не опираться на устаревший локальный кеш.
+                // Подтягиваем профиль с сервера, чтобы актуализировать локальные данные.
                 await window.syncProfileWithBackend();
             } catch (error) {
-                // При ошибке синхронизации оставляем текущий сценарий без аварийного редиректа.
+                // При ошибке синхронизации продолжаем без аварийного редиректа.
             }
         }
 
         const profile = getUserProfile();
-        if (profile?.is_completed === true) {
+        // Защита от старого локального кеша: редиректим только если профиль завершён
+        // и это подтверждено сервером в текущей сессии.
+        if (serverCompleted && profile?.is_completed === true) {
             window.location.replace(resolvePostQuestionnaireRoute(profile));
             return;
         }
