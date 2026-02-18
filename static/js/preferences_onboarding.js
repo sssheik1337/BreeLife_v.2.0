@@ -118,19 +118,25 @@ function updateKpiHints(elements) {
     if (elements.kpiExcluded) {
         elements.kpiExcluded.textContent = `Можно отметить 3 нежелательных продукта (${excludedCount}/3).`;
     }
+
+    updateSoftHint(elements);
 }
 
-function hasSoftKpiUnderfill() {
-    return onboardingState.favoritesSet.size < TARGET_FAVORITES || onboardingState.excludedSet.size < TARGET_EXCLUDED;
-}
+function updateSoftHint(elements) {
+    if (!elements.softHint) {
+        return;
+    }
 
-function showSoftFinishHint(elements) {
-    if (elements.softHint) {
-        elements.softHint.classList.remove('hidden');
+    const remainingFavorites = Math.max(0, TARGET_FAVORITES - onboardingState.favoritesSet.size);
+    const remainingExcluded = Math.max(0, TARGET_EXCLUDED - onboardingState.excludedSet.size);
+
+    if (remainingFavorites === 0 && remainingExcluded === 0) {
+        elements.softHint.classList.add('hidden');
+        return;
     }
-    if (typeof showNotification === 'function') {
-        showNotification('Можно завершить уже сейчас, но ещё пара отметок сделает рацион точнее.', 'warning');
-    }
+
+    elements.softHint.textContent = `Можно завершить уже сейчас — для большей точности можно отметить ещё: любимых ${remainingFavorites}, нежелательных ${remainingExcluded}.`;
+    elements.softHint.classList.remove('hidden');
 }
 
 function setCardEnabled(elements, enabled) {
@@ -306,9 +312,6 @@ function setSavingState(elements, saving) {
 }
 
 async function saveOnboardingChoices(elements) {
-    if (hasSoftKpiUnderfill()) {
-        showSoftFinishHint(elements);
-    }
     if (onboardingState.isSaving) {
         return;
     }
