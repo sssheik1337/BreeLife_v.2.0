@@ -14,6 +14,10 @@ const pageState = {
 document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('my-products-container');
     const searchInput = document.getElementById('my-products-search-input');
+    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
+
+    updatePreferencesEntrypoint(profile);
+
     if (!container) {
         return;
     }
@@ -59,6 +63,21 @@ function bindSearchInput(input, onSearch) {
         syncStateToUrl();
         debouncedSearch(query);
     });
+}
+
+function updatePreferencesEntrypoint(profile) {
+    const entrypoint = document.getElementById('preferences-entrypoint');
+    if (!entrypoint) {
+        return;
+    }
+
+    const favoriteIds = Array.isArray(profile?.favorite_product_ids) ? profile.favorite_product_ids : [];
+    const excludedIds = Array.isArray(profile?.excluded_product_ids) ? profile.excluded_product_ids : [];
+    const hasSelectedPreferences = profile?.preferences_onboarding_completed === true
+        || favoriteIds.length > 0
+        || excludedIds.length > 0;
+
+    entrypoint.textContent = hasSelectedPreferences ? 'Изменить предпочтения' : 'Настроить предпочтения';
 }
 
 function getInitialSearchQuery() {
