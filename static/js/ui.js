@@ -102,6 +102,43 @@ window.isUserDataFieldDirty = isUserDataFieldDirty;
 window.resetUserDataDirtyMap = resetUserDataDirtyMap;
 window.setUserDataField = setUserDataField;
 
+function installDoubleTapZoomProtection() {
+    let lastTouchEndAt = 0;
+
+    const isEditableTarget = (target) => {
+        if (!target || !(target instanceof Element)) {
+            return false;
+        }
+        return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
+    };
+
+    document.addEventListener('touchend', (event) => {
+        if (event.touches && event.touches.length > 0) {
+            return;
+        }
+        if (isEditableTarget(event.target)) {
+            return;
+        }
+
+        const now = Date.now();
+        if (now - lastTouchEndAt <= 300) {
+            // Предотвращаем двойной тап-зум в мобильном WebView.
+            event.preventDefault();
+        }
+        lastTouchEndAt = now;
+    }, { passive: false });
+
+    document.addEventListener('dblclick', (event) => {
+        if (isEditableTarget(event.target)) {
+            return;
+        }
+        // Блокируем системный double-click zoom на интерактивных экранах приложения.
+        event.preventDefault();
+    }, { passive: false });
+}
+
+installDoubleTapZoomProtection();
+
 // Преобразование user_profile в данные анкеты
 function mapUserProfileToUserData(profile) {
     if (!profile) {
