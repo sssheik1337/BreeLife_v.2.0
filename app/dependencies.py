@@ -60,6 +60,15 @@ def require_completed_profile(telegram_user_id: int) -> dict[str, object]:
     return profile
 
 
+
+
+def has_products_onboarding_data(profile: dict[str, object]) -> bool:
+    """Проверить, что пользователь заполнил предпочтения по продуктам."""
+    favorite_ids = profile.get("favorite_product_ids") if isinstance(profile.get("favorite_product_ids"), list) else []
+    excluded_ids = profile.get("excluded_product_ids") if isinstance(profile.get("excluded_product_ids"), list) else []
+    return len(favorite_ids) > 0 or len(excluded_ids) > 0
+
+
 def load_profile(telegram_user_id: int) -> dict[str, object]:
     return normalize_profile_payload_shape(read_payload("profiles", telegram_user_id))
 
