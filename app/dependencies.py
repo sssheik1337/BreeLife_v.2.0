@@ -90,6 +90,14 @@ def apply_profile_patch(profile: dict[str, object], patch: dict[str, object]) ->
     if "trial_welcome_seen" not in patch and normalized_current.get("trial_welcome_seen") is True:
         updated["trial_welcome_seen"] = True
 
+    # Онбординг предпочтений и списки продуктов не должны затираться при частичных PATCH-сохранениях.
+    if "preferences_onboarding_completed" not in patch:
+        updated["preferences_onboarding_completed"] = normalized_current.get("preferences_onboarding_completed")
+    if "favorite_product_ids" not in patch:
+        updated["favorite_product_ids"] = normalized_current.get("favorite_product_ids", [])
+    if "excluded_product_ids" not in patch:
+        updated["excluded_product_ids"] = normalized_current.get("excluded_product_ids", [])
+
     updated["is_completed"] = bool(
         normalized_patch.get("is_completed")
         or normalized_current.get("is_completed")
