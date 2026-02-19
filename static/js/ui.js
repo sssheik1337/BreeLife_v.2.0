@@ -969,6 +969,19 @@ function resetWindowScrollPosition() {
     }
 }
 
+function resetInitialScrollPosition() {
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            resetWindowScrollPosition();
+
+            const scroller = document.querySelector('.app-content');
+            if (scroller) {
+                scroller.scrollTop = 0;
+            }
+        });
+    });
+}
+
 // Применение темы Telegram WebApp к CSS-переменным
 function applyTelegramTheme() {
     const tg = window.Telegram?.WebApp;
@@ -1006,7 +1019,7 @@ function applyTelegramTheme() {
 
 
 window.addEventListener('pageshow', () => {
-    resetWindowScrollPosition();
+    resetInitialScrollPosition();
 });
 
 // Initialize on page load
@@ -1020,7 +1033,11 @@ document.addEventListener('DOMContentLoaded', async function() {
     const isEntryPoint = currentPath === '/' || currentPath === '/index';
     const tg = window.Telegram?.WebApp;
     if (tg) {
+        if (typeof tg.ready === 'function') {
+            tg.ready();
+        }
         tg.expand();
+        resetInitialScrollPosition();
         applyTelegramTheme();
         applyTelegramSafeAreaInsets();
         applyTelegramOverlayOffset();
