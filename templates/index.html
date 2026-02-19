@@ -118,16 +118,6 @@
 
             tg.ready();
             tg.expand();
-
-            setTimeout(() => {
-                window.scrollTo(0, 0);
-
-                const content = document.querySelector('main');
-                if (content) {
-                    content.scrollTop = 0;
-                }
-            }, 50);
-
             if (typeof tg.disableVerticalSwipes === 'function') {
                 tg.disableVerticalSwipes();
             }

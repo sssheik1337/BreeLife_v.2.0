@@ -4,24 +4,31 @@ class CustomLayout extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         .app-layout {
-          position: fixed;
-          inset: 0;
+          min-height: 100vh;
           display: flex;
           flex-direction: column;
           background: var(--tg-bg-color, #f8fafc);
           color: var(--tg-text-color, #0f172a);
-          overflow: hidden;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+          padding-top: env(safe-area-inset-top);
           padding-bottom: env(safe-area-inset-bottom);
         }
-
-        ::slotted(main) {
+        
+        .main-content {
           flex: 1;
           width: 100%;
           max-width: 420px;
-          margin: var(--header-height, 88px) auto 0;
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
-          padding-bottom: var(--bottom-height, 96px);
+          margin: 0 auto;
+          padding: 1.5rem;
+          display: flex;
+          flex-direction: column;
+        }
+        
+        @media (max-width: 640px) {
+          .main-content {
+            padding: 1.25rem;
+          }
         }
       </style>
       
