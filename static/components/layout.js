@@ -11,7 +11,7 @@ class CustomLayout extends HTMLElement {
           color: var(--tg-text-color, #0f172a);
           overflow-y: auto;
           -webkit-overflow-scrolling: touch;
-          padding-top: env(safe-area-inset-top);
+          padding-top: max(env(safe-area-inset-top), var(--tg-safe-top, 0px));
           padding-bottom: env(safe-area-inset-bottom);
         }
         
