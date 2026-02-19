@@ -108,7 +108,6 @@
     <script>
         if (window.Telegram && window.Telegram.WebApp) {
             const tg = window.Telegram.WebApp;
-
             tg.ready();
             tg.expand();
             if (typeof tg.disableVerticalSwipes === 'function') {
@@ -117,10 +116,6 @@
             if (typeof tg.isVersionAtLeast === 'function' && tg.isVersionAtLeast('8.0') && typeof tg.requestFullscreen === 'function') {
                 tg.requestFullscreen();
             }
-            if (typeof tg.onEvent === 'function') {
-                tg.onEvent('viewportChanged', applyTelegramSafeAreaInsets);
-            }
-            applyTelegramSafeAreaInsets();
         }
         feather.replace();
     </script>

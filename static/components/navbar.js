@@ -12,7 +12,7 @@ class CustomNavbar extends HTMLElement {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: calc(1.25rem + max(env(safe-area-inset-top), var(--tg-safe-top, 0px))) 1.5rem 1.25rem;
+          padding: 1.25rem 1.5rem;
           background: white;
           position: sticky;
           top: 0;
@@ -173,7 +173,7 @@ class CustomNavbar extends HTMLElement {
 
         @media (max-width: 640px) {
           .navbar {
-            padding: calc(1rem + max(env(safe-area-inset-top), var(--tg-safe-top, 0px))) 1.25rem 1rem;
+            padding: 1rem 1.25rem;
           }
 
           .logo-text {
