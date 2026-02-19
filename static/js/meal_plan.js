@@ -9,7 +9,7 @@ const MEAL_DISTRIBUTION = [
     { key: 'dinner', title: 'Ужин', share: 0.3, items: 3 }
 ];
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const container = document.getElementById('meal-plan-container');
     if (!container) {
         return;
@@ -17,19 +17,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     container.textContent = 'Загрузка рациона...';
 
-    fetch(PRODUCTS_ENDPOINT)
-        .then((response) => {
-            if (!response.ok) {
-                throw new Error('Не удалось загрузить данные');
-            }
-            return response.json();
-        })
-        .then((products) => {
-            initMealPlan(container, products);
-        })
-        .catch(() => {
-            container.textContent = 'Не удалось загрузить рацион.';
-        });
+    try {
+        // Синхронизируем профиль с backend, чтобы рацион использовал единый источник истины.
+        if (typeof syncProfileWithBackend === 'function') {
+            await syncProfileWithBackend();
+        }
+
+        const response = await fetch(PRODUCTS_ENDPOINT);
+        if (!response.ok) {
+            throw new Error('Не удалось загрузить данные');
+        }
+        const products = await response.json();
+        initMealPlan(container, products);
+    } catch (error) {
+        container.textContent = 'Не удалось загрузить рацион.';
+    }
 });
 
 function initMealPlan(container, products) {
@@ -57,18 +59,56 @@ function updateRangeButtons(buttons, activeValue) {
     });
 }
 
+
+function resolveCaloriesTarget(profile) {
+    const directTarget = Number(profile?.calories_target);
+    if (Number.isFinite(directTarget) && directTarget > 0) {
+        return directTarget;
+    }
+
+    const requiredTarget = Number(profile?.required_calories_target);
+    if (Number.isFinite(requiredTarget) && requiredTarget > 0) {
+        return requiredTarget;
+    }
+
+    const tdee = Number(profile?.tdee_calories);
+    if (!Number.isFinite(tdee) || tdee <= 0) {
+        return null;
+    }
+
+    // Аварийный расчёт цели по калориям на основе TDEE и цели, если явная цель не сохранена.
+    if (profile?.goal === 'lose') {
+        return Math.max(1200, Math.round(tdee * 0.85));
+    }
+    if (profile?.goal === 'gain') {
+        return Math.round(tdee * 1.1);
+    }
+    return Math.round(tdee);
+}
+
+
+function resolveMacrosTarget(profile, caloriesTarget) {
+    if (profile?.macros && typeof profile.macros === 'object') {
+        return profile.macros;
+    }
+
+    if (typeof calculateMacros !== 'function') {
+        return null;
+    }
+
+    return calculateMacros({
+        goal: profile?.goal,
+        weight_kg: profile?.weight_kg,
+        calories_target: caloriesTarget
+    });
+}
+
 function renderMealPlan(container, products, rangeKey) {
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
     const filteredProducts = buildPreferredProducts(products, profile);
 
-    const caloriesTarget = Number(profile?.calories_target ?? profile?.tdee_calories);
-    const macrosTarget = profile?.macros || (typeof calculateMacros === 'function'
-        ? calculateMacros({
-            goal: profile?.goal,
-            weight_kg: profile?.weight_kg,
-            calories_target: caloriesTarget
-        })
-        : null);
+    const caloriesTarget = resolveCaloriesTarget(profile);
+    const macrosTarget = resolveMacrosTarget(profile, caloriesTarget);
     const totalsText = buildTotalsText(caloriesTarget, macrosTarget);
 
     updateSummary(filteredProducts.length, totalsText);
