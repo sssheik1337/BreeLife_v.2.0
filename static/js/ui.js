@@ -928,11 +928,23 @@ function applyTelegramSafeAreaInsets() {
     if (!tg) {
         return;
     }
+
     const viewportHeight = Number(tg.viewportHeight);
     const viewportStableHeight = Number(tg.viewportStableHeight);
-    const safeTop = Number.isFinite(viewportHeight) && Number.isFinite(viewportStableHeight)
+    const viewportDeltaTop = Number.isFinite(viewportHeight) && Number.isFinite(viewportStableHeight)
         ? Math.max(viewportHeight - viewportStableHeight, 0)
         : 0;
+
+    // В fullscreen Telegram системные кнопки могут перекрывать верх приложения.
+    // Берём максимальный верхний inset из всех доступных источников WebApp API.
+    const safeAreaTop = Number(tg.safeAreaInset?.top);
+    const contentSafeAreaTop = Number(tg.contentSafeAreaInset?.top);
+    const safeTopCandidates = [viewportDeltaTop, safeAreaTop, contentSafeAreaTop]
+        .filter((value) => Number.isFinite(value) && value >= 0);
+    const safeTop = safeTopCandidates.length > 0
+        ? Math.max(...safeTopCandidates)
+        : 0;
+
     document.documentElement.style.setProperty('--tg-safe-top', `${safeTop}px`);
 }
 
