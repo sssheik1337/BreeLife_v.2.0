@@ -922,6 +922,26 @@ function mergeUserDataWithoutLosingAnswers(target, source, options = {}) {
 }
 window.mergeUserDataWithoutLosingAnswers = mergeUserDataWithoutLosingAnswers;
 
+
+function applyTelegramSafeAreaInsets() {
+    const tg = window.Telegram?.WebApp;
+    if (!tg) {
+        return;
+    }
+    const viewportHeight = Number(tg.viewportHeight);
+    const viewportStableHeight = Number(tg.viewportStableHeight);
+    const safeTop = Number.isFinite(viewportHeight) && Number.isFinite(viewportStableHeight)
+        ? Math.max(viewportHeight - viewportStableHeight, 0)
+        : 0;
+    document.documentElement.style.setProperty('--tg-safe-top', `${safeTop}px`);
+}
+
+function resetWindowScrollPosition() {
+    if (typeof window.scrollTo === 'function') {
+        window.scrollTo(0, 0);
+    }
+}
+
 // Применение темы Telegram WebApp к CSS-переменным
 function applyTelegramTheme() {
     const tg = window.Telegram?.WebApp;
@@ -957,6 +977,11 @@ function applyTelegramTheme() {
     }
 }
 
+
+window.addEventListener('pageshow', () => {
+    resetWindowScrollPosition();
+});
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async function() {
     animatePageTransition();
@@ -970,12 +995,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (tg) {
         tg.expand();
         applyTelegramTheme();
+        applyTelegramSafeAreaInsets();
         if (typeof tg.onEvent === 'function') {
             tg.onEvent('themeChanged', () => {
                 applyTelegramTheme();
             });
+            tg.onEvent('viewportChanged', applyTelegramSafeAreaInsets);
         }
     }
+    resetWindowScrollPosition();
     if (isEntryPoint && window.appDebug) {
         console.group('🔍 Telegram WebApp DEBUG');
         console.log('window.Telegram:', window.Telegram);
