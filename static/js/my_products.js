@@ -11,11 +11,20 @@ const pageState = {
     searchQuery: ''
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const container = document.getElementById('my-products-container');
     const searchInput = document.getElementById('my-products-search-input');
-    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
 
+    if (typeof window.syncProfileWithBackend === 'function') {
+        try {
+            // Подтягиваем актуальный профиль из backend, чтобы счётчики и статусы были в едином состоянии.
+            await window.syncProfileWithBackend();
+        } catch (_) {
+            // Если синхронизация недоступна, используем локальные данные как fallback.
+        }
+    }
+
+    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
     updatePreferencesEntrypoint(profile);
 
     if (!container) {
@@ -65,17 +74,27 @@ function bindSearchInput(input, onSearch) {
     });
 }
 
+function normalizeProfileIdSet(value) {
+    if (!Array.isArray(value)) {
+        return new Set();
+    }
+    const normalized = value
+        .map((item) => Number(item))
+        .filter((item) => Number.isInteger(item));
+    return new Set(normalized);
+}
+
 function updatePreferencesEntrypoint(profile) {
     const entrypoint = document.getElementById('preferences-entrypoint');
     if (!entrypoint) {
         return;
     }
 
-    const favoriteIds = Array.isArray(profile?.favorite_product_ids) ? profile.favorite_product_ids : [];
-    const excludedIds = Array.isArray(profile?.excluded_product_ids) ? profile.excluded_product_ids : [];
+    const favoriteIds = normalizeProfileIdSet(profile?.favorite_product_ids);
+    const excludedIds = normalizeProfileIdSet(profile?.excluded_product_ids);
     const hasSelectedPreferences = profile?.preferences_onboarding_completed === true
-        || favoriteIds.length > 0
-        || excludedIds.length > 0;
+        || favoriteIds.size > 0
+        || excludedIds.size > 0;
 
     entrypoint.textContent = hasSelectedPreferences ? 'Изменить предпочтения' : 'Настроить предпочтения';
 }
@@ -158,8 +177,8 @@ function debounce(callback, waitMs) {
 
 function renderMyProducts(container, products, options = {}) {
     const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
-    const favoriteIds = new Set(profile.favorite_product_ids || []);
-    const excludedIds = new Set(profile.excluded_product_ids || []);
+    const favoriteIds = normalizeProfileIdSet(profile.favorite_product_ids);
+    const excludedIds = normalizeProfileIdSet(profile.excluded_product_ids);
     const hasActiveSearch = options.hasActiveSearch === true;
 
     container.innerHTML = '';
@@ -375,7 +394,9 @@ function savePreferences(favorites, excluded) {
     }
     patchUserProfile({
         favorite_product_ids: Array.from(favorites),
-        excluded_product_ids: Array.from(excluded)
+        excluded_product_ids: Array.from(excluded),
+        // Любые изменения в "Моих продуктах" считаем завершённым шагом предпочтений.
+        preferences_onboarding_completed: true
     });
 }
 
