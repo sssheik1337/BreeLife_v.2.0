@@ -174,7 +174,7 @@ function resolvePostQuestionnaireRoute(profile) {
     if (profile?.preferences_onboarding_completed === true) {
         return '/trial-start';
     }
-    return '/preferences-onboarding';
+    return '/preferences-onboarding-choice';
 }
 
 async function isServerProfileCompleted() {

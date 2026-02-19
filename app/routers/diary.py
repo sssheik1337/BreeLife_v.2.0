@@ -5,7 +5,6 @@ from config import AI_ENABLED
 from app.context import templates
 from app.dependencies import (
     get_profile_and_admin_config,
-    has_products_onboarding_data,
     load_profile,
     optional_current_user,
     require_completed_profile,
@@ -110,10 +109,7 @@ async def diary(request: Request, telegram_user_id: int | None = Depends(optiona
             "diary.html",
             {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
         )
-    profile = require_completed_profile(telegram_user_id)
-    if not has_products_onboarding_data(profile):
-        # Дневник питания доступен только после заполнения продуктового онбординга.
-        return RedirectResponse(url="/preferences-onboarding", status_code=307)
+    require_completed_profile(telegram_user_id)
     return templates.TemplateResponse(
         "diary.html",
         {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
@@ -124,10 +120,7 @@ async def diary(request: Request, telegram_user_id: int | None = Depends(optiona
 async def food_diary(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
     if telegram_user_id is None:
         return RedirectResponse(url="/diary")
-    profile = require_completed_profile(telegram_user_id)
-    if not has_products_onboarding_data(profile):
-        # Если предпочтения не заполнены, сначала отправляем пользователя на онбординг.
-        return RedirectResponse(url="/preferences-onboarding", status_code=307)
+    require_completed_profile(telegram_user_id)
     return RedirectResponse(url="/diary")
 
 

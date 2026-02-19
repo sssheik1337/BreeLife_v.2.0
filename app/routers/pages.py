@@ -85,6 +85,27 @@ async def reminders_settings(request: Request, telegram_user_id: int | None = De
     )
 
 
+
+
+@router.get("/preferences-onboarding-choice", response_class=HTMLResponse)
+async def preferences_onboarding_choice(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    payload = get_profile_and_admin_config(telegram_user_id)
+    if telegram_user_id is None:
+        return templates.TemplateResponse(
+            "preferences_onboarding_choice.html",
+            {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
+        )
+    profile = load_profile(telegram_user_id)
+    if not isinstance(profile, dict) or profile.get("is_completed") is not True:
+        # Экран выбора доступен только после завершения основной анкеты.
+        return RedirectResponse(url="/questionnaire", status_code=307)
+    if profile.get("preferences_onboarding_completed") is True:
+        return RedirectResponse(url="/trial-start", status_code=307)
+    return templates.TemplateResponse(
+        "preferences_onboarding_choice.html",
+        {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
+    )
+
 @router.get("/preferences-onboarding", response_class=HTMLResponse)
 async def preferences_onboarding(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
     payload = get_profile_and_admin_config(telegram_user_id)
