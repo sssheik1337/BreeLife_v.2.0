@@ -51,6 +51,8 @@ def create_app() -> FastAPI:
         return response
 
     app.mount("/static", StaticFiles(directory="static"), name="static")
+    # Раздаём локальные файлы шрифтов по URL /fonts, чтобы @font-face не получал 404.
+    app.mount("/fonts", StaticFiles(directory="fonts"), name="fonts")
     return app
 
 
