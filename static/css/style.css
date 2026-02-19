@@ -47,6 +47,7 @@ body {
     color: var(--tg-text-color, #0f172a);
     min-height: 100vh;
     overflow: auto;
+    padding-top: max(env(safe-area-inset-top), var(--tg-safe-top, 0px));
 }
 
 .h-screen-title,
