@@ -337,7 +337,6 @@ async function saveOnboardingChoices(elements) {
     }
     setSavingState(elements, true);
 
-    const fetcher = window.apiFetch || fetch;
     const payload = {
         favorite_product_ids: Array.from(onboardingState.favoritesSet),
         excluded_product_ids: Array.from(onboardingState.excludedSet),
@@ -345,17 +344,18 @@ async function saveOnboardingChoices(elements) {
     };
 
     try {
-        const response = await fetcher('/api/profile/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-        if (!response.ok) {
-            throw new Error('PROFILE_SAVE_FAILED');
-        }
-
-        if (typeof patchUserProfile === 'function') {
-            patchUserProfile(payload);
+        if (typeof patchUserProfileWithBackend === 'function') {
+            const savedProfile = await patchUserProfileWithBackend(payload);
+            if (!savedProfile) {
+                throw new Error('PROFILE_SAVE_FAILED');
+            }
+        } else if (typeof patchUserProfile === 'function') {
+            const fallbackProfile = patchUserProfile(payload);
+            if (!fallbackProfile) {
+                throw new Error('PROFILE_SAVE_FALLBACK_FAILED');
+            }
+        } else {
+            throw new Error('PATCH_PROFILE_UNAVAILABLE');
         }
 
         // После успешного ответа снимаем блокировку кнопок и показываем финальный экран.
