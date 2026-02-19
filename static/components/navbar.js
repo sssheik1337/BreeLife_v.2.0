@@ -38,7 +38,7 @@ class CustomNavbar extends HTMLElement {
           align-items: center;
           justify-content: center;
           color: white;
-          font-weight: 800;
+          font-weight: 700;
           font-size: 18px;
         }
 
