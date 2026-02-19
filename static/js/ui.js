@@ -948,6 +948,21 @@ function applyTelegramSafeAreaInsets() {
     document.documentElement.style.setProperty('--tg-safe-top', `${safeTop}px`);
 }
 
+function applyTelegramOverlayOffset() {
+    const tg = window.Telegram?.WebApp;
+    if (!tg) {
+        return;
+    }
+
+    const overlay = Math.max(
+        0,
+        (Number(tg.viewportHeight) || 0) - (Number(tg.viewportStableHeight) || 0)
+    );
+
+    document.documentElement.style.setProperty('--tg-overlay-top', `${overlay}px`);
+}
+
+
 function resetWindowScrollPosition() {
     if (typeof window.scrollTo === 'function') {
         window.scrollTo(0, 0);
@@ -1008,11 +1023,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         tg.expand();
         applyTelegramTheme();
         applyTelegramSafeAreaInsets();
+        applyTelegramOverlayOffset();
         if (typeof tg.onEvent === 'function') {
             tg.onEvent('themeChanged', () => {
                 applyTelegramTheme();
             });
-            tg.onEvent('viewportChanged', applyTelegramSafeAreaInsets);
+            tg.onEvent('viewportChanged', () => {
+                applyTelegramSafeAreaInsets();
+                applyTelegramOverlayOffset();
+            });
         }
     }
     resetWindowScrollPosition();
