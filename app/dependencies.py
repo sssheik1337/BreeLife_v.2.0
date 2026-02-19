@@ -63,7 +63,9 @@ def require_completed_profile(telegram_user_id: int) -> dict[str, object]:
 
 
 def has_products_onboarding_data(profile: dict[str, object]) -> bool:
-    """Проверить, что пользователь заполнил предпочтения по продуктам."""
+    """Проверить, что онбординг предпочтений пройден или есть выбранные продуктовые списки."""
+    if profile.get("preferences_onboarding_completed") is True:
+        return True
     favorite_ids = profile.get("favorite_product_ids") if isinstance(profile.get("favorite_product_ids"), list) else []
     excluded_ids = profile.get("excluded_product_ids") if isinstance(profile.get("excluded_product_ids"), list) else []
     return len(favorite_ids) > 0 or len(excluded_ids) > 0
@@ -167,6 +169,7 @@ def normalize_profile_payload_shape(raw_profile: dict[str, object] | None) -> di
     - food_diary, trial_welcome_seen, is_completed: bool | null
     - вычисляемые поля калорий/динамики: float | null
     - macros, weekly_stats, weekly_adjustments, weekly_review, subscription: object | null
+    - preferences_onboarding_completed, food_diary, trial_welcome_seen, is_completed: bool | null
     - favorite_product_ids, excluded_product_ids: list[int]
     - subscription_until/subscription_status/subscription_started_at/trial_started_at/last_updated: str | null
 
@@ -284,6 +287,7 @@ def normalize_profile_payload_shape(raw_profile: dict[str, object] | None) -> di
         "subscription_started_at": profile.get("subscription_started_at") if isinstance(profile.get("subscription_started_at"), str) else None,
         "trial_started_at": profile.get("trial_started_at") if isinstance(profile.get("trial_started_at"), str) else None,
         "trial_welcome_seen": parse_bool(profile.get("trial_welcome_seen")),
+        "preferences_onboarding_completed": parse_bool(profile.get("preferences_onboarding_completed")),
         "favorite_product_ids": parse_int_list(profile.get("favorite_product_ids")),
         "excluded_product_ids": parse_int_list(profile.get("excluded_product_ids")),
         "is_completed": parse_bool(
@@ -329,6 +333,7 @@ CANONICAL_PROFILE_FIELDS = {
     "subscription_started_at",
     "trial_started_at",
     "trial_welcome_seen",
+    "preferences_onboarding_completed",
     "favorite_product_ids",
     "excluded_product_ids",
     "is_completed",
