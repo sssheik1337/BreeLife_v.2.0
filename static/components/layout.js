@@ -4,31 +4,34 @@ class CustomLayout extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         .app-layout {
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
+          position: fixed;
+          inset: 0;
+          display: block;
           background: var(--tg-bg-color, #f8fafc);
           color: var(--tg-text-color, #0f172a);
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
-          padding-top: env(safe-area-inset-top);
+          overflow: hidden;
           padding-bottom: env(safe-area-inset-bottom);
         }
-        
-        .main-content {
-          flex: 1;
+
+        ::slotted(custom-navbar) {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          z-index: 1000;
+        }
+
+        ::slotted(main) {
+          position: absolute;
+          top: var(--header-height, 88px);
+          bottom: var(--bottom-height, 96px);
+          left: 0;
+          right: 0;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
           width: 100%;
           max-width: 420px;
           margin: 0 auto;
-          padding: 1.5rem;
-          display: flex;
-          flex-direction: column;
-        }
-        
-        @media (max-width: 640px) {
-          .main-content {
-            padding: 1.25rem;
-          }
         }
       </style>
       

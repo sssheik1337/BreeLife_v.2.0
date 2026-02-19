@@ -28,6 +28,8 @@
     --font-secondary-size: 14px;
     --font-section-size: 18px;
     --font-screen-size: 24px;
+    --header-height: 88px;
+    --bottom-height: 96px;
 }
 
 * {
@@ -46,8 +48,7 @@ body {
     background: var(--tg-bg-color, #f8fafc);
     color: var(--tg-text-color, #0f172a);
     min-height: 100vh;
-    overflow: auto;
-    padding-top: max(env(safe-area-inset-top), var(--tg-safe-top, 0px));
+    overflow: hidden;
 }
 
 .h-screen-title,
@@ -105,6 +106,8 @@ a:active {
 html,
 body {
     height: 100%;
+    margin: 0;
+    overflow: hidden;
 }
 
 /* Custom Scrollbar */

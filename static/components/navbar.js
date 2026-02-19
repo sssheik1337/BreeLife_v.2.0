@@ -12,11 +12,13 @@ class CustomNavbar extends HTMLElement {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 1.25rem 1.5rem;
+          padding: calc(1.25rem + max(env(safe-area-inset-top), var(--tg-safe-top, 0px))) 1.5rem 1.25rem;
           background: white;
-          position: sticky;
+          position: fixed;
           top: 0;
-          z-index: 50;
+          left: 0;
+          right: 0;
+          z-index: 1000;
           box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
           border-bottom: 1px solid #f1f5f9;
           font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -225,6 +227,19 @@ class CustomNavbar extends HTMLElement {
         </div>
       </nav>
     `;
+
+
+    const updateHeaderHeight = () => {
+      const navbar = this.shadowRoot.querySelector('.navbar');
+      if (!navbar) {
+        return;
+      }
+      // Высоту шапки сохраняем в CSS-переменную, чтобы контент корректно отступал сверху.
+      document.documentElement.style.setProperty('--header-height', `${navbar.offsetHeight}px`);
+    };
+
+    updateHeaderHeight();
+    window.addEventListener('resize', updateHeaderHeight);
 
     const getTelegramFallback = () => {
       const user = window.Telegram?.WebApp?.initDataUnsafe?.user;

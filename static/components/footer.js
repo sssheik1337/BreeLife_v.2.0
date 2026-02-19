@@ -215,6 +215,18 @@ class CustomFooter extends HTMLElement {
       </div>
     `;
 
+    const syncBottomNavHeight = () => {
+      const bottomNav = this.shadowRoot.querySelector('.bottom-nav');
+      if (!bottomNav) {
+        return;
+      }
+      // Высоту нижней панели сохраняем в переменную для расчёта области прокрутки.
+      document.documentElement.style.setProperty('--bottom-height', `${bottomNav.offsetHeight}px`);
+    };
+
+    syncBottomNavHeight();
+    window.addEventListener('resize', syncBottomNavHeight);
+
     const hasCompletedProfile = window.profileCompleted === true;
     const isDevMode = window.appIsDev === true || window.appMode === 'development';
 
