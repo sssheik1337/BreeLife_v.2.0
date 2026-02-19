@@ -12,10 +12,10 @@ class CustomNavbar extends HTMLElement {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: calc(1.25rem + max(env(safe-area-inset-top), var(--tg-safe-top, 0px))) 1.5rem 1.25rem;
+          padding: 1.25rem 1.5rem;
           background: white;
           position: fixed;
-          top: 0;
+          top: max(env(safe-area-inset-top), var(--tg-safe-top, 0px));
           left: 0;
           right: 0;
           z-index: 1000;

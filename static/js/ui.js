@@ -923,6 +923,17 @@ function mergeUserDataWithoutLosingAnswers(target, source, options = {}) {
 window.mergeUserDataWithoutLosingAnswers = mergeUserDataWithoutLosingAnswers;
 
 // Применение темы Telegram WebApp к CSS-переменным
+function syncTelegramSafeAreaTop() {
+    const tg = window.Telegram?.WebApp;
+    if (!tg) {
+        return;
+    }
+    const safeTop = tg.viewportHeight - tg.viewportStableHeight > 0
+        ? tg.viewportHeight - tg.viewportStableHeight
+        : 0;
+    document.documentElement.style.setProperty('--tg-safe-top', `${safeTop}px`);
+}
+
 function applyTelegramTheme() {
     const tg = window.Telegram?.WebApp;
     if (!tg) {
@@ -970,9 +981,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (tg) {
         tg.expand();
         applyTelegramTheme();
+        syncTelegramSafeAreaTop();
         if (typeof tg.onEvent === 'function') {
             tg.onEvent('themeChanged', () => {
                 applyTelegramTheme();
+            });
+            tg.onEvent('viewportChanged', () => {
+                syncTelegramSafeAreaTop();
             });
         }
     }

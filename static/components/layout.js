@@ -6,32 +6,22 @@ class CustomLayout extends HTMLElement {
         .app-layout {
           position: fixed;
           inset: 0;
-          display: block;
+          display: flex;
+          flex-direction: column;
           background: var(--tg-bg-color, #f8fafc);
           color: var(--tg-text-color, #0f172a);
           overflow: hidden;
           padding-bottom: env(safe-area-inset-bottom);
         }
 
-        ::slotted(custom-navbar) {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          z-index: 1000;
-        }
-
         ::slotted(main) {
-          position: absolute;
-          top: var(--header-height, 88px);
-          bottom: var(--bottom-height, 96px);
-          left: 0;
-          right: 0;
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
+          flex: 1;
           width: 100%;
           max-width: 420px;
-          margin: 0 auto;
+          margin: var(--header-height, 88px) auto 0;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+          padding-bottom: var(--bottom-height, 96px);
         }
       </style>
       
