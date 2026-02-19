@@ -3,6 +3,11 @@ class CustomLayout extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this.shadowRoot.innerHTML = `
       <style>
+        :host {
+          display: block;
+          --app-safe-top: max(env(safe-area-inset-top), var(--tg-safe-top, 0px));
+        }
+
         .app-layout {
           min-height: 100vh;
           display: flex;
@@ -11,7 +16,7 @@ class CustomLayout extends HTMLElement {
           color: var(--tg-text-color, #0f172a);
           overflow-y: auto;
           -webkit-overflow-scrolling: touch;
-          padding-top: env(safe-area-inset-top);
+          padding-top: var(--app-safe-top);
           padding-bottom: env(safe-area-inset-bottom);
         }
         
