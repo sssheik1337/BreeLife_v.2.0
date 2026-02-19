@@ -10,7 +10,6 @@ class CustomLayout extends HTMLElement {
           height: 100%;
           overflow-y: auto;
           -webkit-overflow-scrolling: touch;
-          --app-safe-top: max(env(safe-area-inset-top), var(--tg-safe-top, 0px));
         }
 
         .app-layout {
@@ -19,7 +18,7 @@ class CustomLayout extends HTMLElement {
           flex-direction: column;
           background: var(--tg-bg-color, #f8fafc);
           color: var(--tg-text-color, #0f172a);
-          padding-top: var(--app-safe-top);
+          padding-top: var(--header-height, 72px);
           padding-bottom: env(safe-area-inset-bottom);
         }
         

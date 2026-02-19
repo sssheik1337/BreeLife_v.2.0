@@ -963,6 +963,23 @@ function applyTelegramOverlayOffset() {
 }
 
 
+function applyHeaderHeight() {
+    const navbarHost = document.querySelector('custom-navbar');
+    if (!navbarHost || !navbarHost.shadowRoot) {
+        return;
+    }
+
+    const navbar = navbarHost.shadowRoot.querySelector('.navbar');
+    if (!navbar) {
+        return;
+    }
+
+    const height = Math.max(0, Math.round(navbar.getBoundingClientRect().height));
+    if (height > 0) {
+        document.documentElement.style.setProperty('--header-height', `${height}px`);
+    }
+}
+
 function resetWindowScrollPosition() {
     if (typeof window.scrollTo === 'function') {
         window.scrollTo(0, 0);
@@ -1037,6 +1054,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             tg.ready();
         }
         tg.expand();
+        requestAnimationFrame(() => {
+            // После expand/layout в Telegram шапка может пересчитаться не сразу.
+            applyHeaderHeight();
+        });
         resetInitialScrollPosition();
         applyTelegramTheme();
         applyTelegramSafeAreaInsets();
@@ -1048,9 +1069,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             tg.onEvent('viewportChanged', () => {
                 applyTelegramSafeAreaInsets();
                 applyTelegramOverlayOffset();
+                applyHeaderHeight();
             });
         }
     }
+    requestAnimationFrame(() => {
+        applyHeaderHeight();
+    });
     resetWindowScrollPosition();
     if (isEntryPoint && window.appDebug) {
         console.group('🔍 Telegram WebApp DEBUG');

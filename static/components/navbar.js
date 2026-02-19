@@ -18,8 +18,10 @@ class CustomNavbar extends HTMLElement {
             + var(--tg-overlay-top, 0px)
           );
           background: white;
-          position: sticky;
+          position: fixed;
           top: 0;
+          left: 0;
+          right: 0;
           z-index: 50;
           box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
           border-bottom: 1px solid #f1f5f9;
