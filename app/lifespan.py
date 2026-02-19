@@ -23,21 +23,9 @@ def register_telegram_handlers(dispatcher_instance: Dispatcher) -> None:
             user_id,
             message.text,
         )
-        keyboard = types.InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    types.InlineKeyboardButton(
-                        text=APP_NAME,
-                        web_app=types.WebAppInfo(url=PUBLIC_APP_URL),
-                    )
-                ]
-            ]
-        )
-        logger.info("INFO: Отправлена кнопка WebApp с URL: %s", PUBLIC_APP_URL)
         try:
             await message.answer(
-                "Добро пожаловать! Откройте приложение 👇",
-                reply_markup=keyboard,
+                "Добро пожаловать! Откройте приложение через кнопку меню бота 👇",
             )
         except Exception as exc:
             logger.error("Не удалось отправить ответ на /start: %s", exc)

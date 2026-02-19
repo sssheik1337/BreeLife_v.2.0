@@ -52,20 +52,8 @@ def build_dispatcher() -> Dispatcher:
     async def start(message: types.Message) -> None:
         user_id = message.from_user.id if message.from_user else "unknown"
         logger.info("INFO: /start received from user %s", user_id)
-        keyboard = types.InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    types.InlineKeyboardButton(
-                        text=APP_NAME,
-                        web_app=types.WebAppInfo(url=WEBAPP_URL),
-                    )
-                ]
-            ]
-        )
-        logger.info("INFO: WebApp button sent with URL: %s", WEBAPP_URL)
         await message.answer(
-            "Откройте приложение для управления питанием",
-            reply_markup=keyboard,
+            "Откройте приложение через кнопку меню бота",
         )
 
     return dispatcher
