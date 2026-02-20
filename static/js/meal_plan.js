@@ -25,6 +25,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         initMealPlan(container);
     } catch (error) {
+        if (error?.message === 'Заполните профиль для расчёта плана питания') {
+            container.textContent = 'Заполните профиль для расчёта плана питания';
+            return;
+        }
         container.textContent = 'Не удалось загрузить рацион.';
     }
 });
@@ -69,7 +73,7 @@ function isFrontendDebugEnabled() {
     return Boolean(window?.appDebug);
 }
 
-async function loadMealPlanByDate(isoDate) {
+async function loadMealPlanByDate(isoDate, { allowColdStartRecovery = true } = {}) {
     const params = new URLSearchParams({ date: isoDate });
     if (isFrontendDebugEnabled()) {
         params.set('app_debug', '1');
@@ -79,7 +83,76 @@ async function loadMealPlanByDate(isoDate) {
     if (!response.ok) {
         throw new Error('Не удалось загрузить рацион');
     }
-    return response.json();
+
+    const payload = await response.json();
+    const targetStatus = payload?.target_status;
+    const targetsSource = payload?.targets_source;
+    const needsColdStartRecovery = targetStatus === 'target_not_computed' || targetsSource === 'missing';
+
+    if (!needsColdStartRecovery || allowColdStartRecovery === false) {
+        return payload;
+    }
+
+    const recovery = await computeAndPersistMissingCaloriesTarget();
+    if (!recovery.ok) {
+        const reason = recovery.reason === 'insufficient_profile_data'
+            ? 'Заполните профиль для расчёта плана питания'
+            : 'Не удалось восстановить цель рациона';
+        const error = new Error(reason);
+        error.code = recovery.reason;
+        throw error;
+    }
+
+    // После успешного сохранения цели повторяем запрос один раз.
+    return loadMealPlanByDate(isoDate, { allowColdStartRecovery: false });
+}
+
+
+
+function isValidCaloriesTarget(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0;
+}
+
+async function computeAndPersistMissingCaloriesTarget() {
+    if (typeof window.computeTargets !== 'function') {
+        return { ok: false, reason: 'compute_targets_unavailable' };
+    }
+
+    const profile = typeof window.getUserProfile === 'function'
+        ? (window.getUserProfile() || {})
+        : {};
+    const diaryEntries = typeof window.getDiaryEntries === 'function'
+        ? window.getDiaryEntries()
+        : [];
+
+    const computed = window.computeTargets(profile, diaryEntries, new Date());
+    if (!isValidCaloriesTarget(computed?.calories_target)) {
+        return { ok: false, reason: 'insufficient_profile_data' };
+    }
+
+    const payload = {
+        tdee_calories: computed?.tdee_calories,
+        calories_target: computed?.calories_target,
+        calorie_delta: computed?.calorie_delta,
+        weight_rate_kg_per_week: computed?.weight_rate_kg_per_week,
+        predicted_goal_date: computed?.predicted_goal_date,
+        warning_message: computed?.warning_message,
+        required_rate_kg_per_week: computed?.required_rate_kg_per_week,
+        required_calorie_delta: computed?.required_calorie_delta,
+        required_calories_target: computed?.required_calories_target,
+        safe_weeks_estimate: computed?.safe_weeks_estimate,
+    };
+
+    if (typeof window.patchUserProfileWithBackend === 'function') {
+        await window.patchUserProfileWithBackend(payload);
+    } else if (typeof window.patchUserProfile === 'function') {
+        window.patchUserProfile(payload);
+    } else {
+        return { ok: false, reason: 'profile_patch_unavailable' };
+    }
+
+    return { ok: true, reason: null };
 }
 
 function buildTotalsText(targets) {
@@ -240,6 +313,10 @@ async function renderMealPlan(container, rangeKey) {
             container.appendChild(renderDayCard(plan, dayIndex));
         });
     } catch (error) {
+        if (error?.message === 'Заполните профиль для расчёта плана питания') {
+            container.textContent = 'Заполните профиль для расчёта плана питания';
+            return;
+        }
         container.textContent = 'Не удалось загрузить рацион.';
     }
 }
