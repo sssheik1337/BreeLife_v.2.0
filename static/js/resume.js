@@ -223,9 +223,7 @@ function hasProfileTargetFieldsDrift(profile, computedTargets) {
         return true;
     }
 
-    if (!equalsNullableString(safeProfile?.warning_message, safeTargets?.warning_message)) {
-        return true;
-    }
+    // warning_message остаётся runtime-сигналом UI и не участвует в критерии синхронизации профиля.
 
     return false;
 }
