@@ -165,7 +165,7 @@ function getPaywallMotivation(profile, entriesCount = 0) {
     return `${progressText} ${deadlineText} ${deviationText} Подписка сохранит для вас прогноз и персональные подсказки.`;
 }
 
-function getDeviationStatusFromEntries(entries, tdee, today = new Date()) {
+function getDeviationStatusFromEntries(entries, caloriesTarget, today = new Date()) {
     if (!Array.isArray(entries) || !entries.length) {
         return { status: 'no_data', message: 'Нет данных за последние дни.' };
     }
@@ -215,8 +215,8 @@ function getDeviationStatusFromEntries(entries, tdee, today = new Date()) {
         return { status: 'no_data', message: 'Нет данных за последние 7 дней.' };
     }
 
-    if (typeof tdee !== 'number') {
-        return { status: 'ok', message: 'Мы ещё не рассчитали ваш ориентир по калориям.' };
+    if (typeof caloriesTarget !== 'number' || caloriesTarget <= 0) {
+        return { status: 'ok', message: 'Мы ещё не рассчитали вашу цель по калориям.' };
     }
 
     const total = Array.from(totalsByDate.values()).reduce((sum, value) => sum + value, 0);
@@ -224,7 +224,7 @@ function getDeviationStatusFromEntries(entries, tdee, today = new Date()) {
     const thresholds = window.adminConfig?.calorie_threshold || {};
     const overeatThreshold = Number.isFinite(thresholds.overeat) ? thresholds.overeat : 0.1;
     const undereatThreshold = Number.isFinite(thresholds.undereat) ? thresholds.undereat : 0.1;
-    const deviation = (avg - tdee) / tdee;
+    const deviation = (avg - caloriesTarget) / caloriesTarget;
     if (deviation > overeatThreshold) {
         return { status: 'overeat', message: 'Похоже на переедание.' };
     }
@@ -238,8 +238,8 @@ function getFoodDiaryDeviationStatus(profile) {
     const entries = typeof window.getDiaryEntries === 'function'
         ? window.getDiaryEntries()
         : [];
-    const tdee = typeof profile?.tdee_calories === 'number' ? profile.tdee_calories : null;
-    return getDeviationStatusFromEntries(entries, tdee);
+    const caloriesTarget = typeof profile?.calories_target === 'number' ? profile.calories_target : null;
+    return getDeviationStatusFromEntries(entries, caloriesTarget);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -371,7 +371,7 @@ function analyzeWeeklyNutrition(profile, foodDiary) {
     const avgFat = totals.fat / divisor;
     const avgCarbs = totals.carbs / divisor;
 
-    const tdee = typeof profile?.tdee_calories === 'number' ? profile.tdee_calories : null;
+    const caloriesTarget = typeof profile?.calories_target === 'number' ? profile.calories_target : null;
     const proteinTarget = typeof profile?.macros?.protein_g === 'number' ? profile.macros.protein_g : null;
 
     const thresholds = window.adminConfig?.calorie_threshold || {};
@@ -381,9 +381,9 @@ function analyzeWeeklyNutrition(profile, foodDiary) {
     const minLoggedDays = Number.isFinite(weeklyRules.min_logged_days) ? weeklyRules.min_logged_days : 4;
 
     let status = 'ok';
-    if (tdee !== null && avgCalories > tdee * (1 + overeatThreshold)) {
+    if (caloriesTarget !== null && avgCalories > caloriesTarget * (1 + overeatThreshold)) {
         status = 'overeat';
-    } else if (tdee !== null && avgCalories < tdee * (1 - undereatThreshold)) {
+    } else if (caloriesTarget !== null && avgCalories < caloriesTarget * (1 - undereatThreshold)) {
         status = 'undereat';
     } else if (proteinTarget !== null && avgProtein < proteinTarget) {
         status = 'low_protein';

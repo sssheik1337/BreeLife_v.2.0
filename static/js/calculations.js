@@ -242,18 +242,21 @@ function adjustCaloriesByWeeklyProgress(profile, weeklyAverageWeight) {
         };
     }
 
-    const MAX_WEEKLY_CORRECTION_KCAL = 350;
-    const rawCorrection = deviation * 1100;
-    const cappedCorrection = Math.max(-MAX_WEEKLY_CORRECTION_KCAL, Math.min(rawCorrection, MAX_WEEKLY_CORRECTION_KCAL));
-    const capApplied = Math.abs(rawCorrection - cappedCorrection) > 1e-9;
+    const WEEKLY_CORRECTION_LIMIT_KCAL = 150;
+    const WEEKLY_CORRECTION_DAMPING = 0.5;
+    const DIRECTION_SWITCH_DEVIATION_THRESHOLD = 0.2;
 
-    let nextCaloriesTarget = currentCaloriesTarget - cappedCorrection;
+    const rawCorrection = deviation * 1100;
+    const limitedCorrection = Math.max(-WEEKLY_CORRECTION_LIMIT_KCAL, Math.min(rawCorrection, WEEKLY_CORRECTION_LIMIT_KCAL));
+    const dampedCorrection = limitedCorrection * WEEKLY_CORRECTION_DAMPING;
+    const limitApplied = Math.abs(rawCorrection - limitedCorrection) > 1e-9;
+
+    let nextCaloriesTarget = currentCaloriesTarget - dampedCorrection;
+    const rawNextCaloriesTarget = nextCaloriesTarget;
     let directionGuardApplied = false;
-    if (goal === 'lose' && nextCaloriesTarget > tdee) {
-        nextCaloriesTarget = tdee;
-        directionGuardApplied = true;
-    }
-    if (goal === 'gain' && nextCaloriesTarget < tdee) {
+    const nextCalorieDeltaRaw = nextCaloriesTarget - tdee;
+    const directionSwitched = (goal === 'lose' && nextCalorieDeltaRaw > 0) || (goal === 'gain' && nextCalorieDeltaRaw < 0);
+    if (directionSwitched && Math.abs(deviation) <= DIRECTION_SWITCH_DEVIATION_THRESHOLD) {
         nextCaloriesTarget = tdee;
         directionGuardApplied = true;
     }
@@ -271,17 +274,22 @@ function adjustCaloriesByWeeklyProgress(profile, weeklyAverageWeight) {
 
     const nextCalorieDelta = nextCaloriesTarget - tdee;
     const nextRate = (nextCalorieDelta * 7) / 7700;
-    const warningMessage = 'Обновил цель по калориям пропорционально фактическому отклонению недельного темпа.';
+    const warningMessage = 'Обновил цель по калориям с ограничением и сглаживанием по фактическому отклонению недельного темпа.';
     logWeeklyCorrectionDebug({
         goal,
         plannedRate,
         actualRate,
         deviation,
         correction_raw: rawCorrection,
-        correction_applied: cappedCorrection,
-        correction_cap_kcal: MAX_WEEKLY_CORRECTION_KCAL,
-        correction_cap_applied: capApplied,
+        correction_limited: limitedCorrection,
+        correction_damped: dampedCorrection,
+        correction_limit_kcal: WEEKLY_CORRECTION_LIMIT_KCAL,
+        correction_limit_applied: limitApplied,
+        correction_damping: WEEKLY_CORRECTION_DAMPING,
+        direction_switch_threshold_kg_per_week: DIRECTION_SWITCH_DEVIATION_THRESHOLD,
+        direction_switch_detected: directionSwitched,
         direction_guard_applied: directionGuardApplied,
+        calories_target_after_raw: rawNextCaloriesTarget,
         calories_target_before: currentCaloriesTarget,
         calories_target_after: nextCaloriesTarget,
         calorie_delta_after: nextCalorieDelta,
