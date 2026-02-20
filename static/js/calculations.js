@@ -242,8 +242,22 @@ function adjustCaloriesByWeeklyProgress(profile, weeklyAverageWeight) {
         };
     }
 
-    const correction = deviation * 1100;
-    let nextCaloriesTarget = currentCaloriesTarget - correction;
+    const MAX_WEEKLY_CORRECTION_KCAL = 350;
+    const rawCorrection = deviation * 1100;
+    const cappedCorrection = Math.max(-MAX_WEEKLY_CORRECTION_KCAL, Math.min(rawCorrection, MAX_WEEKLY_CORRECTION_KCAL));
+    const capApplied = Math.abs(rawCorrection - cappedCorrection) > 1e-9;
+
+    let nextCaloriesTarget = currentCaloriesTarget - cappedCorrection;
+    let directionGuardApplied = false;
+    if (goal === 'lose' && nextCaloriesTarget > tdee) {
+        nextCaloriesTarget = tdee;
+        directionGuardApplied = true;
+    }
+    if (goal === 'gain' && nextCaloriesTarget < tdee) {
+        nextCaloriesTarget = tdee;
+        directionGuardApplied = true;
+    }
+
     nextCaloriesTarget = applyCaloriesSafetyClamp(nextCaloriesTarget, profile?.sex);
     if (!Number.isFinite(nextCaloriesTarget)) {
         return {
@@ -263,7 +277,11 @@ function adjustCaloriesByWeeklyProgress(profile, weeklyAverageWeight) {
         plannedRate,
         actualRate,
         deviation,
-        correction,
+        correction_raw: rawCorrection,
+        correction_applied: cappedCorrection,
+        correction_cap_kcal: MAX_WEEKLY_CORRECTION_KCAL,
+        correction_cap_applied: capApplied,
+        direction_guard_applied: directionGuardApplied,
         calories_target_before: currentCaloriesTarget,
         calories_target_after: nextCaloriesTarget,
         calorie_delta_after: nextCalorieDelta,
