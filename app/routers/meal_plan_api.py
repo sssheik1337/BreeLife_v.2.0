@@ -1,4 +1,5 @@
 from datetime import date
+import random
 
 from fastapi import APIRouter, Query, Request, Response
 
@@ -277,13 +278,26 @@ def prepare_products_for_planning(products: list[dict[str, object]]) -> list[dic
     return prepared
 
 
-def choose_best_product(candidates: list[dict[str, object]], used_ids: set[int], score_key: str) -> dict[str, object] | None:
+def choose_best_product(
+    candidates: list[dict[str, object]],
+    used_ids: set[int],
+    score_key: str,
+    rng: random.Random,
+) -> dict[str, object] | None:
     """Выбрать лучший продукт по заданному скорингу, избегая дублирования в одном meal."""
+    shuffled_candidates = list(candidates)
+    rng.shuffle(shuffled_candidates)
     sorted_candidates = sorted(
-        candidates,
+        shuffled_candidates,
         key=lambda item: (float(item.get(score_key) or 0.0), float(item.get("kcal_100") or 0.0)),
         reverse=True,
     )
+    top_candidates = sorted_candidates[:3]
+    rng.shuffle(top_candidates)
+    for product in top_candidates:
+        product_id = product.get("id")
+        if isinstance(product_id, int) and product_id not in used_ids:
+            return product
     for product in sorted_candidates:
         product_id = product.get("id")
         if isinstance(product_id, int) and product_id not in used_ids:
@@ -291,14 +305,17 @@ def choose_best_product(candidates: list[dict[str, object]], used_ids: set[int],
     return None
 
 
-def find_meal_components(products: list[dict[str, object]]) -> tuple[dict[str, object] | None, dict[str, object] | None, dict[str, object] | None]:
+def find_meal_components(
+    products: list[dict[str, object]],
+    rng: random.Random,
+) -> tuple[dict[str, object] | None, dict[str, object] | None, dict[str, object] | None]:
     """Подобрать компоненты meal: белковая база, углеводная часть, опциональный жир."""
     used_ids: set[int] = set()
 
     protein_candidates = [
         item for item in products if float(item.get("protein_100") or 0) >= 8 or float(item.get("protein_density") or 0) >= 0.08
     ]
-    protein_base = choose_best_product(protein_candidates or products, used_ids, "protein_density")
+    protein_base = choose_best_product(protein_candidates or products, used_ids, "protein_density", rng)
     if protein_base and isinstance(protein_base.get("id"), int):
         used_ids.add(int(protein_base["id"]))
 
@@ -310,14 +327,14 @@ def find_meal_components(products: list[dict[str, object]]) -> tuple[dict[str, o
         or "круп" in str(item.get("marker"))
         or "фрукт" in str(item.get("marker"))
     ]
-    carb_base = choose_best_product(carb_candidates or products, used_ids, "carb_density")
+    carb_base = choose_best_product(carb_candidates or products, used_ids, "carb_density", rng)
     if carb_base and isinstance(carb_base.get("id"), int):
         used_ids.add(int(carb_base["id"]))
 
     fat_candidates = [
         item for item in products if float(item.get("fat_100") or 0) >= 10 or float(item.get("fat_density") or 0) >= 0.06
     ]
-    fat_addon = choose_best_product(fat_candidates, used_ids, "fat_density")
+    fat_addon = choose_best_product(fat_candidates, used_ids, "fat_density", rng)
     return protein_base, carb_base, fat_addon
 
 
@@ -412,18 +429,21 @@ def build_meal_items(
     meal_target_calories: int | None,
     meal_macro_target: dict[str, int] | None,
     prepared_products: list[dict[str, object]],
+    rng: random.Random,
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
     """Собрать продукты и граммовки для одного приёма пищи."""
     if not prepared_products:
         return [], {"strategy": "no_products"}
 
-    protein_base, carb_base, fat_addon = find_meal_components(prepared_products)
+    protein_base, carb_base, fat_addon = find_meal_components(prepared_products, rng)
     chosen_products = [item for item in [protein_base, carb_base, fat_addon] if isinstance(item, dict)]
     chosen_products = chosen_products[:3]
 
     if len(chosen_products) < 2:
         # Fallback для бедного каталога: берём первые 2 валидных продукта.
-        fallback = prepared_products[:2]
+        fallback = list(prepared_products)
+        rng.shuffle(fallback)
+        fallback = fallback[:2]
         chosen_products = [item for item in fallback if isinstance(item, dict)]
 
     if not chosen_products:
@@ -486,9 +506,12 @@ def build_meals_with_products(
     meals: list[dict[str, object]],
     distribution_diagnostics: dict[str, object],
     products_pool: list[dict[str, object]],
+    seed_value: str,
 ) -> tuple[list[dict[str, object]], dict[str, object], dict[str, object]]:
     """Сформировать наполненные meals и дневные totals по эвристике v1."""
+    rng = random.Random(seed_value)
     prepared_products = prepare_products_for_planning(products_pool)
+    rng.shuffle(prepared_products)
 
     meal_macros_targets = distribution_diagnostics.get("meal_macros_targets")
     if not isinstance(meal_macros_targets, dict):
@@ -502,6 +525,7 @@ def build_meals_with_products(
             meal_target_calories=meal.get("target_calories") if isinstance(meal.get("target_calories"), int) else None,
             meal_macro_target=meal_macro_target if isinstance(meal_macro_target, dict) else None,
             prepared_products=prepared_products,
+            rng=rng,
         )
         meal["items"] = meal_items
         meal_generation[meal_key] = meal_diag
@@ -540,7 +564,13 @@ async def meal_plan_api(
 
     targets, targets_diagnostics = resolve_targets(profile if isinstance(profile, dict) else {})
     meals, distribution_diagnostics = distribute_meal_targets(targets)
-    meals, totals, generation_diagnostics = build_meals_with_products(meals, distribution_diagnostics, products_pool)
+    seed_value = f"{resolved_date.isoformat()}:{telegram_user_id}"
+    meals, totals, generation_diagnostics = build_meals_with_products(
+        meals,
+        distribution_diagnostics,
+        products_pool,
+        seed_value,
+    )
 
     return {
         "date": resolved_date.isoformat(),
@@ -548,7 +578,7 @@ async def meal_plan_api(
         "meals": meals,
         "totals": totals,
         "meta": {
-            "seed": f"{resolved_date.isoformat()}:{telegram_user_id}",
+            "seed": seed_value,
             "used_favorites_only": used_favorites_only,
             "contract_stage": "stage_6_heuristic_v1",
             "date_parse_error": date_parse_error,
