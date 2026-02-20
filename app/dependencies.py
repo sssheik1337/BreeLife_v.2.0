@@ -96,11 +96,28 @@ def update_profile(telegram_user_id: int, data: dict[str, object]) -> None:
     invalidate_meal_plan_cache_for_today_and_week(telegram_user_id)
 
 
+def should_apply_canonical_patch_key(canonical_key: str, raw_patch: dict[str, object]) -> bool:
+    """Проверить, что canonical-ключ действительно присутствовал во входящем PATCH."""
+    if canonical_key in raw_patch:
+        return True
+
+    alias_map: dict[str, tuple[str, ...]] = {
+        "target_weight_kg": ("target_weight", "targetWeight", "target_weight_kg"),
+    }
+    aliases = alias_map.get(canonical_key, ())
+    return any(alias in raw_patch for alias in aliases)
+
+
 def apply_profile_patch(profile: dict[str, object], patch: dict[str, object]) -> dict[str, object]:
     normalized_current = normalize_profile_payload_shape(profile)
     normalized_patch = normalize_profile_payload_shape(patch)
     updated = dict(normalized_current)
-    updated.update(normalized_patch)
+
+    # Применяем только те canonical-ключи, которые реально пришли во входящем PATCH.
+    # Это защищает профиль от обнуления при частичных сохранениях (например, patch только с is_completed).
+    for key, value in normalized_patch.items():
+        if should_apply_canonical_patch_key(key, patch):
+            updated[key] = value
 
     # Флаг приветственного экрана триала должен фиксироваться один раз и
     # не сбрасываться при последующих частичных сохранениях профиля.
