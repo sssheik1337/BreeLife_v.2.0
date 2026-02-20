@@ -1074,22 +1074,17 @@
             if (!response.ok) {
                 return null;
             }
-            const responseData = await response.json();
-            try {
-                localStorage.removeItem('userData');
-            } catch (error) {
-                console.warn('Не удалось очистить userData', error);
-            }
-            const data = responseData && typeof responseData === 'object'
-                ? responseData
+            const data = await response.json();
+            const responsePayload = data && typeof data === 'object'
+                ? data
                 : null;
-            if (!data || typeof data !== 'object') {
+            if (!responsePayload || typeof responsePayload !== 'object') {
                 throw new Error('Profile payload invalid');
             }
-            if (data?.status === 'not_found') {
+            if (responsePayload?.status === 'not_found') {
                 return null;
             }
-            const normalized = normalizeUserProfile(data);
+            const normalized = normalizeUserProfile(responsePayload);
             applyProfileCache(normalized);
             if (typeof window.resetUserDataDirtyMap === 'function') {
                 window.resetUserDataDirtyMap('profile_saved');
