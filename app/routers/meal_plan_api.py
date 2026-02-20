@@ -138,6 +138,8 @@ def distribute_meal_targets(targets: dict[str, object] | None) -> tuple[list[dic
 
 def resolve_calories_target(profile: dict[str, object]) -> tuple[int | None, str]:
     """Определить целевые калории строго из profile.calories_target."""
+    # В production-контракте /api/meal-plan не рассчитывает цель самостоятельно.
+    # Единый расчёт выполняется на фронте через computeTargets(...) и сохраняется в профиль.
     direct_target = parse_positive_number(profile.get("calories_target"))
     if direct_target is not None:
         return int(round(direct_target)), "profile.calories_target"
