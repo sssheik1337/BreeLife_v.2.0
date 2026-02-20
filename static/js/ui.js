@@ -928,18 +928,79 @@ function applyTelegramSafeAreaInsets() {
     if (!tg) {
         return;
     }
+
     const viewportHeight = Number(tg.viewportHeight);
     const viewportStableHeight = Number(tg.viewportStableHeight);
-    const safeTop = Number.isFinite(viewportHeight) && Number.isFinite(viewportStableHeight)
+    const viewportDeltaTop = Number.isFinite(viewportHeight) && Number.isFinite(viewportStableHeight)
         ? Math.max(viewportHeight - viewportStableHeight, 0)
         : 0;
+
+    // В fullscreen Telegram системные кнопки могут перекрывать верх приложения.
+    // Берём максимальный верхний inset из всех доступных источников WebApp API.
+    const safeAreaTop = Number(tg.safeAreaInset?.top);
+    const contentSafeAreaTop = Number(tg.contentSafeAreaInset?.top);
+    const safeTopCandidates = [viewportDeltaTop, safeAreaTop, contentSafeAreaTop]
+        .filter((value) => Number.isFinite(value) && value >= 0);
+    const safeTop = safeTopCandidates.length > 0
+        ? Math.max(...safeTopCandidates)
+        : 0;
+
     document.documentElement.style.setProperty('--tg-safe-top', `${safeTop}px`);
+}
+
+function applyTelegramUiOffset() {
+    const tg = window.Telegram?.WebApp;
+    if (!tg) {
+        return;
+    }
+
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isFullscreen = Boolean(tg.isExpanded);
+
+    if (isIOS && isFullscreen) {
+        // Фиксированный верхний offset интерфейса Telegram в fullscreen на iOS.
+        document.documentElement.style.setProperty('--tg-ui-top', '48px');
+        return;
+    }
+
+    document.documentElement.style.setProperty('--tg-ui-top', '0px');
+}
+
+
+function applyHeaderHeight() {
+    const navbarHost = document.querySelector('custom-navbar');
+    if (!navbarHost || !navbarHost.shadowRoot) {
+        return;
+    }
+
+    const navbar = navbarHost.shadowRoot.querySelector('.navbar');
+    if (!navbar) {
+        return;
+    }
+
+    const height = Math.max(0, Math.round(navbar.getBoundingClientRect().height));
+    if (height > 0) {
+        document.documentElement.style.setProperty('--header-height', `${height}px`);
+    }
 }
 
 function resetWindowScrollPosition() {
     if (typeof window.scrollTo === 'function') {
         window.scrollTo(0, 0);
     }
+}
+
+function resetInitialScrollPosition() {
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            resetWindowScrollPosition();
+
+            const scroller = document.querySelector('.app-content');
+            if (scroller) {
+                scroller.scrollTop = 0;
+            }
+        });
+    });
 }
 
 // Применение темы Telegram WebApp к CSS-переменным
@@ -979,7 +1040,7 @@ function applyTelegramTheme() {
 
 
 window.addEventListener('pageshow', () => {
-    resetWindowScrollPosition();
+    resetInitialScrollPosition();
 });
 
 // Initialize on page load
@@ -993,16 +1054,32 @@ document.addEventListener('DOMContentLoaded', async function() {
     const isEntryPoint = currentPath === '/' || currentPath === '/index';
     const tg = window.Telegram?.WebApp;
     if (tg) {
+        if (typeof tg.ready === 'function') {
+            tg.ready();
+        }
         tg.expand();
+        requestAnimationFrame(() => {
+            // После expand/layout в Telegram шапка может пересчитаться не сразу.
+            applyHeaderHeight();
+        });
+        resetInitialScrollPosition();
         applyTelegramTheme();
         applyTelegramSafeAreaInsets();
+        applyTelegramUiOffset();
         if (typeof tg.onEvent === 'function') {
             tg.onEvent('themeChanged', () => {
                 applyTelegramTheme();
             });
-            tg.onEvent('viewportChanged', applyTelegramSafeAreaInsets);
+            tg.onEvent('viewportChanged', () => {
+                applyTelegramSafeAreaInsets();
+                applyHeaderHeight();
+            });
+            tg.onEvent('viewportChanged', applyTelegramUiOffset);
         }
     }
+    requestAnimationFrame(() => {
+        applyHeaderHeight();
+    });
     resetWindowScrollPosition();
     if (isEntryPoint && window.appDebug) {
         console.group('🔍 Telegram WebApp DEBUG');

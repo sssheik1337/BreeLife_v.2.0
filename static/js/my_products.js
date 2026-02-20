@@ -8,7 +8,9 @@ const SEARCH_DEBOUNCE_MS = 250;
 const pageState = {
     expandedGroups: new Set(),
     visibleCountByGroup: {},
-    searchQuery: ''
+    searchQuery: '',
+    allProducts: [],
+    renderFn: null
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -42,11 +44,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         })
         .then((products) => {
             const allProducts = Array.isArray(products) ? products : [];
+            pageState.allProducts = allProducts;
             pageState.searchQuery = getInitialSearchQuery();
             const render = () => {
-                const filteredProducts = filterProducts(allProducts, pageState.searchQuery);
+                const filteredProducts = filterProducts(pageState.allProducts, pageState.searchQuery);
                 renderMyProducts(container, filteredProducts, { hasActiveSearch: pageState.searchQuery.length > 0 });
             };
+            pageState.renderFn = render;
 
             hydrateExpandedGroupsFromUrl(allProducts);
             applySearchInputValue(searchInput, pageState.searchQuery);
@@ -56,6 +60,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         .catch(() => {
             container.textContent = 'Не удалось загрузить список продуктов.';
         });
+
+    window.addEventListener('profile-status-updated', async () => {
+        if (typeof pageState.renderFn !== 'function') {
+            return;
+        }
+        if (window.serverUser?.authorized === true && typeof window.syncProfileWithBackend === 'function') {
+            try {
+                await window.syncProfileWithBackend();
+            } catch (_) {
+                // Ошибку синхронизации игнорируем и перерисовываем по локальному профилю.
+            }
+        }
+        pageState.renderFn();
+    });
 });
 
 function bindSearchInput(input, onSearch) {
@@ -244,7 +262,7 @@ function renderMyProducts(container, products, options = {}) {
 
         renderGroupSlice(grid, groupProducts, groupState.visibleCount, favoriteIds, excludedIds, products, (nextFavorites, nextExcluded) => {
             updateCounts(products.length, nextFavorites.size, nextExcluded.size);
-            savePreferences(nextFavorites, nextExcluded);
+            savePreferences(nextFavorites, nextExcluded, products.length);
         });
         updateShowMoreButton(showMoreButton, groupProducts.length, groupState.visibleCount);
         updateGroupProgressBadge(headerButton, groupProducts.length, groupState.visibleCount);
@@ -263,7 +281,7 @@ function renderMyProducts(container, products, options = {}) {
                     products,
                     (nextFavorites, nextExcluded) => {
                         updateCounts(products.length, nextFavorites.size, nextExcluded.size);
-                        savePreferences(nextFavorites, nextExcluded);
+                        savePreferences(nextFavorites, nextExcluded, products.length);
                     }
                 );
             }
@@ -388,16 +406,44 @@ function updateCounts(total, favorites, excluded) {
     }
 }
 
-function savePreferences(favorites, excluded) {
-    if (typeof patchUserProfile !== 'function') {
+function savePreferences(favorites, excluded, totalCount) {
+    if (typeof patchUserProfileWithBackend !== 'function' && typeof patchUserProfile !== 'function') {
         return;
     }
-    patchUserProfile({
-        favorite_product_ids: Array.from(favorites),
-        excluded_product_ids: Array.from(excluded),
-        // Любые изменения в "Моих продуктах" считаем завершённым шагом предпочтений.
-        preferences_onboarding_completed: true
-    });
+
+    const saveResult = typeof patchUserProfileWithBackend === 'function'
+        ? patchUserProfileWithBackend({
+            favorite_product_ids: Array.from(favorites),
+            excluded_product_ids: Array.from(excluded),
+            // Любые изменения в "Моих продуктах" считаем завершённым шагом предпочтений.
+            preferences_onboarding_completed: true
+        })
+        : Promise.resolve(patchUserProfile({
+            favorite_product_ids: Array.from(favorites),
+            excluded_product_ids: Array.from(excluded),
+            // Любые изменения в "Моих продуктах" считаем завершённым шагом предпочтений.
+            preferences_onboarding_completed: true
+        }));
+
+    if (!saveResult || typeof saveResult.then !== 'function') {
+        return;
+    }
+
+    // Оптимистично обновляем UI сразу, а после ответа сервера делаем reconcile по canonical-профилю.
+    saveResult
+        .then((savedProfile) => {
+            const profile = savedProfile && typeof savedProfile === 'object'
+                ? savedProfile
+                : (typeof getUserProfile === 'function' ? getUserProfile() : {});
+            const favoritesCount = normalizeProfileIdSet(profile?.favorite_product_ids).size;
+            const excludedCount = normalizeProfileIdSet(profile?.excluded_product_ids).size;
+            if (Number.isInteger(totalCount)) {
+                updateCounts(totalCount, favoritesCount, excludedCount);
+            }
+        })
+        .catch(() => {
+            // Ошибку reconcile игнорируем: пользователь уже видит оптимистичное локальное состояние.
+        });
 }
 
 function createPreferenceCard(product, favoriteIds, excludedIds, onChange) {
