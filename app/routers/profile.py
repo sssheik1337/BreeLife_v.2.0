@@ -101,6 +101,19 @@ async def api_profile_save(request: Request, response: Response):
     payload = await request.json()
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="INVALID_PAYLOAD")
+
+    # Диагностика PATCH-профиля: фиксируем, какие ключи пришли и есть ли продуктовые поля.
+    product_patch = {
+        "preferences_onboarding_completed": payload.get("preferences_onboarding_completed"),
+        "favorite_product_ids": payload.get("favorite_product_ids"),
+        "excluded_product_ids": payload.get("excluded_product_ids"),
+    }
+    logger.info(
+        "[profile] /api/profile/save patch_keys=%s products_patch_keys=%s",
+        sorted(payload.keys()),
+        {key: value for key, value in product_patch.items() if value is not None},
+    )
+
     profile = load_profile(telegram_user_id)
     updated = apply_profile_patch(profile, payload)
     update_profile(telegram_user_id, updated)

@@ -36,6 +36,7 @@
         'subscription_started_at',
         'trial_started_at',
         'trial_welcome_seen',
+        'preferences_onboarding_completed',
         'favorite_product_ids',
         'excluded_product_ids',
         'is_completed',
@@ -73,6 +74,7 @@
     let cachedProfile = null;
     let cachedDiaryEntries = null;
     let cachedHabitEntries = null;
+    let lastProfilePatchPromise = null;
 
     function getProfileStorageKey() {
         const userId = window.serverUser?.telegram_user_id;
@@ -208,6 +210,7 @@
             subscription_started_at: null,
             trial_started_at: null,
             trial_welcome_seen: null,
+            preferences_onboarding_completed: null,
             favorite_product_ids: [],
             excluded_product_ids: [],
             is_completed: false,
@@ -463,6 +466,7 @@
         merged.subscription_started_at = merged.subscription_started_at || null;
         merged.trial_started_at = merged.trial_started_at || null;
         merged.trial_welcome_seen = parseBoolean(merged.trial_welcome_seen);
+        merged.preferences_onboarding_completed = parseBoolean(merged.preferences_onboarding_completed);
         merged.is_completed = parseBoolean(merged.is_completed);
         merged.favorite_product_ids = normalizeIdList(merged.favorite_product_ids);
         merged.excluded_product_ids = normalizeIdList(merged.excluded_product_ids);
@@ -889,45 +893,67 @@
         return mergedCandidate;
     }
 
+    function applyProfileCache(profile) {
+        cachedProfile = profile;
+        try {
+            memorySet(getProfileStorageKey(), JSON.stringify(profile));
+        } catch (error) {
+            // Игнорируем ошибку сохранения, данные остаются в памяти.
+        }
+    }
+
+    function pickCanonicalPatch(partial) {
+        const source = partial && typeof partial === 'object' ? partial : {};
+        const patch = {};
+        CANONICAL_PROFILE_KEYS.forEach((key) => {
+            if (Object.prototype.hasOwnProperty.call(source, key)) {
+                patch[key] = source[key];
+            }
+        });
+        return patch;
+    }
+
     function setUserProfile(profile) {
         const current = getUserProfile();
         const merged = { ...current, ...(profile || {}) };
         const consistentMerged = enforceGoalWeightConsistencyInMerge(merged, current);
         const trialResult = applyTrialStartIfNeeded(current, consistentMerged);
         const normalized = normalizeUserProfile(trialResult.merged);
-        cachedProfile = normalized;
-        try {
-            memorySet(getProfileStorageKey(), JSON.stringify(normalized));
-        } catch (error) {
-            // Игнорируем ошибку сохранения, данные остаются в памяти.
-        }
+        applyProfileCache(normalized);
         if (trialResult.shouldNotifyBackend) {
             void notifyTrialStart(normalized.subscription_started_at);
         }
-        void saveProfileToBackend(normalized);
+        void saveProfileToBackend(normalized, { skipRequiredValidation: false, mode: 'full' });
         return normalized;
     }
 
     function patchUserProfile(partial) {
         const current = getUserProfile();
-        const merged = { ...current, ...(partial || {}) };
+        const patch = pickCanonicalPatch(partial);
+        const merged = { ...current, ...patch };
         if (partial && Object.prototype.hasOwnProperty.call(partial, 'macros')) {
             merged.macros = partial.macros;
         }
         const consistentMerged = enforceGoalWeightConsistencyInMerge(merged, current);
         const trialResult = applyTrialStartIfNeeded(current, consistentMerged);
         const normalized = normalizeUserProfile(trialResult.merged);
-        cachedProfile = normalized;
-        try {
-            memorySet(getProfileStorageKey(), JSON.stringify(normalized));
-        } catch (error) {
-            // Игнорируем ошибку сохранения, данные остаются в памяти.
-        }
+        applyProfileCache(normalized);
         if (trialResult.shouldNotifyBackend) {
             void notifyTrialStart(normalized.subscription_started_at);
         }
-        void saveProfileToBackend(normalized);
+        const patchPayload = pickCanonicalPatch({ ...patch, ...(trialResult.shouldNotifyBackend ? { subscription_started_at: normalized.subscription_started_at } : {}) });
+        lastProfilePatchPromise = saveProfileToBackend(patchPayload, { skipRequiredValidation: true, mode: 'patch' })
+            .then((savedProfile) => savedProfile || normalized)
+            .catch(() => normalized);
         return normalized;
+    }
+
+    function patchUserProfileWithBackend(partial) {
+        const normalized = patchUserProfile(partial);
+        if (lastProfilePatchPromise && typeof lastProfilePatchPromise.then === 'function') {
+            return lastProfilePatchPromise.then((savedProfile) => savedProfile || normalized);
+        }
+        return Promise.resolve(normalized);
     }
 
     function getDiaryEntries() {
@@ -989,47 +1015,63 @@
         }
     }
 
-    async function saveProfileToBackend(profile) {
+    async function saveProfileToBackend(profile, options = {}) {
+        const skipRequiredValidation = options?.skipRequiredValidation === true;
+        const mode = options?.mode === 'patch' ? 'patch' : 'full';
+        const payload = profile && typeof profile === 'object' ? profile : {};
+
         try {
-            const requiredFields = [
-                profile?.sex,
-                profile?.birth_date,
-                profile?.height_cm,
-                profile?.weight_kg,
-                profile?.goal,
-                profile?.activity_factor
-            ];
-            if (profile?.goal !== 'maintain') {
-                requiredFields.push(profile?.target_weight_kg);
-            }
-            const missingFields = requiredFields.filter((value) => value === null || value === undefined || value === '');
-            if (window.appDebug) {
-                const fieldNames = ['sex', 'birth_date', 'height_cm', 'weight_kg', 'goal', 'activity_factor'];
-                if (profile?.goal !== 'maintain') {
-                    fieldNames.push('target_weight_kg');
+            if (!skipRequiredValidation) {
+                const requiredFields = [
+                    payload?.sex,
+                    payload?.birth_date,
+                    payload?.height_cm,
+                    payload?.weight_kg,
+                    payload?.goal,
+                    payload?.activity_factor
+                ];
+                if (payload?.goal !== 'maintain') {
+                    requiredFields.push(payload?.target_weight_kg);
                 }
-                const missingFieldNames = fieldNames.filter((name, index) => {
-                    const value = requiredFields[index];
-                    return value === null || value === undefined || value === '';
-                });
-                console.log('Проверка payload перед /api/profile/save', {
-                    profile,
-                    missing_required_fields: missingFieldNames
+                const missingFields = requiredFields.filter((value) => value === null || value === undefined || value === '');
+                if (window.appDebug) {
+                    const fieldNames = ['sex', 'birth_date', 'height_cm', 'weight_kg', 'goal', 'activity_factor'];
+                    if (payload?.goal !== 'maintain') {
+                        fieldNames.push('target_weight_kg');
+                    }
+                    const missingFieldNames = fieldNames.filter((name, index) => {
+                        const value = requiredFields[index];
+                        return value === null || value === undefined || value === '';
+                    });
+                    console.log('Проверка payload перед /api/profile/save', {
+                        mode,
+                        payload,
+                        missing_required_fields: missingFieldNames
+                    });
+                }
+                if (missingFields.length > 0) {
+                    console.error('Профиль не отправлен: отсутствуют обязательные поля', {
+                        mode,
+                        payload,
+                        missingFieldsCount: missingFields.length
+                    });
+                    return null;
+                }
+            }
+
+            if (window.appDebug) {
+                console.log('Отправка payload в /api/profile/save', {
+                    mode,
+                    payload_keys: Object.keys(payload)
                 });
             }
-            if (missingFields.length > 0) {
-                console.error('Профиль не отправлен: отсутствуют обязательные поля', {
-                    profile,
-                    missingFieldsCount: missingFields.length
-                });
-                return;
-            }
+
             const response = await apiFetch('/api/profile/save', {
                 method: 'POST',
-                body: JSON.stringify(profile)
+                body: JSON.stringify(payload)
             });
             if (!response.ok) {
-                return;
+                return null;
             }
             const responseData = await response.json();
             try {
@@ -1044,20 +1086,17 @@
                 throw new Error('Profile payload invalid');
             }
             if (data?.status === 'not_found') {
-                return;
+                return null;
             }
             const normalized = normalizeUserProfile(data);
-            cachedProfile = normalized;
-            try {
-                memorySet(getProfileStorageKey(), JSON.stringify(normalized));
-            } catch (error) {
-                // Игнорируем ошибку сохранения, данные остаются в памяти.
-            }
+            applyProfileCache(normalized);
             if (typeof window.resetUserDataDirtyMap === 'function') {
                 window.resetUserDataDirtyMap('profile_saved');
             }
+            return normalized;
         } catch (error) {
             // Ошибки синхронизации игнорируем, данные остаются локально.
+            return null;
         }
     }
 
@@ -1391,6 +1430,7 @@
     window.getUserProfile = getUserProfile;
     window.setUserProfile = setUserProfile;
     window.patchUserProfile = patchUserProfile;
+    window.patchUserProfileWithBackend = patchUserProfileWithBackend;
     window.normalizeLocalDate = normalizeLocalDate;
     window.validateGoalWeightConsistency = validateGoalWeightConsistency;
     window.getDiaryEntries = getDiaryEntries;

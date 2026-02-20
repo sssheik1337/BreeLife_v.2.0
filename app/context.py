@@ -25,6 +25,7 @@ PLANS_CONFIG_MTIME: float | None = None
 ADMIN_SESSION_COOKIE = "admin_session"
 TELEGRAM_SESSION_COOKIE = "telegram_session"
 ADMIN_SESSION_TTL = timedelta(hours=12)
+TELEGRAM_SESSION_TTL = timedelta(hours=12)
 ADMIN_SESSIONS: dict[str, datetime] = {}
 
 
