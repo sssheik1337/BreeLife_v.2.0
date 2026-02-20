@@ -178,6 +178,99 @@ async function loadProfileFromBackend() {
     }
 }
 
+
+
+function hasProfileTargetFieldsDrift(profile, computedTargets) {
+    const safeProfile = profile && typeof profile === 'object' ? profile : {};
+    const safeTargets = computedTargets && typeof computedTargets === 'object' ? computedTargets : {};
+
+    const equalsNumber = (left, right) => {
+        const leftNum = Number(left);
+        const rightNum = Number(right);
+        if (!Number.isFinite(leftNum) && !Number.isFinite(rightNum)) {
+            return true;
+        }
+        if (!Number.isFinite(leftNum) || !Number.isFinite(rightNum)) {
+            return false;
+        }
+        return Math.abs(leftNum - rightNum) < 1e-9;
+    };
+
+    const equalsNullableString = (left, right) => {
+        const leftValue = typeof left === 'string' ? left : null;
+        const rightValue = typeof right === 'string' ? right : null;
+        return leftValue === rightValue;
+    };
+
+    const fields = [
+        'tdee_calories',
+        'calories_target',
+        'calorie_delta',
+        'weight_rate_kg_per_week',
+        'required_rate_kg_per_week',
+        'required_calorie_delta',
+        'required_calories_target',
+        'safe_weeks_estimate'
+    ];
+
+    for (const field of fields) {
+        if (!equalsNumber(safeProfile?.[field], safeTargets?.[field])) {
+            return true;
+        }
+    }
+
+    if (!equalsNullableString(safeProfile?.predicted_goal_date, safeTargets?.predicted_goal_date)) {
+        return true;
+    }
+
+    if (!equalsNullableString(safeProfile?.warning_message, safeTargets?.warning_message)) {
+        return true;
+    }
+
+    return false;
+}
+
+async function ensureComputedTargetsSaved(profile) {
+    const safeProfile = profile && typeof profile === 'object' ? profile : {};
+    if (typeof window.computeTargets !== 'function') {
+        return safeProfile;
+    }
+
+    const diaryEntries = typeof window.getDiaryEntries === 'function'
+        ? window.getDiaryEntries()
+        : [];
+    const computedTargets = window.computeTargets(safeProfile, diaryEntries, new Date());
+    const hasDrift = hasProfileTargetFieldsDrift(safeProfile, computedTargets);
+    if (!hasDrift) {
+        return safeProfile;
+    }
+
+    const payload = {
+        tdee_calories: computedTargets?.tdee_calories,
+        calories_target: computedTargets?.calories_target,
+        calorie_delta: computedTargets?.calorie_delta,
+        weight_rate_kg_per_week: computedTargets?.weight_rate_kg_per_week,
+        predicted_goal_date: computedTargets?.predicted_goal_date,
+        required_rate_kg_per_week: computedTargets?.required_rate_kg_per_week,
+        required_calorie_delta: computedTargets?.required_calorie_delta,
+        required_calories_target: computedTargets?.required_calories_target,
+        safe_weeks_estimate: computedTargets?.safe_weeks_estimate
+    };
+
+    if (typeof window.patchUserProfileWithBackend === 'function') {
+        try {
+            const saved = await window.patchUserProfileWithBackend(payload);
+            return saved && typeof saved === 'object'
+                ? saved
+                : { ...safeProfile, ...payload };
+        } catch (error) {
+            return { ...safeProfile, ...payload };
+        }
+    }
+
+    return { ...safeProfile, ...payload };
+}
+
 // Initialize summary page
 function generateSummary(profile) {
     const cardsContainer = document.getElementById('data-cards');
@@ -1546,14 +1639,15 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
 
-    resumeBackendProfile = profile;
+    const resolvedProfile = await ensureComputedTargetsSaved(profile);
+    resumeBackendProfile = resolvedProfile;
 
-    generateSummary(profile);
-    calculateBMI(profile);
-    updateCalculatedMetrics(profile);
-    renderPersonalRecommendations(profile);
-    applyAiRecommendationToResume(profile);
-    renderNutritionRings(profile);
+    generateSummary(resolvedProfile);
+    calculateBMI(resolvedProfile);
+    updateCalculatedMetrics(resolvedProfile);
+    renderPersonalRecommendations(resolvedProfile);
+    applyAiRecommendationToResume(resolvedProfile);
+    renderNutritionRings(resolvedProfile);
 
     const copyDiagnosticsButton = document.getElementById('resume-copy-diagnostics-button');
     if (copyDiagnosticsButton) {
@@ -1562,13 +1656,13 @@ document.addEventListener('DOMContentLoaded', async function() {
             copyResumeDiagnosticsToClipboard();
         });
     }
-    await renderTrialStatus(profile);
+    await renderTrialStatus(resolvedProfile);
 
     const saveButton = document.getElementById('resume-save-button');
     if (saveButton) {
         saveButton.addEventListener('click', function(event) {
             event.preventDefault();
-            saveAndContinue(profile);
+            saveAndContinue(resolvedProfile);
         });
     }
 });

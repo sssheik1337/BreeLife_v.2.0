@@ -311,7 +311,7 @@ function calculateMacros(payload) {
     };
 }
 
-function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, target_weight_kg, goal_deadline }) {
+function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, target_weight_kg, goal_deadline, now_date = null }) {
     const debugInput = { sex, goal, tdee_calories, weight_kg, target_weight_kg, goal_deadline };
     const logForecastPipeline = (stage, payload = {}) => {
         if (window.appDebug === true) {
@@ -466,7 +466,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         if (goal_deadline) {
             const deadlineDate = new Date(`${goal_deadline}T00:00:00`);
             if (!Number.isNaN(deadlineDate.getTime())) {
-                const todayDate = new Date();
+                const todayDate = now_date ? new Date(now_date) : new Date();
                 todayDate.setHours(0, 0, 0, 0);
                 const diffMs = deadlineDate.getTime() - todayDate.getTime();
                 const weeksAvailable = diffMs / (1000 * 60 * 60 * 24 * 7);
@@ -547,7 +547,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         };
     }
 
-    const today = new Date();
+    const today = now_date ? new Date(now_date) : new Date();
     const targetDate = new Date(today);
     targetDate.setDate(targetDate.getDate() + weeksNeeded * 7);
     const predictedDate = Number.isNaN(targetDate.getTime())
@@ -580,3 +580,77 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         label: null
     };
 }
+
+
+function computeTargets(profile, diaryEntries = [], nowDate = null) {
+    const safeProfile = profile && typeof profile === 'object' ? profile : {};
+    const resolvedNowDate = nowDate ? new Date(nowDate) : new Date();
+    const normalizedNowDate = Number.isNaN(resolvedNowDate.getTime()) ? new Date() : resolvedNowDate;
+
+    const weight = Number(safeProfile?.weight_kg);
+    const height = Number(safeProfile?.height_cm);
+    const activityFactor = Number(safeProfile?.activity_factor);
+    const targetWeight = Number(safeProfile?.target_weight_kg);
+
+    const age = calculateAge(safeProfile?.birth_date);
+    const bmr = calculateBMR({
+        sex: safeProfile?.sex,
+        weight_kg: Number.isFinite(weight) && weight > 0 ? weight : null,
+        height_cm: Number.isFinite(height) && height > 0 ? height : null,
+        age: Number.isFinite(age) && age > 0 ? age : null
+    });
+
+    const tdee = calculateTDEE(
+        Number.isFinite(bmr) ? bmr : null,
+        Number.isFinite(activityFactor) && activityFactor > 0 ? activityFactor : null
+    );
+
+    const forecast = calculateWeightGoalForecast({
+        sex: safeProfile?.sex,
+        goal: safeProfile?.goal,
+        tdee_calories: Number.isFinite(tdee) ? tdee : null,
+        weight_kg: Number.isFinite(weight) && weight > 0 ? weight : null,
+        target_weight_kg: Number.isFinite(targetWeight) && targetWeight > 0 ? targetWeight : safeProfile?.target_weight_kg,
+        goal_deadline: safeProfile?.goal_deadline,
+        now_date: normalizedNowDate
+    });
+
+    const weeklyAdjustment = adjustCaloriesByWeeklyProgress(
+        {
+            ...safeProfile,
+            tdee_calories: Number.isFinite(tdee) ? tdee : safeProfile?.tdee_calories,
+            calories_target: forecast?.calories_target,
+            weight_rate_kg_per_week: forecast?.weight_rate_kg_per_week
+        },
+        safeProfile?.weekly_stats
+    );
+
+    const effectiveCaloriesTarget = Number.isFinite(weeklyAdjustment?.calories_target)
+        ? weeklyAdjustment.calories_target
+        : forecast?.calories_target;
+    const effectiveCalorieDelta = Number.isFinite(weeklyAdjustment?.calorie_delta)
+        ? weeklyAdjustment.calorie_delta
+        : forecast?.calorie_delta;
+    const effectiveWeightRate = Number.isFinite(weeklyAdjustment?.weight_rate_kg_per_week)
+        ? weeklyAdjustment.weight_rate_kg_per_week
+        : forecast?.weight_rate_kg_per_week;
+    const effectiveWarning = typeof weeklyAdjustment?.warning_message === 'string' && weeklyAdjustment.warning_message.trim()
+        ? weeklyAdjustment.warning_message
+        : forecast?.warning_message ?? null;
+
+    const toFiniteOrNull = (value) => (Number.isFinite(Number(value)) ? Number(value) : null);
+    return {
+        tdee_calories: toFiniteOrNull(tdee),
+        calories_target: toFiniteOrNull(effectiveCaloriesTarget),
+        calorie_delta: toFiniteOrNull(effectiveCalorieDelta),
+        weight_rate_kg_per_week: toFiniteOrNull(effectiveWeightRate),
+        predicted_goal_date: forecast?.predicted_goal_date ?? null,
+        warning_message: effectiveWarning,
+        required_rate_kg_per_week: toFiniteOrNull(forecast?.required_rate_kg_per_week),
+        required_calorie_delta: toFiniteOrNull(forecast?.required_calorie_delta),
+        required_calories_target: toFiniteOrNull(forecast?.required_calories_target),
+        safe_weeks_estimate: toFiniteOrNull(forecast?.safe_weeks_estimate)
+    };
+}
+
+window.computeTargets = computeTargets;

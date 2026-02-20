@@ -1,43 +1,74 @@
-# Аудит: строгий контракт целевых калорий (`profile.calories_target`)
+# Аудит: единый pipeline расчёта целей и единый источник `profile.calories_target`
 
-## Что внедрено
-В backend рациона закреплён строгий контракт:
-- единственный источник целевых калорий — `profile.calories_target`;
-- если `calories_target` отсутствует или невалиден, backend **не подставляет** цель по `TDEE*коэффициентам` и возвращает статус `target_not_computed`;
-- в ответе `/api/meal-plan` добавлен верхнеуровневый флаг `targets_source` со значением:
-  - `"profile.calories_target"` — цель взята из профиля,
-  - `"missing"` — цель не рассчитана.
+## Что сделано в этой итерации
+Введён единый фронтовый pipeline:
 
-Дополнительно в ответе возвращается `target_status`:
-- `"ok"` или `"target_not_computed"`.
+`computeTargets(profile, diaryEntries, nowDate)`
 
-## Новый приоритет расчёта для `/api/meal-plan`
-1. Валидный `profile.calories_target`.
-2. Иначе: `target_not_computed` (без fallback на `required_calories_target`, `tdee_calories`, `tdee*0.85/1.10`).
+Pipeline возвращает полный набор целевых полей:
+- `tdee_calories` (справка),
+- `calories_target`,
+- `calorie_delta`,
+- `weight_rate_kg_per_week`,
+- `predicted_goal_date`,
+- `warning_message`,
+- `required_rate_kg_per_week`,
+- `required_calorie_delta`,
+- `required_calories_target`,
+- `safe_weeks_estimate`.
 
-## Важные ограничения, которые сохранены
-- Формулы BMR/TDEE не менялись.
-- Старые поля профиля не удалялись (обратная совместимость структуры данных сохранена).
+## Принципы pipeline
+1. Используется текущая forecast-модель:
+   - темп изменения веса,
+   - перевод через `7700 ккал/кг`,
+   - safety clamp,
+   - weekly autocorrection.
+2. Расчёт детерминирован по входам `profile + nowDate`.
+3. Null-safe: при неполных данных поля возвращаются как `null`, без скрытых коэффициентных fallback (`0.85/1.10`).
 
-## Карта мест в коде: где берутся калории и что стало `calories_target only`
+## Где находится единый расчёт
+- `static/js/calculations.js`
+  - `computeTargets(profile, diaryEntries, nowDate)` — единая точка сборки целевых полей.
+  - `calculateWeightGoalForecast(...)` поддерживает `now_date` для детерминированного расчёта дедлайнов/прогноза.
 
-### Backend (`calories_target only`)
+## Где pipeline вызывается и как сохраняется
+- `static/js/resume.js`
+  - `ensureComputedTargetsSaved(profile)`:
+    1) один вызов `computeTargets(...)`,
+    2) сравнение с текущим профилем,
+    3) одна запись через `patchUserProfileWithBackend(...)` только при drift.
+  - Вызывается на `/resume` при загрузке после анкеты и при первом входе.
+
+После сохранения система работает от сохранённых полей профиля, где целевые калории — `profile.calories_target`.
+
+## Backend-контракт `/api/meal-plan` (строгий)
+- `resolve_calories_target(profile)` берёт только `profile.calories_target`.
+- Если цель отсутствует/невалидна → `target_not_computed`.
+- В ответе есть:
+  - `targets_source`: `"profile.calories_target"` или `"missing"`,
+  - `target_status`: `"ok"` или `"target_not_computed"`.
+
+## Карта мест в коде: где берутся калории
+
+### Backend
 1. `app/routers/meal_plan_api.py`
-   - `resolve_calories_target(profile)` → только `profile.calories_target`, иначе `target_not_computed`.
-   - `resolve_targets(profile)` → при отсутствии цели отдаёт диагностику с `targets_source.calories = "missing"`.
-   - `is_profile_valid_for_targets(profile)` → проверяет только валидность `calories_target`.
-   - `build_meal_plan_payload_for_date(...)` → добавляет в ответ `targets_source` (`profile.calories_target|missing`) и `target_status` (`ok|target_not_computed`).
-   - `meal_plan_week_api(...)` → агрегирует `targets_source`/`target_status` на уровень недели.
+   - `resolve_calories_target(profile)` → строго `calories_target only`.
+   - `resolve_targets(profile)` → диагностирует `missing`, не генерирует «левую» цель.
+   - `build_meal_plan_payload_for_date(...)` → отдаёт `targets_source` и `target_status`.
+   - `meal_plan_week_api(...)` → агрегирует `targets_source`/`target_status` для недели.
 
-### Frontend (по ранее введённому контракту)
-2. `static/js/resume.js`
-   - `updateCalculatedMetrics(profile)` → целевые калории для блока питания берутся из `profile.calories_target`.
-   - `renderNutritionRings(profile)` → `recommended.calories = profile.calories_target`.
+### Frontend
+2. `static/js/calculations.js`
+   - `computeTargets(...)` → единый расчёт целевых полей.
 
-3. `static/js/profile.js`
-   - `getResolvedProfileForDisplay()` → без локального fallback `tdee*0.85/1.1`.
+3. `static/js/resume.js`
+   - `ensureComputedTargetsSaved(...)` → один вызов/одна запись в профиль при необходимости.
+   - `updateCalculatedMetrics(...)` и `renderNutritionRings(...)` используют сохранённый `profile.calories_target`.
+
+4. `static/js/profile.js`
+   - `getResolvedProfileForDisplay()` без fallback `tdee*0.85/1.1`.
    - `renderCalorieTrend(...)`, `renderTodayPlanCard(...)`, `renderWeeklyProgress(...)`, `renderMonthGrid(...)` → цель только `profile.calories_target`.
 
-## Что это меняет в поведении
-- Система больше не «придумывает» калорийную цель на `/api/meal-plan`.
-- Если цель не рассчитана, клиент получает честный признак `target_not_computed` и может инициировать пересчёт+сохранение профиля.
+## Ограничения и совместимость
+- Формулы BMR/TDEE не менялись.
+- Старые поля профиля не удалялись (обратная совместимость структуры сохранена).
