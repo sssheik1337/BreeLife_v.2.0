@@ -855,7 +855,28 @@ function syncLocalProfileCompletion(status) {
     const localCompleted = getLocalProfileCompletedFlag();
     const mergedCompleted = serverCompleted || localCompleted;
     window.profileCompleted = mergedCompleted;
-    if (typeof patchUserProfile === 'function') {
+
+    if (typeof patchUserProfile === 'function' && typeof getUserProfile === 'function') {
+        // Защита от поломки первого онбординга:
+        // не отправляем на backend patch только с is_completed,
+        // если профиль ещё не содержит обязательные поля анкеты.
+        const currentProfile = getUserProfile();
+        const hasCoreProfileFields = Boolean(
+            currentProfile?.sex
+            && currentProfile?.birth_date
+            && Number.isFinite(Number(currentProfile?.height_cm))
+            && Number(currentProfile?.height_cm) > 0
+            && Number.isFinite(Number(currentProfile?.weight_kg))
+            && Number(currentProfile?.weight_kg) > 0
+            && currentProfile?.goal
+            && Number.isFinite(Number(currentProfile?.activity_factor))
+            && Number(currentProfile?.activity_factor) > 0
+        );
+
+        if (!hasCoreProfileFields) {
+            return;
+        }
+
         // Если Telegram-сессия временно недоступна, не затираем локально подтверждённый профиль.
         const safeCompleted = isAuthorized ? mergedCompleted : localCompleted;
         patchUserProfile({
