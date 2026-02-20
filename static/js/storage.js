@@ -1086,6 +1086,7 @@
             }
             const normalized = normalizeUserProfile(responsePayload);
             applyProfileCache(normalized);
+            window.__lastProfileSaveTs = Date.now();
             if (typeof window.resetUserDataDirtyMap === 'function') {
                 window.resetUserDataDirtyMap('profile_saved');
             }
@@ -1145,16 +1146,26 @@
                     });
                 }
                 const normalized = normalizeUserProfile(data);
-                cachedProfile = normalized;
+                const localSaveTs = window.__lastProfileSaveTs || 0;
+                const serverUpdatedAt = new Date(data?.last_updated || 0).getTime();
+                const cachedUpdatedAt = new Date(cachedProfile?.last_updated || 0).getTime();
+
+                // Не перезаписываем локальный профиль устаревшим состоянием с сервера.
+                if (
+                    serverUpdatedAt
+                    && (
+                        (localSaveTs && serverUpdatedAt < localSaveTs)
+                        || (cachedUpdatedAt && serverUpdatedAt < cachedUpdatedAt)
+                    )
+                ) {
+                    return getUserProfile();
+                }
+
+                applyProfileCache(normalized);
                 logStorageDebug('syncProfileWithBackend:normalized_backend_payload', {
                     traceId,
                     normalized
                 });
-                try {
-                    memorySet(getProfileStorageKey(), JSON.stringify(normalized));
-                } catch (error) {
-                    // Игнорируем ошибку сохранения, данные остаются в памяти.
-                }
                 if (
                     typeof window.mergeUserDataWithoutLosingAnswers === 'function'
                     && typeof window.mapUserProfileToUserData === 'function'
