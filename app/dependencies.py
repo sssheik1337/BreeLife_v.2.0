@@ -82,8 +82,33 @@ def update_profile(telegram_user_id: int, data: dict[str, object]) -> None:
 def apply_profile_patch(profile: dict[str, object], patch: dict[str, object]) -> dict[str, object]:
     normalized_current = normalize_profile_payload_shape(profile)
     normalized_patch = normalize_profile_payload_shape(patch)
+
+    # Применяем только те поля, которые действительно пришли в PATCH.
+    # Это защищает профиль от затирания null-значениями, которые появляются
+    # при полной нормализации частичного payload.
+    patch_key_map = {
+        "gender": "sex",
+        "birthDate": "birth_date",
+        "height": "height_cm",
+        "currentWeight": "weight_kg",
+        "targetWeight": "target_weight_kg",
+        "goalType": "goal",
+        "activityLevel": "activity_factor",
+        "deadline": "goal_deadline",
+        "foodDiary": "food_diary",
+        "completed": "is_completed",
+        "profile_completed": "is_completed",
+    }
+    patch_keys = {
+        patch_key_map.get(key, key)
+        for key in patch.keys()
+        if isinstance(key, str)
+    }
+
     updated = dict(normalized_current)
-    updated.update(normalized_patch)
+    for key in patch_keys:
+        if key in normalized_patch:
+            updated[key] = normalized_patch[key]
 
     # Флаг приветственного экрана триала должен фиксироваться один раз и
     # не сбрасываться при последующих частичных сохранениях профиля.
