@@ -55,5 +55,3 @@ def create_app() -> FastAPI:
     app.mount("/fonts", StaticFiles(directory="fonts"), name="fonts")
     return app
 
-
-app = create_app()

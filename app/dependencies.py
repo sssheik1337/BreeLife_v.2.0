@@ -91,6 +91,7 @@ def apply_profile_patch(profile: dict[str, object], patch: dict[str, object]) ->
         updated["trial_welcome_seen"] = True
 
     # Онбординг предпочтений и списки продуктов не должны затираться при частичных PATCH-сохранениях.
+    # Источник истины для этих полей — профиль пользователя в таблице profiles.
     if "preferences_onboarding_completed" not in patch:
         updated["preferences_onboarding_completed"] = normalized_current.get("preferences_onboarding_completed")
     if "favorite_product_ids" not in patch:
