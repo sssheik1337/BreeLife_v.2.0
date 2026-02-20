@@ -394,9 +394,10 @@ function updateCalculatedMetrics(profile) {
         ? adjustCaloriesByWeeklyProgress(weeklySourceProfile, safeProfile?.weekly_stats)
         : null;
 
-    const effectiveCaloriesTarget = Number.isFinite(weeklyAdjustment?.calories_target)
-        ? weeklyAdjustment.calories_target
-        : weightForecast.calories_target;
+    const profileCaloriesTarget = Number(safeProfile?.calories_target);
+    const effectiveCaloriesTarget = Number.isFinite(profileCaloriesTarget) && profileCaloriesTarget > 0
+        ? profileCaloriesTarget
+        : null;
     const effectiveCalorieDelta = Number.isFinite(weeklyAdjustment?.calorie_delta)
         ? weeklyAdjustment.calorie_delta
         : weightForecast.calorie_delta;
@@ -1111,7 +1112,7 @@ function renderNutritionRings(profile) {
 
     const safeProfile = profile && typeof profile === 'object' ? profile : {};
     const recommended = {
-        calories: Number(safeProfile?.tdee_calories) || null,
+        calories: Number(safeProfile?.calories_target) || null,
         protein: Number(safeProfile?.macros?.protein_g) || null,
         fat: Number(safeProfile?.macros?.fat_g) || null,
         carbs: Number(safeProfile?.macros?.carbs_g) || null,

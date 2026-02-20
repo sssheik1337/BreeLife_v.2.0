@@ -149,31 +149,8 @@ function getResolvedProfileForDisplay() {
     const tdee = Number(profile.tdee_calories);
     const caloriesTarget = Number(profile.calories_target);
     if (!hasFiniteNumber(profile.calories_target)) {
-        if (typeof calculateWeightGoalForecast === 'function') {
-            const forecast = calculateWeightGoalForecast({
-                sex: profile.sex,
-                goal: profile.goal,
-                tdee_calories: Number.isFinite(tdee) ? tdee : null,
-                weight_kg: hasWeight ? weight : null,
-                target_weight_kg: profile.target_weight_kg,
-                goal_deadline: profile.goal_deadline
-            });
-            const forecastCalories = Number(forecast?.calories_target);
-            if (Number.isFinite(forecastCalories) && forecastCalories > 0) {
-                profile.calories_target = forecastCalories;
-            }
-        }
-
-        // Резервный расчёт для отображения карточки, если forecast-функция недоступна.
-        if (!hasFiniteNumber(profile.calories_target) && Number.isFinite(tdee) && tdee > 0) {
-            if (profile.goal === 'lose') {
-                profile.calories_target = Math.max(1200, Math.round(tdee * 0.85));
-            } else if (profile.goal === 'gain') {
-                profile.calories_target = Math.round(tdee * 1.1);
-            } else {
-                profile.calories_target = Math.round(tdee);
-            }
-        }
+        // Единый контракт приложения: целевая калорийность берётся только из profile.calories_target.
+        // Локальные fallback-расчёты здесь не применяются, чтобы не расходиться с backend-источником.
     }
 
     if ((!profile.macros || typeof profile.macros !== 'object')) {
@@ -641,7 +618,7 @@ function renderCalorieTrend(rangeDays = 7) {
     }
 
     const profile = getResolvedProfileForDisplay();
-    const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
+    const targetCalories = Number(profile?.calories_target);
     const entries = readDiaryEntries();
     const caloriesByDate = new Map();
 
@@ -1009,7 +986,7 @@ function renderTodayPlanCard() {
     const profile = getResolvedProfileForDisplay();
     const todayTotals = getTodayDiaryTotals();
 
-    const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
+    const targetCalories = Number(profile?.calories_target);
     const targetProtein = Number(profile?.macros?.protein_g);
     const targetFat = Number(profile?.macros?.fat_g);
     const targetCarbs = Number(profile?.macros?.carbs_g);
@@ -1061,7 +1038,7 @@ function renderWeeklyProgress() {
     startDate.setHours(0, 0, 0, 0);
     startDate.setDate(today.getDate() - dayIndex);
     const profile = getResolvedProfileForDisplay();
-    const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
+    const targetCalories = Number(profile?.calories_target);
 
     const entries = readDiaryEntries();
     const caloriesByDate = new Map();
@@ -1201,7 +1178,7 @@ function renderMonthGrid() {
     grid.innerHTML = '';
 
     const profile = getResolvedProfileForDisplay();
-    const targetCalories = Number(profile?.calories_target ?? profile?.tdee_calories);
+    const targetCalories = Number(profile?.calories_target);
     const hasValidTarget = Number.isFinite(targetCalories) && targetCalories > 0;
 
     const entries = readDiaryEntries();

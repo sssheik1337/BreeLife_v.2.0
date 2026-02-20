@@ -8,7 +8,6 @@ from config import APP_DEBUG, MEAL_PLAN_ALGO_VERSION
 from app.dependencies import load_profile, require_telegram_user_id
 from services.products_db import load_admin_products
 from services.storage_db import read_cache_payload, write_cache_payload
-from services.targets import calculate_tdee_kcal
 
 router = APIRouter()
 
@@ -137,35 +136,14 @@ def distribute_meal_targets(targets: dict[str, object] | None) -> tuple[list[dic
     return meals, diagnostics
 
 
-def apply_goal_to_tdee(tdee_kcal: float, goal: object) -> int:
-    """Применить поправку цели к TDEE и вернуть целевые калории."""
-    normalized_goal = str(goal).strip().lower() if isinstance(goal, str) else ""
-    if normalized_goal == "lose":
-        return max(1200, int(round(tdee_kcal * 0.85)))
-    if normalized_goal == "gain":
-        return int(round(tdee_kcal * 1.10))
-    return int(round(tdee_kcal))
-
-
 def resolve_calories_target(profile: dict[str, object]) -> tuple[int | None, str]:
-    """Определить целевые калории по приоритетам профиля."""
+    """Определить целевые калории строго из profile.calories_target."""
     direct_target = parse_positive_number(profile.get("calories_target"))
     if direct_target is not None:
         return int(round(direct_target)), "profile.calories_target"
 
-    required_target = parse_positive_number(profile.get("required_calories_target"))
-    if required_target is not None:
-        return int(round(required_target)), "profile.required_calories_target"
-
-    tdee_from_profile = parse_positive_number(profile.get("tdee_calories"))
-    if tdee_from_profile is not None:
-        return apply_goal_to_tdee(tdee_from_profile, profile.get("goal")), "profile.tdee_calories"
-
-    tdee_calculated = calculate_tdee_kcal(profile)
-    if isinstance(tdee_calculated, int) and tdee_calculated > 0:
-        return apply_goal_to_tdee(float(tdee_calculated), profile.get("goal")), "calculated_tdee"
-
-    return None, "unresolved"
+    # Строгий контракт: backend рациона не подменяет цель коэффициентной или forecast-моделью.
+    return None, "target_not_computed"
 
 
 def normalize_macros_payload(value: object) -> dict[str, int] | None:
@@ -209,7 +187,7 @@ def resolve_targets(profile: dict[str, object]) -> tuple[dict[str, object] | Non
     if calories_target is None:
         missing_fields = collect_missing_target_fields(profile)
         return None, {
-            "targets_source": {"calories": None, "macros": None},
+            "targets_source": {"calories": "missing", "macros": None},
             "missing_fields": missing_fields,
             "calories_source": calories_source,
             "macros_source": "unresolved",
@@ -698,37 +676,18 @@ def build_meals_with_products(
 
 
 def is_profile_valid_for_targets(profile: dict[str, object]) -> bool:
-    """Проверить, хватает ли данных профиля для расчёта целевых калорий."""
-    if parse_positive_number(profile.get("calories_target")) is not None:
-        return True
-    if parse_positive_number(profile.get("required_calories_target")) is not None:
-        return True
-    if parse_positive_number(profile.get("tdee_calories")) is not None:
-        return True
-
-    required_fields = ("sex", "birth_date", "height_cm", "weight_kg", "activity_factor")
-    for field in required_fields:
-        value = profile.get(field)
-        if field in {"height_cm", "weight_kg", "activity_factor"}:
-            if parse_positive_number(value) is None:
-                return False
-        else:
-            if not isinstance(value, str) or not value.strip():
-                return False
-    return True
+    """Проверить, рассчитана ли целевая калорийность по строгому контракту."""
+    return parse_positive_number(profile.get("calories_target")) is not None
 
 
 def collect_missing_target_fields(profile: dict[str, object]) -> list[str]:
-    """Собрать список отсутствующих полей, мешающих расчёту целевых значений."""
+    """Собрать список отсутствующих полей, мешающих расчёту calories_target."""
     missing: list[str] = []
-    if parse_positive_number(profile.get("calories_target")) is None:
-        missing.append("calories_target")
-    if parse_positive_number(profile.get("required_calories_target")) is None:
-        missing.append("required_calories_target")
-    if parse_positive_number(profile.get("tdee_calories")) is None:
-        missing.append("tdee_calories")
+    if parse_positive_number(profile.get("calories_target")) is not None:
+        return missing
 
-    required_fields = ("sex", "birth_date", "height_cm", "weight_kg", "activity_factor")
+    # Эти поля перечисляем для фронта, чтобы он мог инициировать пересчёт и сохранить calories_target.
+    required_fields = ("goal", "sex", "birth_date", "height_cm", "weight_kg", "activity_factor")
     for field in required_fields:
         value = profile.get(field)
         if field in {"height_cm", "weight_kg", "activity_factor"}:
@@ -737,6 +696,14 @@ def collect_missing_target_fields(profile: dict[str, object]) -> list[str]:
         else:
             if not isinstance(value, str) or not value.strip():
                 missing.append(field)
+
+    goal_value = str(profile.get("goal")).strip().lower() if isinstance(profile.get("goal"), str) else ""
+    if goal_value in {"lose", "gain"}:
+        if parse_positive_number(profile.get("target_weight_kg")) is None:
+            missing.append("target_weight_kg")
+
+    # Поле оставляем для обратной совместимости диагностики: это целевое значение по контракту.
+    missing.insert(0, "calories_target")
 
     # Убираем дубли, сохраняя порядок.
     return list(dict.fromkeys(missing))
@@ -940,9 +907,14 @@ def build_meal_plan_payload_for_date(
             },
         )
 
+    top_level_targets_source = "profile.calories_target" if targets_diagnostics.get("calories_source") == "profile.calories_target" else "missing"
+    target_status = "ok" if top_level_targets_source == "profile.calories_target" else "target_not_computed"
+
     return {
         "date": resolved_date.isoformat(),
         "targets": targets,
+        "targets_source": top_level_targets_source,
+        "target_status": target_status,
         "meals": meals,
         "totals": totals,
         "meta": meta,
@@ -1036,8 +1008,11 @@ async def meal_plan_week_api(
         )
         days.append(day_payload)
 
+    week_targets_source = "profile.calories_target" if all(day.get("targets_source") == "profile.calories_target" for day in days) else "missing"
     payload = {
         "week_start": week_start.isoformat(),
+        "targets_source": week_targets_source,
+        "target_status": "ok" if week_targets_source == "profile.calories_target" else "target_not_computed",
         "days": days,
     }
     write_cache_payload(week_cache_key, payload, MEAL_PLAN_CACHE_TTL_SECONDS)

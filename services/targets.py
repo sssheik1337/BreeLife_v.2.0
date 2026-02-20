@@ -92,6 +92,61 @@ def calculate_tdee_kcal(profile: dict[str, object]) -> int | None:
     return int(round(bmr * activity_factor))
 
 
+def _apply_calories_safety_clamp(calories_target: float, sex: object) -> int | None:
+    """Применить нижнюю безопасную границу калорий по полу."""
+    value = _parse_number(calories_target)
+    if value is None:
+        return None
+
+    normalized_sex = _normalize_sex(sex)
+    if normalized_sex == "female":
+        value = max(value, 1200)
+    elif normalized_sex == "male":
+        value = max(value, 1500)
+    return int(round(value))
+
+
+def calculate_calories_target_kcal(profile: dict[str, object]) -> int | None:
+    """Рассчитать целевые калории по forecast-модели и вернуть их как единый target."""
+    existing = _parse_number(profile.get("calories_target"))
+    if existing is not None and existing > 0:
+        return int(round(existing))
+
+    goal = _normalize_goal(profile.get("goal"))
+    tdee_kcal = calculate_tdee_kcal(profile)
+    if goal is None or not isinstance(tdee_kcal, int) or tdee_kcal <= 0:
+        return None
+
+    if goal == "maintain":
+        return _apply_calories_safety_clamp(float(tdee_kcal), profile.get("sex"))
+
+    weight = _parse_number(profile.get("weight_kg"))
+    target_weight = _parse_number(profile.get("target_weight_kg"))
+    if weight is None or target_weight is None or weight <= 0 or target_weight <= 0:
+        return None
+
+    if goal == "lose" and target_weight >= weight:
+        return None
+    if goal == "gain" and target_weight <= weight:
+        return None
+
+    if goal == "lose":
+        adaptive_limit = min(weight * 0.01, 1.2)
+    elif goal == "gain":
+        adaptive_limit = min(weight * 0.005, 0.6)
+    else:
+        return None
+
+    if adaptive_limit <= 0:
+        return None
+
+    direction = -1 if goal == "lose" else 1
+    planned_rate = direction * adaptive_limit
+    planned_calorie_delta = (planned_rate * 7700) / 7
+    calories_target = tdee_kcal + planned_calorie_delta
+    return _apply_calories_safety_clamp(calories_target, profile.get("sex"))
+
+
 def calculate_water_target_l(profile: dict[str, object]) -> float | None:
     weight = _parse_number(profile.get("weight_kg"))
     if weight is None or weight <= 0:
@@ -128,4 +183,3 @@ def calculate_fiber_target_g(profile: dict[str, object], tdee_kcal: int | None) 
     if sex == "male":
         return 30
     return 25
-
