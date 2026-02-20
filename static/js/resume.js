@@ -231,10 +231,7 @@ async function ensureComputedTargetsSaved(profile) {
         return safeProfile;
     }
 
-    const diaryEntries = typeof window.getDiaryEntries === 'function'
-        ? window.getDiaryEntries()
-        : [];
-    const computedTargets = window.computeTargets(safeProfile, diaryEntries, new Date());
+    const computedTargets = window.computeTargets(safeProfile, new Date());
     const hasDrift = hasProfileTargetFieldsDrift(safeProfile, computedTargets);
     if (!hasDrift) {
         return safeProfile;

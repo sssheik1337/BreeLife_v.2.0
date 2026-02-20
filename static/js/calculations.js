@@ -619,7 +619,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
 }
 
 
-function computeTargets(profile, diaryEntries = [], nowDate = null) {
+function computeTargets(profile, nowDate = null) {
     const safeProfile = profile && typeof profile === 'object' ? profile : {};
     const resolvedNowDate = nowDate ? new Date(nowDate) : new Date();
     const normalizedNowDate = Number.isNaN(resolvedNowDate.getTime()) ? new Date() : resolvedNowDate;

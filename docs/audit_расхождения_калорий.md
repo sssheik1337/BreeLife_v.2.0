@@ -3,7 +3,7 @@
 ## Что сделано в этой итерации
 Введён единый фронтовый pipeline:
 
-`computeTargets(profile, diaryEntries, nowDate)`
+`computeTargets(profile, nowDate)`
 
 Pipeline возвращает полный набор целевых полей:
 - `tdee_calories` (справка),
@@ -24,11 +24,12 @@ Pipeline возвращает полный набор целевых полей:
    - safety clamp,
    - weekly autocorrection.
 2. Расчёт детерминирован по входам `profile + nowDate`.
-3. Null-safe: при неполных данных поля возвращаются как `null`, без скрытых коэффициентных fallback (`0.85/1.10`).
+3. Параметр `diaryEntries` удалён из API pipeline, так как weekly autocorrection использует сохранённый `profile.weekly_stats`, а не данные дневника «на лету».
+4. Null-safe: при неполных данных поля возвращаются как `null`, без скрытых коэффициентных fallback (`0.85/1.10`).
 
 ## Где находится единый расчёт
 - `static/js/calculations.js`
-  - `computeTargets(profile, diaryEntries, nowDate)` — единая точка сборки целевых полей.
+  - `computeTargets(profile, nowDate)` — единая точка сборки целевых полей.
   - `calculateWeightGoalForecast(...)` поддерживает `now_date` для детерминированного расчёта дедлайнов/прогноза.
 
 ## Где pipeline вызывается и как сохраняется

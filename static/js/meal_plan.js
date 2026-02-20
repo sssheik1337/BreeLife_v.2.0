@@ -133,11 +133,7 @@ async function computeAndPersistMissingCaloriesTarget() {
     const profile = typeof window.getUserProfile === 'function'
         ? (window.getUserProfile() || {})
         : {};
-    const diaryEntries = typeof window.getDiaryEntries === 'function'
-        ? window.getDiaryEntries()
-        : [];
-
-    const computed = window.computeTargets(profile, diaryEntries, new Date());
+    const computed = window.computeTargets(profile, new Date());
     if (!isValidCaloriesTarget(computed?.calories_target)) {
         return {
             ok: false,
