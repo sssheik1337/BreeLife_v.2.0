@@ -15,7 +15,7 @@ class CustomNavbar extends HTMLElement {
           padding: 1.25rem 1.5rem;
           padding-top: calc(
             max(env(safe-area-inset-top), var(--tg-safe-top, 0px))
-            + var(--tg-overlay-top, 0px)
+            + var(--tg-ui-top, 0px)
           );
           background: white;
           position: fixed;
@@ -182,7 +182,7 @@ class CustomNavbar extends HTMLElement {
             padding: 1rem 1.25rem;
             padding-top: calc(
               max(env(safe-area-inset-top), var(--tg-safe-top, 0px))
-              + var(--tg-overlay-top, 0px)
+              + var(--tg-ui-top, 0px)
             );
           }
 

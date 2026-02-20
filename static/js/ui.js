@@ -948,18 +948,22 @@ function applyTelegramSafeAreaInsets() {
     document.documentElement.style.setProperty('--tg-safe-top', `${safeTop}px`);
 }
 
-function applyTelegramOverlayOffset() {
+function applyTelegramUiOffset() {
     const tg = window.Telegram?.WebApp;
     if (!tg) {
         return;
     }
 
-    const overlay = Math.max(
-        0,
-        (Number(tg.viewportHeight) || 0) - (Number(tg.viewportStableHeight) || 0)
-    );
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    const isFullscreen = Boolean(tg.isExpanded);
 
-    document.documentElement.style.setProperty('--tg-overlay-top', `${overlay}px`);
+    if (isIOS && isFullscreen) {
+        // Фиксированный верхний offset интерфейса Telegram в fullscreen на iOS.
+        document.documentElement.style.setProperty('--tg-ui-top', '48px');
+        return;
+    }
+
+    document.documentElement.style.setProperty('--tg-ui-top', '0px');
 }
 
 
@@ -1061,16 +1065,16 @@ document.addEventListener('DOMContentLoaded', async function() {
         resetInitialScrollPosition();
         applyTelegramTheme();
         applyTelegramSafeAreaInsets();
-        applyTelegramOverlayOffset();
+        applyTelegramUiOffset();
         if (typeof tg.onEvent === 'function') {
             tg.onEvent('themeChanged', () => {
                 applyTelegramTheme();
             });
             tg.onEvent('viewportChanged', () => {
                 applyTelegramSafeAreaInsets();
-                applyTelegramOverlayOffset();
                 applyHeaderHeight();
             });
+            tg.onEvent('viewportChanged', applyTelegramUiOffset);
         }
     }
     requestAnimationFrame(() => {
