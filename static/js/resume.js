@@ -207,9 +207,6 @@ function hasProfileTargetFieldsDrift(profile, computedTargets) {
         'calories_target',
         'calorie_delta',
         'weight_rate_kg_per_week',
-        'required_rate_kg_per_week',
-        'required_calorie_delta',
-        'required_calories_target',
         'safe_weeks_estimate'
     ];
 
@@ -249,9 +246,6 @@ async function ensureComputedTargetsSaved(profile) {
         calorie_delta: computedTargets?.calorie_delta,
         weight_rate_kg_per_week: computedTargets?.weight_rate_kg_per_week,
         predicted_goal_date: computedTargets?.predicted_goal_date,
-        required_rate_kg_per_week: computedTargets?.required_rate_kg_per_week,
-        required_calorie_delta: computedTargets?.required_calorie_delta,
-        required_calories_target: computedTargets?.required_calories_target,
         safe_weeks_estimate: computedTargets?.safe_weeks_estimate
     };
 
@@ -547,7 +541,7 @@ function updateCalculatedMetrics(profile) {
     } else {
         levelE.status = levelE.missing.length > 0
             ? `Не хватает: ${formatMissingFields(levelE.missing)}`
-            : 'Прогноз рассчитан';
+            : 'Прогноз рассчитан (требуемые дедлайн-метрики не рассчитываются)';
     }
 
     const diagnostics = buildResumeDiagnostics({

@@ -12,10 +12,10 @@ Pipeline возвращает полный набор целевых полей:
 - `weight_rate_kg_per_week`,
 - `predicted_goal_date`,
 - `warning_message`,
-- `required_rate_kg_per_week`,
-- `required_calorie_delta`,
-- `required_calories_target`,
+- `deadline_metrics_diagnostics` (`not_applicable`/`not_implemented` для требуемых дедлайн-метрик),
 - `safe_weeks_estimate`.
+
+Требуемые дедлайн-метрики (`required_rate_kg_per_week`, `required_calorie_delta`, `required_calories_target`) не публикуются в рабочем payload `computeTargets`, так как в текущей модели они не рассчитываются и ранее приходили как `null`.
 
 ## Принципы pipeline
 1. Используется текущая forecast-модель:

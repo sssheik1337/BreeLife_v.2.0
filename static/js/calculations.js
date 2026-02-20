@@ -336,6 +336,14 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             console.log('[MODEL_DEBUG] forecast:pipeline', { stage, ...payload });
         }
     };
+
+    const buildDeadlineMetricsDiagnostics = (status) => ({
+        status,
+        metrics: ['required_rate_kg_per_week', 'required_calorie_delta', 'required_calories_target'],
+        reason: status === 'not_applicable'
+            ? 'Метрики дедлайна не применяются для текущего режима цели.'
+            : 'Модель сейчас не рассчитывает требуемые дедлайн-метрики; используются только безопасный темп и прогнозная дата.'
+    });
     if (!goal || tdee_calories === null || tdee_calories === undefined) {
         logForecastPipeline('blocked', { reason: 'MISSING_GOAL_OR_TDEE', input: debugInput });
         return {
@@ -344,6 +352,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_rate_kg_per_week: null,
             required_calorie_delta: null,
             required_calories_target: null,
+            deadline_metrics_diagnostics: buildDeadlineMetricsDiagnostics('not_applicable'),
             safe_weeks_estimate: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
@@ -364,6 +373,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_rate_kg_per_week: null,
             required_calorie_delta: null,
             required_calories_target: null,
+            deadline_metrics_diagnostics: buildDeadlineMetricsDiagnostics('not_applicable'),
             safe_weeks_estimate: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
@@ -390,6 +400,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_rate_kg_per_week: null,
             required_calorie_delta: null,
             required_calories_target: null,
+            deadline_metrics_diagnostics: buildDeadlineMetricsDiagnostics('not_applicable'),
             safe_weeks_estimate: null,
             weight_rate_kg_per_week: 0,
             predicted_goal_date: null,
@@ -408,6 +419,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_rate_kg_per_week: null,
             required_calorie_delta: null,
             required_calories_target: null,
+            deadline_metrics_diagnostics: buildDeadlineMetricsDiagnostics('not_applicable'),
             safe_weeks_estimate: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
@@ -460,6 +472,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_rate_kg_per_week: null,
             required_calorie_delta: null,
             required_calories_target: null,
+            deadline_metrics_diagnostics: buildDeadlineMetricsDiagnostics('not_applicable'),
             safe_weeks_estimate: null,
             weight_rate_kg_per_week: null,
             predicted_goal_date: null,
@@ -472,6 +485,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
     let requiredRate = null;
     let requiredCalorieDelta = null;
     let requiredCaloriesTarget = null;
+    const deadlineMetricsDiagnostics = buildDeadlineMetricsDiagnostics('not_implemented');
     let safeWeeksEstimate = null;
     let warningMessage = null;
 
@@ -521,6 +535,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_rate_kg_per_week: requiredRate,
             required_calorie_delta: requiredCalorieDelta,
             required_calories_target: requiredCaloriesTarget,
+            deadline_metrics_diagnostics: deadlineMetricsDiagnostics,
             safe_weeks_estimate: safeWeeksEstimate,
             weight_rate_kg_per_week: rate,
             predicted_goal_date: null,
@@ -538,6 +553,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_rate_kg_per_week: requiredRate,
             required_calorie_delta: requiredCalorieDelta,
             required_calories_target: requiredCaloriesTarget,
+            deadline_metrics_diagnostics: deadlineMetricsDiagnostics,
             safe_weeks_estimate: safeWeeksEstimate,
             weight_rate_kg_per_week: rate,
             predicted_goal_date: null,
@@ -556,6 +572,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
             required_rate_kg_per_week: requiredRate,
             required_calorie_delta: requiredCalorieDelta,
             required_calories_target: requiredCaloriesTarget,
+            deadline_metrics_diagnostics: deadlineMetricsDiagnostics,
             safe_weeks_estimate: safeWeeksEstimate,
             weight_rate_kg_per_week: rate,
             predicted_goal_date: null,
@@ -577,6 +594,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         weightDiff: deltaKg,
         requiredRate,
         requiredCalorieDelta,
+        deadlineMetricsDiagnostics,
         safeWeeksEstimate,
         caloriesTarget,
         calorieDelta,
@@ -590,6 +608,7 @@ function calculateWeightGoalForecast({ sex, goal, tdee_calories, weight_kg, targ
         required_rate_kg_per_week: requiredRate,
         required_calorie_delta: requiredCalorieDelta,
         required_calories_target: requiredCaloriesTarget,
+        deadline_metrics_diagnostics: deadlineMetricsDiagnostics,
         safe_weeks_estimate: safeWeeksEstimate,
         weight_rate_kg_per_week: rate,
         predicted_goal_date: predictedDate,
@@ -664,9 +683,7 @@ function computeTargets(profile, diaryEntries = [], nowDate = null) {
         weight_rate_kg_per_week: toFiniteOrNull(effectiveWeightRate),
         predicted_goal_date: forecast?.predicted_goal_date ?? null,
         warning_message: effectiveWarning,
-        required_rate_kg_per_week: toFiniteOrNull(forecast?.required_rate_kg_per_week),
-        required_calorie_delta: toFiniteOrNull(forecast?.required_calorie_delta),
-        required_calories_target: toFiniteOrNull(forecast?.required_calories_target),
+        deadline_metrics_diagnostics: forecast?.deadline_metrics_diagnostics ?? null,
         safe_weeks_estimate: toFiniteOrNull(forecast?.safe_weeks_estimate)
     };
 }

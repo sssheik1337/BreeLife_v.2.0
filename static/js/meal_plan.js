@@ -138,9 +138,6 @@ async function computeAndPersistMissingCaloriesTarget() {
         weight_rate_kg_per_week: computed?.weight_rate_kg_per_week,
         predicted_goal_date: computed?.predicted_goal_date,
         warning_message: computed?.warning_message,
-        required_rate_kg_per_week: computed?.required_rate_kg_per_week,
-        required_calorie_delta: computed?.required_calorie_delta,
-        required_calories_target: computed?.required_calories_target,
         safe_weeks_estimate: computed?.safe_weeks_estimate,
     };
 
