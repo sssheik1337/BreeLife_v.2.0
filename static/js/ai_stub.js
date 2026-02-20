@@ -454,7 +454,7 @@ function calculateEntryTotals(entry) {
 
 function analyzeWeeklyStats(profile, entries = []) {
     const stats = profile?.weekly_stats || {};
-    const tdee = Number(profile?.tdee_calories);
+    const targetCalories = Number(profile?.calories_target);
     const proteinTarget = Number(profile?.macros?.protein_g);
 
     let caloriesAvg = Number(stats.calories_avg);
@@ -511,10 +511,12 @@ function analyzeWeeklyStats(profile, entries = []) {
         };
     }
 
-    if (Number.isFinite(tdee) && Number.isFinite(caloriesAvg)) {
-        if (caloriesAvg > tdee * 1.1) {
+    if (!Number.isFinite(targetCalories) || targetCalories <= 0) {
+        adjustments.push('Цель не рассчитана. Заполните профиль, чтобы сравнивать факт с планом.');
+    } else if (Number.isFinite(caloriesAvg)) {
+        if (caloriesAvg > targetCalories * 1.1) {
             adjustments.push('Еды в среднем было больше, чем нужно для цели. Попробуйте чуть уменьшить порции.');
-        } else if (caloriesAvg < tdee * 0.9) {
+        } else if (caloriesAvg < targetCalories * 0.9) {
             adjustments.push('Еды в среднем было меньше, чем нужно для цели. Добавьте немного энергии.');
         }
     }
