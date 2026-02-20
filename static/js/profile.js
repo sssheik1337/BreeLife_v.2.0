@@ -146,13 +146,6 @@ function getResolvedProfileForDisplay() {
         }
     }
 
-    const tdee = Number(profile.tdee_calories);
-    const caloriesTarget = Number(profile.calories_target);
-    if (!hasFiniteNumber(profile.calories_target)) {
-        // Единый контракт приложения: целевая калорийность берётся только из profile.calories_target.
-        // Локальные fallback-расчёты здесь не применяются, чтобы не расходиться с backend-источником.
-    }
-
     if ((!profile.macros || typeof profile.macros !== 'object')) {
         const resolvedCalories = Number(profile.calories_target);
         if (Number.isFinite(resolvedCalories) && resolvedCalories > 0 && hasWeight && profile.goal) {
@@ -283,7 +276,7 @@ function resolveCalorieTone(dayCalories, targetCalories) {
     if (tone.tone === 'success') {
         return { color: tone.color, label: 'в нужном диапазоне' };
     }
-    return { color: tone.color, label: 'ориентир не рассчитан' };
+    return { color: tone.color, label: 'цель не рассчитана' };
 }
 
 function safeDivide(a, b) {
@@ -1000,7 +993,7 @@ function renderTodayPlanCard() {
 
     caloriesElement.textContent = Number.isFinite(targetCalories) && targetCalories > 0
         ? `${caloriesFact} / ${Math.round(targetCalories)} ккал`
-        : `${caloriesFact} ккал`;
+        : `${caloriesFact} / цель не рассчитана`;
     proteinElement.textContent = Number.isFinite(targetProtein) && targetProtein > 0
         ? `Б: ${proteinFact} / ${Math.round(targetProtein)} г`
         : `Б: ${proteinFact} г`;
@@ -1103,6 +1096,9 @@ function renderWeeklyProgress() {
             if (!hasData) {
                 bar.style.height = '0%';
                 bar.style.background = '#e2e8f0';
+            } else if (!hasValidTarget) {
+                bar.style.height = '0%';
+                bar.style.background = '#e2e8f0';
             } else {
                 bar.style.height = `${heightPercent}%`;
                 bar.style.background = percentToGradientColor(dayPercent);
@@ -1131,9 +1127,11 @@ function renderWeeklyProgress() {
         return Math.round(Math.min(Math.max(safeDivide(totalPercent, 7) * 100, 0), 100));
     };
     const percent = resolveWeeklyPercent();
-    percentElement.textContent = `${percent}%`;
+    percentElement.textContent = hasValidTarget ? `${percent}%` : '—';
     if (descElement) {
-        descElement.textContent = 'Учитываются записи дневника питания.';
+        descElement.textContent = hasValidTarget
+            ? 'Учитываются записи дневника питания.'
+            : 'Цель не рассчитана.';
     }
     if (!loggedDays) {
         if (insight) {
@@ -1149,7 +1147,7 @@ function renderWeeklyProgress() {
     }
     if (!hasValidTarget) {
         if (insight) {
-            insight.textContent = 'Есть записи за неделю, но ориентир не задан. Старайтесь держать дни более ровными.';
+            insight.textContent = 'Есть записи за неделю, но цель не рассчитана. Заполните профиль, чтобы увидеть факт / цель.';
         }
         return;
     }
