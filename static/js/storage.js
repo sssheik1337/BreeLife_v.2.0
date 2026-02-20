@@ -1086,7 +1086,12 @@
             }
             const normalized = normalizeUserProfile(responsePayload);
             applyProfileCache(normalized);
-            window.__lastProfileSaveTs = Date.now();
+            const savedUpdatedAtTs = new Date(normalized?.last_updated || 0).getTime();
+            // Используем серверный last_updated как основной таймштамп,
+            // чтобы избежать ложной блокировки из-за рассинхрона часов клиента и сервера.
+            window.__lastProfileSaveTs = Number.isFinite(savedUpdatedAtTs) && savedUpdatedAtTs > 0
+                ? savedUpdatedAtTs
+                : Date.now();
             if (typeof window.resetUserDataDirtyMap === 'function') {
                 window.resetUserDataDirtyMap('profile_saved');
             }
