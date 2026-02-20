@@ -945,6 +945,7 @@
         lastProfilePatchPromise = saveProfileToBackend(patchPayload, { skipRequiredValidation: true, mode: 'patch' })
             .then((savedProfile) => savedProfile || normalized)
             .catch(() => normalized);
+        window.lastProfilePatchPromise = lastProfilePatchPromise;
         return normalized;
     }
 
@@ -1430,6 +1431,7 @@
     window.getUserProfile = getUserProfile;
     window.setUserProfile = setUserProfile;
     window.patchUserProfile = patchUserProfile;
+    window.lastProfilePatchPromise = null;
     window.patchUserProfileWithBackend = patchUserProfileWithBackend;
     window.normalizeLocalDate = normalizeLocalDate;
     window.validateGoalWeightConsistency = validateGoalWeightConsistency;

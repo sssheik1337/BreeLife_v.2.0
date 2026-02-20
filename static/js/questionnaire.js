@@ -1233,7 +1233,7 @@ function setupEventListeners() {
             currentQuestionIndex++;
             displayQuestion();
         } else {
-            // Сохраняем профиль и отправляем на сервер (если доступен Telegram ID).
+            // Сохраняем профиль и дожидаемся завершения patch-сохранения перед редиректом.
             let profile = null;
             const consistency = validateGoalWeightConsistencyForQuestionnaire(window.userData);
             if (!consistency.ok) {
@@ -1287,15 +1287,8 @@ function setupEventListeners() {
                 profile = getUserProfile();
             }
             persistUserData();
-            const saved = await saveProfileToServer(profile);
-            if (!saved) {
-                if (typeof showNotification === 'function') {
-                    showNotification('Не удалось сохранить профиль. Проверьте подключение и повторите попытку.', 'error');
-                }
-                return;
-            }
-            if (typeof resetUserDataDirtyMap === 'function') {
-                resetUserDataDirtyMap('profile_saved');
+            if (window.lastProfilePatchPromise) {
+                await window.lastProfilePatchPromise;
             }
             // Все вопросы заполнены, переходим на следующий экран с учётом шага предпочтений.
             window.location.href = resolvePostQuestionnaireRoute(profile);
