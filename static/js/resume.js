@@ -169,13 +169,28 @@ async function loadProfileFromBackend() {
             }
             return null;
         }
-        return data;
+        return mergeProfileForResume(data);
     } catch (error) {
         if (window.appDebug === true) {
             console.error('[RESUME][backend] Исключение при загрузке профиля', error);
         }
         return null;
     }
+}
+
+
+function mergeProfileForResume(serverProfile) {
+    const backendProfile = serverProfile && typeof serverProfile === 'object' ? serverProfile : {};
+    const localProfile = typeof getUserProfile === 'function' ? (getUserProfile() || {}) : {};
+
+    // Для экрана /resume предпочитаем свежий ответ сервера,
+    // но не теряем локально известные поля, если backend прислал частичный payload.
+    const merged = {
+        ...localProfile,
+        ...backendProfile
+    };
+
+    return merged;
 }
 
 // Initialize summary page
