@@ -83,25 +83,50 @@ def apply_profile_patch(profile: dict[str, object], patch: dict[str, object]) ->
     normalized_current = normalize_profile_payload_shape(profile)
     normalized_patch = normalize_profile_payload_shape(patch)
     updated = dict(normalized_current)
-    updated.update(normalized_patch)
+
+    # Частичный PATCH не должен обнулять поля, которых нет во входящем payload.
+    # Приводим только реально переданные ключи (включая legacy-алиасы) к canonical-ключам.
+    legacy_to_canonical = {
+        "gender": "sex",
+        "birthDate": "birth_date",
+        "height": "height_cm",
+        "currentWeight": "weight_kg",
+        "targetWeight": "target_weight_kg",
+        "goalType": "goal",
+        "activityLevel": "activity_factor",
+        "deadline": "goal_deadline",
+        "foodDiary": "food_diary",
+        "completed": "is_completed",
+        "profile_completed": "is_completed",
+    }
+
+    patch_canonical_keys: set[str] = set()
+    for key in patch.keys():
+        canonical_key = legacy_to_canonical.get(key, key)
+        if canonical_key in normalized_patch:
+            patch_canonical_keys.add(canonical_key)
+
+    for key in patch_canonical_keys:
+        updated[key] = normalized_patch.get(key)
 
     # Флаг приветственного экрана триала должен фиксироваться один раз и
     # не сбрасываться при последующих частичных сохранениях профиля.
-    if "trial_welcome_seen" not in patch and normalized_current.get("trial_welcome_seen") is True:
+    if "trial_welcome_seen" not in patch_canonical_keys and normalized_current.get("trial_welcome_seen") is True:
         updated["trial_welcome_seen"] = True
 
     # Онбординг предпочтений и списки продуктов не должны затираться при частичных PATCH-сохранениях.
     # Источник истины для этих полей — профиль пользователя в таблице profiles.
-    if "preferences_onboarding_completed" not in patch:
+    if "preferences_onboarding_completed" not in patch_canonical_keys:
         updated["preferences_onboarding_completed"] = normalized_current.get("preferences_onboarding_completed")
-    if "favorite_product_ids" not in patch:
+    if "favorite_product_ids" not in patch_canonical_keys:
         updated["favorite_product_ids"] = normalized_current.get("favorite_product_ids", [])
-    if "excluded_product_ids" not in patch:
+    if "excluded_product_ids" not in patch_canonical_keys:
         updated["excluded_product_ids"] = normalized_current.get("excluded_product_ids", [])
 
     updated["is_completed"] = bool(
         normalized_patch.get("is_completed")
-        or normalized_current.get("is_completed")
+        if "is_completed" in patch_canonical_keys
+        else normalized_current.get("is_completed")
     )
     updated["last_updated"] = datetime.now(timezone.utc).isoformat()
     return updated
