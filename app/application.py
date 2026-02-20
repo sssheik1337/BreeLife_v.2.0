@@ -12,6 +12,7 @@ from app.routers import (
     core,
     diary,
     foods,
+    meal_plan_api,
     pages,
     products_api,
     profile,
@@ -35,6 +36,7 @@ def create_app() -> FastAPI:
     app.include_router(profile.router)
     app.include_router(diary.router)
     app.include_router(foods.router)
+    app.include_router(meal_plan_api.router)
     app.include_router(pages.router)
     app.include_router(admin.router)
     app.include_router(products_api.router)
@@ -55,5 +57,3 @@ def create_app() -> FastAPI:
     app.mount("/fonts", StaticFiles(directory="fonts"), name="fonts")
     return app
 
-
-app = create_app()

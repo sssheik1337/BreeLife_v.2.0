@@ -1,12 +1,12 @@
-// Генератор рациона: день или неделя на основе профиля и предпочтений.
+// Экран рациона использует backend-контракт /api/meal-plan без изменения текущего UI.
 
-const PRODUCTS_ENDPOINT = '/api/products';
+const MEAL_PLAN_ENDPOINT = '/api/meal-plan';
 
-const MEAL_DISTRIBUTION = [
-    { key: 'breakfast', title: 'Завтрак', share: 0.25, items: 2 },
-    { key: 'lunch', title: 'Обед', share: 0.35, items: 3 },
-    { key: 'snack', title: 'Перекус', share: 0.1, items: 2 },
-    { key: 'dinner', title: 'Ужин', share: 0.3, items: 3 }
+const DEFAULT_MEALS = [
+    { key: 'breakfast', title: 'Завтрак' },
+    { key: 'lunch', title: 'Обед' },
+    { key: 'snack', title: 'Перекус' },
+    { key: 'dinner', title: 'Ужин' }
 ];
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -18,33 +18,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     container.textContent = 'Загрузка рациона...';
 
     try {
-        // Синхронизируем профиль с backend, чтобы рацион использовал единый источник истины.
+        // Синхронизируем профиль с backend, чтобы экран работал с актуальными данными.
         if (typeof syncProfileWithBackend === 'function') {
             await syncProfileWithBackend();
         }
 
-        const response = await fetch(PRODUCTS_ENDPOINT);
-        if (!response.ok) {
-            throw new Error('Не удалось загрузить данные');
-        }
-        const products = await response.json();
-        initMealPlan(container, products);
+        initMealPlan(container);
     } catch (error) {
         container.textContent = 'Не удалось загрузить рацион.';
     }
 });
 
-function initMealPlan(container, products) {
+function initMealPlan(container) {
     const rangeButtons = Array.from(document.querySelectorAll('[data-plan-range]'));
     let activeRange = 'day';
+
     updateRangeButtons(rangeButtons, activeRange);
-    renderMealPlan(container, products, activeRange);
+    renderMealPlan(container, activeRange);
 
     rangeButtons.forEach((button) => {
-        button.addEventListener('click', () => {
+        button.addEventListener('click', async () => {
             activeRange = button.dataset.planRange || 'day';
             updateRangeButtons(rangeButtons, activeRange);
-            renderMealPlan(container, products, activeRange);
+            await renderMealPlan(container, activeRange);
         });
     });
 }
@@ -59,107 +55,77 @@ function updateRangeButtons(buttons, activeValue) {
     });
 }
 
-
-function resolveCaloriesTarget(profile) {
-    const directTarget = Number(profile?.calories_target);
-    if (Number.isFinite(directTarget) && directTarget > 0) {
-        return directTarget;
-    }
-
-    const requiredTarget = Number(profile?.required_calories_target);
-    if (Number.isFinite(requiredTarget) && requiredTarget > 0) {
-        return requiredTarget;
-    }
-
-    const tdee = Number(profile?.tdee_calories);
-    if (!Number.isFinite(tdee) || tdee <= 0) {
-        return null;
-    }
-
-    // Аварийный расчёт цели по калориям на основе TDEE и цели, если явная цель не сохранена.
-    if (profile?.goal === 'lose') {
-        return Math.max(1200, Math.round(tdee * 0.85));
-    }
-    if (profile?.goal === 'gain') {
-        return Math.round(tdee * 1.1);
-    }
-    return Math.round(tdee);
+function getIsoDateWithOffset(dayOffset) {
+    const baseDate = new Date();
+    baseDate.setHours(0, 0, 0, 0);
+    baseDate.setDate(baseDate.getDate() + dayOffset);
+    const year = baseDate.getFullYear();
+    const month = String(baseDate.getMonth() + 1).padStart(2, '0');
+    const day = String(baseDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
-
-function resolveMacrosTarget(profile, caloriesTarget) {
-    if (profile?.macros && typeof profile.macros === 'object') {
-        return profile.macros;
-    }
-
-    if (typeof calculateMacros !== 'function') {
-        return null;
-    }
-
-    return calculateMacros({
-        goal: profile?.goal,
-        weight_kg: profile?.weight_kg,
-        calories_target: caloriesTarget
-    });
+function isFrontendDebugEnabled() {
+    return Boolean(window?.appDebug);
 }
 
-function renderMealPlan(container, products, rangeKey) {
-    const profile = typeof getUserProfile === 'function' ? getUserProfile() : {};
-    const filteredProducts = buildPreferredProducts(products, profile);
-
-    const caloriesTarget = resolveCaloriesTarget(profile);
-    const macrosTarget = resolveMacrosTarget(profile, caloriesTarget);
-    const totalsText = buildTotalsText(caloriesTarget, macrosTarget);
-
-    updateSummary(filteredProducts.length, totalsText);
-
-    container.innerHTML = '';
-
-    const days = rangeKey === 'week' ? 7 : 1;
-    for (let dayIndex = 0; dayIndex < days; dayIndex += 1) {
-        const dayPlan = buildDayPlan(filteredProducts, dayIndex);
-        container.appendChild(renderDayCard(dayPlan, dayIndex, caloriesTarget));
+async function loadMealPlanByDate(isoDate) {
+    const params = new URLSearchParams({ date: isoDate });
+    if (isFrontendDebugEnabled()) {
+        params.set('app_debug', '1');
     }
+
+    const response = await fetch(`${MEAL_PLAN_ENDPOINT}?${params.toString()}`);
+    if (!response.ok) {
+        throw new Error('Не удалось загрузить рацион');
+    }
+    return response.json();
 }
 
-function normalizeProfileIdSet(value) {
-    if (!Array.isArray(value)) {
-        return new Set();
-    }
-    const normalized = value
-        .map((item) => Number(item))
-        .filter((item) => Number.isInteger(item));
-    return new Set(normalized);
-}
+function buildTotalsText(targets) {
+    const caloriesTarget = Number(targets?.calories);
+    const macrosTarget = targets?.macros && typeof targets.macros === 'object'
+        ? targets.macros
+        : null;
 
-function buildPreferredProducts(products, profile) {
-    // Безопасно нормализуем id, чтобы учесть legacy-форматы (строки/дубли).
-    const favorites = normalizeProfileIdSet(profile?.favorite_product_ids);
-    const excluded = normalizeProfileIdSet(profile?.excluded_product_ids);
-    const available = products.filter((product) => !excluded.has(product.id));
-    if (favorites.size > 0) {
-        const favoriteProducts = available.filter((product) => favorites.has(product.id));
-        if (favoriteProducts.length > 0) {
-            return favoriteProducts;
-        }
-    }
-    return available;
-}
-
-function buildTotalsText(caloriesTarget, macrosTarget) {
     const caloriesText = Number.isFinite(caloriesTarget) && caloriesTarget > 0
         ? `${Math.round(caloriesTarget)} ккал`
         : 'ещё не рассчитано';
+
     if (!macrosTarget) {
         return { calories: caloriesText, macros: 'ещё не рассчитано' };
     }
-    const protein = macrosTarget.protein_g ? Math.round(macrosTarget.protein_g) : 0;
-    const fat = macrosTarget.fat_g ? Math.round(macrosTarget.fat_g) : 0;
-    const carbs = macrosTarget.carbs_g ? Math.round(macrosTarget.carbs_g) : 0;
+
+    const protein = Number.isFinite(Number(macrosTarget.protein_g)) ? Math.round(Number(macrosTarget.protein_g)) : 0;
+    const fat = Number.isFinite(Number(macrosTarget.fat_g)) ? Math.round(Number(macrosTarget.fat_g)) : 0;
+    const carbs = Number.isFinite(Number(macrosTarget.carbs_g)) ? Math.round(Number(macrosTarget.carbs_g)) : 0;
+
+    // Если backend явно вернул пустые макросы, сохраняем заглушку как раньше.
+    if (protein === 0 && fat === 0 && carbs === 0 && !Number.isFinite(Number(macrosTarget.protein_g))) {
+        return { calories: caloriesText, macros: 'ещё не рассчитано' };
+    }
+
     return {
         calories: caloriesText,
         macros: `${protein} / ${fat} / ${carbs} г`
     };
+}
+
+function countUniqueProductsInMeals(meals) {
+    if (!Array.isArray(meals)) {
+        return 0;
+    }
+    const ids = new Set();
+    meals.forEach((meal) => {
+        const items = Array.isArray(meal?.items) ? meal.items : [];
+        items.forEach((item) => {
+            const productId = Number(item?.product_id);
+            if (Number.isInteger(productId)) {
+                ids.add(productId);
+            }
+        });
+    });
+    return ids.size;
 }
 
 function updateSummary(productsCount, totalsText) {
@@ -167,6 +133,7 @@ function updateSummary(productsCount, totalsText) {
     const calories = document.getElementById('meal-plan-calories');
     const macros = document.getElementById('meal-plan-macros');
     const products = document.getElementById('meal-plan-products');
+
     if (desc) {
         desc.textContent = 'План собран по вашему профилю и выбранным продуктам. Это подсказка, а не медсовет.';
     }
@@ -177,46 +144,20 @@ function updateSummary(productsCount, totalsText) {
         macros.textContent = totalsText.macros;
     }
     if (products) {
-        products.textContent = productsCount.toString();
+        products.textContent = String(productsCount);
     }
 }
 
-function buildDayPlan(products, dayIndex) {
-    const sorted = [...products].sort((a, b) => {
-        const groupA = a.group || '';
-        const groupB = b.group || '';
-        if (groupA === groupB) {
-            return (a.name || '').localeCompare(b.name || '');
-        }
-        return groupA.localeCompare(groupB);
-    });
-
-    const plan = MEAL_DISTRIBUTION.map((meal, mealIndex) => {
-        const startIndex = (dayIndex * 7 + mealIndex * 3) % Math.max(sorted.length, 1);
-        const items = pickItems(sorted, startIndex, meal.items);
-        return {
-            title: meal.title,
-            share: meal.share,
-            items
-        };
-    });
-
-    return plan;
+function normalizeMeals(meals) {
+    if (Array.isArray(meals) && meals.length > 0) {
+        return meals;
+    }
+    return DEFAULT_MEALS.map((meal) => ({ ...meal, items: [], target_calories: null, suggestion: 'Сборный приём пищи' }));
 }
 
-function pickItems(list, startIndex, count) {
-    if (list.length === 0) {
-        return [];
-    }
-    const items = [];
-    for (let i = 0; i < count; i += 1) {
-        const index = (startIndex + i) % list.length;
-        items.push(list[index]);
-    }
-    return items;
-}
+function renderDayCard(dayPlan, dayIndex) {
+    const mealsData = normalizeMeals(dayPlan?.meals);
 
-function renderDayCard(plan, dayIndex, caloriesTarget) {
     const card = document.createElement('div');
     card.className = 'bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-4';
 
@@ -230,33 +171,75 @@ function renderDayCard(plan, dayIndex, caloriesTarget) {
         </div>
     `;
 
-    const meals = document.createElement('div');
-    meals.className = 'space-y-3';
+    const mealsContainer = document.createElement('div');
+    mealsContainer.className = 'space-y-3';
 
-    plan.forEach((meal) => {
+    mealsData.forEach((meal) => {
         const mealCard = document.createElement('div');
         mealCard.className = 'rounded-xl border border-slate-100 bg-slate-50 px-4 py-3';
 
-        const caloriesPart = Number.isFinite(caloriesTarget) && caloriesTarget > 0
-            ? `≈ ${Math.round(caloriesTarget * meal.share)} ккал`
+        const targetCalories = Number(meal?.target_calories);
+        const caloriesPart = Number.isFinite(targetCalories) && targetCalories > 0
+            ? `≈ ${Math.round(targetCalories)} ккал`
             : 'ориентир не рассчитан';
 
-        const itemsText = meal.items.length
-            ? meal.items.map((item) => item.name).join(', ')
+        const items = Array.isArray(meal?.items) ? meal.items : [];
+        const suggestion = typeof meal?.suggestion === 'string' && meal.suggestion.trim()
+            ? meal.suggestion.trim()
+            : 'Сборный приём пищи';
+
+        const itemsText = items.length > 0
+            ? items
+                .map((item) => {
+                    const itemName = String(item?.name || 'Продукт');
+                    const grams = Number(item?.grams);
+                    return Number.isFinite(grams) && grams > 0
+                        ? `${itemName} (${Math.round(grams)} г)`
+                        : itemName;
+                })
+                .join(', ')
             : 'Добавьте любимые продукты, чтобы получить подборку.';
 
         mealCard.innerHTML = `
             <div class="flex items-center justify-between">
-                <div class="text-sm font-semibold text-slate-800">${meal.title}</div>
+                <div class="text-sm font-semibold text-slate-800">${meal?.title || 'Приём пищи'}</div>
                 <div class="text-xs text-slate-500">${caloriesPart}</div>
             </div>
-            <div class="text-xs text-slate-600 mt-2">${itemsText}</div>
+            <div class="text-xs text-slate-600 mt-2">${suggestion}</div>
+            <div class="text-xs text-slate-600 mt-1">${itemsText}</div>
         `;
 
-        meals.appendChild(mealCard);
+        mealsContainer.appendChild(mealCard);
     });
 
     card.appendChild(header);
-    card.appendChild(meals);
+    card.appendChild(mealsContainer);
     return card;
+}
+
+async function renderMealPlan(container, rangeKey) {
+    container.textContent = 'Загрузка рациона...';
+
+    const days = rangeKey === 'week' ? 7 : 1;
+    const dates = Array.from({ length: days }, (_, index) => getIsoDateWithOffset(index));
+
+    try {
+        const plans = await Promise.all(dates.map((isoDate) => loadMealPlanByDate(isoDate)));
+        const primaryPlan = plans[0] || {};
+
+        const totalsText = buildTotalsText(primaryPlan.targets);
+        const backendPoolSize = Number(primaryPlan?.meta?.pool_size);
+        const productsCount = Number.isFinite(backendPoolSize) && backendPoolSize >= 0
+            ? backendPoolSize
+            : countUniqueProductsInMeals(primaryPlan.meals);
+
+        updateSummary(productsCount, totalsText);
+
+        container.innerHTML = '';
+        plans.forEach((plan, dayIndex) => {
+            container.appendChild(renderDayCard(plan, dayIndex));
+        });
+    } catch (error) {
+        container.textContent = 'Не удалось загрузить рацион.';
+    }
 }

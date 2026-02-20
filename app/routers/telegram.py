@@ -4,7 +4,7 @@ from aiogram import types
 from aiogram.utils.web_app import safe_parse_webapp_init_data
 
 from config import APP_NAME, IS_DEV, TELEGRAM_BOT_TOKEN
-from app.context import ADMIN_SESSION_TTL, TELEGRAM_SESSION_COOKIE
+from app.context import TELEGRAM_SESSION_COOKIE, TELEGRAM_SESSION_TTL
 from app.lifespan import get_bot, get_dispatcher
 from app.schemas import TelegramAuthRequest
 from services.storage_db import create_session
@@ -68,7 +68,7 @@ async def telegram_auth(request: Request, response: Response, payload: TelegramA
         TELEGRAM_SESSION_COOKIE,
         session["token"],
         httponly=True,
-        max_age=int(ADMIN_SESSION_TTL.total_seconds()),
+        max_age=int(TELEGRAM_SESSION_TTL.total_seconds()),
         samesite="lax",
     )
     return {

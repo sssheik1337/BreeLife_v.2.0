@@ -1,17 +1,24 @@
 class CustomLayout extends HTMLElement {
   connectedCallback() {
+    // Помечаем корневой scroll-контейнер для принудительного сброса прокрутки при старте.
+    this.classList.add('app-content');
     this.attachShadow({ mode: 'open' });
     this.shadowRoot.innerHTML = `
       <style>
+        :host {
+          display: block;
+          height: 100%;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
         .app-layout {
-          min-height: 100vh;
+          min-height: 100%;
           display: flex;
           flex-direction: column;
           background: var(--tg-bg-color, #f8fafc);
           color: var(--tg-text-color, #0f172a);
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
-          padding-top: env(safe-area-inset-top);
+          padding-top: var(--header-height, 72px);
           padding-bottom: env(safe-area-inset-bottom);
         }
         

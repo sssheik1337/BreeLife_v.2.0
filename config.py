@@ -14,8 +14,10 @@ DEV_TELEGRAM_USER_ID = int(os.getenv("DEV_TELEGRAM_USER_ID", "999001"))
 APP_HOST = os.getenv("APP_HOST", "127.0.0.1")
 APP_PORT = int(os.getenv("APP_PORT", "8000"))
 DEBUG = os.getenv("DEBUG", "false").lower() in {"1", "true", "yes"}
+APP_DEBUG = os.getenv("APP_DEBUG", "false").lower() in {"1", "true", "yes"}
 AI_ENABLED = os.getenv("AI_ENABLED", "false").lower() in {"1", "true", "yes"}
 REMINDERS_ENABLED = os.getenv("REMINDERS_ENABLED", "false").lower() in {"1", "true", "yes"}
+MEAL_PLAN_ALGO_VERSION = os.getenv("MEAL_PLAN_ALGO_VERSION", "v1")
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 

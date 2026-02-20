@@ -81,6 +81,14 @@ TABLES = {
             last_seen_at TEXT NOT NULL
         )
     """,
+    "meal_plan_cache": """
+        CREATE TABLE IF NOT EXISTS meal_plan_cache (
+            cache_key TEXT PRIMARY KEY,
+            payload TEXT NOT NULL,
+            expires_at INTEGER NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """,
 }
 
 
@@ -235,3 +243,70 @@ def get_session_user(session_id: str) -> dict[str, object] | None:
         "username": row["username"],
         "photo_url": row["photo_url"],
     }
+
+
+
+def read_cache_payload(cache_key: str) -> dict | None:
+    """Прочитать payload из кэша по ключу, если он не просрочен."""
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.row_factory = sqlite3.Row
+        cursor = connection.execute(
+            "SELECT payload, expires_at FROM meal_plan_cache WHERE cache_key = ?",
+            (cache_key,),
+        )
+        row = cursor.fetchone()
+
+        if not row:
+            return None
+
+        expires_at = int(row["expires_at"])
+        if expires_at <= now_ts:
+            connection.execute("DELETE FROM meal_plan_cache WHERE cache_key = ?", (cache_key,))
+            connection.commit()
+            return None
+
+    try:
+        payload = json.loads(row["payload"])
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+    return payload if isinstance(payload, dict) else None
+
+
+def write_cache_payload(cache_key: str, payload: dict[str, object], ttl_seconds: int) -> None:
+    """Сохранить payload в SQLite-кэш с TTL в секундах."""
+    if ttl_seconds <= 0:
+        return
+
+    now = datetime.now(timezone.utc)
+    expires_at = int(now.timestamp()) + int(ttl_seconds)
+    serialized = json.dumps(payload, ensure_ascii=False)
+
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.execute(
+            """
+            INSERT INTO meal_plan_cache (cache_key, payload, expires_at, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(cache_key)
+            DO UPDATE SET
+                payload = excluded.payload,
+                expires_at = excluded.expires_at,
+                updated_at = excluded.updated_at
+            """,
+            (cache_key, serialized, expires_at, now.isoformat()),
+        )
+        connection.commit()
+
+
+def delete_cache_keys(cache_keys: list[str]) -> None:
+    """Удалить набор ключей из SQLite-кэша."""
+    keys = [key for key in cache_keys if isinstance(key, str) and key]
+    if not keys:
+        return
+
+    placeholders = ",".join("?" for _ in keys)
+    query = f"DELETE FROM meal_plan_cache WHERE cache_key IN ({placeholders})"
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.execute(query, keys)
+        connection.commit()
