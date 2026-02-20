@@ -100,10 +100,17 @@ async function loadMealPlanByDate(isoDate, { allowColdStartRecovery = true } = {
             : 'Не удалось восстановить цель рациона';
         const error = new Error(reason);
         error.code = recovery.reason;
+        error.recovery_diagnostics = recovery.diagnostics || null;
+        if (isFrontendDebugEnabled()) {
+            console.warn('[MEAL_PLAN][cold_start] Восстановление не выполнено', {
+                reason: recovery.reason,
+                diagnostics: recovery.diagnostics || null
+            });
+        }
         throw error;
     }
 
-    // После успешного сохранения цели повторяем запрос один раз.
+    // Повторяем запрос только после подтверждённого backend-сохранения.
     return loadMealPlanByDate(isoDate, { allowColdStartRecovery: false });
 }
 
@@ -116,7 +123,11 @@ function isValidCaloriesTarget(value) {
 
 async function computeAndPersistMissingCaloriesTarget() {
     if (typeof window.computeTargets !== 'function') {
-        return { ok: false, reason: 'compute_targets_unavailable' };
+        return {
+            ok: false,
+            reason: 'compute_targets_unavailable',
+            diagnostics: { stage: 'compute', message: 'window.computeTargets недоступна' }
+        };
     }
 
     const profile = typeof window.getUserProfile === 'function'
@@ -128,7 +139,11 @@ async function computeAndPersistMissingCaloriesTarget() {
 
     const computed = window.computeTargets(profile, diaryEntries, new Date());
     if (!isValidCaloriesTarget(computed?.calories_target)) {
-        return { ok: false, reason: 'insufficient_profile_data' };
+        return {
+            ok: false,
+            reason: 'insufficient_profile_data',
+            diagnostics: { stage: 'compute', message: 'Недостаточно данных профиля для расчёта calories_target' }
+        };
     }
 
     const payload = {
@@ -141,15 +156,41 @@ async function computeAndPersistMissingCaloriesTarget() {
         safe_weeks_estimate: computed?.safe_weeks_estimate,
     };
 
-    if (typeof window.patchUserProfileWithBackend === 'function') {
-        await window.patchUserProfileWithBackend(payload);
-    } else if (typeof window.patchUserProfile === 'function') {
-        window.patchUserProfile(payload);
-    } else {
-        return { ok: false, reason: 'profile_patch_unavailable' };
+    if (typeof window.patchUserProfileWithBackend !== 'function') {
+        return {
+            ok: false,
+            reason: 'profile_patch_unavailable',
+            diagnostics: { stage: 'persist', message: 'window.patchUserProfileWithBackend недоступна' }
+        };
     }
 
-    return { ok: true, reason: null };
+    try {
+        const savedProfile = await window.patchUserProfileWithBackend(payload);
+        const savedCaloriesTarget = Number(savedProfile?.calories_target);
+        const isConfirmed = Number.isFinite(savedCaloriesTarget) && savedCaloriesTarget > 0;
+        if (!isConfirmed) {
+            return {
+                ok: false,
+                reason: 'profile_patch_not_confirmed',
+                diagnostics: {
+                    stage: 'persist',
+                    message: 'Backend не подтвердил сохранение calories_target',
+                    backend_response: savedProfile ?? null
+                }
+            };
+        }
+    } catch (error) {
+        return {
+            ok: false,
+            reason: 'profile_patch_failed',
+            diagnostics: {
+                stage: 'persist',
+                message: error?.message || 'Ошибка сохранения профиля на backend'
+            }
+        };
+    }
+
+    return { ok: true, reason: null, diagnostics: null };
 }
 
 function buildTotalsText(targets) {
