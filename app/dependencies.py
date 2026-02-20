@@ -109,11 +109,32 @@ def apply_profile_patch(profile: dict[str, object], patch: dict[str, object]) ->
 
     # Онбординг предпочтений и списки продуктов не должны затираться при частичных PATCH-сохранениях.
     # Источник истины для этих полей — профиль пользователя в таблице profiles.
-    if "preferences_onboarding_completed" not in patch:
+    incoming_onboarding = patch.get("preferences_onboarding_completed") if "preferences_onboarding_completed" in patch else None
+    incoming_favorites = patch.get("favorite_product_ids") if "favorite_product_ids" in patch else None
+    incoming_excluded = patch.get("excluded_product_ids") if "excluded_product_ids" in patch else None
+
+    # Явное намерение обновить продуктовые предпочтения:
+    # - завершение онбординга (true),
+    # - или непустой список favorites/excluded.
+    has_product_update_intent = bool(
+        incoming_onboarding is True
+        or (isinstance(incoming_favorites, list) and len(incoming_favorites) > 0)
+        or (isinstance(incoming_excluded, list) and len(incoming_excluded) > 0)
+    )
+
+    if "preferences_onboarding_completed" not in patch or incoming_onboarding is not True:
         updated["preferences_onboarding_completed"] = normalized_current.get("preferences_onboarding_completed")
+
     if "favorite_product_ids" not in patch:
         updated["favorite_product_ids"] = normalized_current.get("favorite_product_ids", [])
+    elif isinstance(incoming_favorites, list) and len(incoming_favorites) == 0 and not has_product_update_intent:
+        # Защита от legacy/full-save payload, которые присылают пустые массивы без намерения сброса.
+        updated["favorite_product_ids"] = normalized_current.get("favorite_product_ids", [])
+
     if "excluded_product_ids" not in patch:
+        updated["excluded_product_ids"] = normalized_current.get("excluded_product_ids", [])
+    elif isinstance(incoming_excluded, list) and len(incoming_excluded) == 0 and not has_product_update_intent:
+        # Защита от legacy/full-save payload, которые присылают пустые массивы без намерения сброса.
         updated["excluded_product_ids"] = normalized_current.get("excluded_product_ids", [])
 
     updated["is_completed"] = bool(
