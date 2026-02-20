@@ -147,6 +147,45 @@ function copyResumeDiagnosticsToClipboard() {
     }
 }
 
+function mergeProfileWithLocalFallback(remoteProfile) {
+    const remote = remoteProfile && typeof remoteProfile === 'object' ? remoteProfile : {};
+    const local = typeof getUserProfile === 'function' ? getUserProfile() : {};
+
+    if (!local || typeof local !== 'object') {
+        return { merged: remote, patch: {} };
+    }
+
+    const fallbackKeys = [
+        'sex',
+        'birth_date',
+        'age',
+        'height_cm',
+        'weight_kg',
+        'target_weight_kg',
+        'goal',
+        'activity_factor',
+        'goal_deadline',
+        'food_diary'
+    ];
+
+    const merged = { ...remote };
+    const patch = {};
+
+    fallbackKeys.forEach((key) => {
+        const remoteValue = remote[key];
+        const localValue = local[key];
+        const remoteMissing = remoteValue === null || remoteValue === undefined || remoteValue === '';
+        const localHasValue = !(localValue === null || localValue === undefined || localValue === '');
+
+        if (remoteMissing && localHasValue) {
+            merged[key] = localValue;
+            patch[key] = localValue;
+        }
+    });
+
+    return { merged, patch };
+}
+
 async function loadProfileFromBackend() {
     try {
         const response = await apiFetch('/api/profile');
@@ -169,7 +208,28 @@ async function loadProfileFromBackend() {
             }
             return null;
         }
-        return data;
+
+        const withFallback = mergeProfileWithLocalFallback(data);
+
+        if (Object.keys(withFallback.patch).length > 0) {
+            try {
+                // Восстанавливаем на backend только отсутствующие поля, если они есть локально.
+                const saveResponse = await apiFetch('/api/profile/save', {
+                    method: 'POST',
+                    body: JSON.stringify(withFallback.patch)
+                });
+                if (saveResponse.ok) {
+                    const saved = await saveResponse.json();
+                    if (saved && typeof saved === 'object') {
+                        return saved;
+                    }
+                }
+            } catch (_) {
+                // Если восстановление не удалось, используем локально объединённый профиль для рендера.
+            }
+        }
+
+        return withFallback.merged;
     } catch (error) {
         if (window.appDebug === true) {
             console.error('[RESUME][backend] Исключение при загрузке профиля', error);
