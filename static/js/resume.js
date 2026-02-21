@@ -791,6 +791,31 @@ function normalizeAiRecommendationResponse(data) {
     };
 }
 
+function splitAiRecommendationSentences(text) {
+    if (typeof text !== 'string' || !text.trim()) {
+        return [];
+    }
+    return text
+        .replace(/\s+/g, ' ')
+        .split(/(?<=[.!?])\s+/)
+        .map((part) => part.trim())
+        .filter(Boolean);
+}
+
+function findAiSentence(sentences, patterns) {
+    if (!Array.isArray(sentences) || sentences.length === 0) {
+        return null;
+    }
+    const regexpList = Array.isArray(patterns) ? patterns : [];
+    for (const sentence of sentences) {
+        const normalized = sentence.toLowerCase();
+        if (regexpList.some((regexp) => regexp.test(normalized))) {
+            return sentence;
+        }
+    }
+    return null;
+}
+
 function getPersonalizationMissingFields(profile) {
     const required = [
         { key: 'sex', label: 'пол' },
@@ -938,16 +963,11 @@ async function applyAiRecommendationToResume(profile) {
             return;
         }
 
-        const sentences = normalized.text
-            .split(/(?<=[.!?])\s+/)
-            .map((part) => part.trim())
-            .filter(Boolean);
+        const sentences = splitAiRecommendationSentences(normalized.text);
 
-        const caloriesSentence = sentences.find((item) => item.toLowerCase().includes('ккал'));
-        const macrosSentence = sentences.find((item) => item.toLowerCase().includes('бжу'));
-        const deadlineSentence = sentences.find((item) =>
-            item.toLowerCase().includes('дата') || item.toLowerCase().includes('нед')
-        );
+        const caloriesSentence = findAiSentence(sentences, [/ккал/, /калори/]);
+        const macrosSentence = findAiSentence(sentences, [/бжу/, /белк/, /жир/, /углевод/]);
+        const deadlineSentence = findAiSentence(sentences, [/дата/, /нед/, /срок/, /дедлайн/]);
 
         if (caloriesElement && caloriesSentence) {
             caloriesElement.textContent = caloriesSentence;
@@ -958,6 +978,25 @@ async function applyAiRecommendationToResume(profile) {
         if (deadlineElement && deadlineSentence) {
             deadlineElement.textContent = deadlineSentence;
             deadlineElement.classList.remove('hidden');
+        }
+
+        // Если AI-ответ не совпал с узкими эвристиками по блокам,
+        // всё равно показываем пользователю текст в списке рекомендаций.
+        const listElement = document.getElementById('recommendations-list');
+        if (listElement) {
+            const previousAiItem = listElement.querySelector('[data-ai-full-text="true"]');
+            if (previousAiItem) {
+                previousAiItem.remove();
+            }
+
+            const aiItem = document.createElement('li');
+            aiItem.className = 'flex items-start space-x-2';
+            aiItem.setAttribute('data-ai-full-text', 'true');
+            aiItem.innerHTML = '<span class="text-cyan-600">✦</span>';
+            const textNode = document.createElement('span');
+            textNode.textContent = normalized.text;
+            aiItem.appendChild(textNode);
+            listElement.prepend(aiItem);
         }
 
         updateRecommendationsState('ready', 'Состояние: готово — AI-рекомендации применены.');
