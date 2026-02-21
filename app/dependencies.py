@@ -19,6 +19,84 @@ from config import MEAL_PLAN_ALGO_VERSION
 logger = logging.getLogger(__name__)
 
 
+def _parse_number_value(value: object) -> float | None:
+    """Безопасно привести значение к числу или вернуть None."""
+    if value is None:
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed != parsed:
+        return None
+    return parsed
+
+
+def _normalize_goal_value(value: object) -> str | None:
+    """Нормализовать цель профиля к canonical-значению."""
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().lower()
+    if normalized in {"lose", "loss", "weight_loss"}:
+        return "lose"
+    if normalized in {"gain", "muscle", "mass"}:
+        return "gain"
+    if normalized in {"maintain", "maintenance", "keep"}:
+        return "maintain"
+    return None
+
+
+def enrich_profile_targets(profile: dict[str, object]) -> dict[str, object]:
+    """
+    Досчитать и сохранить ключевые целевые поля на backend.
+
+    Нужно, чтобы частичные PATCH и переходы по экранам не оставляли профиль
+    без calories_target/tdee_calories, даже если фронт не успел синхронизировать
+    вычисленные значения.
+    """
+    enriched = dict(profile)
+
+    tdee = calculate_tdee_kcal(enriched)
+    if isinstance(tdee, int) and tdee > 0:
+        current_tdee = _parse_number_value(enriched.get("tdee_calories"))
+        if current_tdee is None or current_tdee <= 0:
+            enriched["tdee_calories"] = tdee
+
+    activity = _parse_number_value(enriched.get("activity_factor"))
+    current_bmr = _parse_number_value(enriched.get("bmr"))
+    if current_bmr is None and isinstance(tdee, int) and tdee > 0 and isinstance(activity, float) and activity > 0:
+        enriched["bmr"] = round(tdee / activity, 2)
+
+    goal = _normalize_goal_value(enriched.get("goal"))
+    weight = _parse_number_value(enriched.get("weight_kg"))
+    target_weight = _parse_number_value(enriched.get("target_weight_kg"))
+
+    goal_is_consistent = False
+    if goal == "maintain":
+        goal_is_consistent = True
+    elif goal == "lose" and isinstance(weight, float) and isinstance(target_weight, float):
+        goal_is_consistent = target_weight < weight
+    elif goal == "gain" and isinstance(weight, float) and isinstance(target_weight, float):
+        goal_is_consistent = target_weight > weight
+
+    current_calories_target = _parse_number_value(enriched.get("calories_target"))
+    if (current_calories_target is None or current_calories_target <= 0) and isinstance(tdee, int) and tdee > 0 and goal_is_consistent:
+        if goal == "maintain":
+            calories_target = tdee
+        elif goal == "lose":
+            calories_target = int(round(tdee * 0.85))
+        elif goal == "gain":
+            calories_target = int(round(tdee * 1.15))
+        else:
+            calories_target = None
+
+        if isinstance(calories_target, int) and calories_target > 0:
+            enriched["calories_target"] = calories_target
+            enriched["calorie_delta"] = calories_target - tdee
+
+    return enriched
+
+
 def require_telegram_user_id(request: Request, response: Response) -> int:
     token = request.cookies.get(TELEGRAM_SESSION_COOKIE)
     if not token:
@@ -198,6 +276,11 @@ def apply_profile_patch(profile: dict[str, object], patch: dict[str, object]) ->
         normalized_patch.get("is_completed")
         or normalized_current.get("is_completed")
     )
+
+    # Финальный серверный слой: гарантируем заполнение расчётных целей,
+    # если для этого уже есть валидные входные данные профиля.
+    updated = enrich_profile_targets(updated)
+
     updated["last_updated"] = datetime.now(timezone.utc).isoformat()
     return updated
 
