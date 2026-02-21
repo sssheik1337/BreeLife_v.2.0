@@ -119,6 +119,46 @@ def apply_profile_patch(profile: dict[str, object], patch: dict[str, object]) ->
         if should_apply_canonical_patch_key(key, patch):
             updated[key] = value
 
+    # Защита вычисляемых целей от случайного обнуления при частичных/full PATCH-сохранениях.
+    # На практике клиент иногда отправляет технические PATCH (например, только is_completed,
+    # weekly_adjustments или trial_welcome_seen) вместе с вычисляемыми полями = null.
+    # Если расчётные входы при этом не менялись, сохраняем уже рассчитанные значения профиля.
+    computed_target_fields = {
+        "bmr",
+        "tdee_calories",
+        "calories_target",
+        "calorie_delta",
+        "required_rate_kg_per_week",
+        "required_calorie_delta",
+        "required_calories_target",
+        "safe_weeks_estimate",
+        "macros",
+        "weight_rate_kg_per_week",
+        "predicted_goal_date",
+    }
+    target_input_fields = {
+        "sex",
+        "birth_date",
+        "age",
+        "height_cm",
+        "weight_kg",
+        "target_weight_kg",
+        "goal",
+        "activity_factor",
+        "goal_deadline",
+        "weekly_adjustments",
+    }
+    inputs_changed = any(should_apply_canonical_patch_key(field, patch) for field in target_input_fields)
+    if not inputs_changed:
+        for field in computed_target_fields:
+            has_explicit_patch_key = should_apply_canonical_patch_key(field, patch)
+            if not has_explicit_patch_key:
+                continue
+            incoming_value = normalized_patch.get(field)
+            current_value = normalized_current.get(field)
+            if incoming_value is None and current_value is not None:
+                updated[field] = current_value
+
     # Флаг приветственного экрана триала должен фиксироваться один раз и
     # не сбрасываться при последующих частичных сохранениях профиля.
     if "trial_welcome_seen" not in patch and normalized_current.get("trial_welcome_seen") is True:
