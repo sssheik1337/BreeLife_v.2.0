@@ -26,6 +26,70 @@ const mealLabels = {
 let diaryProductsFormContext = 'meal';
 let diaryProductsPrefillExisting = false;
 
+function showDiaryNotification(message, type = 'success') {
+    const anchor = document.getElementById('diary-notification-anchor');
+    if (!anchor) {
+        if (typeof showNotification === 'function') {
+            showNotification(message, type);
+        }
+        return;
+    }
+
+    let container = document.getElementById('diary-notification-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'diary-notification-container';
+        anchor.appendChild(container);
+    }
+
+    // Привязываем уведомление строго к зоне main дневника.
+    container.style.cssText = `
+        position: relative;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        pointer-events: none;
+    `;
+
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        background: ${type === 'success' ? '#10b981' : '#ef4444'};
+        color: white;
+        padding: 16px 20px;
+        border-radius: 16px;
+        margin-bottom: 10px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        animation: slideIn 0.3s ease-out;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        pointer-events: auto;
+        max-width: min(320px, 100%);
+    `;
+
+    const icon = document.createElement('i');
+    icon.setAttribute('data-feather', type === 'success' ? 'check-circle' : 'alert-circle');
+
+    const text = document.createElement('span');
+    text.textContent = message;
+
+    notification.appendChild(icon);
+    notification.appendChild(text);
+    container.appendChild(notification);
+
+    if (window.feather) {
+        feather.replace();
+    }
+
+    setTimeout(() => {
+        notification.style.animation = 'fadeIn 0.3s ease-out reverse';
+        setTimeout(() => {
+            notification.remove();
+        }, 300);
+    }, 3000);
+}
+
 function setProductsFormContext(context) {
     diaryProductsFormContext = context === 'water' ? 'water' : 'meal';
     const metaBlock = document.getElementById('diary-products-meta');
@@ -1505,9 +1569,9 @@ function bindGlobalDiaryHandlers() {
             const sleepValue = config.sleepInput?.value || '';
             const activityValue = Boolean(config.activityInput?.checked);
             const saved = persistDayMeta(dateKey, next, sleepValue, activityValue, { hintId: config.hintId });
-            if (saved && typeof showNotification === 'function') {
+            if (saved) {
                 const amountMl = Math.round(amount * 1000);
-                showNotification(`Добавлено ${amountMl} мл воды. Сейчас: ${next.toFixed(2)} л.`);
+                showDiaryNotification(`Добавлено ${amountMl} мл воды. Сейчас: ${next.toFixed(2)} л.`);
             }
             return;
         }
@@ -1821,15 +1885,15 @@ async function initDiary() {
                     sleepTime,
                     activity
                 );
-                if (saved && typeof showNotification === 'function') {
-                    showNotification('Вода сохранена.');
+                if (saved) {
+                    showDiaryNotification('Вода сохранена.');
                 }
                 closeFabMenu();
                 return;
             }
 
             if (!items.length) {
-                showNotification('Добавьте хотя бы один продукт.', 'error');
+                showDiaryNotification('Добавьте хотя бы один продукт.', 'error');
                 return;
             }
             const totals = calculateTotals(items);
@@ -1867,9 +1931,7 @@ async function initDiary() {
             // После сохранения через FAB оставляем форму в режиме добавления,
             // чтобы не подтягивать уже сохранённые продукты обратно во всплывающее окно.
             updateProductsForm(merged, dateKey, meal, false);
-            if (typeof showNotification === 'function') {
-                showNotification('Приём пищи сохранён.');
-            }
+            showDiaryNotification('Приём пищи сохранён.');
         });
     }
 
