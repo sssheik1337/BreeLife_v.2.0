@@ -72,8 +72,14 @@
       }
       .plan-row {
         display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 12px;
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
       }
       .plan-card {
         border: 1px solid #e2e8f0;
@@ -85,6 +91,66 @@
         display: flex;
         gap: 8px;
         margin-top: 12px;
+        flex-wrap: wrap;
+      }
+      @media (max-width: 1024px) {
+        .plan-row {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 768px) {
+        body {
+          padding: 14px;
+        }
+        .toolbar {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+        .toolbar h1 {
+          margin: 0 0 10px;
+          font-size: 40px;
+          line-height: 1;
+        }
+        .toolbar-links {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 14px;
+        }
+        .toolbar-links a {
+          margin-right: 0;
+        }
+        .logout {
+          width: 100%;
+        }
+        .logout button {
+          width: 100%;
+          min-height: 44px;
+        }
+        .card,
+        .plan-card {
+          padding: 14px;
+        }
+        .plan-row {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+        input[type="text"],
+        input[type="number"],
+        textarea,
+        button {
+          min-height: 42px;
+          font-size: 16px;
+        }
+        .plan-actions {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .plan-actions .btn-primary,
+        .plan-actions .btn-danger {
+          width: 100%;
+        }
       }
       .toolbar-links a {
         margin-right: 12px;

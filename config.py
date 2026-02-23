@@ -1,9 +1,19 @@
 import os
+from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 from dotenv import load_dotenv
 
 load_dotenv()
+
+BASE_DIR = Path(__file__).resolve().parent
+
+
+def resolve_project_path(raw_path: str) -> str:
+    path = Path(raw_path)
+    if path.is_absolute():
+        return str(path)
+    return str((BASE_DIR / path).resolve())
 
 
 APP_NAME = os.getenv("APP_NAME", "BreeLife")
@@ -49,10 +59,12 @@ if not DB_PATH:
     raise RuntimeError("DB_PATH is required. Set it in the environment.")
 
 # Путь к базе данных продуктов.
-PRODUCTS_DB_PATH = os.getenv("PRODUCTS_DB_PATH", "static/data/products.db")
+PRODUCTS_DB_PATH = resolve_project_path(
+    os.getenv("PRODUCTS_DB_PATH", "static/data/products.db")
+)
 
 # Путь к файлу с тарифами.
-PLANS_PATH = os.getenv("PLANS_PATH", "config/plans.json")
+PLANS_PATH = resolve_project_path(os.getenv("PLANS_PATH", "config/plans.json"))
 
 # Данные доступа в админку.
 ADMIN_LOGIN = os.getenv("ADMIN_LOGIN", "")

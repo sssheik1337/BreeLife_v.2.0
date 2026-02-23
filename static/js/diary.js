@@ -24,6 +24,7 @@ const mealLabels = {
 };
 
 let diaryProductsFormContext = 'meal';
+let diaryProductsPrefillExisting = false;
 
 function setProductsFormContext(context) {
     diaryProductsFormContext = context === 'water' ? 'water' : 'meal';
@@ -1298,12 +1299,12 @@ function getFabActionFromUrl() {
 function handleFabAction(action, meal) {
     if (action === 'meal') {
         setProductsFormContext('meal');
-        openProductsForm(getSelectedDate(), meal || 'breakfast');
+        openProductsForm(getSelectedDate(), meal || 'breakfast', { prefillExisting: false });
         return;
     }
     if (action === 'water') {
         setProductsFormContext('water');
-        openProductsForm(getSelectedDate(), 'water');
+        openProductsForm(getSelectedDate(), 'water', { prefillExisting: false });
         setTimeout(() => {
             const waterInput = document.getElementById('diary-products-water');
             if (waterInput) {
@@ -1416,7 +1417,7 @@ function updateSummaryCarbTotal() {
     return resolved;
 }
 
-function updateProductsForm(entries, dateKey, meal) {
+function updateProductsForm(entries, dateKey, meal, prefillExisting = diaryProductsPrefillExisting) {
     const itemsContainer = document.getElementById('diary-products-items');
     const deleteButton = document.getElementById('diary-products-delete');
     const waterInput = document.getElementById('diary-products-water');
@@ -1427,7 +1428,7 @@ function updateProductsForm(entries, dateKey, meal) {
         return;
     }
 
-    const entry = dateKey && meal ? findProductsEntry(entries, dateKey, meal) : null;
+    const entry = prefillExisting && dateKey && meal ? findProductsEntry(entries, dateKey, meal) : null;
     itemsContainer.innerHTML = '';
     if (entry && Array.isArray(entry.items) && entry.items.length > 0) {
         entry.items.forEach((item) => {
@@ -1436,11 +1437,7 @@ function updateProductsForm(entries, dateKey, meal) {
         deleteButton.classList.remove('hidden');
     } else {
         itemsContainer.appendChild(buildFoodItemRow());
-        if (entry) {
-            deleteButton.classList.remove('hidden');
-        } else {
-            deleteButton.classList.add('hidden');
-        }
+        deleteButton.classList.add('hidden');
     }
 
     if (dateKey) {
@@ -1518,7 +1515,7 @@ function bindGlobalDiaryHandlers() {
         const editMealButton = event.target.closest('[data-action="edit-meal"]');
         if (editMealButton) {
             setProductsFormContext('meal');
-            openProductsForm(getSelectedDate(), editMealButton.dataset.meal || 'breakfast');
+            openProductsForm(getSelectedDate(), editMealButton.dataset.meal || 'breakfast', { prefillExisting: true });
             return;
         }
 
@@ -1658,8 +1655,9 @@ function ensureDiaryDate() {
     return dayDate.value;
 }
 
-function openProductsForm(dateKey, mealKey) {
+function openProductsForm(dateKey, mealKey, options = {}) {
     const dateValue = dateKey || ensureDiaryDate();
+    diaryProductsPrefillExisting = options?.prefillExisting === true;
     setActiveMode(MODE_PRODUCTS);
     const productsDate = document.getElementById('diary-products-date');
     if (productsDate && dateValue) {
@@ -1789,10 +1787,12 @@ async function initDiary() {
         await window.syncProfileWithBackend();
     }
 
+    diaryProductsPrefillExisting = initialMode === MODE_PRODUCTS && !openFabOnLoad;
     updateProductsForm(
         readDiaryEntries(),
         resolvedDate,
-        document.getElementById('diary-products-meal')?.value || 'breakfast'
+        document.getElementById('diary-products-meal')?.value || 'breakfast',
+        diaryProductsPrefillExisting
     );
     renderDayScreen(readDiaryEntries(), resolvedDate);
 
@@ -1854,11 +1854,19 @@ async function initDiary() {
             }
             const merged = sortEntries(updated);
             saveDiaryEntries(merged);
-            await syncEntryWithBackend(entry);
-            updateProductsForm(merged, dateKey, meal);
-            await refreshDiary();
+
+            // Сразу обновляем дневник локально, чтобы пользователь видел запись
+            // без перезагрузки страницы и без ожидания ответа backend.
+            renderDiaryList(merged);
+            renderDailySummary(merged, dateKey);
             setActiveMode(MODE_DAY);
+            renderDayScreen(merged, dateKey);
             closeFabMenu();
+
+            await syncEntryWithBackend(entry);
+            // После сохранения через FAB оставляем форму в режиме добавления,
+            // чтобы не подтягивать уже сохранённые продукты обратно во всплывающее окно.
+            updateProductsForm(merged, dateKey, meal, false);
             if (typeof showNotification === 'function') {
                 showNotification('Приём пищи сохранён.');
             }
@@ -1904,7 +1912,8 @@ async function initDiary() {
             updateProductsForm(
                 readDiaryEntries(),
                 getSelectedDate(),
-                selectedMeal
+                selectedMeal,
+                diaryProductsPrefillExisting
             );
             const params = new URLSearchParams(window.location.search);
             params.set('mode', getModeFromUrl());

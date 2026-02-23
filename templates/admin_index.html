@@ -56,6 +56,36 @@
         padding: 6px 12px;
         cursor: pointer;
       }
+      @media (max-width: 768px) {
+        body {
+          padding: 14px;
+        }
+        .toolbar {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+        .toolbar h1 {
+          margin: 0 0 8px;
+          font-size: 40px;
+          line-height: 1;
+        }
+        .logout {
+          width: 100%;
+        }
+        .logout button {
+          width: 100%;
+          min-height: 44px;
+          font-size: 16px;
+        }
+        .card {
+          padding: 14px;
+        }
+        .links {
+          gap: 14px;
+        }
+      }
     </style>
   </head>
   <body>
