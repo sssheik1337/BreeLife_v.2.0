@@ -358,18 +358,30 @@ function validateForm() {
     return allFilled;
 }
 
-// Show notification
-function showNotification(message, type = 'success') {
-    let container = document.getElementById('notification-container');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'notification-container';
-        document.body.appendChild(container);
+function getCssPxVariable(name, fallback = 0) {
+    const value = window.getComputedStyle(document.documentElement).getPropertyValue(name);
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function computeNotificationTopOffset() {
+    if (typeof applyHeaderHeight === 'function') {
+        applyHeaderHeight();
     }
 
-    // Жёсткий верхний отступ: фиксированная сумма высоты хедера и 12px.
-    const topOffset = 72 + 12;
+    const headerHeight = getCssPxVariable('--header-height', 72);
+    const safeTop = getCssPxVariable('--tg-safe-top', 0);
+    const uiTop = getCssPxVariable('--tg-ui-top', 0);
 
+    // Берём максимум, чтобы не прилипать к верхнему краю,
+    // даже если высота navbar обновилась с задержкой.
+    const offsetByHeader = headerHeight + 12;
+    const offsetByFallback = 72 + safeTop + uiTop + 12;
+    return Math.round(Math.max(offsetByHeader, offsetByFallback));
+}
+
+function applyNotificationContainerPosition(container) {
+    const topOffset = computeNotificationTopOffset();
     container.style.cssText = `
         position: fixed;
         top: ${topOffset}px;
@@ -381,6 +393,30 @@ function showNotification(message, type = 'success') {
         align-items: flex-end;
         pointer-events: none;
     `;
+}
+
+// Show notification
+function showNotification(message, type = 'success') {
+    let container = document.getElementById('notification-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'notification-container';
+        document.body.appendChild(container);
+    }
+
+    applyNotificationContainerPosition(container);
+
+    // Перепозиционируем контейнер после следующего кадра,
+    // чтобы поймать позднее обновление высоты header.
+    requestAnimationFrame(() => {
+        applyNotificationContainerPosition(container);
+    });
+
+    // Дублируем перепозиционирование с небольшой задержкой
+    // для Telegram WebApp, где safe-area и viewport приходят асинхронно.
+    setTimeout(() => {
+        applyNotificationContainerPosition(container);
+    }, 120);
 
     const notification = document.createElement('div');
     notification.style.cssText = `
