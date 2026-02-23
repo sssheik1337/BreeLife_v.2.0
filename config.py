@@ -26,6 +26,18 @@ APP_PORT = int(os.getenv("APP_PORT", "8000"))
 DEBUG = os.getenv("DEBUG", "false").lower() in {"1", "true", "yes"}
 APP_DEBUG = os.getenv("APP_DEBUG", "false").lower() in {"1", "true", "yes"}
 AI_ENABLED = os.getenv("AI_ENABLED", "false").lower() in {"1", "true", "yes"}
+
+
+def env_flag(name: str, default: bool = False) -> bool:
+    return os.getenv(name, '1' if default else '0').lower() in {'1', 'true', 'yes'}
+
+
+SPA_ENABLED = env_flag('SPA_ENABLED', False)
+SPA_PHASE_1_ENABLED = env_flag('SPA_PHASE_1_ENABLED', False)
+SPA_PHASE_2_ENABLED = env_flag('SPA_PHASE_2_ENABLED', False)
+SPA_PHASE_3_ENABLED = env_flag('SPA_PHASE_3_ENABLED', False)
+SPA_PHASE_4_ENABLED = env_flag('SPA_PHASE_4_ENABLED', False)
+
 REMINDERS_ENABLED = os.getenv("REMINDERS_ENABLED", "false").lower() in {"1", "true", "yes"}
 MEAL_PLAN_ALGO_VERSION = os.getenv("MEAL_PLAN_ALGO_VERSION", "v1")
 

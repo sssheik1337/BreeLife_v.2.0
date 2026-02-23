@@ -1,7 +1,21 @@
+from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
-from config import APP_ENV, APP_HOST, APP_NAME, APP_PORT, DEBUG, IS_PROD, PUBLIC_APP_URL
+from config import (
+    APP_ENV,
+    APP_HOST,
+    APP_NAME,
+    APP_PORT,
+    DEBUG,
+    IS_PROD,
+    PUBLIC_APP_URL,
+    SPA_ENABLED,
+    SPA_PHASE_1_ENABLED,
+    SPA_PHASE_2_ENABLED,
+    SPA_PHASE_3_ENABLED,
+    SPA_PHASE_4_ENABLED,
+)
 from app.context import TELEGRAM_SESSION_COOKIE, load_admin_config, load_plans_config, templates
 from services.storage_db import get_session_user, read_payload
 
@@ -24,6 +38,28 @@ async def index(request: Request):
 @router.get("/index", response_class=HTMLResponse)
 async def index_alias(request: Request):
     return await index(request)
+
+
+@router.get("/app", response_class=HTMLResponse)
+async def spa_shell(request: Request):
+    if not SPA_ENABLED:
+        # Быстрый rollback: при выключенном SPA возвращаем пользователя в legacy-вход.
+        return RedirectResponse(url="/", status_code=307)
+
+    spa_index_path = Path("spa/dist/index.html")
+    if spa_index_path.exists():
+        return FileResponse(spa_index_path)
+
+    # Fallback: если SPA ещё не собрана, возвращаем понятный экран без поломки legacy-страниц.
+    return HTMLResponse(
+        "<h1>SPA не собрана</h1><p>Соберите фронтенд командой <code>cd spa && npm install && npm run build</code>.</p>",
+        status_code=503,
+    )
+
+
+@router.get("/app/{spa_path:path}", response_class=HTMLResponse)
+async def spa_shell_with_path(spa_path: str, request: Request):
+    return await spa_shell(request)
 
 
 @router.get("/healthz")
@@ -74,6 +110,13 @@ async def get_app_config():
         "app_env": APP_ENV,
         "app_host": APP_HOST,
         "app_port": APP_PORT,
+        "spa_rollout": {
+            "spa_enabled": SPA_ENABLED,
+            "phase_1_enabled": SPA_PHASE_1_ENABLED,
+            "phase_2_enabled": SPA_PHASE_2_ENABLED,
+            "phase_3_enabled": SPA_PHASE_3_ENABLED,
+            "phase_4_enabled": SPA_PHASE_4_ENABLED,
+        },
     }
 
 

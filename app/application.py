@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -55,5 +56,10 @@ def create_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory="static"), name="static")
     # Раздаём локальные файлы шрифтов по URL /fonts, чтобы @font-face не получал 404.
     app.mount("/fonts", StaticFiles(directory="fonts"), name="fonts")
+
+    # Статические SPA-ассеты (Vite build) отдаются по отдельному префиксу.
+    spa_assets_dir = Path('spa/dist/assets')
+    spa_assets_dir.mkdir(parents=True, exist_ok=True)
+    app.mount('/spa-assets', StaticFiles(directory=str(spa_assets_dir)), name='spa-assets')
     return app
 
