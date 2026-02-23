@@ -358,32 +358,6 @@ function validateForm() {
     return allFilled;
 }
 
-function getCssPxVar(name, fallback = 0) {
-    const value = getComputedStyle(document.documentElement).getPropertyValue(name);
-    const parsed = Number.parseFloat(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function resolveNotificationTopOffsetStable() {
-    // Пытаемся обновить --header-height прямо перед показом уведомления.
-    if (typeof applyHeaderHeight === 'function') {
-        applyHeaderHeight();
-    }
-
-    // Основной источник высоты шапки.
-    let headerHeight = getCssPxVar('--header-height', 0);
-
-    // Фолбэк: учитываем Telegram safe-area и ui-offset,
-    // если высота хедера ещё не успела обновиться.
-    if (headerHeight <= 0) {
-        const safeTop = getCssPxVar('--tg-safe-top', 0);
-        const uiTop = getCssPxVar('--tg-ui-top', 0);
-        headerHeight = 72 + safeTop + uiTop;
-    }
-
-    return Math.round(headerHeight + 12);
-}
-
 // Show notification
 function showNotification(message, type = 'success') {
     let container = document.getElementById('notification-container');
@@ -393,7 +367,8 @@ function showNotification(message, type = 'success') {
         document.body.appendChild(container);
     }
 
-    const topOffset = resolveNotificationTopOffsetStable();
+    // Жёсткий верхний отступ: фиксированная сумма высоты хедера и 12px.
+    const topOffset = 72 + 12;
 
     container.style.cssText = `
         position: fixed;
