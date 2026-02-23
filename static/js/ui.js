@@ -358,32 +358,6 @@ function validateForm() {
     return allFilled;
 }
 
-function resolveNotificationTopOffset() {
-    const root = document.documentElement;
-    const rootStyles = window.getComputedStyle(root);
-    const cssHeaderHeight = Number.parseFloat(rootStyles.getPropertyValue('--header-height')) || 0;
-
-    const navbarHost = document.querySelector('custom-navbar');
-    const navbar = navbarHost?.shadowRoot?.querySelector('.navbar');
-    const navbarRect = navbar?.getBoundingClientRect?.();
-    const measuredHeaderHeight = navbarRect
-        ? Math.max(0, Math.round(navbarRect.height))
-        : 0;
-    const navbarBottomOffset = navbarRect
-        ? Math.max(0, Math.round(navbarRect.bottom))
-        : 0;
-
-    const resolvedHeaderHeight = Math.max(cssHeaderHeight, measuredHeaderHeight, 72);
-    if (resolvedHeaderHeight > 0) {
-        root.style.setProperty('--header-height', `${resolvedHeaderHeight}px`);
-    }
-
-    // Берём нижнюю границу реального navbar в viewport,
-    // чтобы уведомление гарантированно было ниже шапки.
-    const headerBottom = Math.max(navbarBottomOffset, resolvedHeaderHeight);
-    return Math.round(headerBottom + 12);
-}
-
 // Show notification
 function showNotification(message, type = 'success') {
     let container = document.getElementById('notification-container');
@@ -393,16 +367,19 @@ function showNotification(message, type = 'success') {
         document.body.appendChild(container);
     }
 
-    // Считаем top от нижней границы navbar, а не от верхнего края экрана.
-    const topOffset = resolveNotificationTopOffset();
+    // Позиционируем уведомление от вычисленной высоты хедера,
+    // чтобы не зависеть от Shadow DOM и времени рендера navbar.
+    const headerHeight = Number.parseFloat(
+        window.getComputedStyle(document.documentElement).getPropertyValue('--header-height')
+    ) || 72;
+    const topOffset = headerHeight + 12;
 
-    // Глобальный слой уведомлений: всегда фиксируем под хедером,
-    // чтобы одинаково работать на всех страницах приложения.
+    // Слой уведомлений всегда ниже navbar по z-index.
     container.style.cssText = `
         position: fixed;
         top: ${topOffset}px;
         right: 12px;
-        z-index: 120;
+        z-index: 40;
         width: min(320px, calc(100vw - 24px));
         display: flex;
         flex-direction: column;
