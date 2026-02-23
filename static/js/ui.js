@@ -378,12 +378,12 @@ function showNotification(message, type = 'success') {
         mainElement.style.position = 'relative';
     }
 
-    // Всегда переустанавливаем стиль контейнера, чтобы убрать следы старого fixed-layout.
+    // Позиционируем контейнер фиксированно под шапкой: высота хедера + 12px.
     container.style.cssText = `
-        position: absolute;
-        top: 12px;
+        position: fixed;
+        top: calc(var(--header-height, 72px) + 12px);
         right: 12px;
-        z-index: 120;
+        z-index: 40;
         width: min(320px, calc(100% - 24px));
         display: flex;
         flex-direction: column;
