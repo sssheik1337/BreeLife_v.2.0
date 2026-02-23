@@ -56,6 +56,7 @@ function getResolvedProfileForDisplay() {
     }
 
     const hasFiniteNumber = (value) => value !== null && value !== undefined && Number.isFinite(Number(value));
+    const hasFinitePositiveNumber = (value) => hasFiniteNumber(value) && Number(value) > 0;
 
     // Локальные безопасные версии расчётов нужны как fallback для мобильного WebView,
     // если calculations.js ещё не подгрузился из кеша/старого HTML.
@@ -143,6 +144,27 @@ function getResolvedProfileForDisplay() {
         const tdee = calculateTDEESafe(bmr, activityFactor);
         if (Number.isFinite(tdee)) {
             profile.tdee_calories = tdee;
+        }
+    }
+
+    // Для блока «Факт / цель» используем тот же источник истины,
+    // что и в расчёте целей профиля: window.computeTargets из calculations.js.
+    if (typeof window.computeTargets === 'function') {
+        const computedTargets = window.computeTargets(profile, new Date());
+        if (hasFinitePositiveNumber(computedTargets?.tdee_calories)) {
+            profile.tdee_calories = Number(computedTargets.tdee_calories);
+        }
+        if (hasFinitePositiveNumber(computedTargets?.calories_target)) {
+            profile.calories_target = Number(computedTargets.calories_target);
+        }
+        if (hasFiniteNumber(computedTargets?.calorie_delta)) {
+            profile.calorie_delta = Number(computedTargets.calorie_delta);
+        }
+        if (hasFiniteNumber(computedTargets?.weight_rate_kg_per_week)) {
+            profile.weight_rate_kg_per_week = Number(computedTargets.weight_rate_kg_per_week);
+        }
+        if (typeof computedTargets?.predicted_goal_date === 'string' && computedTargets.predicted_goal_date) {
+            profile.predicted_goal_date = computedTargets.predicted_goal_date;
         }
     }
 
