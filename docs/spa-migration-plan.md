@@ -1,55 +1,128 @@
-# SPA Migration Assessment (FastAPI + Telegram WebApp)
+# План миграции BreeLife на SPA (React и Vue)
 
-## Current architecture snapshot
+## 1. Текущее состояние проекта
 
-- Backend uses FastAPI routers for both template-rendered pages and JSON APIs.
-- Frontend is currently a multi-script setup with shared global state (`window.*`) and page-level script bundles.
-- Telegram WebApp integration and profile/session sync behavior are critical and should be preserved during migration.
+На сегодня проект сочетает в себе:
 
-## Migration complexity
+- FastAPI-роутеры для SSR-страниц (через шаблоны) и отдельные API-эндпоинты.
+- Набор клиентских JavaScript-скриптов с общим состоянием и глобальными обработчиками.
+- Критичную интеграцию с Telegram WebApp (safe-area, сессия, контекст пользователя).
 
-The migration is **medium-high complexity** because:
+Это важно, потому что миграция в SPA должна быть **эволюционной**, а не «сжечь и переписать».
 
-1. Significant client business logic lives in browser scripts and global handlers.
-2. SSR templates and API endpoints are mixed, so migration requires route and rendering strategy changes.
-3. Telegram-specific UX/session lifecycle introduces additional regression risk.
+## 2. Сложность миграции
 
-## Framework recommendation
+Сложность: **средняя/высокая**.
 
-### Recommended: Vue 3
+Почему:
 
-Vue 3 is the pragmatic choice here for a staged migration:
+1. Бизнес-логика частично находится в клиентских скриптах, а не только на backend.
+2. SSR + API живут одновременно, а значит нужно поддерживать два режима в переходный период.
+3. Telegram WebApp накладывает UX/инфраструктурные ограничения, где легко поймать регресс.
 
-- Lower ceremony for incremental page-by-page replacement.
-- Easier transition from existing template-style frontend code.
-- Good fit for gradual refactors where legacy pages must continue working.
+## 3. React и Vue: нормальное сравнение под ваш кейс
 
-### React is still valid when
+Ниже сравнение не «в вакууме», а именно для BreeLife.
 
-- Team expertise is stronger in React.
-- There is a strategic requirement to align with existing React ecosystem tooling.
+| Критерий | React | Vue 3 |
+|---|---|---|
+| Вход в проект с текущими шаблонами | Средний | Более плавный |
+| Скорость постепенной миграции экранами | Хорошая | Очень хорошая |
+| Гибкость архитектуры в долгую | Очень высокая | Высокая |
+| Количество обязательных решений на старте | Больше | Меньше |
+| Риск перегрузить MVP-этап | Выше | Ниже |
+| Удобство «быстро починить и двинуться дальше» | Среднее | Высокое |
 
-## Safe migration strategy
+### Когда выбирать React
 
-1. Keep FastAPI as API/auth/business layer.
-2. Introduce an SPA entry route (for example `/app`) while keeping existing SSR pages alive.
-3. Define and freeze API contracts for profile, onboarding, meal plan, and diary modules.
-4. Move legacy browser logic into SPA services/stores module by module.
-5. Migrate features in vertical slices (onboarding -> profile -> meal plan -> diary).
-6. Use feature flags or route split to reduce deployment risk.
-7. Remove legacy scripts only after stability metrics pass.
+Выбирайте React, если:
 
-## Key risks and mitigations
+- команда уже уверенно работает с React;
+- есть внутренний UI-kit/библиотеки/гайдлайны под React;
+- планируется масштабирование фронтенд-направления с большим количеством сложных фич.
 
-- **State sync regressions**: add contract tests for profile patch/merge behavior.
-- **Telegram flow regressions**: isolate Telegram adapter and add smoke E2E coverage.
-- **Logic duplication during transition**: enforce per-module ownership and sunset plan.
-- **Performance regressions**: lazy-load routes and keep initial JS payload minimal.
+### Когда выбирать Vue
 
-## Suggested timeline (single squad)
+Выбирайте Vue, если:
 
-- MVP SPA for 1-2 core flows: **3-5 weeks**.
-- Main user flows migrated: **8-14 weeks**.
-- Hardening/regressions/perf: **+2-4 weeks**.
+- цель — **быстро и безопасно** перейти с текущего состояния на SPA;
+- важнее скорость онбординга и короткий time-to-market;
+- миграция будет вестись по частям и с постоянной поддержкой legacy-страниц.
 
-**Overall estimate:** ~10-18 weeks depending on team size and release constraints.
+### Практический вывод
+
+Для текущего состояния BreeLife более прагматичен **Vue 3**.
+Но если у команды уже сильная React-экспертиза — React тоже корректный выбор, и тогда решает компетенция команды, а не «религия» фреймворка.
+
+## 4. Рекомендуемая целевая архитектура SPA
+
+1. FastAPI остаётся источником бизнес-логики, авторизации и API.
+2. Добавляется SPA entrypoint (`/app`) + отдельный frontend build.
+3. Вводится единый API-клиент (retry/timeout/обработка ошибок/логирование).
+4. Выносится слой адаптера Telegram WebApp (изолированно от UI-компонентов).
+5. Хранилище состояния разделяется по доменам: профиль, онбординг, рацион, дневник.
+6. Дублирующие legacy-скрипты отключаются только после стабилизации конкретного домена.
+
+## 5. Поэтапный план миграции без потери функционала
+
+### Этап 0. Подготовка (1 неделя)
+
+- Зафиксировать API-контракты (вход/выход/ошибки).
+- Добавить минимальные smoke-проверки критических флоу (логин, профиль, рацион).
+- Включить feature flag для переключения на SPA-экран.
+
+### Этап 1. Инфраструктура SPA (1–2 недели)
+
+- Поднять frontend-проект (React или Vue).
+- Настроить маршрутизацию, базовый layout, API-клиент, Telegram-адаптер.
+- Подключить централизованное логирование ошибок клиента.
+
+### Этап 2. Миграция «вертикальными срезами» (4–8 недель)
+
+Порядок миграции:
+
+1. Онбординг/предпочтения.
+2. Профиль/анкета.
+3. Рацион (день/неделя).
+4. Дневник и сопутствующие экраны.
+
+На каждом шаге:
+
+- переносим UI + бизнес-логику одного домена;
+- проверяем паритет со старым поведением;
+- только после этого выключаем legacy JS для этого домена.
+
+### Этап 3. Стабилизация и удаление legacy (2–4 недели)
+
+- Сбор регрессий из продакшена.
+- Оптимизация производительности (lazy routes, chunk splitting).
+- Удаление неиспользуемых SSR-шаблонов и старых скриптов.
+
+## 6. Основные риски и меры
+
+1. **Риск потери данных профиля при PATCH**  
+   Мера: контрактные тесты и строгая схема частичных обновлений.
+
+2. **Риск поломки Telegram UX**  
+   Мера: отдельный Telegram-адаптер + ручной чек-лист перед релизом.
+
+3. **Риск рассинхрона между legacy и SPA**  
+   Мера: миграция строго по доменам, без параллельной двойной логики на долгий срок.
+
+4. **Риск ухудшения производительности**  
+   Мера: бюджет бандла, lazy loading, контроль Web Vitals.
+
+## 7. Оценка сроков
+
+- MVP SPA (1–2 основных пользовательских флоу): **3–5 недель**.
+- Перенос ключевых пользовательских сценариев: **8–14 недель**.
+- Полировка, регрессии, перфоманс: **+2–4 недели**.
+
+Итого реалистично: **10–18 недель** для одной команды разработки.
+
+## 8. Короткий ответ «что выбрать прямо сейчас»
+
+- Если нужен максимально практичный путь миграции с минимальным риском — **Vue 3**.
+- Если команда объективно сильнее в React и уже есть готовые наработки — **React**.
+
+Главное: успех миграции здесь определяется не названием фреймворка, а дисциплиной поэтапного переноса, контрактами API и контролем регрессий.
