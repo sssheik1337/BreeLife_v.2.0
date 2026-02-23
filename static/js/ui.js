@@ -358,6 +358,25 @@ function validateForm() {
     return allFilled;
 }
 
+function resolveHeaderHeightForNotifications() {
+    const root = document.documentElement;
+    const rootStyles = window.getComputedStyle(root);
+    const cssHeaderHeight = Number.parseFloat(rootStyles.getPropertyValue('--header-height')) || 0;
+
+    const navbarHost = document.querySelector('custom-navbar');
+    const navbar = navbarHost?.shadowRoot?.querySelector('.navbar');
+    const measuredHeaderHeight = navbar
+        ? Math.max(0, Math.round(navbar.getBoundingClientRect().height))
+        : 0;
+
+    const resolvedHeaderHeight = Math.max(cssHeaderHeight, measuredHeaderHeight, 72);
+    if (resolvedHeaderHeight > 0) {
+        root.style.setProperty('--header-height', `${resolvedHeaderHeight}px`);
+    }
+
+    return resolvedHeaderHeight;
+}
+
 // Show notification
 function showNotification(message, type = 'success') {
     let container = document.getElementById('notification-container');
@@ -367,11 +386,15 @@ function showNotification(message, type = 'success') {
         document.body.appendChild(container);
     }
 
+    // Считаем верхний отступ в пикселях, чтобы гарантированно учитывать высоту хедера.
+    const headerOffset = resolveHeaderHeightForNotifications();
+    const topOffset = Math.round(headerOffset + 12);
+
     // Глобальный слой уведомлений: всегда фиксируем под хедером,
     // чтобы одинаково работать на всех страницах приложения.
     container.style.cssText = `
         position: fixed;
-        top: calc(var(--header-height, 72px) + 12px);
+        top: ${topOffset}px;
         right: 12px;
         z-index: 120;
         width: min(320px, calc(100vw - 24px));
