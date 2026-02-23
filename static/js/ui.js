@@ -362,34 +362,31 @@ function validateForm() {
 function showNotification(message, type = 'success') {
     // Проверяем, существует ли контейнер уведомлений.
     let container = document.getElementById('notification-container');
-    
+    const mainElement = document.querySelector('main');
+    const mainContentElement = document.querySelector('main .max-w-md');
+    const targetContainer = mainContentElement || mainElement || document.body;
+
     if (!container) {
-        const mainElement = document.querySelector('main');
         container = document.createElement('div');
         container.id = 'notification-container';
-        container.style.cssText = `
-            position: sticky;
-            top: 12px;
-            z-index: 1000;
-            max-width: 320px;
-            margin-left: auto;
-            margin-bottom: 12px;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            pointer-events: none;
-        `;
+    }
 
-        // Вставляем уведомления в main, чтобы они были под header,
-        // а не перекрывались системными UI-элементами сверху.
-        if (mainElement) {
-            mainElement.prepend(container);
-        } else {
-            container.style.position = 'fixed';
-            container.style.top = '20px';
-            container.style.right = '20px';
-            document.body.appendChild(container);
-        }
+    // Всегда переинициализируем контейнер: это защищает от старого fixed-позиционирования,
+    // если элемент был создан ранее на другой странице или до загрузки main.
+    container.style.cssText = `
+        position: relative;
+        z-index: 40;
+        width: 100%;
+        max-width: 100%;
+        margin: 0 0 12px 0;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        pointer-events: none;
+    `;
+
+    if (container.parentElement !== targetContainer) {
+        targetContainer.prepend(container);
     }
     
     const notification = document.createElement('div');
