@@ -365,19 +365,27 @@ function getCssPxVariable(name, fallback = 0) {
 }
 
 function computeNotificationTopOffset() {
+    const navbarHost = document.querySelector('custom-navbar');
+    const navbar = navbarHost?.shadowRoot?.querySelector('.navbar');
+    const navbarBottom = navbar ? navbar.getBoundingClientRect().bottom : 0;
+    if (Number.isFinite(navbarBottom) && navbarBottom > 0) {
+        return Math.round(navbarBottom + 12);
+    }
+
     if (typeof applyHeaderHeight === 'function') {
         applyHeaderHeight();
     }
 
-    const headerHeight = getCssPxVariable('--header-height', 72);
+    const headerHeight = getCssPxVariable('--header-height', 0);
+    if (headerHeight > 0) {
+        return Math.round(headerHeight + 12);
+    }
+
     const safeTop = getCssPxVariable('--tg-safe-top', 0);
     const uiTop = getCssPxVariable('--tg-ui-top', 0);
 
-    // Берём максимум, чтобы не прилипать к верхнему краю,
-    // даже если высота navbar обновилась с задержкой.
-    const offsetByHeader = headerHeight + 12;
-    const offsetByFallback = 72 + safeTop + uiTop + 12;
-    return Math.round(Math.max(offsetByHeader, offsetByFallback));
+    // Запасной расчёт, если высота header ещё не рассчитана (в Telegram safe-area/viewport могут приходить асинхронно).
+    return Math.round(72 + safeTop + uiTop + 12);
 }
 
 function applyNotificationContainerPosition(container) {

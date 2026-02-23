@@ -5,7 +5,7 @@ from pathlib import Path
 
 from fastapi.templating import Jinja2Templates
 
-from config import APP_ENV, APP_NAME, IS_DEV, PLANS_PATH
+from config import APP_ENV, APP_NAME, BASE_DIR, IS_DEV, PLANS_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +13,30 @@ templates = Jinja2Templates(directory="templates")
 templates.env.globals["APP_NAME"] = APP_NAME
 if IS_DEV:
     templates.env.globals["APP_ENV"] = APP_ENV
+
+STATIC_DIR = (BASE_DIR / "static").resolve()
+
+
+def static_mtime(relative_path: str) -> int:
+    """Cache-busting helper for templates: returns mtime for /static assets."""
+    if not isinstance(relative_path, str):
+        return 0
+    candidate = Path(relative_path)
+    if candidate.is_absolute() or ".." in candidate.parts:
+        return 0
+    try:
+        full_path = (STATIC_DIR / candidate).resolve()
+    except OSError:
+        return 0
+    if full_path != STATIC_DIR and STATIC_DIR not in full_path.parents:
+        return 0
+    try:
+        return int(full_path.stat().st_mtime)
+    except OSError:
+        return 0
+
+
+templates.env.globals["static_mtime"] = static_mtime
 
 ADMIN_CONFIG_PATH = Path("config/admin_config.json")
 ADMIN_CONFIG_CACHE: dict[str, object] | None = None
