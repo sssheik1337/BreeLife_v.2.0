@@ -64,8 +64,8 @@
       }
       .form-row {
         display: grid;
-        grid-template-columns: repeat(7, minmax(0, 1fr));
-        gap: 8px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
       }
       .product-list {
         display: flex;
@@ -115,13 +115,86 @@
       }
       .product-grid {
         display: grid;
-        grid-template-columns: repeat(7, minmax(0, 1fr));
-        gap: 8px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .form-row label,
+      .product-grid label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+        line-height: 1.3;
       }
       .product-actions {
         display: flex;
         gap: 8px;
         margin-top: 10px;
+        flex-wrap: wrap;
+      }
+      @media (max-width: 1024px) {
+        .form-row,
+        .product-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 768px) {
+        body {
+          padding: 14px;
+        }
+        .toolbar {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+        .toolbar h1 {
+          margin: 0 0 10px;
+          font-size: 44px;
+          line-height: 1;
+        }
+        .toolbar-links {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 14px;
+        }
+        .toolbar-links a {
+          margin-right: 0;
+        }
+        .logout {
+          width: 100%;
+        }
+        .logout button {
+          width: 100%;
+          min-height: 44px;
+        }
+        .card {
+          padding: 14px;
+        }
+        .form-row,
+        .product-grid {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+        input[type="text"],
+        input[type="number"],
+        select,
+        button {
+          min-height: 42px;
+          font-size: 16px;
+        }
+        .product-actions {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .product-actions .btn-primary,
+        .product-actions .btn-danger {
+          width: 100%;
+        }
+        .group-summary {
+          gap: 8px;
+          align-items: flex-start;
+        }
       }
       .toolbar-links a {
         margin-right: 12px;
