@@ -360,40 +360,26 @@ function validateForm() {
 
 // Show notification
 function showNotification(message, type = 'success') {
-    // Жёстко привязываем уведомления к main, чтобы они не попадали в шапку.
-    const mainElement = document.querySelector('main');
-    if (!mainElement) {
-        return;
-    }
-
     let container = document.getElementById('notification-container');
     if (!container) {
         container = document.createElement('div');
         container.id = 'notification-container';
+        document.body.appendChild(container);
     }
 
-    // У main должен быть контекст позиционирования для абсолютного контейнера.
-    const mainPosition = window.getComputedStyle(mainElement).position;
-    if (mainPosition === 'static') {
-        mainElement.style.position = 'relative';
-    }
-
-    // Всегда переустанавливаем стиль контейнера, чтобы убрать следы старого fixed-layout.
+    // Глобальный слой уведомлений: всегда фиксируем под хедером,
+    // чтобы одинаково работать на всех страницах приложения.
     container.style.cssText = `
-        position: absolute;
-        top: 12px;
+        position: fixed;
+        top: calc(var(--header-height, 72px) + 12px);
         right: 12px;
         z-index: 120;
-        width: min(320px, calc(100% - 24px));
+        width: min(320px, calc(100vw - 24px));
         display: flex;
         flex-direction: column;
         align-items: flex-end;
         pointer-events: none;
     `;
-
-    if (container.parentElement !== mainElement) {
-        mainElement.prepend(container);
-    }
 
     const notification = document.createElement('div');
     notification.style.cssText = `
