@@ -360,35 +360,41 @@ function validateForm() {
 
 // Show notification
 function showNotification(message, type = 'success') {
-    // Проверяем, существует ли контейнер уведомлений.
-    let container = document.getElementById('notification-container');
+    // Жёстко привязываем уведомления к main, чтобы они не попадали в шапку.
     const mainElement = document.querySelector('main');
-    const mainContentElement = document.querySelector('main .max-w-md');
-    const targetContainer = mainContentElement || mainElement || document.body;
+    if (!mainElement) {
+        return;
+    }
 
+    let container = document.getElementById('notification-container');
     if (!container) {
         container = document.createElement('div');
         container.id = 'notification-container';
     }
 
-    // Всегда переинициализируем контейнер: это защищает от старого fixed-позиционирования,
-    // если элемент был создан ранее на другой странице или до загрузки main.
+    // У main должен быть контекст позиционирования для абсолютного контейнера.
+    const mainPosition = window.getComputedStyle(mainElement).position;
+    if (mainPosition === 'static') {
+        mainElement.style.position = 'relative';
+    }
+
+    // Всегда переустанавливаем стиль контейнера, чтобы убрать следы старого fixed-layout.
     container.style.cssText = `
-        position: relative;
-        z-index: 40;
-        width: 100%;
-        max-width: 100%;
-        margin: 0 0 12px 0;
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        z-index: 120;
+        width: min(320px, calc(100% - 24px));
         display: flex;
         flex-direction: column;
         align-items: flex-end;
         pointer-events: none;
     `;
 
-    if (container.parentElement !== targetContainer) {
-        targetContainer.prepend(container);
+    if (container.parentElement !== mainElement) {
+        mainElement.prepend(container);
     }
-    
+
     const notification = document.createElement('div');
     notification.style.cssText = `
         background: ${type === 'success' ? '#10b981' : '#ef4444'};
@@ -402,24 +408,25 @@ function showNotification(message, type = 'success') {
         align-items: center;
         gap: 12px;
         pointer-events: auto;
+        max-width: 100%;
     `;
-    
+
     const icon = document.createElement('i');
     icon.setAttribute('data-feather', type === 'success' ? 'check-circle' : 'alert-circle');
-    
+
     const text = document.createElement('span');
     text.textContent = message;
-    
+
     notification.appendChild(icon);
     notification.appendChild(text);
     container.appendChild(notification);
-    
-    // Feather icons replacement
+
+    // Обновляем иконки после добавления уведомления в DOM.
     if (window.feather) {
         feather.replace();
     }
-    
-    // Auto remove after 3 seconds
+
+    // Удаляем уведомление автоматически через 3 секунды.
     setTimeout(() => {
         notification.style.animation = 'fadeIn 0.3s ease-out reverse';
         setTimeout(() => {
