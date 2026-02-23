@@ -360,20 +360,36 @@ function validateForm() {
 
 // Show notification
 function showNotification(message, type = 'success') {
-    // Check if notification container exists
+    // Проверяем, существует ли контейнер уведомлений.
     let container = document.getElementById('notification-container');
     
     if (!container) {
+        const mainElement = document.querySelector('main');
         container = document.createElement('div');
         container.id = 'notification-container';
         container.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
+            position: sticky;
+            top: 12px;
             z-index: 1000;
             max-width: 320px;
+            margin-left: auto;
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            pointer-events: none;
         `;
-        document.body.appendChild(container);
+
+        // Вставляем уведомления в main, чтобы они были под header,
+        // а не перекрывались системными UI-элементами сверху.
+        if (mainElement) {
+            mainElement.prepend(container);
+        } else {
+            container.style.position = 'fixed';
+            container.style.top = '20px';
+            container.style.right = '20px';
+            document.body.appendChild(container);
+        }
     }
     
     const notification = document.createElement('div');
@@ -388,6 +404,7 @@ function showNotification(message, type = 'success') {
         display: flex;
         align-items: center;
         gap: 12px;
+        pointer-events: auto;
     `;
     
     const icon = document.createElement('i');
