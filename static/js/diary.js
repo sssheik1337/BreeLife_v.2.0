@@ -909,7 +909,7 @@ function renderDayScreen(entries, dateKey) {
         if (!list || !total) {
             return;
         }
-        const entry = mealEntries.find((item) => item.meal === mealKey) || null;
+        const entry = pickBestProductsEntry(mealEntries, dateKey, mealKey);
         if (!entry) {
             list.innerHTML = `
                 <p class="text-slate-400">Ничего не добавлено.</p>
@@ -1347,8 +1347,20 @@ function findSummaryEntry(entries, dateKey) {
     return entries.find((entry) => entry.mode === MODE_SUMMARY && entry.date === dateKey) || null;
 }
 
+function pickBestProductsEntry(entries, dateKey, meal) {
+    const matches = entries.filter((entry) => entry.mode === MODE_PRODUCTS && entry.date === dateKey && entry.meal === meal);
+    if (!matches.length) {
+        return null;
+    }
+
+    // Предпочитаем запись с товарами, чтобы не терять список продуктов
+    // в случаях, когда backend прислал дубликат только с totals.
+    const withItems = matches.find((entry) => Array.isArray(entry.items) && entry.items.length > 0);
+    return withItems || matches[0];
+}
+
 function findProductsEntry(entries, dateKey, meal) {
-    return entries.find((entry) => entry.mode === MODE_PRODUCTS && entry.date === dateKey && entry.meal === meal) || null;
+    return pickBestProductsEntry(entries, dateKey, meal);
 }
 
 function updateSummaryForm(entries, dateKey) {
