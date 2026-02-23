@@ -85,12 +85,79 @@
         display: flex;
         gap: 8px;
         margin-top: 12px;
+        flex-wrap: wrap;
+      }
+      .plan-row label {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+        line-height: 1.3;
       }
       .toolbar-links a {
         margin-right: 12px;
         color: #2563eb;
         text-decoration: none;
         font-weight: 600;
+      }
+      @media (max-width: 1024px) {
+        .plan-row {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 768px) {
+        body {
+          padding: 14px;
+        }
+        .toolbar {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+        .toolbar h1 {
+          margin: 0 0 10px;
+          font-size: 44px;
+          line-height: 1;
+        }
+        .toolbar-links {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 14px;
+        }
+        .toolbar-links a {
+          margin-right: 0;
+        }
+        .logout {
+          width: 100%;
+        }
+        .logout button {
+          width: 100%;
+          min-height: 44px;
+        }
+        .card,
+        .plan-card {
+          padding: 14px;
+        }
+        .plan-row {
+          grid-template-columns: 1fr;
+          gap: 10px;
+        }
+        input[type="text"],
+        input[type="number"],
+        textarea,
+        button {
+          min-height: 42px;
+          font-size: 16px;
+        }
+        .plan-actions {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .plan-actions .btn-primary,
+        .plan-actions .btn-danger {
+          width: 100%;
+        }
       }
       .logout button {
         background: #0f172a;
