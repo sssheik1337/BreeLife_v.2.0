@@ -358,15 +358,19 @@ function validateForm() {
     return allFilled;
 }
 
-function resolveHeaderHeightForNotifications() {
+function resolveNotificationTopOffset() {
     const root = document.documentElement;
     const rootStyles = window.getComputedStyle(root);
     const cssHeaderHeight = Number.parseFloat(rootStyles.getPropertyValue('--header-height')) || 0;
 
     const navbarHost = document.querySelector('custom-navbar');
     const navbar = navbarHost?.shadowRoot?.querySelector('.navbar');
-    const measuredHeaderHeight = navbar
-        ? Math.max(0, Math.round(navbar.getBoundingClientRect().height))
+    const navbarRect = navbar?.getBoundingClientRect?.();
+    const measuredHeaderHeight = navbarRect
+        ? Math.max(0, Math.round(navbarRect.height))
+        : 0;
+    const navbarBottomOffset = navbarRect
+        ? Math.max(0, Math.round(navbarRect.bottom))
         : 0;
 
     const resolvedHeaderHeight = Math.max(cssHeaderHeight, measuredHeaderHeight, 72);
@@ -374,7 +378,10 @@ function resolveHeaderHeightForNotifications() {
         root.style.setProperty('--header-height', `${resolvedHeaderHeight}px`);
     }
 
-    return resolvedHeaderHeight;
+    // Берём нижнюю границу реального navbar в viewport,
+    // чтобы уведомление гарантированно было ниже шапки.
+    const headerBottom = Math.max(navbarBottomOffset, resolvedHeaderHeight);
+    return Math.round(headerBottom + 12);
 }
 
 // Show notification
@@ -386,9 +393,8 @@ function showNotification(message, type = 'success') {
         document.body.appendChild(container);
     }
 
-    // Считаем верхний отступ в пикселях, чтобы гарантированно учитывать высоту хедера.
-    const headerOffset = resolveHeaderHeightForNotifications();
-    const topOffset = Math.round(headerOffset + 12);
+    // Считаем top от нижней границы navbar, а не от верхнего края экрана.
+    const topOffset = resolveNotificationTopOffset();
 
     // Глобальный слой уведомлений: всегда фиксируем под хедером,
     // чтобы одинаково работать на всех страницах приложения.
