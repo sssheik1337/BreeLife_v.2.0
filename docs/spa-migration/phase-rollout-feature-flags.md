@@ -5,6 +5,7 @@
 ## Флаги окружения
 
 - `SPA_ENABLED` — глобальный рубильник SPA-shell (`/app`).
+- `SPA_PRIMARY_ROUTES_TO_SHELL_ENABLED` — переводит основные пользовательские маршруты на SPA shell (`/app/*`) после стабилизации.
 - `SPA_PHASE_1_ENABLED` — фаза 1.
 - `SPA_PHASE_2_ENABLED` — фаза 2.
 - `SPA_PHASE_3_ENABLED` — фаза 3.
@@ -58,3 +59,11 @@ SPA_PHASE_3_ENABLED=0 \
 SPA_PHASE_4_ENABLED=0 \
 python main.py
 ```
+
+
+## Перевод основных маршрутов на SPA shell
+
+После стабилизации фазового rollout включается `SPA_PRIMARY_ROUTES_TO_SHELL_ENABLED=1`.
+
+- Backend начинает редиректить основные пользовательские маршруты (`/menu`, `/profile`, `/diary`, ... ) на `/app/<route>`.
+- Admin-часть и API не участвуют в этом редиректе и остаются отдельными.

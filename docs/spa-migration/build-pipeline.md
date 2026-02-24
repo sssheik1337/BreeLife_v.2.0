@@ -22,3 +22,9 @@ scripts/сборка_spa_перед_деплоем.sh
 - FastAPI отдает ассеты сборки по `/spa-assets`.
 - SPA shell отдается роутом `/app` (и `/app/{path}`).
 - Legacy HTML-страницы продолжают работать как fallback и не удаляются.
+
+
+## Эксплуатация
+
+- Для процедур деплоя/rollback/мониторинга используйте `docs/spa-migration/operations-runbook.md`.
+- Legacy-файлы `templates/*.html` и `static/js/*.js` удаляются только после подтвержденной замены в SPA и фиксации в итоговом отчете `docs/spa-migration/migration-final-report.md`.

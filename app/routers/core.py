@@ -11,6 +11,7 @@ from config import (
     IS_PROD,
     PUBLIC_APP_URL,
     SPA_ENABLED,
+    SPA_PRIMARY_ROUTES_TO_SHELL_ENABLED,
     SPA_PHASE_1_ENABLED,
     SPA_PHASE_2_ENABLED,
     SPA_PHASE_3_ENABLED,
@@ -112,6 +113,7 @@ async def get_app_config():
         "app_port": APP_PORT,
         "spa_rollout": {
             "spa_enabled": SPA_ENABLED,
+            "spa_primary_routes_to_shell_enabled": SPA_PRIMARY_ROUTES_TO_SHELL_ENABLED,
             "phase_1_enabled": SPA_PHASE_1_ENABLED,
             "phase_2_enabled": SPA_PHASE_2_ENABLED,
             "phase_3_enabled": SPA_PHASE_3_ENABLED,

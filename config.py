@@ -33,6 +33,7 @@ def env_flag(name: str, default: bool = False) -> bool:
 
 
 SPA_ENABLED = env_flag('SPA_ENABLED', False)
+SPA_PRIMARY_ROUTES_TO_SHELL_ENABLED = env_flag('SPA_PRIMARY_ROUTES_TO_SHELL_ENABLED', False)
 SPA_PHASE_1_ENABLED = env_flag('SPA_PHASE_1_ENABLED', False)
 SPA_PHASE_2_ENABLED = env_flag('SPA_PHASE_2_ENABLED', False)
 SPA_PHASE_3_ENABLED = env_flag('SPA_PHASE_3_ENABLED', False)
