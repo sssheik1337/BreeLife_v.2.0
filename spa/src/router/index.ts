@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type NavigationGuardNext, type RouteLocationNormalized, type RouteRecordRaw } from 'vue-router';
 import { h, type Component } from 'vue';
 import { useAppStateStore, type ProfileState } from '../stores/appStateStore';
+import { createOnboardingDebugLogger, evaluateOnboardingState } from '../domain/onboarding';
 
 /**
  * Техническая заглушка для маршрутов, которые будут заменены
@@ -277,44 +278,6 @@ const loadProfileForGuards = async (): Promise<ProfileState | null> => {
     return data && typeof data === 'object' ? (data as ProfileState) : null;
 };
 
-/**
- * Повторяет backend-правило: если онбординг завершён или есть списки,
- * считаем продуктовый шаг заполненным.
- */
-const hasProductsOnboardingData = (profile: ProfileState | null): boolean => {
-    if (!profile || typeof profile !== 'object') {
-        return false;
-    }
-    const completed = profile.preferences_onboarding_completed === true;
-    if (completed) {
-        return true;
-    }
-    const favorites = Array.isArray(profile.favorite_product_ids) ? profile.favorite_product_ids : [];
-    const excluded = Array.isArray(profile.excluded_product_ids) ? profile.excluded_product_ids : [];
-    return favorites.length > 0 || excluded.length > 0;
-};
-
-/**
- * Повторяет backend-правило should_redirect_to_trial_start(...).
- */
-const shouldRedirectToTrialStart = (profile: ProfileState | null): boolean => {
-    if (!profile || typeof profile !== 'object') {
-        return false;
-    }
-    if (profile.trial_welcome_seen === true) {
-        return false;
-    }
-    if (profile.trial_started_at) {
-        return false;
-    }
-    const subscriptionStatus = typeof profile.subscription_status === 'string' ? profile.subscription_status : '';
-    if (['trial', 'active', 'expired'].includes(subscriptionStatus)) {
-        return false;
-    }
-    return true;
-};
-
-
 const DEFAULT_ROLLOUT_CONFIG: SpaRolloutConfig = {
     spa_enabled: false,
     phase_1_enabled: false,
@@ -324,6 +287,7 @@ const DEFAULT_ROLLOUT_CONFIG: SpaRolloutConfig = {
 };
 
 let cachedRolloutConfig: SpaRolloutConfig | null = null;
+const onboardingDebugLog = createOnboardingDebugLogger();
 
 const loadRolloutConfig = async (): Promise<SpaRolloutConfig> => {
     if (cachedRolloutConfig) {
@@ -407,46 +371,27 @@ router.beforeEach(async (to: RouteLocationNormalized, _from: RouteLocationNormal
             redirectToLegacyRoute(to.path);
             return;
         }
-        const requiresAuth = to.meta.requiresAuth === true;
-        const requiresCompletedProfile = to.meta.requiresCompletedProfile === true;
+        const onboardingDecision = evaluateOnboardingState(
+            {
+                path: to.path,
+                session: {
+                    authorized: session.authorized,
+                    profile_completed: session.profile_completed
+                },
+                profile
+            },
+            onboardingDebugLog
+        );
 
-        if ((to.path === '/' || to.path === '/index') && session.profile_completed) {
-            next('/profile');
-            return;
-        }
+        onboardingDebugLog('guard:decision', {
+            path: to.path,
+            allow: onboardingDecision.allow,
+            reason: onboardingDecision.reason,
+            redirectTo: onboardingDecision.redirectTo
+        });
 
-        if (requiresAuth && !session.authorized) {
-            // Для неавторизованного пользователя возвращаем entry.
-            next('/');
-            return;
-        }
-
-        if (requiresCompletedProfile && !session.profile_completed) {
-            next('/questionnaire');
-            return;
-        }
-
-        if (to.meta.onboardingStep === 'choice') {
-            if (profile?.preferences_onboarding_completed === true) {
-                next('/trial-start');
-                return;
-            }
-        }
-
-        if (to.meta.onboardingStep === 'trial') {
-            if (!shouldRedirectToTrialStart(profile)) {
-                next('/profile');
-                return;
-            }
-        }
-
-        if (to.path === '/profile' && shouldRedirectToTrialStart(profile)) {
-            next('/trial-start');
-            return;
-        }
-
-        if (to.meta.requiresProductsOnboarding === true && !hasProductsOnboardingData(profile)) {
-            next('/preferences-onboarding');
+        if (!onboardingDecision.allow && onboardingDecision.redirectTo) {
+            next(onboardingDecision.redirectTo);
             return;
         }
 
