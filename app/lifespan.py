@@ -72,6 +72,8 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.error("Не удалось установить webhook: %s", exc)
         yield
+        if bot:
+            await bot.session.close()
         return
     logger.info("INFO: Telegram bot started (webhook): %s", webhook_url)
     yield

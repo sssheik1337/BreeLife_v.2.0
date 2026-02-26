@@ -6,12 +6,21 @@ from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from config import APP_NAME, SPA_ENABLED, SPA_PRIMARY_ROUTES_TO_SHELL_ENABLED
+from config import (
+    APP_NAME,
+    SPA_ENABLED,
+    SPA_PRIMARY_ROUTES_TO_SHELL_ENABLED,
+    SPA_PHASE_1_ENABLED,
+    SPA_PHASE_2_ENABLED,
+    SPA_PHASE_3_ENABLED,
+    SPA_PHASE_4_ENABLED,
+)
 from app.lifespan import lifespan
 from app.routers import (
     admin,
     ai,
     core,
+    dev,
     diary,
     foods,
     meal_plan_api,
@@ -27,26 +36,54 @@ from services.storage_db import init_db
 
 logging.basicConfig(level=logging.DEBUG)
 
-PRIMARY_SPA_ROUTES = {
+SPA_PHASE_1_ROUTES = {
     '/menu',
     '/support',
     '/references',
     '/plans',
     '/settings/reminders',
+}
+
+SPA_PHASE_2_ROUTES = {
     '/foods',
     '/my-products',
     '/shopping-list',
     '/trial-start',
     '/preferences-onboarding-choice',
     '/preferences-onboarding',
+}
+
+SPA_PHASE_3_ROUTES = {
     '/questionnaire',
     '/resume',
     '/meal-plan',
+}
+
+SPA_PHASE_4_ROUTES = {
     '/profile',
     '/profile.html',
     '/diary',
     '/food-diary',
 }
+
+PRIMARY_SPA_ROUTES = (
+    SPA_PHASE_1_ROUTES
+    | SPA_PHASE_2_ROUTES
+    | SPA_PHASE_3_ROUTES
+    | SPA_PHASE_4_ROUTES
+)
+
+
+def is_spa_route_enabled(path: str) -> bool:
+    if path in SPA_PHASE_1_ROUTES:
+        return SPA_PHASE_1_ENABLED
+    if path in SPA_PHASE_2_ROUTES:
+        return SPA_PHASE_2_ENABLED
+    if path in SPA_PHASE_3_ROUTES:
+        return SPA_PHASE_3_ENABLED
+    if path in SPA_PHASE_4_ROUTES:
+        return SPA_PHASE_4_ENABLED
+    return False
 
 
 
@@ -55,6 +92,7 @@ def create_app() -> FastAPI:
     init_db()
 
     app.include_router(core.router)
+    app.include_router(dev.router)
     app.include_router(telegram.router)
     app.include_router(questionnaire.router)
     app.include_router(profile.router)
@@ -85,6 +123,9 @@ def create_app() -> FastAPI:
         if request.method != 'GET' or request_path not in PRIMARY_SPA_ROUTES:
             return await call_next(request)
 
+        if not is_spa_route_enabled(request_path):
+            return await call_next(request)
+
         # Админ-часть и API остаются вне автоматического редиректа до отдельной миграции.
         query_string = f"?{request.url.query}" if request.url.query else ''
         return RedirectResponse(url=f'/app{request_path}{query_string}', status_code=307)
@@ -94,7 +135,7 @@ def create_app() -> FastAPI:
     app.mount('/fonts', StaticFiles(directory='fonts'), name='fonts')
 
     # Статические SPA-ассеты (Vite build) отдаются по отдельному префиксу.
-    spa_assets_dir = Path('spa/dist/assets')
-    spa_assets_dir.mkdir(parents=True, exist_ok=True)
-    app.mount('/spa-assets', StaticFiles(directory=str(spa_assets_dir)), name='spa-assets')
+    spa_dist_dir = Path('spa/dist')
+    spa_dist_dir.mkdir(parents=True, exist_ok=True)
+    app.mount('/spa-assets', StaticFiles(directory=str(spa_dist_dir)), name='spa-assets')
     return app

@@ -32,6 +32,7 @@ def env_flag(name: str, default: bool = False) -> bool:
     return os.getenv(name, '1' if default else '0').lower() in {'1', 'true', 'yes'}
 
 
+DEV_AUTH_ENABLED = env_flag("DEV_AUTH_ENABLED", False)
 SPA_ENABLED = env_flag('SPA_ENABLED', False)
 SPA_PRIMARY_ROUTES_TO_SHELL_ENABLED = env_flag('SPA_PRIMARY_ROUTES_TO_SHELL_ENABLED', False)
 SPA_PHASE_1_ENABLED = env_flag('SPA_PHASE_1_ENABLED', False)

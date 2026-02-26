@@ -230,6 +230,49 @@ class CustomFooter extends HTMLElement {
     const fabOverlay = this.shadowRoot.querySelector('[data-fab-overlay]');
     const fabMenu = this.shadowRoot.querySelector('[data-fab-menu]');
 
+    const normalizeSpaTarget = (target) => {
+      if (!target || typeof target !== 'string') {
+        return null;
+      }
+
+      try {
+        const resolved = new URL(target, window.location.origin);
+        if (resolved.origin !== window.location.origin) {
+          return null;
+        }
+
+        const resolvedPath = `${resolved.pathname}${resolved.search}${resolved.hash}`;
+        if (resolvedPath === '/app') {
+          return '/';
+        }
+        if (resolvedPath.startsWith('/app/')) {
+          return resolvedPath.slice(4);
+        }
+        return resolvedPath;
+      } catch (error) {
+        return null;
+      }
+    };
+
+    const navigateTo = (target, replace = false) => {
+      if (!target) {
+        return;
+      }
+
+      const method = replace ? window.spaReplace : window.spaNavigate;
+      const spaTarget = normalizeSpaTarget(target);
+      if (spaTarget && typeof method === 'function') {
+        method(spaTarget);
+        return;
+      }
+
+      if (replace) {
+        window.location.replace(target);
+      } else {
+        window.location.assign(target);
+      }
+    };
+
     const closeFabMenu = () => {
       fabMenu?.classList.add('hidden');
       fabOverlay?.classList.add('hidden');
@@ -274,7 +317,7 @@ class CustomFooter extends HTMLElement {
               if (typeof showNotification === 'function') {
                 showNotification('Сначала заполните анкету.', 'error');
               }
-              window.location.href = '/questionnaire';
+              navigateTo('/questionnaire');
             });
           }
         } else {
@@ -337,7 +380,33 @@ class CustomFooter extends HTMLElement {
         if (meal) {
           params.set('meal', meal);
         }
-        window.location.href = `/diary?${params.toString()}`;
+        navigateTo(`/diary?${params.toString()}`);
+      });
+    });
+
+    Object.values(bottomLinks).forEach((link) => {
+      if (!link) {
+        return;
+      }
+
+      link.addEventListener('click', (event) => {
+        if (event.defaultPrevented) {
+          return;
+        }
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+          return;
+        }
+        if (link.classList.contains('bottom-link--disabled')) {
+          return;
+        }
+
+        const target = link.getAttribute('href');
+        if (!target || target === '#') {
+          return;
+        }
+
+        event.preventDefault();
+        navigateTo(target);
       });
     });
 

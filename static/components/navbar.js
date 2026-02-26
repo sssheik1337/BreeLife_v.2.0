@@ -338,10 +338,62 @@ class CustomNavbar extends HTMLElement {
     };
 
     const bindMenu = () => {
+      const normalizeSpaTarget = (target) => {
+        if (!target || typeof target !== 'string') {
+          return null;
+        }
+
+        try {
+          const resolved = new URL(target, window.location.origin);
+          if (resolved.origin !== window.location.origin) {
+            return null;
+          }
+
+          const resolvedPath = `${resolved.pathname}${resolved.search}${resolved.hash}`;
+          if (resolvedPath === '/app') {
+            return '/';
+          }
+          if (resolvedPath.startsWith('/app/')) {
+            return resolvedPath.slice(4);
+          }
+          return resolvedPath;
+        } catch (error) {
+          return null;
+        }
+      };
+
+      const navigateTo = (target, replace = false) => {
+        if (!target) {
+          return;
+        }
+
+        const method = replace ? window.spaReplace : window.spaNavigate;
+        const spaTarget = normalizeSpaTarget(target);
+        if (spaTarget && typeof method === 'function') {
+          method(spaTarget);
+          return;
+        }
+
+        if (replace) {
+          window.location.replace(target);
+        } else {
+          window.location.assign(target);
+        }
+      };
+
+      const logoLink = this.shadowRoot.querySelector('.logo[href]');
       const menuButton = this.shadowRoot.querySelector('[data-nav="menu"]');
       const menuPanel = this.shadowRoot.getElementById('menu-panel');
       if (!menuButton || !menuPanel) {
         return;
+      }
+
+      if (logoLink) {
+        logoLink.addEventListener('click', (event) => {
+          event.preventDefault();
+          const target = logoLink.getAttribute('href');
+          navigateTo(target);
+        });
       }
 
       menuButton.addEventListener('click', () => {
@@ -363,7 +415,7 @@ class CustomNavbar extends HTMLElement {
           menuPanel.classList.remove('is-open');
           const target = link.getAttribute('href');
           if (target) {
-            window.location.assign(target);
+            navigateTo(target);
           }
         });
       });

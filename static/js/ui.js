@@ -1091,8 +1091,9 @@ window.addEventListener('pageshow', () => {
     resetInitialScrollPosition();
 });
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', async function() {
+// Initialize on page load (skip auto-init when running inside SPA shell).
+if (!window.__SPA_MODE__) {
+    document.addEventListener('DOMContentLoaded', async function() {
     animatePageTransition();
     const appConfig = await loadAppConfig();
     window.appMode = appConfig?.mode || 'production';
@@ -1225,4 +1226,5 @@ document.addEventListener('DOMContentLoaded', async function() {
     if (!userData.registrationDate) {
         userData.registrationDate = new Date().toISOString();
     }
-});
+    });
+}

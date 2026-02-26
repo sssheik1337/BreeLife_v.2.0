@@ -10,6 +10,12 @@
 scripts/сборка_spa_перед_деплоем.sh
 ```
 
+Для Windows PowerShell есть эквивалент:
+
+```powershell
+scripts/build_spa.ps1
+```
+
 Скрипт:
 
 1. проверяет наличие `npm`,

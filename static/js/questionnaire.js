@@ -177,6 +177,22 @@ function resolvePostQuestionnaireRoute(profile) {
     return '/preferences-onboarding-choice';
 }
 
+function navigateToPostQuestionnaire(path, replace = false) {
+    if (replace && typeof window.spaReplace === 'function') {
+        window.spaReplace(path);
+        return;
+    }
+    if (!replace && typeof window.spaNavigate === 'function') {
+        window.spaNavigate(path);
+        return;
+    }
+    if (replace) {
+        window.location.replace(path);
+        return;
+    }
+    window.location.href = path;
+}
+
 async function isServerProfileCompleted() {
     try {
         const fetcher = window.apiFetch || fetch;
@@ -247,7 +263,7 @@ async function initQuestionnaire() {
         // Защита от старого локального кеша: редиректим только если профиль завершён
         // и это подтверждено сервером в текущей сессии.
         if (serverCompleted && profile?.is_completed === true) {
-            window.location.replace(resolvePostQuestionnaireRoute(profile));
+            navigateToPostQuestionnaire(resolvePostQuestionnaireRoute(profile), true);
             return;
         }
     }
@@ -1298,7 +1314,7 @@ function setupEventListeners() {
                 resetUserDataDirtyMap('profile_saved');
             }
             // Все вопросы заполнены, переходим на следующий экран с учётом шага предпочтений.
-            window.location.href = resolvePostQuestionnaireRoute(profile);
+            navigateToPostQuestionnaire(resolvePostQuestionnaireRoute(profile), false);
         }
     });
     

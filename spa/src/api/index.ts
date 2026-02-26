@@ -5,3 +5,4 @@ export * from './diaryApi';
 export * from './mealPlanApi';
 export * from './subscriptionApi';
 export * from './remindersApi';
+export * from './preferencesOnboardingApi';
