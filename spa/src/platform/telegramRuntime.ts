@@ -6,6 +6,11 @@ export interface TelegramWebApp {
     ready?: () => void;
     expand: () => void;
     isExpanded?: boolean;
+    requestFullscreen?: () => void;
+    isFullscreen?: boolean;
+    requestViewport?: () => void;
+    requestSafeArea?: () => void;
+    requestContentSafeArea?: () => void;
     viewportHeight?: number;
     viewportStableHeight?: number;
     safeAreaInset?: {
@@ -150,10 +155,43 @@ const applyHeaderHeight = (documentRef: Document): void => {
 export const createTelegramRuntime = (options: TelegramRuntimeOptions = {}): TelegramRuntimeHandle => {
     const documentRef = options.documentRef || document;
     const navigatorRef = options.navigatorRef || navigator;
-    const tg = options.telegramWebApp || (window.Telegram?.WebApp as TelegramWebApp | undefined) || null;
     const preservePageTheme = options.preservePageTheme === true;
+    const resolveWebApp = (): TelegramWebApp | null =>
+        options.telegramWebApp || (window.Telegram?.WebApp as TelegramWebApp | undefined) || null;
+
+    let activeWebApp: TelegramWebApp | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let retryCount = 0;
+    const MAX_RETRIES = 30;
+    const RETRY_DELAY_MS = 100;
+    let expandRetryTimer: ReturnType<typeof setTimeout> | null = null;
+    let expandRetryCount = 0;
+    const MAX_EXPAND_RETRIES = 8;
+    const EXPAND_RETRY_DELAY_MS = 150;
+
+    const requestTelegramMetrics = (tg: TelegramWebApp): void => {
+        if (typeof tg.requestViewport === 'function') {
+            tg.requestViewport();
+        }
+        if (typeof tg.requestSafeArea === 'function') {
+            tg.requestSafeArea();
+        }
+        if (typeof tg.requestContentSafeArea === 'function') {
+            tg.requestContentSafeArea();
+        }
+    };
+
+    const ensureExpanded = (tg: TelegramWebApp): void => {
+        if (typeof tg.requestFullscreen === 'function') {
+            tg.requestFullscreen();
+        }
+        if (typeof tg.expand === 'function') {
+            tg.expand();
+        }
+    };
 
     const onThemeChanged = (): void => {
+        const tg = activeWebApp || resolveWebApp();
         if (!tg) {
             return;
         }
@@ -161,8 +199,12 @@ export const createTelegramRuntime = (options: TelegramRuntimeOptions = {}): Tel
     };
 
     const onViewportChanged = (): void => {
+        const tg = activeWebApp || resolveWebApp();
         if (!tg) {
             return;
+        }
+        if (tg.isExpanded !== true || tg.isFullscreen !== true) {
+            ensureExpanded(tg);
         }
         applyTelegramSafeAreaInsets(documentRef, tg);
         applyTelegramUiOffset(documentRef, navigatorRef, tg);
@@ -170,6 +212,7 @@ export const createTelegramRuntime = (options: TelegramRuntimeOptions = {}): Tel
     };
 
     const refreshLayout = (): void => {
+        const tg = activeWebApp || resolveWebApp();
         if (!tg) {
             applyHeaderHeight(documentRef);
             return;
@@ -181,16 +224,46 @@ export const createTelegramRuntime = (options: TelegramRuntimeOptions = {}): Tel
     };
 
     const start = (): void => {
+        const tg = resolveWebApp();
         if (!tg) {
             applyHeaderHeight(documentRef);
+            if (!retryTimer && retryCount < MAX_RETRIES) {
+                retryTimer = setTimeout(() => {
+                    retryTimer = null;
+                    retryCount += 1;
+                    start();
+                }, RETRY_DELAY_MS);
+            }
             return;
         }
+        activeWebApp = tg;
 
         if (typeof tg.ready === 'function') {
             tg.ready();
         }
 
-        tg.expand();
+        ensureExpanded(tg);
+        requestTelegramMetrics(tg);
+        expandRetryCount = 0;
+        if (expandRetryTimer) {
+            clearTimeout(expandRetryTimer);
+            expandRetryTimer = null;
+        }
+        if (typeof tg.expand === 'function' || typeof tg.requestFullscreen === 'function') {
+            const scheduleExpandRetry = (): void => {
+                if (!activeWebApp || expandRetryCount >= MAX_EXPAND_RETRIES) {
+                    return;
+                }
+                if (activeWebApp.isExpanded === true && activeWebApp.isFullscreen === true) {
+                    return;
+                }
+                expandRetryCount += 1;
+                ensureExpanded(activeWebApp);
+                requestTelegramMetrics(activeWebApp);
+                expandRetryTimer = setTimeout(scheduleExpandRetry, EXPAND_RETRY_DELAY_MS);
+            };
+            expandRetryTimer = setTimeout(scheduleExpandRetry, EXPAND_RETRY_DELAY_MS);
+        }
         refreshLayout();
 
         if (typeof tg.onEvent === 'function') {
@@ -200,12 +273,21 @@ export const createTelegramRuntime = (options: TelegramRuntimeOptions = {}): Tel
     };
 
     const stop = (): void => {
-        if (!tg || typeof tg.offEvent !== 'function') {
+        if (retryTimer) {
+            clearTimeout(retryTimer);
+            retryTimer = null;
+        }
+        if (expandRetryTimer) {
+            clearTimeout(expandRetryTimer);
+            expandRetryTimer = null;
+        }
+        if (!activeWebApp || typeof activeWebApp.offEvent !== 'function') {
             return;
         }
 
-        tg.offEvent('themeChanged', onThemeChanged);
-        tg.offEvent('viewportChanged', onViewportChanged);
+        activeWebApp.offEvent('themeChanged', onThemeChanged);
+        activeWebApp.offEvent('viewportChanged', onViewportChanged);
+        activeWebApp = null;
     };
 
     return {

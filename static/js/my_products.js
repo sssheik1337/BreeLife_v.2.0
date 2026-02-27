@@ -11,7 +11,7 @@ const pageState = {
     searchQuery: ''
 };
 
-document.addEventListener('DOMContentLoaded', async () => {
+async function initMyProductsScreen() {
     const container = document.getElementById('my-products-container');
     const searchInput = document.getElementById('my-products-search-input');
 
@@ -56,7 +56,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         .catch(() => {
             container.textContent = 'Не удалось загрузить список продуктов.';
         });
-});
+}
+
+if (typeof window !== 'undefined') {
+    window.initMyProductsScreen = initMyProductsScreen;
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        void initMyProductsScreen();
+    });
+} else {
+    void initMyProductsScreen();
+}
 
 function bindSearchInput(input, onSearch) {
     if (!input) {

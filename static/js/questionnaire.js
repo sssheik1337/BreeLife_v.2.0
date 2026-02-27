@@ -177,6 +177,10 @@ function resolvePostQuestionnaireRoute(profile) {
     return '/preferences-onboarding-choice';
 }
 
+if (typeof window !== 'undefined') {
+    window.resolvePostQuestionnaireRoute = resolvePostQuestionnaireRoute;
+}
+
 function navigateToPostQuestionnaire(path, replace = false) {
     if (replace && typeof window.spaReplace === 'function') {
         window.spaReplace(path);
@@ -186,11 +190,25 @@ function navigateToPostQuestionnaire(path, replace = false) {
         window.spaNavigate(path);
         return;
     }
+
+    const spaBase = typeof window.__SPA_BASE__ === 'string' ? window.__SPA_BASE__ : '';
+    let fallbackTarget = path;
+    if (spaBase && typeof path === 'string') {
+        if (path === '/') {
+            fallbackTarget = `${spaBase}/`;
+        } else if (path.startsWith(`${spaBase}/`) || path === spaBase) {
+            fallbackTarget = path;
+        } else if (path.startsWith('/')) {
+            fallbackTarget = `${spaBase}${path}`;
+        } else {
+            fallbackTarget = `${spaBase}/${path}`;
+        }
+    }
     if (replace) {
-        window.location.replace(path);
+        window.location.replace(fallbackTarget);
         return;
     }
-    window.location.href = path;
+    window.location.href = fallbackTarget;
 }
 
 async function isServerProfileCompleted() {
@@ -312,7 +330,7 @@ async function loadSavedAnswers() {
     return null;
 }
 // Display current question
-function displayQuestion() {
+function displayQuestion(options = {}) {
     const activeQuestions = getActiveQuestions();
     if (!activeQuestions.length) {
         return;
@@ -375,6 +393,22 @@ function displayQuestion() {
         card.style.opacity = '1';
         card.style.transform = 'translateY(0)';
     }, 50);
+
+    if (!options.preserveScroll) {
+        resetQuestionnaireScroll();
+    }
+}
+
+function resetQuestionnaireScroll() {
+    if (typeof window.resetWindowScrollPosition === 'function') {
+        window.resetWindowScrollPosition();
+    } else if (typeof window.scrollTo === 'function') {
+        window.scrollTo(0, 0);
+    }
+    const scroller = document.querySelector('.app-content');
+    if (scroller) {
+        scroller.scrollTop = 0;
+    }
 }
 // Display options for select questions
 function displayOptions(options) {
@@ -972,8 +1006,9 @@ function selectOption(optionElement, value) {
     saveUserData();
     const currentQuestion = getQuestionByIndex(currentQuestionIndex);
     if (currentQuestion?.id === 7) {
-        // Для шага выбора цели динамически перестраиваем ветку вопросов.
-        displayQuestion();
+        // Для шага выбора цели динамически перестраиваем ветку вопросов,
+        // но не сбрасываем скролл внутри этого шага.
+        displayQuestion({ preserveScroll: true });
     } else {
         updateButtonStates();
     }
@@ -1312,6 +1347,23 @@ function setupEventListeners() {
             }
             if (typeof resetUserDataDirtyMap === 'function') {
                 resetUserDataDirtyMap('profile_saved');
+            }
+            if (typeof window !== 'undefined') {
+                window.profileCompleted = true;
+                if (window.serverUser && typeof window.serverUser === 'object') {
+                    window.serverUser.profile_completed = true;
+                }
+                if (typeof window.dispatchEvent === 'function') {
+                    window.dispatchEvent(new CustomEvent('profile-status-updated', {
+                        detail: {
+                            profileCompleted: true,
+                            first_name: window.serverUser?.first_name ?? null,
+                            last_name: window.serverUser?.last_name ?? null,
+                            username: window.serverUser?.username ?? null,
+                            photo_url: window.serverUser?.photo_url ?? null
+                        }
+                    }));
+                }
             }
             // Все вопросы заполнены, переходим на следующий экран с учётом шага предпочтений.
             navigateToPostQuestionnaire(resolvePostQuestionnaireRoute(profile), false);

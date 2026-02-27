@@ -68,6 +68,37 @@
         keyline.textContent = `Пробный период активен до ${trialEndDate}`;
     }
 
+    function buildSpaFallbackTarget(path) {
+        const spaBase = typeof window.__SPA_BASE__ === 'string' ? window.__SPA_BASE__ : '';
+        if (!spaBase || typeof path !== 'string') {
+            return path;
+        }
+        if (path === '/') {
+            return `${spaBase}/`;
+        }
+        if (path.startsWith(`${spaBase}/`) || path === spaBase) {
+            return path;
+        }
+        if (path.startsWith('/')) {
+            return `${spaBase}${path}`;
+        }
+        return `${spaBase}/${path}`;
+    }
+
+    function navigateToProfile() {
+        const target = '/profile';
+        if (typeof window.spaReplace === 'function') {
+            window.spaReplace(target);
+            return;
+        }
+        if (typeof window.spaNavigate === 'function') {
+            window.spaNavigate(target);
+            return;
+        }
+        const fallbackTarget = buildSpaFallbackTarget(target);
+        window.location.href = fallbackTarget;
+    }
+
     async function initTrialStartScreen() {
         const continueButton = document.getElementById('trial-start-continue');
         if (!continueButton) {
@@ -87,9 +118,16 @@
                 }
                 return;
             }
-            window.location.href = '/profile';
+            navigateToProfile();
         });
     }
 
-    document.addEventListener('DOMContentLoaded', initTrialStartScreen);
+    if (typeof window !== 'undefined') {
+        window.initTrialStartScreen = initTrialStartScreen;
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initTrialStartScreen);
+    } else {
+        initTrialStartScreen();
+    }
 })();

@@ -37,6 +37,8 @@ from services.storage_db import init_db
 logging.basicConfig(level=logging.DEBUG)
 
 SPA_PHASE_1_ROUTES = {
+    '/',
+    '/index',
     '/menu',
     '/support',
     '/references',

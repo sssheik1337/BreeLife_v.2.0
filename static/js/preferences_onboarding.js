@@ -263,6 +263,46 @@ function getPostOnboardingRoute() {
     return '/profile';
 }
 
+function buildSpaFallbackTarget(path) {
+    const spaBase = typeof window.__SPA_BASE__ === 'string' ? window.__SPA_BASE__ : '';
+    if (!spaBase || typeof path !== 'string') {
+        return path;
+    }
+    if (path === '/') {
+        return `${spaBase}/`;
+    }
+    if (path.startsWith(`${spaBase}/`) || path === spaBase) {
+        return path;
+    }
+    if (path.startsWith('/')) {
+        return `${spaBase}${path}`;
+    }
+    return `${spaBase}/${path}`;
+}
+
+function attachSpaNavigationToContinue(button) {
+    if (!button || button.dataset.spaBound === 'true') {
+        return;
+    }
+    button.dataset.spaBound = 'true';
+    button.addEventListener('click', (event) => {
+        const target = button.getAttribute('href');
+        if (!target) {
+            return;
+        }
+        if (typeof window.spaNavigate === 'function') {
+            event.preventDefault();
+            window.spaNavigate(target);
+            return;
+        }
+        const fallbackTarget = buildSpaFallbackTarget(target);
+        if (fallbackTarget && fallbackTarget !== target) {
+            event.preventDefault();
+            window.location.href = fallbackTarget;
+        }
+    });
+}
+
 function hasAnyChoices() {
     return onboardingState.favoritesSet.size > 0 || onboardingState.excludedSet.size > 0;
 }
@@ -286,6 +326,7 @@ function showSuccessState(elements, completionType) {
 
     if (continueButton) {
         continueButton.setAttribute('href', nextRoute);
+        attachSpaNavigationToContinue(continueButton);
     }
 
     const isWithChoices = completionType === 'completed_with_choices';

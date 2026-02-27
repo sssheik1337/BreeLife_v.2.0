@@ -1,9 +1,5 @@
-import type {
-    DiaryEntryState,
-    HabitEntryState,
-    ProfileState,
-    ServerUserState
-} from '../stores/appStateStore';
+import type { DiaryEntryState, HabitEntriesState, ProfileState } from '../storage/storageTypes';
+import type { ServerUserState } from '../stores/appStateStore';
 import { useAppStateStore } from '../stores/appStateStore';
 
 /**
@@ -19,7 +15,7 @@ export interface LegacyWindowBindings {
     apiFetch: LegacyApiFetch;
     getUserProfile: () => ProfileState;
     getDiaryEntries: () => DiaryEntryState[];
-    getHabitEntries: () => HabitEntryState[];
+    getHabitEntries: () => HabitEntriesState;
     getServerUser: () => ServerUserState;
     getProfileCompleted: () => boolean;
 }
@@ -43,7 +39,7 @@ declare global {
         apiFetch?: LegacyApiFetch;
         getUserProfile?: () => ProfileState;
         getDiaryEntries?: () => DiaryEntryState[];
-        getHabitEntries?: () => HabitEntryState[];
+        getHabitEntries?: () => HabitEntriesState;
         getServerUser?: () => ServerUserState;
         getProfileCompleted?: () => boolean;
     }
@@ -70,7 +66,7 @@ export const createLegacyBindings = (
         apiFetch: options.apiFetch || window.fetch.bind(window),
         getUserProfile: () => ({ ...store.profile }),
         getDiaryEntries: () => store.diaryEntries.map((entry) => ({ ...entry })),
-        getHabitEntries: () => store.habitEntries.map((entry) => ({ ...entry })),
+        getHabitEntries: () => ({ ...store.habitEntries }),
         getServerUser: () => ({ ...store.serverUser }),
         getProfileCompleted: () => store.profileCompleted === true
     };

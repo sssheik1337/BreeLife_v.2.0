@@ -1,6 +1,37 @@
 // Хранилище профиля пользователя и нормализация данных
 
 (function() {
+    if (window.__SPA_MODE__ && window.__SPA_STORAGE__) {
+        const bridge = window.__SPA_STORAGE__;
+        window.beginProfileTrace = bridge.beginProfileTrace;
+        window.getProfileTraceId = bridge.getProfileTraceId;
+        window.getUserProfile = bridge.getUserProfile;
+        window.setUserProfile = bridge.setUserProfile;
+        window.patchUserProfile = bridge.patchUserProfile;
+        window.patchUserProfileWithBackend = bridge.patchUserProfileWithBackend;
+        window.normalizeLocalDate = bridge.normalizeLocalDate;
+        window.validateGoalWeightConsistency = bridge.validateGoalWeightConsistency;
+        window.getDiaryEntries = bridge.getDiaryEntries;
+        window.setDiaryEntries = bridge.setDiaryEntries;
+        window.getHabitEntries = bridge.getHabitEntries;
+        window.setHabitEntries = bridge.setHabitEntries;
+        window.syncProfileWithBackend = bridge.syncProfileWithBackend;
+        window.syncDiaryEntriesWithBackend = bridge.syncDiaryEntriesWithBackend;
+        window.syncWaterEntriesWithBackend = bridge.syncWaterEntriesWithBackend;
+        window.syncSleepEntriesWithBackend = bridge.syncSleepEntriesWithBackend;
+        window.syncHabitEntriesWithBackend = bridge.syncHabitEntriesWithBackend;
+        window.apiFetch = bridge.apiFetch;
+        if (bridge.runStorageSmokeCheck || bridge.runSmokeCheck) {
+            window.runStorageSmokeCheck = bridge.runStorageSmokeCheck || bridge.runSmokeCheck;
+        }
+        window.initStorage = function initStorage() { return true; };
+        return;
+    }
+    if (window.__storageInitialized) {
+        return;
+    }
+    window.__storageInitialized = true;
+
     // Единый canonical-формат профиля между фронтендом и бэкендом.
     // Все чтения/записи профиля должны использовать только эти ключи.
     const CANONICAL_PROFILE_KEYS = [
@@ -1443,5 +1474,6 @@
     window.syncSleepEntriesWithBackend = syncSleepEntriesWithBackend;
     window.syncHabitEntriesWithBackend = syncHabitEntriesWithBackend;
     window.apiFetch = apiFetch;
+    window.initStorage = function initStorage() { return true; };
 
 })();

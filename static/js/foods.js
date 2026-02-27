@@ -11,12 +11,24 @@ const pageState = {
   searchQuery: ''
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+function resetPageState() {
+  pageState.expandedGroups = new Set();
+  pageState.visibleCountByGroup = {};
+  pageState.searchQuery = '';
+}
+
+function initFoods() {
   const container = document.getElementById('foods-container');
   const searchInput = document.getElementById('foods-search-input');
   if (!container) {
     return;
   }
+  if (container.dataset.foodsInitialized === 'true') {
+    return;
+  }
+  container.dataset.foodsInitialized = 'true';
+
+  resetPageState();
 
   container.textContent = 'Загрузка списка продуктов...';
 
@@ -45,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .catch(() => {
       container.textContent = 'Не удалось загрузить список продуктов.';
     });
-});
+}
 
 function bindSearchInput(input, onSearch) {
   if (!input) {
@@ -398,4 +410,20 @@ function renderTags(tags) {
     .filter((tag) => tag !== 'клетчатка')
     .map((tag) => `<span class="px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">${tag}</span>`)
     .join('');
+}
+
+function shouldAutoInitFoods() {
+  return !(window && window.__SPA_MODE__);
+}
+
+window.initFoods = initFoods;
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    if (shouldAutoInitFoods()) {
+      initFoods();
+    }
+  });
+} else if (shouldAutoInitFoods()) {
+  initFoods();
 }

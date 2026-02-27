@@ -10,10 +10,20 @@ const DEFAULT_MEALS = [
 ];
 
 document.addEventListener('DOMContentLoaded', async () => {
+    if (shouldAutoInitMealPlan()) {
+        void initMealPlanScreen();
+    }
+});
+
+async function initMealPlanScreen() {
     const container = document.getElementById('meal-plan-container');
     if (!container) {
         return;
     }
+    if (container.dataset.mealPlanInitialized === 'true') {
+        return;
+    }
+    container.dataset.mealPlanInitialized = 'true';
 
     container.textContent = 'Загрузка рациона...';
 
@@ -31,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         container.textContent = 'Не удалось загрузить рацион.';
     }
-});
+}
 
 function initMealPlan(container) {
     const rangeButtons = Array.from(document.querySelectorAll('[data-plan-range]'));
@@ -253,6 +263,22 @@ function updateSummary(productsCount, totalsText) {
     if (products) {
         products.textContent = String(productsCount);
     }
+}
+
+function shouldAutoInitMealPlan() {
+    return !(window && window.__SPA_MODE__);
+}
+
+window.initMealPlanScreen = initMealPlanScreen;
+
+if (!shouldAutoInitMealPlan()) {
+    // SPA will call initMealPlanScreen explicitly.
+} else if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        void initMealPlanScreen();
+    });
+} else {
+    void initMealPlanScreen();
 }
 
 function normalizeMeals(meals) {

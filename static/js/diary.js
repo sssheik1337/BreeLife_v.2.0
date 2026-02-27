@@ -55,6 +55,26 @@ function setProductsFormContext(context) {
     }
 }
 
+function bindSpaLinks(container) {
+    if (!window.__SPA_MODE__ || typeof window.spaNavigate !== 'function' || !container) {
+        return;
+    }
+    container.querySelectorAll('a[href^="/"]').forEach((link) => {
+        if (link.dataset.spaBound === 'true') {
+            return;
+        }
+        link.dataset.spaBound = 'true';
+        link.addEventListener('click', (event) => {
+            const href = link.getAttribute('href');
+            if (!href) {
+                return;
+            }
+            event.preventDefault();
+            window.spaNavigate(href);
+        });
+    });
+}
+
 
 function readDiaryEntries() {
     if (typeof window.getDiaryEntries === 'function') {
@@ -488,6 +508,7 @@ function renderDiaryList(entries) {
         });
         list.appendChild(button);
     }
+    bindSpaLinks(list);
 }
 
 function setDiaryLoadingState(isLoading) {
@@ -1976,14 +1997,18 @@ async function initDiary() {
     void refreshDiary();
 }
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
+window.initDiary = initDiary;
+
+if (!window.__SPA_MODE__) {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            void initDiary();
+        });
+    } else {
+        void initDiary();
+    }
+
+    window.addEventListener('load', () => {
         void initDiary();
     });
-} else {
-    void initDiary();
 }
-
-window.addEventListener('load', () => {
-    void initDiary();
-});

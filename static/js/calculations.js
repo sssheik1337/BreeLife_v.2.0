@@ -696,4 +696,20 @@ function computeTargets(profile, nowDate = null) {
     };
 }
 
-window.computeTargets = computeTargets;
+if (window.__SPA_MODE__ && window.__SPA_CALCULATIONS__) {
+    const bridge = window.__SPA_CALCULATIONS__;
+    window.calculateAge = bridge.calculateAge;
+    window.calculateBMR = bridge.calculateBMR;
+    window.calculateTDEE = bridge.calculateTDEE;
+    window.clamp = bridge.clamp;
+    window.validateGoalWeightConsistency = bridge.validateGoalWeightConsistency;
+    window.resolveAdaptiveRateLimit = bridge.resolveAdaptiveRateLimit;
+    window.applyCaloriesSafetyClamp = bridge.applyCaloriesSafetyClamp;
+    window.adjustCaloriesByWeeklyProgress = bridge.adjustCaloriesByWeeklyProgress;
+    window.calculateMacros = bridge.calculateMacros;
+    window.calculateWeightGoalForecast = bridge.calculateWeightGoalForecast;
+    window.computeTargets = bridge.computeTargets;
+    window.calculations = bridge.calculations;
+} else {
+    window.computeTargets = computeTargets;
+}

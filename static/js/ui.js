@@ -865,14 +865,43 @@ function getLocalProfileCompletedFlag() {
     return profile.is_completed === true;
 }
 
+function getSpaBasePath() {
+    const base = typeof window.__SPA_BASE__ === 'string' ? window.__SPA_BASE__ : '';
+    if (!base || base === '/') {
+        return '';
+    }
+    return base.endsWith('/') ? base.slice(0, -1) : base;
+}
+
+function getNormalizedPathname() {
+    const rawPath = window.location.pathname || '/';
+    const base = getSpaBasePath();
+    if (!base || !rawPath.startsWith(base)) {
+        return rawPath || '/';
+    }
+    const trimmed = rawPath.slice(base.length);
+    if (!trimmed) {
+        return '/';
+    }
+    return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+}
+
+function navigateReplace(path) {
+    if (window.__SPA_MODE__ && typeof window.spaReplace === 'function') {
+        window.spaReplace(path);
+        return;
+    }
+    window.location.replace(path);
+}
+
 function redirectToQuestionnaireIfNeeded(status) {
-    const path = window.location.pathname || '/';
+    const path = getNormalizedPathname();
     const serverCompleted = status?.profile_completed === true;
     const localCompleted = getLocalProfileCompletedFlag();
     const profileCompleted = serverCompleted || localCompleted;
     if (path === '/' || path === '/index') {
         if (profileCompleted) {
-            window.location.replace('/profile');
+            navigateReplace('/profile');
         }
         return;
     }
@@ -882,7 +911,7 @@ function redirectToQuestionnaireIfNeeded(status) {
         return;
     }
     if (!profileCompleted) {
-        window.location.replace('/questionnaire');
+        navigateReplace('/questionnaire');
     }
 }
 
@@ -890,7 +919,7 @@ function redirectFromMenuIfCompleted(profileCompleted) {
     if (!profileCompleted) {
         return;
     }
-    const path = window.location.pathname || '/';
+    const path = getNormalizedPathname();
     if (path.startsWith('/menu')) {
         // Для завершённого профиля не уводим пользователя из меню автоматически.
         return;
@@ -1091,15 +1120,13 @@ window.addEventListener('pageshow', () => {
     resetInitialScrollPosition();
 });
 
-// Initialize on page load (skip auto-init when running inside SPA shell).
-if (!window.__SPA_MODE__) {
-    document.addEventListener('DOMContentLoaded', async function() {
+async function initializeUiShell() {
     animatePageTransition();
     const appConfig = await loadAppConfig();
     window.appMode = appConfig?.mode || 'production';
     window.appIsDev = Boolean(appConfig?.is_dev);
     window.appDebug = Boolean(appConfig?.debug);
-    const currentPath = window.location.pathname || '/';
+    const currentPath = getNormalizedPathname();
     const isEntryPoint = currentPath === '/' || currentPath === '/index';
     const tg = window.Telegram?.WebApp;
     if (tg) {
@@ -1107,6 +1134,12 @@ if (!window.__SPA_MODE__) {
             tg.ready();
         }
         tg.expand();
+        if (typeof tg.disableVerticalSwipes === 'function') {
+            tg.disableVerticalSwipes();
+        }
+        if (isEntryPoint && typeof tg.isVersionAtLeast === 'function' && tg.isVersionAtLeast('8.0') && typeof tg.requestFullscreen === 'function') {
+            tg.requestFullscreen();
+        }
         requestAnimationFrame(() => {
             // После expand/layout в Telegram шапка может пересчитаться не сразу.
             applyHeaderHeight();
@@ -1226,5 +1259,13 @@ if (!window.__SPA_MODE__) {
     if (!userData.registrationDate) {
         userData.registrationDate = new Date().toISOString();
     }
+}
+
+window.initUiShell = initializeUiShell;
+
+// Initialize on page load (skip auto-init when running inside SPA shell).
+if (!window.__SPA_MODE__) {
+    document.addEventListener('DOMContentLoaded', () => {
+        void initializeUiShell();
     });
 }

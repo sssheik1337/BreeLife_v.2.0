@@ -1390,19 +1390,33 @@ async function loadProfileFromServer() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initProfileScreen() {
     const navigateToDiary = (event, link) => {
         if (!link) {
             return;
         }
-        event.preventDefault();
         const target = link.getAttribute('href') || '/diary';
+        if (typeof window.spaNavigate === 'function') {
+            if (event?.preventDefault) {
+                event.preventDefault();
+            }
+            window.spaNavigate(target);
+            return;
+        }
+        if (event?.preventDefault) {
+            event.preventDefault();
+        }
         window.location.href = target;
     };
 
     document.addEventListener(
         'click',
         (event) => {
+            const diaryLink = event.target.closest('a[href^="/diary"]');
+            if (diaryLink) {
+                navigateToDiary(event, diaryLink);
+                return;
+            }
             const quickActionLink = event.target.closest('.quick-actions a[href^="/diary"]');
             if (quickActionLink) {
                 navigateToDiary(event, quickActionLink);
@@ -1474,4 +1488,13 @@ document.addEventListener('DOMContentLoaded', () => {
         renderWeeklyAdjustments();
         renderWeeklyReview();
     })();
-});
+}
+
+if (typeof window !== 'undefined') {
+    window.initProfileScreen = initProfileScreen;
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initProfileScreen);
+} else {
+    initProfileScreen();
+}

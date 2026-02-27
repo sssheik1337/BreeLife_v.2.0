@@ -83,6 +83,10 @@ function initReminderControls() {
     if (!container) {
         return;
     }
+    if (container.dataset.remindersInitialized === 'true') {
+        return;
+    }
+    container.dataset.remindersInitialized = 'true';
     const settings = getReminderSettings();
 
     const toggleInputs = container.querySelectorAll('[data-reminder-toggle]');
@@ -156,9 +160,26 @@ function initReminderControls() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
+async function initRemindersScreen() {
     if (typeof window.syncProfileWithBackend === 'function') {
         await window.syncProfileWithBackend();
     }
     initReminderControls();
-});
+}
+
+function shouldAutoInitReminders() {
+    return !(window && window.__SPA_MODE__);
+}
+
+window.initReminderControls = initReminderControls;
+window.initRemindersScreen = initRemindersScreen;
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        if (shouldAutoInitReminders()) {
+            void initRemindersScreen();
+        }
+    });
+} else if (shouldAutoInitReminders()) {
+    void initRemindersScreen();
+}

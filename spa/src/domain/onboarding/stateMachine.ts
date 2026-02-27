@@ -102,7 +102,7 @@ export const evaluateOnboardingState = (
         };
     }
 
-    if (!profileCompleted && !QUESTIONNAIRE_ROUTES.has(path) && !PREFERENCES_ROUTES.has(path)) {
+    if (!profileCompleted && !QUESTIONNAIRE_ROUTES.has(path) && !PREFERENCES_ROUTES.has(path) && !ENTRY_ROUTES.has(path)) {
         return {
             allow: false,
             redirectTo: '/questionnaire',

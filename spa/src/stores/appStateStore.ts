@@ -1,5 +1,7 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
+import { useStorageStore } from './storageStore';
+import type { DiaryEntryState, HabitEntriesState, ProfileState } from '../storage/storageTypes';
 
 /**
  * Снимок авторизации пользователя с бэкенда.
@@ -19,17 +21,7 @@ export interface ServerUserState {
  * Текущий формат профиля совместим с legacy-структурой,
  * поэтому не ограничиваем схему жёстко на этом этапе миграции.
  */
-export type ProfileState = Record<string, unknown>;
-
-/**
- * Текущий формат записи дневника совместим с legacy-структурой.
- */
-export type DiaryEntryState = Record<string, unknown>;
-
-/**
- * Текущий формат записи привычек совместим с legacy-структурой.
- */
-export type HabitEntryState = Record<string, unknown>;
+export type { ProfileState, DiaryEntryState, HabitEntriesState as HabitEntryState } from '../storage/storageTypes';
 
 const DEFAULT_SERVER_USER: ServerUserState = {
     authorized: false,
@@ -45,9 +37,10 @@ const DEFAULT_SERVER_USER: ServerUserState = {
  * Единый Pinia-store для ключевого состояния приложения на этапе SPA-миграции.
  */
 export const useAppStateStore = defineStore('appState', () => {
-    const profile = ref<ProfileState>({});
-    const diaryEntries = ref<DiaryEntryState[]>([]);
-    const habitEntries = ref<HabitEntryState[]>([]);
+    const storageStore = useStorageStore();
+    const profile = storageStore.profile;
+    const diaryEntries = storageStore.diaryEntries;
+    const habitEntries = storageStore.habitEntries;
     const serverUser = ref<ServerUserState>({ ...DEFAULT_SERVER_USER });
     const profileCompleted = ref(false);
 
@@ -57,21 +50,21 @@ export const useAppStateStore = defineStore('appState', () => {
      * Обновляет профиль без изменения ключей payload.
      */
     const setProfile = (nextProfile: ProfileState | null | undefined): void => {
-        profile.value = nextProfile && typeof nextProfile === 'object' ? { ...nextProfile } : {};
+        storageStore.setUserProfile(nextProfile || {});
     };
 
     /**
      * Обновляет записи дневника с копированием массива.
      */
     const setDiaryEntries = (entries: DiaryEntryState[] | null | undefined): void => {
-        diaryEntries.value = Array.isArray(entries) ? entries.map((entry) => ({ ...entry })) : [];
+        storageStore.setDiaryEntries(entries || []);
     };
 
     /**
      * Обновляет записи привычек с копированием массива.
      */
-    const setHabitEntries = (entries: HabitEntryState[] | null | undefined): void => {
-        habitEntries.value = Array.isArray(entries) ? entries.map((entry) => ({ ...entry })) : [];
+    const setHabitEntries = (entries: HabitEntryState | null | undefined): void => {
+        storageStore.setHabitEntries(entries || {});
     };
 
     /**
@@ -82,6 +75,7 @@ export const useAppStateStore = defineStore('appState', () => {
             ...DEFAULT_SERVER_USER,
             ...(nextServerUser || {})
         };
+        (window as any).serverUser = { ...serverUser.value };
     };
 
     /**
@@ -89,6 +83,7 @@ export const useAppStateStore = defineStore('appState', () => {
      */
     const setProfileCompleted = (value: unknown): void => {
         profileCompleted.value = value === true;
+        (window as any).profileCompleted = profileCompleted.value;
     };
 
     /**
@@ -105,14 +100,14 @@ export const useAppStateStore = defineStore('appState', () => {
         if (typeof legacy.getUserProfile === 'function') {
             const snapshot = legacy.getUserProfile();
             if (snapshot && typeof snapshot === 'object') {
-                setProfile(snapshot as ProfileState);
+                storageStore.setUserProfile(snapshot as ProfileState);
             }
         }
         if (typeof legacy.getDiaryEntries === 'function') {
-            setDiaryEntries(legacy.getDiaryEntries() as DiaryEntryState[]);
+            storageStore.setDiaryEntries(legacy.getDiaryEntries() as DiaryEntryState[]);
         }
         if (typeof legacy.getHabitEntries === 'function') {
-            setHabitEntries(legacy.getHabitEntries() as HabitEntryState[]);
+            storageStore.setHabitEntries(legacy.getHabitEntries() as HabitEntryState);
         }
     };
 

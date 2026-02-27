@@ -212,6 +212,13 @@ const resolveApiFetch = (): typeof fetch => {
     return window.fetch.bind(window);
 };
 
+const loadLocalProfile = (): ProfileState | null => {
+    const candidate = typeof (window as any).getUserProfile === 'function'
+        ? (window as any).getUserProfile()
+        : null;
+    return candidate && typeof candidate === 'object' ? (candidate as ProfileState) : null;
+};
+
 const loadSessionStatus = async (): Promise<SessionStatusPayload> => {
     const fetcher = resolveApiFetch();
     const response = await fetcher('/api/me/status');
@@ -227,9 +234,13 @@ const loadSessionStatus = async (): Promise<SessionStatusPayload> => {
         };
     }
     const data = await response.json();
+    const legacyCompleted = typeof (window as any).getProfileCompleted === 'function'
+        ? (window as any).getProfileCompleted() === true
+        : false;
+    const localCompleted = legacyCompleted || (window as any).profileCompleted === true;
     return {
         authorized: data?.authorized === true,
-        profile_completed: data?.profile_completed === true,
+        profile_completed: data?.profile_completed === true || localCompleted,
         telegram_user_id: typeof data?.telegram_user_id === 'number' ? data.telegram_user_id : null,
         first_name: typeof data?.first_name === 'string' ? data.first_name : null,
         last_name: typeof data?.last_name === 'string' ? data.last_name : null,
@@ -240,12 +251,45 @@ const loadSessionStatus = async (): Promise<SessionStatusPayload> => {
 
 const loadProfileForGuards = async (): Promise<ProfileState | null> => {
     const fetcher = resolveApiFetch();
-    const response = await fetcher('/api/profile');
-    if (!response.ok) {
-        return null;
+    let serverProfile: ProfileState | null = null;
+    try {
+        const response = await fetcher('/api/profile');
+        if (response.ok) {
+            const data = await response.json();
+            serverProfile = data && typeof data === 'object' ? (data as ProfileState) : null;
+        }
+    } catch {
+        serverProfile = null;
     }
-    const data = await response.json();
-    return data && typeof data === 'object' ? (data as ProfileState) : null;
+
+    const localProfile = loadLocalProfile();
+    if (serverProfile && localProfile) {
+        if (localProfile.is_completed === true && serverProfile.is_completed !== true) {
+            serverProfile = { ...serverProfile, is_completed: true };
+        }
+        if (
+            localProfile.preferences_onboarding_completed === true
+            && serverProfile.preferences_onboarding_completed !== true
+        ) {
+            serverProfile = { ...serverProfile, preferences_onboarding_completed: true };
+        }
+        if (
+            Array.isArray(localProfile.favorite_product_ids)
+            && localProfile.favorite_product_ids.length
+            && (!Array.isArray(serverProfile.favorite_product_ids) || !serverProfile.favorite_product_ids.length)
+        ) {
+            serverProfile = { ...serverProfile, favorite_product_ids: [...localProfile.favorite_product_ids] };
+        }
+        if (
+            Array.isArray(localProfile.excluded_product_ids)
+            && localProfile.excluded_product_ids.length
+            && (!Array.isArray(serverProfile.excluded_product_ids) || !serverProfile.excluded_product_ids.length)
+        ) {
+            serverProfile = { ...serverProfile, excluded_product_ids: [...localProfile.excluded_product_ids] };
+        }
+    }
+
+    return serverProfile || localProfile;
 };
 
 const DEFAULT_ROLLOUT_CONFIG: SpaRolloutConfig = {
@@ -300,6 +344,7 @@ const buildGuardContext = async (to: RouteLocationNormalized): Promise<RouterGua
     const needsProfile = Boolean(
         to.meta.onboardingStep
         || to.meta.requiresProductsOnboarding
+        || to.path === '/questionnaire'
         || to.path === '/profile'
         || to.path === '/trial-start'
     );
@@ -365,6 +410,17 @@ router.beforeEach(async (to: RouteLocationNormalized, _from: RouteLocationNormal
         next();
     } catch {
         next();
+    }
+});
+
+router.afterEach(() => {
+    // Reset scroll position on each SPA navigation.
+    if (typeof window.scrollTo === 'function') {
+        window.scrollTo(0, 0);
+    }
+    const scroller = document.querySelector('.app-content');
+    if (scroller) {
+        scroller.scrollTop = 0;
     }
 });
 

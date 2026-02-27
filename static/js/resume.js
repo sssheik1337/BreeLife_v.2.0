@@ -1643,12 +1643,63 @@ async function saveAndContinue(profile) {
     }
 
     setTimeout(() => {
-        window.location.href = '/profile';
+        navigateToResumePath('/profile', { replace: false });
     }, 600);
 }
 
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', async function() {
+function buildResumeSpaFallbackTarget(path) {
+    const spaBase = typeof window.__SPA_BASE__ === 'string' ? window.__SPA_BASE__ : '';
+    if (!spaBase || typeof path !== 'string') {
+        return path;
+    }
+    if (path === '/') {
+        return `${spaBase}/`;
+    }
+    if (path.startsWith(`${spaBase}/`) || path === spaBase) {
+        return path;
+    }
+    if (path.startsWith('/')) {
+        return `${spaBase}${path}`;
+    }
+    return `${spaBase}/${path}`;
+}
+
+function navigateToResumePath(path, options = {}) {
+    const shouldReplace = options.replace === true;
+    if (shouldReplace && typeof window.spaReplace === 'function') {
+        window.spaReplace(path);
+        return;
+    }
+    if (!shouldReplace && typeof window.spaNavigate === 'function') {
+        window.spaNavigate(path);
+        return;
+    }
+    const fallbackTarget = buildResumeSpaFallbackTarget(path);
+    if (shouldReplace) {
+        window.location.replace(fallbackTarget);
+        return;
+    }
+    window.location.href = fallbackTarget;
+}
+
+function attachResumeSpaLink(link, options = {}) {
+    if (!link || link.dataset.spaBound === 'true') {
+        return;
+    }
+    link.dataset.spaBound = 'true';
+    link.addEventListener('click', (event) => {
+        const target = link.getAttribute('href');
+        if (!target) {
+            return;
+        }
+        if (typeof window.spaNavigate === 'function' || typeof window.spaReplace === 'function') {
+            event.preventDefault();
+            navigateToResumePath(target, options);
+        }
+    });
+}
+
+async function initResumeScreen() {
     if (window.serverUser?.authorized !== true && typeof loadProfileStatus === 'function') {
         const status = await loadProfileStatus();
         window.serverUser = {
@@ -1693,4 +1744,21 @@ document.addEventListener('DOMContentLoaded', async function() {
             saveAndContinue(resolvedProfile);
         });
     }
-});
+
+    const progressButton = document.getElementById('resume-go-progress-button');
+    if (progressButton) {
+        attachResumeSpaLink(progressButton, { replace: false });
+    }
+    document.querySelectorAll('a[href^="/questionnaire"]').forEach((link) => {
+        attachResumeSpaLink(link, { replace: false });
+    });
+}
+
+if (typeof window !== 'undefined') {
+    window.initResumeScreen = initResumeScreen;
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initResumeScreen);
+} else {
+    initResumeScreen();
+}

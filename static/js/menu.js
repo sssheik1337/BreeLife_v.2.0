@@ -4,11 +4,15 @@ const PLANS_ENDPOINT = '/api/plans';
 let cachedPlans = [];
 let activePlan = 'free';
 
-document.addEventListener('DOMContentLoaded', () => {
+async function initPlansScreen() {
   const container = document.getElementById('plans-container');
   if (!container) {
     return;
   }
+  if (container.dataset.plansInitialized === 'true') {
+    return;
+  }
+  container.dataset.plansInitialized = 'true';
 
   container.textContent = 'Загрузка тарифов...';
 
@@ -26,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .catch(() => {
       container.textContent = 'Не удалось загрузить тарифы.';
     });
-});
+}
 
 function renderPlans(container, plans) {
   container.innerHTML = '';
@@ -103,4 +107,20 @@ function createPlanCard(plan) {
   }
 
   return card;
+}
+
+function shouldAutoInitPlans() {
+  return !(window && window.__SPA_MODE__);
+}
+
+window.initPlansScreen = initPlansScreen;
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    if (shouldAutoInitPlans()) {
+      initPlansScreen();
+    }
+  });
+} else if (shouldAutoInitPlans()) {
+  initPlansScreen();
 }

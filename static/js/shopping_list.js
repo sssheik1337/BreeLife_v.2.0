@@ -11,7 +11,7 @@ const SHOPPING_MEAL_DISTRIBUTION = [
     { key: 'dinner', title: 'Ужин', share: 0.3, items: 3 }
 ];
 
-document.addEventListener('DOMContentLoaded', () => {
+function initShoppingListScreen() {
     const container = document.getElementById('shopping-list-container');
     if (!container) {
         return;
@@ -32,7 +32,16 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(() => {
             container.textContent = 'Не удалось загрузить список покупок.';
         });
-});
+}
+
+if (typeof window !== 'undefined') {
+    window.initShoppingListScreen = initShoppingListScreen;
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initShoppingListScreen);
+} else {
+    initShoppingListScreen();
+}
 
 function initShoppingList(container, products) {
     const rangeButtons = Array.from(document.querySelectorAll('[data-shopping-range]'));
