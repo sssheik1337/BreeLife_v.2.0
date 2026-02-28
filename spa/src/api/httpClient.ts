@@ -30,7 +30,6 @@ export interface ApiClientConfig {
 
 declare global {
     interface Window {
-        apiFetch?: typeof fetch;
         telegramInitData?: string;
         Telegram?: {
             WebApp?: {
@@ -44,9 +43,6 @@ const resolveFetch = (config?: ApiClientConfig): typeof fetch => {
     if (config?.fetchImpl) {
         return config.fetchImpl;
     }
-    if (typeof window !== 'undefined' && typeof window.apiFetch === 'function') {
-        return window.apiFetch.bind(window);
-    }
     return fetch.bind(globalThis);
 };
 
@@ -54,6 +50,11 @@ const resolveTelegramInitData = (): string => {
     if (typeof window === 'undefined') {
         return '';
     }
+    // Telegram initData source is fixed:
+    // 1) window.telegramInitData cache (preferred),
+    // 2) Telegram.WebApp.initData direct read if cache is empty.
+    // If both are empty (early SPA init / non-Telegram env), request is sent without header.
+    // No waiting/guard fallback is used to preserve legacy request semantics.
     const fromWindow = typeof window.telegramInitData === 'string' ? window.telegramInitData.trim() : '';
     if (fromWindow) {
         return fromWindow;
@@ -61,6 +62,9 @@ const resolveTelegramInitData = (): string => {
     const fromTelegram = typeof window.Telegram?.WebApp?.initData === 'string'
         ? window.Telegram.WebApp.initData.trim()
         : '';
+    if (fromTelegram) {
+        window.telegramInitData = fromTelegram;
+    }
     return fromTelegram;
 };
 

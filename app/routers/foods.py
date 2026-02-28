@@ -4,12 +4,16 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from config import AI_ENABLED
 from app.context import templates
 from app.dependencies import get_profile_and_admin_config, has_products_onboarding_data, optional_current_user, require_completed_profile
+from app.spa_rollout import maybe_redirect_to_spa_shell
 
 router = APIRouter()
 
 
 @router.get("/foods", response_class=HTMLResponse)
 async def foods(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    spa_redirect = maybe_redirect_to_spa_shell(request)
+    if spa_redirect:
+        return spa_redirect
     payload = get_profile_and_admin_config(telegram_user_id)
     if telegram_user_id is None:
         return templates.TemplateResponse(
@@ -25,6 +29,9 @@ async def foods(request: Request, telegram_user_id: int | None = Depends(optiona
 
 @router.get("/my-products", response_class=HTMLResponse)
 async def my_products(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    spa_redirect = maybe_redirect_to_spa_shell(request)
+    if spa_redirect:
+        return spa_redirect
     payload = get_profile_and_admin_config(telegram_user_id)
     if telegram_user_id is None:
         return templates.TemplateResponse(
@@ -40,6 +47,9 @@ async def my_products(request: Request, telegram_user_id: int | None = Depends(o
 
 @router.get("/meal-plan", response_class=HTMLResponse)
 async def meal_plan(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    spa_redirect = maybe_redirect_to_spa_shell(request)
+    if spa_redirect:
+        return spa_redirect
     payload = get_profile_and_admin_config(telegram_user_id)
     if telegram_user_id is None:
         return templates.TemplateResponse(
@@ -58,6 +68,9 @@ async def meal_plan(request: Request, telegram_user_id: int | None = Depends(opt
 
 @router.get("/shopping-list", response_class=HTMLResponse)
 async def shopping_list(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    spa_redirect = maybe_redirect_to_spa_shell(request)
+    if spa_redirect:
+        return spa_redirect
     payload = get_profile_and_admin_config(telegram_user_id)
     if telegram_user_id is None:
         return templates.TemplateResponse(

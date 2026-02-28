@@ -18,6 +18,7 @@ from config import (
     SPA_PHASE_4_ENABLED,
 )
 from app.context import TELEGRAM_SESSION_COOKIE, load_admin_config, load_plans_config, templates
+from app.spa_rollout import maybe_redirect_to_spa_shell
 from services.storage_db import get_session_user, read_payload
 
 router = APIRouter()
@@ -25,6 +26,9 @@ router = APIRouter()
 
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
+    spa_redirect = maybe_redirect_to_spa_shell(request)
+    if spa_redirect:
+        return spa_redirect
     if IS_PROD and not DEBUG:
         return templates.TemplateResponse(
             "index.html",

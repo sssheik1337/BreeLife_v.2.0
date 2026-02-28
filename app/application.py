@@ -9,13 +9,9 @@ from fastapi.staticfiles import StaticFiles
 from config import (
     APP_NAME,
     SPA_ENABLED,
-    SPA_PRIMARY_ROUTES_TO_SHELL_ENABLED,
-    SPA_PHASE_1_ENABLED,
-    SPA_PHASE_2_ENABLED,
-    SPA_PHASE_3_ENABLED,
-    SPA_PHASE_4_ENABLED,
 )
 from app.lifespan import lifespan
+from app.spa_rollout import build_spa_shell_url, should_route_to_spa_shell
 from app.routers import (
     admin,
     ai,
@@ -35,59 +31,6 @@ from app.routers import (
 from services.storage_db import init_db
 
 logging.basicConfig(level=logging.DEBUG)
-
-SPA_PHASE_1_ROUTES = {
-    '/',
-    '/index',
-    '/menu',
-    '/support',
-    '/references',
-    '/plans',
-    '/settings/reminders',
-}
-
-SPA_PHASE_2_ROUTES = {
-    '/foods',
-    '/my-products',
-    '/shopping-list',
-    '/trial-start',
-    '/preferences-onboarding-choice',
-    '/preferences-onboarding',
-}
-
-SPA_PHASE_3_ROUTES = {
-    '/questionnaire',
-    '/resume',
-    '/meal-plan',
-}
-
-SPA_PHASE_4_ROUTES = {
-    '/profile',
-    '/profile.html',
-    '/diary',
-    '/food-diary',
-}
-
-PRIMARY_SPA_ROUTES = (
-    SPA_PHASE_1_ROUTES
-    | SPA_PHASE_2_ROUTES
-    | SPA_PHASE_3_ROUTES
-    | SPA_PHASE_4_ROUTES
-)
-
-
-def is_spa_route_enabled(path: str) -> bool:
-    if path in SPA_PHASE_1_ROUTES:
-        return SPA_PHASE_1_ENABLED
-    if path in SPA_PHASE_2_ROUTES:
-        return SPA_PHASE_2_ENABLED
-    if path in SPA_PHASE_3_ROUTES:
-        return SPA_PHASE_3_ENABLED
-    if path in SPA_PHASE_4_ROUTES:
-        return SPA_PHASE_4_ENABLED
-    return False
-
-
 
 def create_app() -> FastAPI:
     app = FastAPI(title=APP_NAME, lifespan=lifespan)
@@ -118,19 +61,18 @@ def create_app() -> FastAPI:
 
     @app.middleware('http')
     async def redirect_primary_routes_to_spa_shell(request, call_next):
-        if not (SPA_ENABLED and SPA_PRIMARY_ROUTES_TO_SHELL_ENABLED):
+        if not SPA_ENABLED:
             return await call_next(request)
 
         request_path = request.url.path or '/'
-        if request.method != 'GET' or request_path not in PRIMARY_SPA_ROUTES:
+        if request.method != 'GET':
             return await call_next(request)
 
-        if not is_spa_route_enabled(request_path):
+        if not should_route_to_spa_shell(request_path):
             return await call_next(request)
 
         # Админ-часть и API остаются вне автоматического редиректа до отдельной миграции.
-        query_string = f"?{request.url.query}" if request.url.query else ''
-        return RedirectResponse(url=f'/app{request_path}{query_string}', status_code=307)
+        return RedirectResponse(url=build_spa_shell_url(request_path, request.url.query or ''), status_code=307)
 
     app.mount('/static', StaticFiles(directory='static'), name='static')
     # Раздаём локальные файлы шрифтов по URL /fonts, чтобы @font-face не получал 404.

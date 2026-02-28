@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from config import AI_ENABLED
 from app.context import templates
 from app.dependencies import get_profile_and_admin_config, load_profile, optional_current_user, require_completed_profile
+from app.spa_rollout import maybe_redirect_to_spa_shell
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -12,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 @router.get("/menu", response_class=HTMLResponse)
 async def menu(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    spa_redirect = maybe_redirect_to_spa_shell(request)
+    if spa_redirect:
+        return spa_redirect
     payload = get_profile_and_admin_config(telegram_user_id)
     if telegram_user_id is None:
         return templates.TemplateResponse(
@@ -27,6 +31,9 @@ async def menu(request: Request, telegram_user_id: int | None = Depends(optional
 
 @router.get("/references", response_class=HTMLResponse)
 async def references(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    spa_redirect = maybe_redirect_to_spa_shell(request)
+    if spa_redirect:
+        return spa_redirect
     payload = get_profile_and_admin_config(telegram_user_id)
     if telegram_user_id is None:
         return templates.TemplateResponse(
@@ -42,6 +49,9 @@ async def references(request: Request, telegram_user_id: int | None = Depends(op
 
 @router.get("/support", response_class=HTMLResponse)
 async def support(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    spa_redirect = maybe_redirect_to_spa_shell(request)
+    if spa_redirect:
+        return spa_redirect
     payload = get_profile_and_admin_config(telegram_user_id)
     if telegram_user_id is None:
         return templates.TemplateResponse(
@@ -57,6 +67,9 @@ async def support(request: Request, telegram_user_id: int | None = Depends(optio
 
 @router.get("/plans", response_class=HTMLResponse)
 async def plans(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    spa_redirect = maybe_redirect_to_spa_shell(request)
+    if spa_redirect:
+        return spa_redirect
     payload = get_profile_and_admin_config(telegram_user_id)
     if telegram_user_id is None:
         return templates.TemplateResponse(
@@ -72,6 +85,9 @@ async def plans(request: Request, telegram_user_id: int | None = Depends(optiona
 
 @router.get("/settings/reminders", response_class=HTMLResponse)
 async def reminders_settings(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    spa_redirect = maybe_redirect_to_spa_shell(request)
+    if spa_redirect:
+        return spa_redirect
     payload = get_profile_and_admin_config(telegram_user_id)
     if telegram_user_id is None:
         return templates.TemplateResponse(
@@ -89,6 +105,9 @@ async def reminders_settings(request: Request, telegram_user_id: int | None = De
 
 @router.get("/preferences-onboarding-choice", response_class=HTMLResponse)
 async def preferences_onboarding_choice(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    spa_redirect = maybe_redirect_to_spa_shell(request)
+    if spa_redirect:
+        return spa_redirect
     payload = get_profile_and_admin_config(telegram_user_id)
     if telegram_user_id is None:
         return templates.TemplateResponse(
@@ -108,6 +127,9 @@ async def preferences_onboarding_choice(request: Request, telegram_user_id: int 
 
 @router.get("/preferences-onboarding", response_class=HTMLResponse)
 async def preferences_onboarding(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
+    spa_redirect = maybe_redirect_to_spa_shell(request)
+    if spa_redirect:
+        return spa_redirect
     payload = get_profile_and_admin_config(telegram_user_id)
     if telegram_user_id is None:
         return templates.TemplateResponse(

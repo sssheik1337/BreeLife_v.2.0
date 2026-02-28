@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type NavigationGuardNext, type RouteLocationNormalized, type RouteRecordRaw } from 'vue-router';
 import { useAppStateStore, type ProfileState } from '../stores/appStateStore';
+import { useStorageStore } from '../stores/storageStore';
 import { createOnboardingDebugLogger, evaluateOnboardingState } from '../domain/onboarding';
 import EntryPage from '../pages/EntryPage.vue';
 import QuestionnairePage from '../pages/QuestionnairePage.vue';
@@ -200,27 +201,55 @@ const routes: RouteRecordRaw[] = [
     }
 ];
 
+const resetSpaScrollPosition = (): void => {
+    if (typeof window.scrollTo === 'function') {
+        window.scrollTo(0, 0);
+    }
+    const scroller = document.querySelector('.app-content');
+    if (scroller) {
+        scroller.scrollTop = 0;
+    }
+};
+
 const router = createRouter({
     history: createWebHistory('/app'),
-    routes
+    routes,
+    scrollBehavior(to, _from, savedPosition) {
+        if (savedPosition) {
+            return savedPosition;
+        }
+        if (to.hash) {
+            return {
+                el: to.hash,
+                behavior: 'auto'
+            };
+        }
+        return {
+            left: 0,
+            top: 0,
+            behavior: 'auto'
+        };
+    }
 });
 
 const resolveApiFetch = (): typeof fetch => {
-    if (typeof window.apiFetch === 'function') {
-        return window.apiFetch;
+    const storageStore = useStorageStore();
+    if (typeof storageStore.apiFetch === 'function') {
+        return storageStore.apiFetch;
     }
     return window.fetch.bind(window);
 };
 
 const loadLocalProfile = (): ProfileState | null => {
-    const candidate = typeof (window as any).getUserProfile === 'function'
-        ? (window as any).getUserProfile()
-        : null;
-    return candidate && typeof candidate === 'object' ? (candidate as ProfileState) : null;
+    const storageStore = useStorageStore();
+    const snapshot = storageStore.getUserProfile();
+    return snapshot && typeof snapshot === 'object' ? (snapshot as ProfileState) : null;
 };
 
 const loadSessionStatus = async (): Promise<SessionStatusPayload> => {
     const fetcher = resolveApiFetch();
+    const storageStore = useStorageStore();
+    const appStateStore = useAppStateStore();
     const response = await fetcher('/api/me/status');
     if (!response.ok) {
         return {
@@ -234,10 +263,7 @@ const loadSessionStatus = async (): Promise<SessionStatusPayload> => {
         };
     }
     const data = await response.json();
-    const legacyCompleted = typeof (window as any).getProfileCompleted === 'function'
-        ? (window as any).getProfileCompleted() === true
-        : false;
-    const localCompleted = legacyCompleted || (window as any).profileCompleted === true;
+    const localCompleted = appStateStore.profileCompleted === true || storageStore.profile?.is_completed === true;
     return {
         authorized: data?.authorized === true,
         profile_completed: data?.profile_completed === true || localCompleted,
@@ -327,13 +353,6 @@ const loadRolloutConfig = async (): Promise<SpaRolloutConfig> => {
     return cachedRolloutConfig;
 };
 
-const isPhaseEnabled = (phase: 1 | 2 | 3 | 4, rollout: SpaRolloutConfig): boolean => {
-    if (phase === 1) return rollout.phase_1_enabled;
-    if (phase === 2) return rollout.phase_2_enabled;
-    if (phase === 3) return rollout.phase_3_enabled;
-    return rollout.phase_4_enabled;
-};
-
 const redirectToLegacyRoute = (targetPath: string): void => {
     window.location.replace(targetPath);
 };
@@ -377,12 +396,6 @@ router.beforeEach(async (to: RouteLocationNormalized, _from: RouteLocationNormal
             return;
         }
 
-        const phase = to.meta.migrationPhase as (1 | 2 | 3 | 4 | undefined);
-        if (phase && !isPhaseEnabled(phase, rollout)) {
-            redirectToLegacyRoute(to.path);
-            return;
-        }
-
         const onboardingDecision = evaluateOnboardingState(
             {
                 path: to.path,
@@ -414,14 +427,7 @@ router.beforeEach(async (to: RouteLocationNormalized, _from: RouteLocationNormal
 });
 
 router.afterEach(() => {
-    // Reset scroll position on each SPA navigation.
-    if (typeof window.scrollTo === 'function') {
-        window.scrollTo(0, 0);
-    }
-    const scroller = document.querySelector('.app-content');
-    if (scroller) {
-        scroller.scrollTop = 0;
-    }
+    resetSpaScrollPosition();
 });
 
 export default router;
