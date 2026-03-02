@@ -76,6 +76,10 @@ export const useAppStateStore = defineStore('appState', () => {
             ...(nextServerUser || {})
         };
         (window as any).serverUser = { ...serverUser.value };
+        const hasProfileCompletedField = nextServerUser && Object.prototype.hasOwnProperty.call(nextServerUser, 'profile_completed');
+        if (hasProfileCompletedField) {
+            setProfileCompleted(serverUser.value.profile_completed === true);
+        }
     };
 
     /**
@@ -84,6 +88,17 @@ export const useAppStateStore = defineStore('appState', () => {
     const setProfileCompleted = (value: unknown): void => {
         profileCompleted.value = value === true;
         (window as any).profileCompleted = profileCompleted.value;
+        if (typeof window.dispatchEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('profile-status-updated', {
+                detail: {
+                    profileCompleted: profileCompleted.value,
+                    first_name: serverUser.value.first_name ?? null,
+                    last_name: serverUser.value.last_name ?? null,
+                    username: serverUser.value.username ?? null,
+                    photo_url: serverUser.value.photo_url ?? null
+                }
+            }));
+        }
     };
 
     /**

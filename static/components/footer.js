@@ -1,4 +1,4 @@
-class CustomFooter extends HTMLElement {
+﻿class CustomFooter extends HTMLElement {
   connectedCallback() {
     this.attachShadow({ mode: 'open' });
     this.shadowRoot.innerHTML = `
@@ -8,7 +8,7 @@ class CustomFooter extends HTMLElement {
         }
 
         .footer {
-          margin-top: auto;
+          margin-top: 0;
           padding: 2rem 1.5rem 1.5rem;
           background: white;
           border-top: 1px solid #f1f5f9;
@@ -41,7 +41,7 @@ class CustomFooter extends HTMLElement {
         }
 
         .bottom-spacer {
-          height: 96px;
+          height: 0;
         }
 
         .bottom-nav {
@@ -49,7 +49,7 @@ class CustomFooter extends HTMLElement {
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(255, 255, 255, 0.98);
+          background: #ffffff;
           border-top: 1px solid #e2e8f0;
           box-shadow: 0 -6px 20px rgba(15, 23, 42, 0.08);
           padding: 0.5rem 1rem 0.75rem;
@@ -170,18 +170,18 @@ class CustomFooter extends HTMLElement {
         }
       </style>
 
-      <div class="bottom-spacer" aria-hidden="true"></div>
-      
       <footer class="footer">
         <div class="footer-content">
           <p class="footer-text">
-            🌱 Посадите здоровье сегодня, расцветёте завтра. Делайте маленькие шаги каждый день к более здоровому себе.
+            🌱 Посадите здоровье сегодня, расцветете завтра. Делайте маленькие шаги каждый день к более здоровому себе.
           </p>
           <div class="copyright">
             © ${new Date().getFullYear()} Health Bloom • Сделано с ❤️ для здоровой жизни
           </div>
         </div>
       </footer>
+
+      <div class="bottom-spacer" aria-hidden="true"></div>
 
       <nav class="bottom-nav" aria-label="Основная навигация">
         <div class="bottom-nav__inner">
@@ -346,8 +346,8 @@ class CustomFooter extends HTMLElement {
         if (isDisabled) {
           return;
         }
-        // На любой странице сначала открываем интерактивное меню,
-        // не переводя пользователя на экран дневника автоматически.
+        // РќР° Р»СЋР±РѕР№ СЃС‚СЂР°РЅРёС†Рµ СЃРЅР°С‡Р°Р»Р° РѕС‚РєСЂС‹РІР°РµРј РёРЅС‚РµСЂР°РєС‚РёРІРЅРѕРµ РјРµРЅСЋ,
+        // РЅРµ РїРµСЂРµРІРѕРґСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РЅР° СЌРєСЂР°РЅ РґРЅРµРІРЅРёРєР° Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё.
         toggleFabMenu();
       });
     }
@@ -405,6 +405,11 @@ class CustomFooter extends HTMLElement {
           return;
         }
 
+        const normalizedTarget = normalizeSpaTarget(target);
+        if (normalizedTarget) {
+          window.__SPA_CURRENT_PATH__ = normalizedTarget;
+        }
+        updateActiveBottomLink();
         event.preventDefault();
         navigateTo(target);
       });
@@ -416,34 +421,74 @@ class CustomFooter extends HTMLElement {
       applyBottomNavState(profileCompleted);
     });
 
-    const currentPath = window.location.pathname || '/';
-    const currentHash = window.location.hash || '';
-    if (!hasCompletedProfile && currentPath.startsWith('/questionnaire')) {
+    const resolveCurrentPath = () => {
+      const runtimePath = typeof window.__SPA_CURRENT_PATH__ === 'string' ? window.__SPA_CURRENT_PATH__ : '';
+      if (runtimePath.startsWith('/')) {
+        return runtimePath === '/app' ? '/' : (runtimePath.startsWith('/app/') ? runtimePath.slice(4) : runtimePath);
+      }
+      const rawPath = window.location.pathname || '/';
+      const fromPathname = rawPath === '/app' ? '/' : (rawPath.startsWith('/app/') ? rawPath.slice(4) : rawPath);
+      if (fromPathname !== '/') {
+        return fromPathname;
+      }
+      const hash = window.location.hash || '';
+      if (hash.startsWith('#/')) {
+        return hash.slice(1);
+      }
+      return fromPathname;
+    };
+
+    const updateBottomNavVisibility = () => {
+      const currentPath = resolveCurrentPath();
+      const shouldHide = !hasCompletedProfile && currentPath.startsWith('/questionnaire');
       if (bottomNav) {
-        bottomNav.style.display = 'none';
+        bottomNav.style.display = shouldHide ? 'none' : '';
       }
       if (bottomSpacer) {
-        bottomSpacer.style.height = '0';
+        bottomSpacer.style.height = shouldHide ? '0' : '0';
       }
-    }
-    let activeKey = 'progress';
-    if (currentPath.startsWith('/resume')) {
-      activeKey = 'profile';
-    } else if (currentPath.startsWith('/diary')) {
-      activeKey = 'diary';
-    } else if (currentPath.startsWith('/meal-plan')) {
-      activeKey = 'mealPlan';
-    } else if (currentPath.startsWith('/profile')) {
-      activeKey = 'progress';
-    }
+    };
 
-    Object.entries(bottomLinks).forEach(([key, link]) => {
-      if (!link) {
-        return;
+    const updateActiveBottomLink = () => {
+      const currentPath = resolveCurrentPath();
+      let activeKey = '';
+      if (currentPath.startsWith('/diary')) {
+        activeKey = 'diary';
+      } else if (
+        currentPath.startsWith('/meal-plan')
+        || currentPath.startsWith('/shopping-list')
+        || currentPath.startsWith('/foods')
+        || currentPath.startsWith('/my-products')
+      ) {
+        activeKey = 'mealPlan';
+      } else if (currentPath.startsWith('/resume')) {
+        activeKey = 'profile';
+      } else if (currentPath.startsWith('/profile') || currentPath.startsWith('/progress')) {
+        activeKey = 'progress';
+      } else if (
+        currentPath === '/'
+        || currentPath.startsWith('/questionnaire')
+        || currentPath.startsWith('/preferences-onboarding')
+        || currentPath.startsWith('/trial-start')
+      ) {
+        activeKey = 'profile';
       }
-      link.classList.toggle('bottom-link--active', key === activeKey);
-    });
+
+      Object.entries(bottomLinks).forEach(([key, link]) => {
+        if (!link) {
+          return;
+        }
+        link.classList.toggle('bottom-link--active', key === activeKey);
+      });
+    };
+
+    updateBottomNavVisibility();
+    updateActiveBottomLink();
+    window.addEventListener('popstate', updateActiveBottomLink);
+    window.addEventListener('spa-route-changed', updateActiveBottomLink);
   }
 }
 
 customElements.define('custom-footer', CustomFooter);
+
+

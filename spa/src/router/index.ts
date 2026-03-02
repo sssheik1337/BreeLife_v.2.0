@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory, type NavigationGuardNext, type RouteLocationNormalized, type RouteRecordRaw } from 'vue-router';
 import { useAppStateStore, type ProfileState } from '../stores/appStateStore';
 import { useStorageStore } from '../stores/storageStore';
+import { ensureTelegramAuthSession } from '../platform/telegramAuth';
 import { createOnboardingDebugLogger, evaluateOnboardingState } from '../domain/onboarding';
 import EntryPage from '../pages/EntryPage.vue';
 import QuestionnairePage from '../pages/QuestionnairePage.vue';
@@ -240,82 +241,71 @@ const resolveApiFetch = (): typeof fetch => {
     return window.fetch.bind(window);
 };
 
-const loadLocalProfile = (): ProfileState | null => {
-    const storageStore = useStorageStore();
-    const snapshot = storageStore.getUserProfile();
-    return snapshot && typeof snapshot === 'object' ? (snapshot as ProfileState) : null;
-};
+const parseSessionStatus = (data: any): SessionStatusPayload => ({
+    authorized: data?.authorized === true,
+    profile_completed: data?.profile_completed === true,
+    telegram_user_id: typeof data?.telegram_user_id === 'number' ? data.telegram_user_id : null,
+    first_name: typeof data?.first_name === 'string' ? data.first_name : null,
+    last_name: typeof data?.last_name === 'string' ? data.last_name : null,
+    username: typeof data?.username === 'string' ? data.username : null,
+    photo_url: typeof data?.photo_url === 'string' ? data.photo_url : null
+});
+
+const buildUnauthorizedSession = (): SessionStatusPayload => ({
+    authorized: false,
+    profile_completed: false,
+    telegram_user_id: null,
+    first_name: null,
+    last_name: null,
+    username: null,
+    photo_url: null
+});
 
 const loadSessionStatus = async (): Promise<SessionStatusPayload> => {
     const fetcher = resolveApiFetch();
-    const storageStore = useStorageStore();
-    const appStateStore = useAppStateStore();
     const response = await fetcher('/api/me/status');
     if (!response.ok) {
-        return {
-            authorized: false,
-            profile_completed: false,
-            telegram_user_id: null,
-            first_name: null,
-            last_name: null,
-            username: null,
-            photo_url: null
-        };
+        return buildUnauthorizedSession();
     }
+
     const data = await response.json();
-    const localCompleted = appStateStore.profileCompleted === true || storageStore.profile?.is_completed === true;
-    return {
-        authorized: data?.authorized === true,
-        profile_completed: data?.profile_completed === true || localCompleted,
-        telegram_user_id: typeof data?.telegram_user_id === 'number' ? data.telegram_user_id : null,
-        first_name: typeof data?.first_name === 'string' ? data.first_name : null,
-        last_name: typeof data?.last_name === 'string' ? data.last_name : null,
-        username: typeof data?.username === 'string' ? data.username : null,
-        photo_url: typeof data?.photo_url === 'string' ? data.photo_url : null
-    };
+    let parsed = parseSessionStatus(data);
+    if (parsed.authorized) {
+        return parsed;
+    }
+
+    const reAuthorized = await ensureTelegramAuthSession({ reason: 'router-session-check' });
+    if (!reAuthorized) {
+        return parsed;
+    }
+
+    const retryResponse = await fetcher('/api/me/status');
+    if (!retryResponse.ok) {
+        return buildUnauthorizedSession();
+    }
+    parsed = parseSessionStatus(await retryResponse.json());
+    return parsed;
 };
 
 const loadProfileForGuards = async (): Promise<ProfileState | null> => {
     const fetcher = resolveApiFetch();
-    let serverProfile: ProfileState | null = null;
+    const storageStore = useStorageStore();
     try {
         const response = await fetcher('/api/profile');
-        if (response.ok) {
-            const data = await response.json();
-            serverProfile = data && typeof data === 'object' ? (data as ProfileState) : null;
+        if (!response.ok) {
+            storageStore.clearProfileLocalCache();
+            return storageStore.profile as ProfileState;
         }
+        const data = await response.json();
+        if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
+            storageStore.clearProfileLocalCache();
+            return storageStore.profile as ProfileState;
+        }
+        return data as ProfileState;
     } catch {
-        serverProfile = null;
+        storageStore.clearProfileLocalCache();
+        return storageStore.profile as ProfileState;
     }
-
-    const localProfile = loadLocalProfile();
-    if (serverProfile && localProfile) {
-        if (localProfile.is_completed === true && serverProfile.is_completed !== true) {
-            serverProfile = { ...serverProfile, is_completed: true };
-        }
-        if (
-            localProfile.preferences_onboarding_completed === true
-            && serverProfile.preferences_onboarding_completed !== true
-        ) {
-            serverProfile = { ...serverProfile, preferences_onboarding_completed: true };
-        }
-        if (
-            Array.isArray(localProfile.favorite_product_ids)
-            && localProfile.favorite_product_ids.length
-            && (!Array.isArray(serverProfile.favorite_product_ids) || !serverProfile.favorite_product_ids.length)
-        ) {
-            serverProfile = { ...serverProfile, favorite_product_ids: [...localProfile.favorite_product_ids] };
-        }
-        if (
-            Array.isArray(localProfile.excluded_product_ids)
-            && localProfile.excluded_product_ids.length
-            && (!Array.isArray(serverProfile.excluded_product_ids) || !serverProfile.excluded_product_ids.length)
-        ) {
-            serverProfile = { ...serverProfile, excluded_product_ids: [...localProfile.excluded_product_ids] };
-        }
-    }
-
-    return serverProfile || localProfile;
 };
 
 const DEFAULT_ROLLOUT_CONFIG: SpaRolloutConfig = {

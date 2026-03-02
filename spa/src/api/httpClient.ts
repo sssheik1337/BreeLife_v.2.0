@@ -1,5 +1,7 @@
+import { ensureTelegramAuthSession } from '../platform/telegramAuth';
+
 /**
- * Унифицированная ошибка API-клиента.
+ * Unified API client HTTP error.
  */
 export class ApiHttpError extends Error {
     status: number;
@@ -50,11 +52,6 @@ const resolveTelegramInitData = (): string => {
     if (typeof window === 'undefined') {
         return '';
     }
-    // Telegram initData source is fixed:
-    // 1) window.telegramInitData cache (preferred),
-    // 2) Telegram.WebApp.initData direct read if cache is empty.
-    // If both are empty (early SPA init / non-Telegram env), request is sent without header.
-    // No waiting/guard fallback is used to preserve legacy request semantics.
     const fromWindow = typeof window.telegramInitData === 'string' ? window.telegramInitData.trim() : '';
     if (fromWindow) {
         return fromWindow;
@@ -91,9 +88,6 @@ const parseResponsePayload = async (response: Response): Promise<unknown> => {
     return response.text();
 };
 
-/**
- * Создаёт единый typed http-клиент для SPA API-слоя.
- */
 export const createApiClient = (config: ApiClientConfig = {}) => {
     const fetchImpl = resolveFetch(config);
     const baseUrl = config.baseUrl || '';
@@ -112,12 +106,28 @@ export const createApiClient = (config: ApiClientConfig = {}) => {
             headers['X-Telegram-Init-Data'] = telegramInitData;
         }
 
-        const response = await fetchImpl(url, {
+        const requestInit: RequestInit = {
             method,
             headers,
             signal: options.signal,
             body: options.body !== undefined ? JSON.stringify(options.body) : undefined
-        });
+        };
+
+        let response = await fetchImpl(url, requestInit);
+        if (response.status === 401) {
+            const reAuthorized = await ensureTelegramAuthSession({ reason: 'http-client-401', force: true });
+            if (reAuthorized) {
+                const retryHeaders: Record<string, string> = { ...headers };
+                const retryInitData = resolveTelegramInitData();
+                if (retryInitData) {
+                    retryHeaders['X-Telegram-Init-Data'] = retryInitData;
+                }
+                response = await fetchImpl(url, {
+                    ...requestInit,
+                    headers: retryHeaders
+                });
+            }
+        }
 
         const payload = await parseResponsePayload(response);
 
@@ -134,3 +144,4 @@ export const createApiClient = (config: ApiClientConfig = {}) => {
         request
     };
 };
+

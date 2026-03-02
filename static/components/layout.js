@@ -19,7 +19,7 @@ class CustomLayout extends HTMLElement {
           background: var(--tg-bg-color, #f8fafc);
           color: var(--tg-text-color, #0f172a);
           padding-top: var(--header-height, 72px);
-          padding-bottom: env(safe-area-inset-bottom);
+          padding-bottom: 0;
         }
         
         .main-content {
