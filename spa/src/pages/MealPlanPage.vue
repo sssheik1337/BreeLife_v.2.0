@@ -80,6 +80,68 @@
                         </div>
                     </div>
                 </div>
+
+                <section id="meal-shopping-inline" class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-base font-semibold text-slate-800">Список покупок</h2>
+                            <p class="text-xs text-slate-500">Откройте список прямо в разделе «Рацион».</p>
+                        </div>
+                        <button
+                            type="button"
+                            class="text-xs font-semibold px-3 py-1 rounded-full"
+                            :class="shoppingExpanded ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
+                            @click="toggleShoppingList"
+                        >{{ shoppingExpanded ? 'Свернуть' : 'Развернуть' }}</button>
+                    </div>
+
+                    <div v-if="shoppingExpanded" class="space-y-4">
+                        <div class="flex items-center gap-2">
+                            <button
+                                type="button"
+                                class="text-xs font-semibold px-3 py-1 rounded-full"
+                                :class="shoppingRange === 'day' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                                @click="shoppingRange = 'day'"
+                            >День</button>
+                            <button
+                                type="button"
+                                class="text-xs font-semibold px-3 py-1 rounded-full"
+                                :class="shoppingRange === 'week' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                                @click="shoppingRange = 'week'"
+                            >Неделя</button>
+                            <button type="button" class="btn-secondary ml-auto" @click="copyShoppingList">Скопировать список</button>
+                        </div>
+
+                        <p v-if="shoppingLoading" class="text-center text-slate-400">Загрузка списка...</p>
+                        <p v-else-if="shoppingLoadError" class="text-center text-slate-400">{{ shoppingLoadError }}</p>
+
+                        <template v-else>
+                            <p v-if="shoppingGroupNames.length === 0" class="text-center text-slate-400">Сначала выберите продукты в рационе.</p>
+
+                            <section
+                                v-for="groupName in shoppingGroupNames"
+                                :key="groupName"
+                                class="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3"
+                            >
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-sm font-semibold text-slate-800">{{ groupName }}</h3>
+                                    <span class="text-xs text-slate-400">{{ groupedShoppingList[groupName].length }} поз.</span>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <div
+                                        v-for="item in groupedShoppingList[groupName]"
+                                        :key="`${item.group}::${item.name}`"
+                                        class="rounded-xl border border-slate-100 bg-white px-3 py-2"
+                                    >
+                                        <div class="text-sm font-semibold text-slate-800">{{ item.name }}</div>
+                                        <div class="text-xs text-slate-500">≈ {{ item.weight }} г • {{ item.count }} раз</div>
+                                    </div>
+                                </div>
+                            </section>
+                        </template>
+                    </div>
+                </section>
             </div>
         </main>
     </section>
@@ -87,11 +149,26 @@
 
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
-import { computed, nextTick, onMounted, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useMealPlanStore, type MealPlanItem, type MealPlanMeal, type MealPlanPayload } from '../stores/mealPlanStore';
 import { useStorageStore } from '../stores/storageStore';
 
 const MEAL_PLAN_ENDPOINT = '/api/meal-plan';
+const SHOPPING_PRODUCTS_ENDPOINT = '/api/products';
+const SHOPPING_DEFAULT_WEIGHT = 100;
+
+interface Product {
+    id: number;
+    name: string;
+    group?: string;
+}
+
+interface ShoppingAggregateItem {
+    name: string;
+    group: string;
+    weight: number;
+    count: number;
+}
 
 const DEFAULT_MEALS: Array<{ key: string; title: string }> = [
     { key: 'breakfast', title: 'Завтрак' },
@@ -100,9 +177,22 @@ const DEFAULT_MEALS: Array<{ key: string; title: string }> = [
     { key: 'dinner', title: 'Ужин' }
 ];
 
+const SHOPPING_MEAL_DISTRIBUTION = [
+    { key: 'breakfast', title: 'Завтрак', items: 2 },
+    { key: 'lunch', title: 'Обед', items: 3 },
+    { key: 'snack', title: 'Перекус', items: 2 },
+    { key: 'dinner', title: 'Ужин', items: 3 }
+] as const;
+
 const storageStore = useStorageStore();
 const mealPlanStore = useMealPlanStore();
 const { activeRange, plans, isLoading, loadError } = storeToRefs(mealPlanStore);
+const shoppingExpanded = ref(false);
+const shoppingRange = ref<'day' | 'week'>('day');
+const shoppingProducts = ref<Product[]>([]);
+const shoppingLoading = ref(false);
+const shoppingLoadError = ref('');
+const shoppingLoaded = ref(false);
 
 const isFrontendDebugEnabled = (): boolean => Boolean((window as any)?.appDebug);
 
@@ -278,6 +368,190 @@ const summaryProducts = computed(() => {
     }
     return String(countUniqueProductsInMeals(primaryPlan?.meals));
 });
+
+const normalizeProfileIdSet = (value: unknown): Set<number> => {
+    if (!Array.isArray(value)) {
+        return new Set();
+    }
+    const normalized = value
+        .map((item) => Number(item))
+        .filter((item) => Number.isInteger(item));
+    return new Set(normalized);
+};
+
+const buildPreferredProducts = (items: Product[]): Product[] => {
+    const profile = storageStore.getUserProfile() as Record<string, unknown>;
+    const favorites = normalizeProfileIdSet(profile?.favorite_product_ids);
+    const excluded = normalizeProfileIdSet(profile?.excluded_product_ids);
+
+    const available = items.filter((product) => !excluded.has(product.id));
+    if (favorites.size > 0) {
+        const favoriteProducts = available.filter((product) => favorites.has(product.id));
+        if (favoriteProducts.length > 0) {
+            return favoriteProducts;
+        }
+    }
+    return available;
+};
+
+const pickItems = (list: Product[], startIndex: number, count: number): Product[] => {
+    if (list.length === 0) {
+        return [];
+    }
+    const items: Product[] = [];
+    for (let index = 0; index < count; index += 1) {
+        const itemIndex = (startIndex + index) % list.length;
+        items.push(list[itemIndex]);
+    }
+    return items;
+};
+
+const buildDayPlanForShopping = (items: Product[], dayIndex: number) => {
+    const sorted = [...items].sort((left, right) => {
+        const leftGroup = left.group || '';
+        const rightGroup = right.group || '';
+        if (leftGroup === rightGroup) {
+            return (left.name || '').localeCompare(right.name || '');
+        }
+        return leftGroup.localeCompare(rightGroup);
+    });
+
+    return SHOPPING_MEAL_DISTRIBUTION.map((meal, mealIndex) => {
+        const startIndex = (dayIndex * 7 + mealIndex * 3) % Math.max(sorted.length, 1);
+        return pickItems(sorted, startIndex, meal.items);
+    });
+};
+
+const buildShoppingList = (items: Product[], range: 'day' | 'week'): Record<string, ShoppingAggregateItem[]> => {
+    const preferred = buildPreferredProducts(items);
+    const days = range === 'week' ? 7 : 1;
+    const totals = new Map<string, ShoppingAggregateItem>();
+
+    for (let dayIndex = 0; dayIndex < days; dayIndex += 1) {
+        const dayPlan = buildDayPlanForShopping(preferred, dayIndex);
+        dayPlan.forEach((mealItems) => {
+            mealItems.forEach((item) => {
+                if (!item) {
+                    return;
+                }
+                const key = `${item.group || 'Без группы'}::${item.name}`;
+                const current = totals.get(key) || {
+                    name: item.name,
+                    group: item.group || 'Без группы',
+                    weight: 0,
+                    count: 0
+                };
+                current.weight += SHOPPING_DEFAULT_WEIGHT;
+                current.count += 1;
+                totals.set(key, current);
+            });
+        });
+    }
+
+    const grouped: Record<string, ShoppingAggregateItem[]> = {};
+    totals.forEach((item) => {
+        if (!grouped[item.group]) {
+            grouped[item.group] = [];
+        }
+        grouped[item.group].push(item);
+    });
+
+    Object.keys(grouped).forEach((groupName) => {
+        grouped[groupName].sort((left, right) => left.name.localeCompare(right.name));
+    });
+
+    return grouped;
+};
+
+const groupedShoppingList = computed(() => buildShoppingList(shoppingProducts.value, shoppingRange.value));
+const shoppingGroupNames = computed(() => Object.keys(groupedShoppingList.value));
+
+const notify = (message: string, type: 'success' | 'error'): void => {
+    const showNotification = (window as any).showNotification;
+    if (typeof showNotification === 'function') {
+        showNotification(message, type);
+        return;
+    }
+    if (type === 'error') {
+        console.error(message);
+    } else {
+        console.log(message);
+    }
+};
+
+const fallbackCopy = (text: string): void => {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', 'true');
+    textarea.style.position = 'absolute';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+        document.execCommand('copy');
+        notify('Список скопирован!', 'success');
+    } catch {
+        notify('Не удалось скопировать список.', 'error');
+    }
+    document.body.removeChild(textarea);
+};
+
+const copyShoppingList = async (): Promise<void> => {
+    const lines: string[] = [];
+    shoppingGroupNames.value.forEach((groupName) => {
+        lines.push(groupName);
+        groupedShoppingList.value[groupName].forEach((item) => {
+            lines.push(`- ${item.name}: ≈ ${item.weight} г`);
+        });
+        lines.push('');
+    });
+
+    const text = lines.join('\n').trim();
+    if (!text) {
+        notify('Список пуст.', 'error');
+        return;
+    }
+
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        try {
+            await navigator.clipboard.writeText(text);
+            notify('Список скопирован!', 'success');
+            return;
+        } catch {
+            fallbackCopy(text);
+            return;
+        }
+    }
+
+    fallbackCopy(text);
+};
+
+const loadShoppingProducts = async (): Promise<void> => {
+    shoppingLoading.value = true;
+    shoppingLoadError.value = '';
+
+    try {
+        const response = await storageStore.apiFetch(SHOPPING_PRODUCTS_ENDPOINT);
+        if (!response.ok) {
+            throw new Error('load_failed');
+        }
+        const payload = await response.json();
+        shoppingProducts.value = Array.isArray(payload) ? payload as Product[] : [];
+        shoppingLoaded.value = true;
+    } catch {
+        shoppingLoadError.value = 'Не удалось загрузить список покупок.';
+    } finally {
+        shoppingLoading.value = false;
+    }
+};
+
+const toggleShoppingList = async (): Promise<void> => {
+    shoppingExpanded.value = !shoppingExpanded.value;
+    if (shoppingExpanded.value && !shoppingLoaded.value) {
+        await loadShoppingProducts();
+    }
+    await refreshIcons();
+};
 
 const dayCards = computed(() => {
     return plans.value.map((plan, dayIndex) => {

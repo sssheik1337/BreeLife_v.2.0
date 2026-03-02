@@ -18,10 +18,6 @@
                         </div>
                         <i data-feather="external-link" class="w-5 h-5 text-slate-400"></i>
                     </a>
-                    <div class="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
-                        <p class="font-semibold text-slate-800">Статус сервиса</p>
-                        <p class="text-sm text-slate-500 mt-1">Если что-то не работает, напишите в поддержку и опишите шаги воспроизведения.</p>
-                    </div>
                 </div>
             </div>
         </main>

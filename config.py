@@ -44,6 +44,9 @@ REMINDERS_ENABLED = os.getenv("REMINDERS_ENABLED", "false").lower() in {"1", "tr
 MEAL_PLAN_ALGO_VERSION = os.getenv("MEAL_PLAN_ALGO_VERSION", "v1")
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_HIDDEN_ADMIN_COMMAND = (
+    os.getenv("TELEGRAM_HIDDEN_ADMIN_COMMAND", "adminbreeva").strip().lstrip("/") or "adminbreeva"
+)
 
 
 def normalize_webapp_url(raw_url: str) -> str:

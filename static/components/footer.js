@@ -365,7 +365,7 @@
         closeFabMenu();
 
         const currentPath = window.location.pathname || '/';
-        const isDiaryPage = currentPath.startsWith('/diary');
+        const isDiaryPage = currentPath.startsWith('/diary') || currentPath.startsWith('/app/diary');
 
         if (isDiaryPage) {
           window.dispatchEvent(new CustomEvent('diary-fab-action', {

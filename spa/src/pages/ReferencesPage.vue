@@ -25,20 +25,6 @@
                         </div>
                         <i data-feather="chevron-right" class="w-5 h-5 text-slate-400"></i>
                     </RouterLink>
-                    <RouterLink to="/meal-plan" class="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 hover:bg-slate-100 transition">
-                        <div>
-                            <p class="font-semibold text-slate-800">Рацион</p>
-                            <p class="text-sm text-slate-500">Готовый план питания</p>
-                        </div>
-                        <i data-feather="chevron-right" class="w-5 h-5 text-slate-400"></i>
-                    </RouterLink>
-                    <RouterLink to="/shopping-list" class="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 hover:bg-slate-100 transition">
-                        <div>
-                            <p class="font-semibold text-slate-800">Список покупок</p>
-                            <p class="text-sm text-slate-500">Покупки по рациону</p>
-                        </div>
-                        <i data-feather="chevron-right" class="w-5 h-5 text-slate-400"></i>
-                    </RouterLink>
                 </div>
             </div>
         </main>

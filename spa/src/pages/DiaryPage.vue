@@ -28,6 +28,32 @@
           <p id="diary-day-hint" class="text-sm text-slate-500 mt-3">{{ dayHint }}</p>
         </div>
 
+        <section id="diary-month-calendar" class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100">
+          <h3 class="font-semibold text-slate-800 mb-3">Календарь месяца</h3>
+          <div class="grid grid-cols-7 gap-1 mb-2">
+            <div
+              v-for="label in weekDayLabels"
+              :key="label"
+              class="h-6 rounded bg-slate-50 text-[11px] font-semibold text-slate-500 flex items-center justify-center"
+            >{{ label }}</div>
+          </div>
+          <div id="diary-month-grid" class="grid grid-cols-7 gap-1">
+            <button
+              v-for="cell in monthGrid"
+              :key="cell.date"
+              type="button"
+              class="h-8 rounded text-[11px] flex items-center justify-center transition-colors"
+              :class="cell.className"
+              :style="cell.style"
+              @click="selectCalendarDate(cell.date)"
+            >{{ cell.text }}</button>
+          </div>
+          <div class="mt-3 flex items-center justify-between text-xs text-slate-500">
+            <span>Прошлый: {{ monthLabels.previous }}</span>
+            <span>Текущий: {{ monthLabels.current }}</span>
+          </div>
+        </section>
+
         <div id="diary-meals" class="space-y-3">
           <div
             v-for="card in mealCards"
@@ -103,7 +129,8 @@
                       type="text"
                       class="form-input"
                       placeholder="Название продукта"
-                      required
+                      :required="productsFormContext !== 'water'"
+                      :disabled="productsFormContext === 'water'"
                       @input="onProductQueryInput(row.id)"
                     >
                     <div
@@ -130,7 +157,8 @@
                     placeholder="Граммы"
                     min="1"
                     step="1"
-                    required
+                    :required="productsFormContext !== 'water'"
+                    :disabled="productsFormContext === 'water'"
                     @input="recalculateRow(row.id)"
                   >
 
@@ -169,7 +197,7 @@
                 id="diary-products-delete"
                 type="button"
                 class="btn-secondary w-full"
-                :class="{ hidden: productsFormContext === 'water' || !hasExistingMealEntry }"
+                :class="{ hidden: !canDeleteCurrentMeal }"
                 @click="deleteCurrentMeal"
               >
                 Удалить приём пищи
@@ -184,7 +212,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useStorageStore } from '../stores/storageStore';
 
@@ -278,10 +306,65 @@ interface DiaryEntry {
 const route = useRoute();
 const router = useRouter();
 const storage = useStorageStore();
+const notify = (message: string, type: 'success' | 'error' = 'success'): void => {
+  const showNotification = (window as { showNotification?: (text: string, tone?: string) => void }).showNotification;
+  if (typeof showNotification === 'function') {
+    showNotification(message, type);
+    return;
+  }
+  let container = document.getElementById('notification-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'notification-container';
+    (document.documentElement || document.body).appendChild(container);
+  }
+
+  const maxTop = Math.max(12, window.innerHeight - 96);
+  const top = Math.min(Math.max(92, 12), maxTop);
+  (container as HTMLDivElement).style.setProperty('position', 'fixed', 'important');
+  (container as HTMLDivElement).style.setProperty('top', `${top}px`, 'important');
+  (container as HTMLDivElement).style.setProperty('right', '12px', 'important');
+  (container as HTMLDivElement).style.setProperty('left', 'auto', 'important');
+  (container as HTMLDivElement).style.setProperty('bottom', 'auto', 'important');
+  (container as HTMLDivElement).style.setProperty('z-index', '2147483647', 'important');
+  (container as HTMLDivElement).style.setProperty('width', 'min(320px, calc(100vw - 24px))', 'important');
+  (container as HTMLDivElement).style.setProperty('display', 'flex', 'important');
+  (container as HTMLDivElement).style.setProperty('flex-direction', 'column', 'important');
+  (container as HTMLDivElement).style.setProperty('align-items', 'flex-end', 'important');
+  (container as HTMLDivElement).style.setProperty('pointer-events', 'none', 'important');
+  (container as HTMLDivElement).style.setProperty('visibility', 'visible', 'important');
+  (container as HTMLDivElement).style.setProperty('opacity', '1', 'important');
+
+  const toast = document.createElement('div');
+  toast.textContent = message;
+  toast.style.background = type === 'error' ? '#ef4444' : '#10b981';
+  toast.style.color = '#ffffff';
+  toast.style.padding = '14px 16px';
+  toast.style.borderRadius = '14px';
+  toast.style.marginBottom = '10px';
+  toast.style.maxWidth = '100%';
+  toast.style.boxShadow = '0 10px 26px rgba(15, 23, 42, 0.28)';
+  toast.style.wordBreak = 'break-word';
+  toast.style.opacity = '0';
+  toast.style.transform = 'translateY(-8px)';
+  toast.style.transition = 'transform 180ms ease, opacity 180ms ease';
+  container.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+  });
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-6px)';
+    setTimeout(() => toast.remove(), 180);
+  }, 3000);
+};
 
 const selectedDate = ref('');
 const productsPanelOpen = ref(false);
 const productsFormContext = ref<'meal' | 'water'>('meal');
+const productsSubmitMode = ref<'append' | 'replace'>('replace');
 
 const form = reactive({
   date: '',
@@ -317,6 +400,41 @@ const diaryEntries = computed(() => {
   return entries as DiaryEntry[];
 });
 
+const profile = computed(() => {
+  const value = storage.profile;
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+});
+
+const toNumber = (value: unknown): number => {
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : 0;
+};
+
+const safeDivide = (left: number, right: number): number => {
+  if (!Number.isFinite(left) || !Number.isFinite(right) || right === 0) {
+    return 0;
+  }
+  return left / right;
+};
+
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
+const clamp01 = (value: number): number => clamp(value, 0, 1);
+const smoothStep = (value: number): number => {
+  const normalized = clamp01(value);
+  return normalized * normalized * (3 - 2 * normalized);
+};
+const lerp = (start: number, end: number, factor: number): number => start + ((end - start) * factor);
+const getFabProgressColor = (ratio: number): string => {
+  if (!Number.isFinite(ratio)) {
+    return 'hsl(164, 14%, 94%)';
+  }
+  const t = smoothStep(clamp01(ratio));
+  const hue = 164;
+  const saturation = lerp(18, 66, t);
+  const lightness = lerp(90, 49, t);
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+};
+
 const mealCards = computed(() => {
   return mealMeta.map(({ key, label }) => {
     const entry = pickProductsEntry(selectedDate.value, key);
@@ -334,7 +452,14 @@ const hasExistingMealEntry = computed(() => {
   if (productsFormContext.value === 'water') {
     return false;
   }
-  return Boolean(findProductsEntry(form.date, form.meal as MealKey));
+  return findProductsEntries(form.date, form.meal as MealKey).length > 0;
+});
+
+const canDeleteCurrentMeal = computed(() => {
+  if (productsFormContext.value === 'water') {
+    return false;
+  }
+  return productsSubmitMode.value === 'replace' && hasExistingMealEntry.value;
 });
 
 const normalizeDate = (value: unknown): string => {
@@ -342,6 +467,122 @@ const normalizeDate = (value: unknown): string => {
 };
 
 const todayDate = (): string => normalizeDate(new Date().toISOString());
+const weekDayLabels = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
+
+const calendarAnchorDate = computed(() => {
+  const parsed = selectedDate.value ? new Date(`${selectedDate.value}T00:00:00`) : new Date();
+  if (Number.isNaN(parsed.getTime())) {
+    return new Date();
+  }
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
+});
+
+const monthFormatter = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' });
+const formatMonthLabel = (date: Date): string => {
+  const raw = monthFormatter.format(date);
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+};
+
+const monthLabels = computed(() => {
+  const current = new Date(calendarAnchorDate.value);
+  const previous = new Date(current);
+  previous.setMonth(previous.getMonth() - 1);
+  return {
+    previous: formatMonthLabel(previous),
+    current: formatMonthLabel(current)
+  };
+});
+
+const caloriesTarget = computed(() => {
+  const value = toNumber(profile.value.calories_target);
+  return value > 0 ? value : null;
+});
+
+const dayTotalsByDate = computed(() => {
+  const totals = new Map<string, { calories: number }>();
+  diaryEntries.value.forEach((entry) => {
+    const key = normalizeDate(entry.date);
+    if (!key) {
+      return;
+    }
+    const current = totals.get(key) || { calories: 0 };
+    const resolved = resolveTotals(entry);
+    current.calories += resolved.calories;
+    totals.set(key, current);
+  });
+  return totals;
+});
+
+const monthGrid = computed(() => {
+  const base = calendarAnchorDate.value;
+  const currentYear = base.getFullYear();
+  const currentMonth = base.getMonth();
+  const monthStart = new Date(currentYear, currentMonth, 1);
+  const monthEnd = new Date(currentYear, currentMonth + 1, 0);
+  const leadingDays = (monthStart.getDay() + 6) % 7;
+  const totalDays = monthEnd.getDate();
+  const totalCells = Math.ceil((leadingDays + totalDays) / 7) * 7;
+  const todayKey = todayDate();
+  const selectedKey = normalizeDate(selectedDate.value);
+  const target = caloriesTarget.value;
+
+  let monthMaxCalories = 0;
+  for (let index = 0; index < totalCells; index += 1) {
+    const cellDate = new Date(monthStart);
+    cellDate.setDate(1 - leadingDays + index);
+    const isCurrentMonth = cellDate.getMonth() === currentMonth && cellDate.getFullYear() === currentYear;
+    if (!isCurrentMonth) {
+      continue;
+    }
+    const key = normalizeDate(cellDate.toISOString());
+    const calories = dayTotalsByDate.value.get(key)?.calories || 0;
+    monthMaxCalories = Math.max(monthMaxCalories, calories);
+  }
+
+  const cells: Array<{ date: string; text: string; className: string; style: Record<string, string> }> = [];
+  for (let index = 0; index < totalCells; index += 1) {
+    const cellDate = new Date(monthStart);
+    cellDate.setDate(1 - leadingDays + index);
+    const key = normalizeDate(cellDate.toISOString());
+    const isCurrentMonth = cellDate.getMonth() === currentMonth && cellDate.getFullYear() === currentYear;
+    const calories = dayTotalsByDate.value.get(key)?.calories || 0;
+    const hasData = calories > 0;
+    const ratio = hasData
+      ? (target ? safeDivide(calories, target) : safeDivide(calories, monthMaxCalories || 1))
+      : Number.NaN;
+    const normalized = clamp01(ratio);
+
+    const backgroundColor = hasData
+      ? getFabProgressColor(normalized)
+      : (isCurrentMonth ? 'hsl(164, 14%, 94%)' : 'hsl(164, 12%, 96%)');
+    const textColor = hasData
+      ? (normalized >= 0.45 ? '#ffffff' : '#334155')
+      : (isCurrentMonth ? '#64748b' : '#94a3b8');
+    const opacity = isCurrentMonth ? '1' : '0.78';
+
+    let className = '';
+
+    if (key === selectedKey) {
+      className += ' ring-2 ring-emerald-500';
+    } else if (key === todayKey) {
+      className += ' ring-2 ring-emerald-300';
+    }
+
+    cells.push({
+      date: key,
+      text: String(cellDate.getDate()),
+      className,
+      style: {
+        backgroundColor,
+        color: textColor,
+        opacity
+      }
+    });
+  }
+
+  return cells;
+});
 
 const emptyTotals = (): DiaryTotals => ({
   calories: 0,
@@ -404,13 +645,12 @@ const getEntriesByDate = (dateKey: string): DiaryEntry[] => {
   return diaryEntries.value.filter((entry) => normalizeDate(entry.date) === dateKey);
 };
 
-const findProductsEntry = (dateKey: string, meal: MealKey): DiaryEntry | null => {
-  return getEntriesByDate(dateKey).find((entry) => entry.mode === 'products' && entry.meal === meal) || null;
+const findProductsEntries = (dateKey: string, meal: MealKey): DiaryEntry[] => {
+  return getEntriesByDate(dateKey).filter((entry) => entry.mode === 'products' && entry.meal === meal);
 };
 
 const pickProductsEntry = (dateKey: string, meal: MealKey): (DiaryEntry & { totals: DiaryTotals; items: DiaryEntryItem[] }) | null => {
-  const matches = getEntriesByDate(dateKey)
-    .filter((entry) => entry.mode === 'products' && entry.meal === meal)
+  const matches = findProductsEntries(dateKey, meal)
     .map((entry) => ({
       ...entry,
       totals: resolveTotals(entry),
@@ -419,7 +659,21 @@ const pickProductsEntry = (dateKey: string, meal: MealKey): (DiaryEntry & { tota
   if (!matches.length) {
     return null;
   }
-  return matches.reduce((best, current) => (current.totals.calories >= best.totals.calories ? current : best));
+  const mergedItems = matches.flatMap((entry) => entry.items);
+  const mergedTotals = calculateTotals(mergedItems);
+  const water = matches.reduce((maxWater, entry) => Math.max(maxWater, Number(entry.water_l) || 0), 0);
+  const sleepTime = matches.map((entry) => String(entry.sleep_time || '')).find((value) => value.length > 0) || null;
+  const activity = matches.some((entry) => entry.activity === true);
+  return {
+    date: dateKey,
+    mode: 'products',
+    meal,
+    items: mergedItems,
+    totals: mergedTotals,
+    water_l: water,
+    sleep_time: sleepTime,
+    activity
+  };
 };
 
 const createEmptyRow = (): ProductRow => {
@@ -633,6 +887,11 @@ const onDateChanged = async () => {
   await updateDateQuery(productsPanelOpen.value ? 'products' : 'day', productsPanelOpen.value ? form.meal : undefined);
 };
 
+const selectCalendarDate = async (dateKey: string) => {
+  selectedDate.value = dateKey;
+  await onDateChanged();
+};
+
 const applyQuickWater = (value: number) => {
   const current = Number(form.water_l) || 0;
   form.water_l = (current + value).toFixed(2);
@@ -650,6 +909,7 @@ const onMealChanged = () => {
 const openProductsForm = async (meal: MealKey, context: 'meal' | 'water', prefillExisting: boolean) => {
   productsPanelOpen.value = true;
   productsFormContext.value = context;
+  productsSubmitMode.value = context === 'meal' && prefillExisting ? 'replace' : 'append';
   form.date = selectedDate.value;
   form.meal = context === 'water' ? 'water' : meal;
   if (context === 'water') {
@@ -677,7 +937,7 @@ const hydrateFormMetaForDate = (dateKey: string) => {
 };
 
 const hydrateFormFromExistingMeal = (dateKey: string, meal: MealKey, prefillExisting: boolean) => {
-  const existing = findProductsEntry(dateKey, meal);
+  const existing = pickProductsEntry(dateKey, meal);
   hydrateFormMetaForDate(dateKey);
   if (!prefillExisting || !existing || !Array.isArray(existing.items) || !existing.items.length) {
     productRows.value = [createEmptyRow()];
@@ -758,20 +1018,26 @@ const submitProductsForm = async () => {
 
   if (productsFormContext.value === 'water') {
     await persistDayMeta(dateKey, Number(form.water_l) || 0, form.sleep_time, form.activity);
+    notify('Вода сохранена.', 'success');
     await closeProductsPanel();
     return;
   }
 
   const items = collectFoodItems();
   if (!items.length) {
+    notify('Добавьте хотя бы один продукт.', 'error');
     return;
   }
 
   const meal = form.meal as MealKey;
-  const totals = calculateTotals(items);
-  const water = Number(form.water_l) || 0;
-  const sleep = form.sleep_time || null;
-  const activity = Boolean(form.activity);
+  const existing = pickProductsEntry(dateKey, meal);
+  const finalItems = productsSubmitMode.value === 'append' && existing?.items?.length
+    ? [...existing.items, ...items]
+    : items;
+  const totals = calculateTotals(finalItems);
+  const water = Number(form.water_l) || Number(existing?.water_l) || 0;
+  const sleep = form.sleep_time || existing?.sleep_time || null;
+  const activity = Boolean(form.activity) || Boolean(existing?.activity);
 
   const nextEntries = diaryEntries.value.filter((entry) => {
     return !(normalizeDate(entry.date) === dateKey && entry.mode === 'products' && entry.meal === meal);
@@ -781,7 +1047,7 @@ const submitProductsForm = async () => {
     date: dateKey,
     mode: 'products',
     meal,
-    items,
+    items: finalItems,
     totals,
     water_l: water,
     sleep_time: sleep,
@@ -789,6 +1055,7 @@ const submitProductsForm = async () => {
   });
 
   storage.setDiaryEntries(nextEntries as never[]);
+  notify('Приём пищи сохранён.', 'success');
   await closeProductsPanel();
 };
 
@@ -813,6 +1080,16 @@ const handleFabAction = async (action: 'meal' | 'water', meal: MealKey = 'breakf
   await openProductsForm(meal, 'meal', false);
 };
 
+const onDiaryFabAction = async (event: Event) => {
+  const customEvent = event as CustomEvent<{ action?: 'meal' | 'water'; meal?: string }>;
+  const action = customEvent.detail?.action === 'water' ? 'water' : 'meal';
+  const mealValue = customEvent.detail?.meal || 'breakfast';
+  const meal = (['breakfast', 'lunch', 'dinner', 'snack'] as string[]).includes(mealValue)
+    ? (mealValue as MealKey)
+    : 'breakfast';
+  await handleFabAction(action, meal);
+};
+
 watch(
   selectedDate,
   (value) => {
@@ -822,6 +1099,7 @@ watch(
 );
 
 onMounted(async () => {
+  window.addEventListener('diary-fab-action', onDiaryFabAction as EventListener);
   await storage.syncProfileWithBackend();
   await storage.syncDiaryEntriesWithBackend();
 
@@ -853,5 +1131,9 @@ onMounted(async () => {
   if (typeof (window as { feather?: { replace?: () => void } }).feather?.replace === 'function') {
     (window as { feather: { replace: () => void } }).feather.replace();
   }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('diary-fab-action', onDiaryFabAction as EventListener);
 });
 </script>

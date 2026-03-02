@@ -51,7 +51,7 @@
         </div>
 
         <div id="recommendations-section" class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8" :class="{ hidden: trial.isExpired }">
-          <div class="mb-3">
+          <div class="mb-3 flex justify-center">
             <span id="recommendations-state" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" :class="recommendationsState.className">{{ recommendationsState.text }}</span>
           </div>
           <ul id="recommendations-list" class="space-y-2 text-slate-700">
@@ -61,10 +61,10 @@
             </li>
           </ul>
           <div class="mt-4 space-y-2 text-sm text-slate-500">
-            <p id="diary-explanation">{{ explanations.diary }}</p>
-            <p id="calories-explanation">{{ explanations.calories }}</p>
-            <p id="macros-explanation">{{ explanations.macros }}</p>
-            <p id="deadline-motivation" :class="{ hidden: !explanations.deadline }">{{ explanations.deadline }}</p>
+            <p id="diary-explanation" :class="{ hidden: !displayedExplanations.diary }">{{ displayedExplanations.diary }}</p>
+            <p id="calories-explanation" :class="{ hidden: !displayedExplanations.calories }">{{ displayedExplanations.calories }}</p>
+            <p id="macros-explanation" :class="{ hidden: !displayedExplanations.macros }">{{ displayedExplanations.macros }}</p>
+            <p id="deadline-motivation" :class="{ hidden: !displayedExplanations.deadline }">{{ displayedExplanations.deadline }}</p>
             <p id="deadline-warning" class="text-rose-600" :class="{ hidden: !deadlineWarning }">{{ deadlineWarning }}</p>
           </div>
         </div>
@@ -76,33 +76,6 @@
           </div>
           <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
             <div id="bmi-progress" class="h-full rounded-full transition-all duration-1000" :style="{ width: `${bmi.progress}%`, background: bmi.color }"></div>
-          </div>
-        </div>
-
-        <div id="trial-card" class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8 text-center">
-          <div class="flex items-center justify-center space-x-3 mb-4">
-            <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
-              <i data-feather="clock" class="w-5 h-5 text-emerald-600"></i>
-            </div>
-            <h3 class="font-semibold text-slate-800">Мы всё рассчитали для вас</h3>
-          </div>
-          <div class="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 shadow-sm">
-            <div class="text-slate-700 font-semibold">План, нормы и рекомендации доступны в максимальном тарифе</div>
-            <div v-if="trial.datesText" id="trial-dates" class="text-sm text-slate-500 mt-1">{{ trial.datesText }}</div>
-          </div>
-          <div class="mt-4 flex justify-center">
-            <span id="trial-badge" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold" :class="trial.badgeClass">{{ trial.badgeText }}</span>
-          </div>
-          <p id="trial-warning" class="text-sm text-amber-600 mt-3" :class="{ hidden: !trial.warningText }">{{ trial.warningText }}</p>
-          <div id="paywall" class="mt-4" :class="{ hidden: !trial.showPaywall }">
-            <div class="bg-rose-50 rounded-2xl p-4 border border-rose-100 shadow-sm">
-              <p class="text-sm text-rose-700">Пробный период завершён. Чтобы продолжить пользоваться сервисом, оформите подписку.</p>
-              <p id="payment-motivation" class="text-sm text-rose-700 mt-2">{{ trial.paymentMotivation }}</p>
-            </div>
-            <button id="pay-button" class="btn-primary w-full mt-4 flex items-center justify-center space-x-3" :disabled="trial.payProcessing" @click="startPayment">
-              <i data-feather="credit-card" class="w-5 h-5"></i>
-              <span>{{ trial.payProcessing ? 'Оплата...' : 'Оплатить' }}</span>
-            </button>
           </div>
         </div>
 
@@ -130,7 +103,7 @@ const loadedProfile = ref<Record<string, unknown>>({});
 const deadlineWarning = ref('');
 const aiText = ref('');
 
-const recommendationsState = reactive({ text: 'Состояние: частично', className: 'bg-slate-100 text-slate-600' });
+const recommendationsState = reactive({ text: 'Советы от ассистента', className: 'bg-slate-100 text-slate-600' });
 const explanations = reactive({
   diary: 'Заполняйте дневник питания ежедневно, чтобы рекомендации уточнялись.',
   calories: 'Калорийность рассчитана с учётом цели и текущих параметров.',
@@ -284,8 +257,26 @@ const recommendations = computed(() => {
   if (aiText.value) list.unshift(aiText.value);
   return list;
 });
+const displayedExplanations = computed(() => {
+  const uniqueValues = new Set<string>();
+  const uniqueOrEmpty = (value: string): string => {
+    const normalized = value.replace(/\s+/g, ' ').trim();
+    if (!normalized || uniqueValues.has(normalized)) {
+      return '';
+    }
+    uniqueValues.add(normalized);
+    return value;
+  };
+  return {
+    diary: uniqueOrEmpty(explanations.diary),
+    calories: uniqueOrEmpty(explanations.calories),
+    macros: uniqueOrEmpty(explanations.macros),
+    deadline: uniqueOrEmpty(explanations.deadline)
+  };
+});
 const setRecommendationState = (state: 'loading' | 'partial' | 'ready' | 'error', text: string) => {
-  recommendationsState.text = text;
+  void text;
+  recommendationsState.text = 'Советы от ассистента';
   recommendationsState.className = state === 'loading'
     ? 'bg-amber-100 text-amber-700'
     : state === 'ready'

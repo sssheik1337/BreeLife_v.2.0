@@ -122,8 +122,8 @@
               <div class="text-[10px] text-slate-400">{{ day.dateLabel }}</div>
             </RouterLink>
           </div>
-          <p id="weekly-progress-desc" class="text-xs text-slate-500 mt-2">{{ weeklyProgress.desc }}</p>
-          <p id="weekly-progress-insight" class="text-xs text-slate-500 mt-1">{{ weeklyProgress.insight }}</p>
+          <p id="weekly-progress-desc" class="text-xs text-slate-500 mt-2 text-center">{{ weeklyProgress.desc }}</p>
+          <p id="weekly-progress-insight" class="text-xs text-slate-500 mt-1 text-center">{{ weeklyProgress.insight }}</p>
         </section>
 
         <section id="profile-calorie-trend" class="profile-card profile-card--secondary p-5 mb-4">
@@ -147,7 +147,7 @@
             </div>
           </div>
           <div id="calorie-trend-grid" class="grid gap-2" :class="calorieRange === 30 ? 'grid-cols-10' : 'grid-cols-7'">
-            <div v-for="item in calorieTrend" :key="item.date" class="flex flex-col items-center gap-1">
+            <div v-for="item in calorieTrend" :key="item.date" class="trend-day flex flex-col items-center gap-1" :class="{ 'is-today': item.isToday }">
               <div class="w-full flex items-end justify-center" :style="{ height: calorieRange === 30 ? '48px' : '62px' }">
                 <div class="w-full rounded-lg" :style="{ height: `${item.height}%`, background: item.color }"></div>
               </div>
@@ -155,13 +155,13 @@
               <div class="text-[10px] text-slate-500">{{ item.dateLabel }}</div>
             </div>
           </div>
-          <p id="calorie-trend-desc" class="text-xs text-slate-500 mt-2">{{ calorieTrendMeta.desc }}</p>
-          <p id="calorie-trend-insight" class="text-xs text-slate-500 mt-1">{{ calorieTrendMeta.insight }}</p>
+          <p id="calorie-trend-desc" class="text-xs text-slate-500 mt-2 text-center">{{ calorieTrendMeta.desc }}</p>
+          <p id="calorie-trend-insight" class="text-xs text-slate-500 mt-1 text-center">{{ calorieTrendMeta.insight }}</p>
         </section>
 
         <section id="profile-water-history" class="profile-card profile-card--secondary p-5 mb-4">
           <div class="flex items-center justify-between mb-3">
-            <h2 class="text-lg font-bold text-slate-800">История воды</h2>
+            <h2 class="text-lg font-bold text-slate-800">Гидратация</h2>
             <div class="flex gap-2">
               <button
                 type="button"
@@ -180,7 +180,7 @@
             </div>
           </div>
           <div id="water-history-grid" class="grid gap-2" :class="waterRange === 30 ? 'grid-cols-10' : 'grid-cols-7'">
-            <div v-for="item in waterHistory" :key="item.date" class="flex flex-col items-center gap-1">
+            <div v-for="item in waterHistory" :key="item.date" class="trend-day flex flex-col items-center gap-1" :class="{ 'is-today': item.isToday }">
               <div class="w-full flex items-end justify-center" :style="{ height: waterRange === 30 ? '48px' : '62px' }">
                 <div class="w-full rounded-lg" :style="{ height: `${item.height}%`, background: item.color }"></div>
               </div>
@@ -188,21 +188,8 @@
               <div class="text-[10px] text-slate-500">{{ item.dateLabel }}</div>
             </div>
           </div>
-          <p id="water-history-desc" class="text-xs text-slate-500 mt-2">{{ waterHistoryMeta.desc }}</p>
-          <p id="water-history-insight" class="text-xs text-slate-500 mt-1">{{ waterHistoryMeta.insight }}</p>
-        </section>
-
-        <section id="profile-month-activity" class="profile-card profile-card--compact mb-6">
-          <h2 class="text-lg font-bold text-slate-800 mb-3">Календарь месяца</h2>
-          <div id="profile-month-grid" class="grid grid-cols-6 gap-1">
-            <RouterLink
-              v-for="cell in monthGrid"
-              :key="cell.date"
-              class="month-day h-7 rounded text-[10px] flex items-center justify-center"
-              :class="cell.className"
-              :to="{ path: '/diary', query: { date: cell.date, mode: 'day' } }"
-            >{{ cell.text }}</RouterLink>
-          </div>
+          <p id="water-history-desc" class="text-xs text-slate-500 mt-2 text-center">{{ waterHistoryMeta.desc }}</p>
+          <p id="water-history-insight" class="text-xs text-slate-500 mt-1 text-center">{{ waterHistoryMeta.insight }}</p>
         </section>
 
         <div class="text-center mt-4">
@@ -246,6 +233,7 @@ const diaryEntries = computed(() => (Array.isArray(storage.diaryEntries) ? stora
 
 const normalizeDate = (value: unknown): string => storage.normalizeLocalDate(String(value ?? '')) || '';
 const todayKey = normalizeDate(new Date().toISOString());
+const weekdayLabels = ['ВС', 'ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ'];
 
 const safeDivide = (a: number, b: number): number => {
   if (!Number.isFinite(a) || !Number.isFinite(b) || b === 0) {
@@ -271,6 +259,76 @@ const toRecord = (value: unknown): Record<string, unknown> => (
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
 );
 
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
+const clamp01 = (value: number): number => clamp(value, 0, 1);
+
+const normalizeGoal = (value: unknown): 'lose' | 'maintain' | 'gain' | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'lose' || normalized === 'loss') {
+    return 'lose';
+  }
+  if (normalized === 'gain' || normalized === 'muscle') {
+    return 'gain';
+  }
+  if (normalized === 'maintain') {
+    return 'maintain';
+  }
+  return null;
+};
+
+const normalizeSex = (value: unknown): 'male' | 'female' | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (['male', 'man', 'm', 'м', 'мужской', 'муж'].includes(normalized)) {
+    return 'male';
+  }
+  if (['female', 'woman', 'f', 'ж', 'женский', 'жен'].includes(normalized)) {
+    return 'female';
+  }
+  return null;
+};
+
+const calculateWaterTargetFromProfile = (profileInput: Record<string, unknown>): number | null => {
+  const weight = toPositiveOrNull(profileInput.weight_kg);
+  if (weight === null) {
+    return null;
+  }
+
+  const activityFactor = toNumber(profileInput.activity_factor);
+  const goal = normalizeGoal(profileInput.goal);
+
+  const base = weight * 0.033;
+  let activityBonus = 0;
+  if (activityFactor >= 1.725) {
+    activityBonus = 0.5;
+  } else if (activityFactor >= 1.55) {
+    activityBonus = 0.3;
+  }
+
+  let goalBonus = 0;
+  if (goal === 'gain') {
+    goalBonus = 0.2;
+  } else if (goal === 'lose') {
+    goalBonus = 0.1;
+  }
+
+  const target = clamp(base + activityBonus + goalBonus, 1.5, 4.5);
+  return Math.round(target * 10) / 10;
+};
+
+const calculateFiberTargetFromProfile = (profileInput: Record<string, unknown>, tdeeKcal: number | null): number => {
+  if (tdeeKcal !== null && tdeeKcal > 0) {
+    return Math.round(clamp((tdeeKcal / 1000) * 14, 18, 45));
+  }
+  const sex = normalizeSex(profileInput.sex);
+  return sex === 'male' ? 30 : 25;
+};
+
 const getReminderTarget = (key: 'water_min_l' | 'fiber_target_g'): number | null => {
   const currentConfig = toRecord(adminConfig.value);
   const reminders = toRecord(currentConfig.reminders);
@@ -286,6 +344,7 @@ const getReminderTarget = (key: 'water_min_l' | 'fiber_target_g'): number | null
 const resolvedProfile = computed(() => {
   const source = toRecord(profile.value);
   const computedTargets = toRecord(storage.computeTargetsForProfile(source, new Date(), false));
+  const tdee = toPositiveOrNull(source.tdee_calories) ?? toPositiveOrNull(computedTargets.tdee_calories);
 
   const caloriesTarget = toPositiveOrNull(source.calories_target)
     ?? toPositiveOrNull(computedTargets.calories_target);
@@ -303,11 +362,15 @@ const resolvedProfile = computed(() => {
     ? profileMacros
     : toRecord(fallbackMacros);
 
+  const computedWaterTarget = calculateWaterTargetFromProfile(source);
+  const computedFiberTarget = calculateFiberTargetFromProfile(source, tdee);
+  const fallbackFiberTarget = getReminderTarget('fiber_target_g');
+
   return {
     caloriesTarget,
     macros,
-    waterTarget: getReminderTarget('water_min_l'),
-    fiberTarget: getReminderTarget('fiber_target_g')
+    waterTarget: computedWaterTarget ?? null,
+    fiberTarget: computedFiberTarget ?? fallbackFiberTarget
   };
 });
 
@@ -406,30 +469,56 @@ const buildDateRange = (days: number) => {
   return result;
 };
 
-const resolveStatusTone = (type: 'calories' | 'water' | 'weekly', ratio: number | string) => {
-  if (type === 'weekly') {
-    const palette: Record<string, { dotClass: string }> = {
-      overeat: { dotClass: 'bg-rose-500' },
-      undereat: { dotClass: 'bg-amber-500' },
-      low_protein: { dotClass: 'bg-cyan-500' },
-      low_discipline: { dotClass: 'bg-orange-500' },
-      ok: { dotClass: 'bg-emerald-500' }
-    };
-    return palette[String(ratio)] || { dotClass: 'bg-slate-300' };
+const buildCenteredDateRange = (days: number) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const before = Math.floor((days - 1) / 2);
+  const after = days - before - 1;
+  const result: Array<{ date: Date; key: string; label: string; weekday: string; isToday: boolean }> = [];
+
+  for (let offset = -before; offset <= after; offset += 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + offset);
+    const key = normalizeDate(date.toISOString());
+    const label = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}`;
+    result.push({
+      date,
+      key,
+      label,
+      weekday: weekdayLabels[date.getDay()],
+      isToday: offset === 0
+    });
   }
-  if (!Number.isFinite(Number(ratio))) {
-    return { color: '#e2e8f0' };
+  return result;
+};
+
+const smoothStep = (value: number): number => {
+  const clamped = clamp01(value);
+  return clamped * clamped * (3 - 2 * clamped);
+};
+
+const lerp = (from: number, to: number, factor: number): number => from + ((to - from) * factor);
+const getFabProgressColor = (ratio: number): string => {
+  if (!Number.isFinite(ratio)) {
+    return '#e2e8f0';
   }
-  const value = Number(ratio);
-  if (type === 'calories') {
-    if (value < 0.8) return { color: '#f59e0b' };
-    if (value <= 1.1) return { color: '#22c55e' };
-    if (value <= 1.25) return { color: '#f97316' };
-    return { color: '#ef4444' };
-  }
-  if (value < 0.7) return { color: '#f59e0b' };
-  if (value <= 1.1) return { color: '#22c55e' };
-  return { color: '#14b8a6' };
+  // One FAB-aligned hue; only saturation/lightness change with progress.
+  const t = smoothStep(clamp01(ratio));
+  const hue = 164;
+  const saturation = lerp(18, 66, t);
+  const lightness = lerp(90, 49, t);
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+};
+
+const resolveWeeklyStatusTone = (status: string) => {
+  const palette: Record<string, { dotClass: string }> = {
+    overeat: { dotClass: 'bg-rose-500' },
+    undereat: { dotClass: 'bg-amber-500' },
+    low_protein: { dotClass: 'bg-cyan-500' },
+    low_discipline: { dotClass: 'bg-orange-500' },
+    ok: { dotClass: 'bg-emerald-500' }
+  };
+  return palette[status] || { dotClass: 'bg-slate-300' };
 };
 
 const todayFacts = computed(() => {
@@ -464,48 +553,43 @@ const todayFacts = computed(() => {
 });
 
 const weeklyProgress = computed(() => {
-  const dayLabels = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
   const targetCalories = resolvedProfile.value.caloriesTarget;
   const hasTarget = targetCalories !== null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const dayIndex = (today.getDay() + 6) % 7;
-  const startDate = new Date(today);
-  startDate.setDate(today.getDate() - dayIndex);
+  const range = buildCenteredDateRange(7);
 
   const days = [] as Array<{ date: string; dateLabel: string; label: string; height: number; color: string; isToday: boolean; calories: number; hasData: boolean }>;
   let totalPercent = 0;
+  let trackedDays = 0;
   let loggedDays = 0;
   let totalCalories = 0;
 
-  for (let index = 0; index < 7; index += 1) {
-    const date = new Date(startDate);
-    date.setDate(startDate.getDate() + index);
-    const key = normalizeDate(date.toISOString());
-    const dateLabel = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}`;
-    const totals = dayTotalsByDate.value.get(key);
+  for (let index = 0; index < range.length; index += 1) {
+    const item = range[index];
+    const totals = dayTotalsByDate.value.get(item.key);
     const calories = totals?.calories || 0;
     const hasData = Boolean(totals);
     const ratio = hasTarget ? Math.max(0, Math.min(1, safeDivide(calories, targetCalories as number))) : 0;
-    totalPercent += ratio;
-    if (hasData) {
+    if (item.key <= todayKey) {
+      totalPercent += ratio;
+      trackedDays += 1;
+    }
+    if (hasData && item.key <= todayKey) {
       loggedDays += 1;
       totalCalories += calories;
     }
-    const tone = hasTarget ? resolveStatusTone('calories', ratio) : resolveStatusTone('calories', Number.NaN);
     days.push({
-      date: key,
-      dateLabel,
-      label: dayLabels[index],
+      date: item.key,
+      dateLabel: item.label,
+      label: item.weekday,
       height: hasData && hasTarget ? Math.max(4, Math.round(ratio * 100)) : 0,
-      color: hasData && hasTarget ? tone.color : '#e2e8f0',
-      isToday: key === todayKey,
+      color: hasData && hasTarget ? getFabProgressColor(ratio) : '#e2e8f0',
+      isToday: item.isToday,
       calories,
       hasData
     });
   }
 
-  const percent = hasTarget ? Math.round(Math.min(Math.max((totalPercent / 7) * 100, 0), 100)) : 0;
+  const percent = hasTarget && trackedDays > 0 ? Math.round(Math.min(Math.max((totalPercent / trackedDays) * 100, 0), 100)) : 0;
   let insight = 'Пока нет записей за неделю.';
   if (loggedDays > 0 && loggedDays < 3) {
     insight = 'Записей пока мало, вывод приблизительный.';
@@ -533,7 +617,7 @@ const weeklyProgress = computed(() => {
 const calorieTrend = computed(() => {
   const targetCalories = resolvedProfile.value.caloriesTarget;
   const hasTarget = targetCalories !== null;
-  const range = buildDateRange(calorieRange.value);
+  const range = buildCenteredDateRange(calorieRange.value);
   const maxValue = range.reduce((max, item) => Math.max(max, dayTotalsByDate.value.get(item.key)?.calories || 0), 0);
   const scale = Math.max(1, maxValue, hasTarget ? (targetCalories as number) : 0);
   return range.map((item) => {
@@ -543,8 +627,9 @@ const calorieTrend = computed(() => {
       date: item.key,
       calories,
       dateLabel: item.label,
+      isToday: item.isToday,
       height: Math.max(4, Math.round(Math.min(1, safeDivide(calories, scale)) * 100)),
-      color: resolveStatusTone('calories', ratio).color
+      color: getFabProgressColor(ratio)
     };
   });
 });
@@ -578,7 +663,7 @@ const calorieTrendMeta = computed(() => {
 const waterHistory = computed(() => {
   const targetWater = resolvedProfile.value.waterTarget;
   const hasTarget = targetWater !== null;
-  const range = buildDateRange(waterRange.value);
+  const range = buildCenteredDateRange(waterRange.value);
   const maxValue = range.reduce((max, item) => Math.max(max, dayTotalsByDate.value.get(item.key)?.water || 0), 0);
   const scale = Math.max(1, maxValue, hasTarget ? (targetWater as number) : 0);
   return range.map((item) => {
@@ -588,8 +673,9 @@ const waterHistory = computed(() => {
       date: item.key,
       water,
       dateLabel: item.label,
+      isToday: item.isToday,
       height: Math.max(4, Math.round(Math.min(1, safeDivide(water, scale)) * 100)),
-      color: resolveStatusTone('water', ratio).color
+      color: getFabProgressColor(ratio)
     };
   });
 });
@@ -725,45 +811,6 @@ const carbSplit = computed(() => {
   };
 });
 
-const monthGrid = computed(() => {
-  const targetCalories = resolvedProfile.value.caloriesTarget;
-  const hasTarget = targetCalories !== null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayNormalized = normalizeDate(today.toISOString());
-
-  const cells: Array<{ date: string; text: string; className: string }> = [];
-  for (let offset = 29; offset >= 0; offset -= 1) {
-    const date = new Date(today);
-    date.setDate(today.getDate() - offset);
-    const key = normalizeDate(date.toISOString());
-    const calories = dayTotalsByDate.value.get(key)?.calories || 0;
-    const hasData = calories > 0;
-
-    let className = 'month-day--empty bg-slate-200 text-slate-500';
-    if (hasData && !hasTarget) {
-      className = 'month-day--active bg-emerald-300 text-white';
-    } else if (hasData && hasTarget) {
-      const ratio = safeDivide(calories, targetCalories as number);
-      className = ratio >= 0.9 && ratio <= 1.1
-        ? 'month-day--good bg-emerald-500 text-white'
-        : 'month-day--bad bg-rose-500 text-white';
-    }
-
-    if (key === todayNormalized) {
-      className += ' month-day--today ring-2 ring-emerald-300';
-    }
-
-    cells.push({
-      date: key,
-      text: String(date.getDate()).padStart(2, '0'),
-      className
-    });
-  }
-
-  return cells;
-});
-
 const weeklyAdjustments = computed(() => {
   const raw = (profile.value as Record<string, unknown>).weekly_adjustments;
   if (Array.isArray(raw)) {
@@ -785,7 +832,7 @@ const weeklyAdjustments = computed(() => {
 const weeklyReview = computed(() => {
   const review = ((profile.value as Record<string, unknown>).weekly_review || {}) as Record<string, unknown>;
   const status = String(review.status || 'ok');
-  const tone = resolveStatusTone('weekly', status);
+  const tone = resolveWeeklyStatusTone(status);
   const statusLabels: Record<string, string> = {
     overeat: 'Еды было больше, чем нужно',
     undereat: 'Еды было меньше, чем нужно',
@@ -841,5 +888,17 @@ onMounted(async () => {
 
 .profile-card--compact {
   padding: 1.25rem;
+}
+
+.trend-day {
+  border: 1px solid #f1f5f9;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  padding: 0.35rem 0.25rem;
+}
+
+.is-today {
+  border-color: rgba(45, 212, 191, 0.95) !important;
+  box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.2);
 }
 </style>

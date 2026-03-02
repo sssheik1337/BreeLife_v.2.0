@@ -35,7 +35,6 @@
                     </div>
                     <div class="flex items-center gap-2">
                         <button type="button" class="btn-secondary w-full" id="shopping-copy" @click="copyShoppingList">Скопировать список</button>
-                        <button type="button" class="btn-secondary w-full" id="shopping-clear" @click="clearShoppingChecks">Очистить отметки</button>
                     </div>
                 </div>
 
@@ -57,25 +56,16 @@
                             </div>
 
                             <div class="space-y-3">
-                                <label
+                                <div
                                     v-for="item in groupedShoppingList[groupName]"
-                                    :key="buildCheckKey(item)"
+                                    :key="`${item.group}::${item.name}`"
                                     class="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3"
                                 >
-                                    <div class="flex items-center gap-3">
-                                        <input
-                                            type="checkbox"
-                                            class="form-checkbox"
-                                            :checked="Boolean(shoppingChecks[buildCheckKey(item)])"
-                                            :data-shopping-check="buildCheckKey(item)"
-                                            @change="toggleShoppingCheck(buildCheckKey(item), ($event.target as HTMLInputElement).checked)"
-                                        >
-                                        <div>
-                                            <div class="text-sm font-semibold text-slate-800">{{ item.name }}</div>
-                                            <div class="text-xs text-slate-500">≈ {{ item.weight }} г • {{ item.count }} раз</div>
-                                        </div>
+                                    <div>
+                                        <div class="text-sm font-semibold text-slate-800">{{ item.name }}</div>
+                                        <div class="text-xs text-slate-500">≈ {{ item.weight }} г • {{ item.count }} раз</div>
                                     </div>
-                                </label>
+                                </div>
                             </div>
                         </section>
                     </template>
@@ -116,7 +106,6 @@ const storageStore = useStorageStore();
 
 const activeRange = ref<'day' | 'week'>('day');
 const products = ref<Product[]>([]);
-const shoppingChecks = ref<Record<string, boolean>>({});
 
 const isLoading = ref(true);
 const loadError = ref('');
@@ -221,22 +210,6 @@ const buildShoppingList = (items: Product[], range: 'day' | 'week'): Record<stri
 const groupedShoppingList = computed(() => buildShoppingList(products.value, activeRange.value));
 const groupNames = computed(() => Object.keys(groupedShoppingList.value));
 
-const buildCheckKey = (item: ShoppingAggregateItem): string => `${item.group}::${item.name}`;
-
-const toggleShoppingCheck = (key: string, checked: boolean): void => {
-    const nextChecks = { ...shoppingChecks.value };
-    if (checked) {
-        nextChecks[key] = true;
-    } else {
-        delete nextChecks[key];
-    }
-    shoppingChecks.value = nextChecks;
-};
-
-const clearShoppingChecks = (): void => {
-    shoppingChecks.value = {};
-};
-
 const notify = (message: string, type: 'success' | 'error'): void => {
     const showNotification = (window as any).showNotification;
     if (typeof showNotification === 'function') {
@@ -272,7 +245,7 @@ const copyShoppingList = async (): Promise<void> => {
     groupNames.value.forEach((groupName) => {
         lines.push(groupName);
         groupedShoppingList.value[groupName].forEach((item) => {
-            lines.push(`- ${item.name}: в‰€ ${item.weight} Рі`);
+            lines.push(`- ${item.name}: ≈ ${item.weight} г`);
         });
         lines.push('');
     });

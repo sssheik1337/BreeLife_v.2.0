@@ -81,6 +81,17 @@ TABLES = {
             last_seen_at TEXT NOT NULL
         )
     """,
+    "payments": """
+        CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            telegram_user_id INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            amount_rub INTEGER NOT NULL DEFAULT 0,
+            duration_days INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'success',
+            meta_json TEXT
+        )
+    """,
     "meal_plan_cache": """
         CREATE TABLE IF NOT EXISTS meal_plan_cache (
             cache_key TEXT PRIMARY KEY,
@@ -100,6 +111,34 @@ def init_db() -> None:
         connection.execute("PRAGMA journal_mode=WAL;")
         for statement in TABLES.values():
             connection.execute(statement)
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_telegram_users_username ON telegram_users(username)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_telegram_users_updated_at ON telegram_users(updated_at)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_sessions_user_created ON sessions(telegram_user_id, created_at)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_profiles_user ON profiles(telegram_user_id)"
+        )
+        try:
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_profiles_subscription_until ON profiles(json_extract(data, '$.subscription_until'))"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_profiles_subscription_status ON profiles(lower(json_extract(data, '$.subscription_status')))"
+            )
+        except sqlite3.OperationalError:
+            # JSON expression indexes may be unavailable on older SQLite builds.
+            pass
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_payments_user_created ON payments(telegram_user_id, created_at)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_payments_status_created ON payments(status, created_at)"
+        )
 
 
 def read_payload(table: str, telegram_user_id: int) -> dict | list | None:
