@@ -23,6 +23,22 @@ export interface OnboardingProductsResponse {
 }
 
 export const preferencesOnboardingApi = {
+    getCatalogProducts: async (): Promise<OnboardingProduct[]> => {
+        const response = await api.request<Array<Record<string, unknown>>>('/api/products');
+        if (!Array.isArray(response)) {
+            return [];
+        }
+
+        return response
+            .filter((item) => item && typeof item.id === 'number')
+            .map((item) => ({
+                id: item.id as number,
+                name: typeof item.name === 'string' && item.name.trim() ? item.name : 'Без названия',
+                group: typeof item.group === 'string' && item.group.trim() ? item.group : 'Без группы',
+                kcal: typeof item.kcal === 'number' ? item.kcal : 0
+            }));
+    },
+
     getProducts: async (limit = 30): Promise<OnboardingProductsResponse> => {
         const response = await api.request<OnboardingProductsResponse>('/api/preferences/onboarding-products', {
             query: { limit }
@@ -45,4 +61,3 @@ export const preferencesOnboardingApi = {
         };
     }
 };
-

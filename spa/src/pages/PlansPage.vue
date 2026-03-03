@@ -17,7 +17,7 @@
                     <div id="plans-trial-status" class="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
                         <div class="flex items-center justify-between gap-3">
                             <p class="font-semibold text-slate-800">Пробный период</p>
-                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold" :class="trialStatus.badgeClass">{{ trialStatus.badgeText }}</span>
+                            <span class="plans-trial-chip" :class="trialStatus.badgeClass">{{ trialStatus.badgeText }}</span>
                         </div>
                         <p class="text-sm text-slate-500 mt-1">{{ trialStatus.detailsText }}</p>
                     </div>
@@ -53,8 +53,8 @@
                                 class="btn-primary w-full"
                                 type="button"
                                 :data-plan="plan.id"
-                                :disabled="isPremium(plan)"
-                                :title="isPremium(plan) ? 'Оплата не подключена' : undefined"
+                                :disabled="isPlanSelectionDisabled(plan)"
+                                :title="isPlanSelectionDisabled(plan) ? 'Доступ уже открыт в текущем периоде' : undefined"
                                 @click="selectPlan(plan)"
                             >
                                 {{ planButtonText(plan) }}
@@ -70,8 +70,9 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import { useStorageStore } from '../stores/storageStore';
+import { subscriptionApi } from '../api/subscriptionApi';
 
 interface PlanDto {
     id: string;
@@ -92,9 +93,11 @@ const plans = ref<PlanDto[]>([]);
 const activePlan = ref('free');
 const isLoading = ref(true);
 const loadError = ref('');
+const selectedPlanId = ref('');
 const trialStatus = ref({
+    kind: 'loading' as 'loading' | 'active' | 'expired' | 'inactive' | 'error',
     badgeText: 'Проверка...',
-    badgeClass: 'bg-slate-100 text-slate-600',
+    badgeClass: 'plans-trial-chip--inactive',
     detailsText: 'Проверяем срок действия пробного периода.'
 });
 
@@ -104,9 +107,6 @@ const normalizeFeatures = (value: unknown): string[] => {
     }
     return value.filter((item) => typeof item === 'string') as string[];
 };
-
-const isPremium = (plan: PlanDto): boolean => plan.id === 'premium';
-const isTrial = (plan: PlanDto): boolean => plan.id === 'trial';
 
 const toPriceNumber = (value: unknown): number => {
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -134,6 +134,13 @@ const formatDateRu = (value: unknown): string | null => {
 };
 
 const showOldPrice = (plan: PlanDto): boolean => plan.price_old_enabled === true && toPriceNumber(plan.price_old) > 0;
+const currentPrice = (plan: PlanDto): number => toPriceNumber(plan.price_current ?? plan.price);
+const isCommercialPlan = (plan: PlanDto): boolean => currentPrice(plan) > 0;
+const hasUnlockedAccess = computed(() => trialStatus.value.kind === 'active');
+const isPlanSelectionDisabled = (plan: PlanDto): boolean => (
+    selectedPlanId.value === plan.id
+    || (hasUnlockedAccess.value && isCommercialPlan(plan))
+);
 
 const planSubtitle = (plan: PlanDto): string => {
     const durationDays = Number(plan.duration_days);
@@ -141,43 +148,60 @@ const planSubtitle = (plan: PlanDto): string => {
 };
 
 const planStatusText = (plan: PlanDto): string => {
-    if (isTrial(plan)) {
-        return 'Пробный период активируется автоматически';
+    if (isCommercialPlan(plan) && hasUnlockedAccess.value) {
+        return 'Сейчас этот уровень доступа уже открыт в пробном периоде.';
     }
-    if (isPremium(plan)) {
-        return 'Оплата подключается, тариф готовится';
+    if (isCommercialPlan(plan)) {
+        return 'Коммерческий тариф';
     }
     return 'Текущий бесплатный план';
 };
 
 const planButtonText = (plan: PlanDto): string => {
-    if (isPremium(plan)) {
+    if (isCommercialPlan(plan) && hasUnlockedAccess.value) {
         return 'Доступно в пробном периоде';
     }
-    if (activePlan.value === plan.id) {
+    if (selectedPlanId.value === plan.id) {
+        return 'Выбор...';
+    }
+    if (activePlan.value === plan.id && !isCommercialPlan(plan)) {
         return 'Выбран';
     }
     return 'Выбрать';
 };
 
-const notify = (message: string): void => {
+const notify = (message: string, type: 'success' | 'error' = 'success'): void => {
     const showNotification = (window as any).showNotification;
     if (typeof showNotification === 'function') {
-        showNotification(message, 'success');
+        showNotification(message, type);
         return;
     }
     alert(message);
 };
 
-const selectPlan = (plan: PlanDto): void => {
-    if (isPremium(plan)) {
+const selectPlan = async (plan: PlanDto): Promise<void> => {
+    if (isPlanSelectionDisabled(plan)) {
+        if (hasUnlockedAccess.value && isCommercialPlan(plan)) {
+            notify('Пробный период уже активен. Дополнительный выбор тарифа сейчас не требуется.');
+        }
         return;
     }
-    activePlan.value = plan.id;
-    const message = isTrial(plan)
-        ? 'Пробный период 30 дней доступен. Оплата не требуется.'
-        : 'Бесплатный план выбран.';
-    notify(message);
+
+    selectedPlanId.value = plan.id;
+    try {
+        if (isCommercialPlan(plan)) {
+            await subscriptionApi.startPayment({ plan_id: plan.id });
+            notify(`Тариф «${plan.title || plan.id}» выбран.`);
+            return;
+        }
+
+        activePlan.value = plan.id;
+        notify('Бесплатный план выбран.');
+    } catch {
+        notify('Не удалось выбрать тариф. Попробуйте ещё раз.', 'error');
+    } finally {
+        selectedPlanId.value = '';
+    }
 };
 
 const refreshIcons = async (): Promise<void> => {
@@ -214,45 +238,43 @@ const fetchTrialStatus = async (): Promise<void> => {
             throw new Error('status_failed');
         }
         const payload = await response.json();
-        const status = String(payload?.subscription_status || '');
+        const status = String(payload?.status || '').toLowerCase();
         const until = formatDateRu(payload?.subscription_until);
+        const untilRaw = typeof payload?.subscription_until === 'string' ? payload.subscription_until : '';
+        const untilDate = untilRaw ? new Date(untilRaw) : null;
+        const isExpired = Boolean(untilDate && !Number.isNaN(untilDate.getTime()) && untilDate.getTime() < Date.now());
 
-        if (status === 'expired') {
+        if (isExpired) {
             trialStatus.value = {
+                kind: 'expired',
                 badgeText: 'Завершён',
-                badgeClass: 'bg-rose-100 text-rose-700',
+                badgeClass: 'plans-trial-chip--expired',
                 detailsText: until ? `Пробный период завершился ${until}.` : 'Пробный период завершён.'
             };
             return;
         }
 
-        if (status === 'trial') {
+        if (status === 'active') {
             trialStatus.value = {
+                kind: 'active',
                 badgeText: 'Активен',
-                badgeClass: 'bg-emerald-100 text-emerald-700',
+                badgeClass: 'plans-trial-chip--active',
                 detailsText: until ? `Действует до ${until}.` : 'Пробный период активен.'
             };
             return;
         }
 
-        if (status === 'paid') {
-            trialStatus.value = {
-                badgeText: 'Premium',
-                badgeClass: 'bg-cyan-100 text-cyan-700',
-                detailsText: until ? `Доступ активен до ${until}.` : 'Платный доступ активен.'
-            };
-            return;
-        }
-
         trialStatus.value = {
+            kind: 'inactive',
             badgeText: 'Не активирован',
-            badgeClass: 'bg-slate-100 text-slate-600',
+            badgeClass: 'plans-trial-chip--inactive',
             detailsText: 'Пробный период пока не активирован.'
         };
     } catch {
         trialStatus.value = {
+            kind: 'error',
             badgeText: '—',
-            badgeClass: 'bg-slate-100 text-slate-600',
+            badgeClass: 'plans-trial-chip--inactive',
             detailsText: 'Не удалось получить статус пробного периода.'
         };
     }
@@ -263,3 +285,38 @@ onMounted(async () => {
     await Promise.all([fetchPlans(), fetchTrialStatus()]);
 });
 </script>
+
+<style scoped>
+.plans-trial-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  border: 1px solid #d1d5db;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.plans-trial-chip--active {
+  border-color: transparent;
+  background: linear-gradient(135deg, #34d399 0%, #3b82f6 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(52, 211, 153, 0.24);
+}
+
+.plans-trial-chip--expired {
+  border-color: #fecdd3;
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.plans-trial-chip--inactive {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+}
+</style>

@@ -35,8 +35,8 @@ export interface PatchOptions {
 export const useStorageStore = defineStore('storage', () => {
     // Source of truth: store state drives UI; storageService keeps legacy cache only.
     // Reactivity: every public call re-syncs cache into reactive refs, so UI updates without manual refresh.
-    // РСЃС‚РѕС‡РЅРёРє РёСЃС‚РёРЅС‹ РґР»СЏ UI вЂ” СЃРѕСЃС‚РѕСЏРЅРёСЏ store. storageService С…СЂР°РЅРёС‚ С‚РѕР»СЊРєРѕ legacy-РєРµС€,
-    // Р° store СЃРёРЅС…СЂРѕРЅРёР·РёСЂСѓРµС‚ РµРіРѕ РІ СЂРµР°РєС‚РёРІРЅС‹Рµ refs РїСЂРё РєР°Р¶РґРѕРј РІС‹Р·РѕРІРµ.
+    // Источник истины для UI — состояния store. storageService хранит только legacy-кеш,
+    // а store синхронизирует его в реактивные refs при каждом вызове.
     const profile = ref<ProfileState>(legacyGetUserProfile());
     const diaryEntries = ref<DiaryEntryState[]>(legacyGetDiaryEntries());
     const habitEntries = ref<HabitEntriesState>(legacyGetHabitEntries());
@@ -311,7 +311,7 @@ export const useStorageStore = defineStore('storage', () => {
                 logStage('patchProfile', { skipped: true });
             }
 
-            // РЎС†РµРЅР°СЂРёР№ РіРѕРЅРєРё: С‚СЂРё Р±С‹СЃС‚СЂС‹С… patch в†’ sync.
+            // Сценарий гонки: три быстрых patch → sync.
             const raceStamp = Date.now();
             const raceValues = [
                 new Date(raceStamp).toISOString(),
@@ -383,7 +383,7 @@ export const useStorageStore = defineStore('storage', () => {
         syncHabitEntriesWithBackend,
         computeTargetsForProfile,
         // Exposed for diagnostics and ordered syncs.
-        // РћР¶РёРґР°РЅРёРµ РїРѕСЃР»РµРґРЅРµРіРѕ patch РґРѕСЃС‚СѓРїРЅРѕ РґР»СЏ РІРЅРµС€РЅРµР№ РґРёР°РіРЅРѕСЃС‚РёРєРё.
+        // Ожидание последнего patch доступно для внешней диагностики.
         awaitPendingProfilePatch,
         runStorageSmokeCheck,
         runSmokeCheck

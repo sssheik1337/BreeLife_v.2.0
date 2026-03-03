@@ -302,8 +302,8 @@
         }
 
         .fab-menu__item {
-          border: none;
-          background: #f8fafc;
+          border: 1px solid rgba(16, 185, 129, 0.28);
+          background: linear-gradient(135deg, #34d399 0%, #3b82f6 100%);
           border-radius: 12px;
           min-height: 58px;
           width: 100%;
@@ -315,8 +315,16 @@
           font-size: 16px;
           font-weight: 600;
           line-height: 1.2;
-          color: #0f172a;
+          color: #ffffff;
           cursor: pointer;
+          box-shadow: 0 8px 16px rgba(52, 211, 153, 0.24);
+          transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, filter 0.2s ease;
+        }
+
+        .fab-menu__item:hover {
+          border-color: rgba(16, 185, 129, 0.35);
+          box-shadow: 0 10px 18px rgba(52, 211, 153, 0.3);
+          filter: brightness(1.03);
         }
 
         .fab-menu__item:active {
@@ -353,8 +361,8 @@
         }
 
         .faq-menu__item {
-          border: none;
-          background: #f8fafc;
+          border: 1px solid rgba(16, 185, 129, 0.28);
+          background: linear-gradient(135deg, #34d399 0%, #3b82f6 100%);
           border-radius: 12px;
           min-height: 58px;
           width: 100%;
@@ -366,8 +374,16 @@
           font-size: 16px;
           font-weight: 600;
           line-height: 1.2;
-          color: #0f172a;
+          color: #ffffff;
           cursor: pointer;
+          box-shadow: 0 8px 16px rgba(52, 211, 153, 0.24);
+          transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, filter 0.2s ease;
+        }
+
+        .faq-menu__item:hover {
+          border-color: rgba(16, 185, 129, 0.35);
+          box-shadow: 0 10px 18px rgba(52, 211, 153, 0.3);
+          filter: brightness(1.03);
         }
 
         .faq-menu__item:active {
@@ -443,7 +459,7 @@
       <footer class="footer">
         <div class="footer-content">
           <p class="footer-text">
-            🌱 Посадите здоровье сегодня, расцветете завтра. Делайте маленькие шаги каждый день к более здоровому себе.
+            🌱 Делайте маленькие шаги каждый день к более здоровому себе.
           </p>
           <div class="copyright">
             © ${new Date().getFullYear()} Health Bloom • Сделано с ❤️ для здоровой жизни
@@ -499,7 +515,9 @@
       </div>
     `;
 
-    const hasCompletedProfile = window.profileCompleted === true;
+    let hasCompletedProfile = window.profileCompleted === true;
+    let hasCompletedPreferencesOnboarding = false;
+    let hasSeenTrialWelcome = false;
     const isDevMode = window.appIsDev === true || window.appMode === 'development';
 
     const bottomLinks = {
@@ -516,6 +534,32 @@
     const faqFab = this.shadowRoot.querySelector('.faq-fab');
     const faqOverlay = this.shadowRoot.querySelector('[data-faq-overlay]');
     const faqMenu = this.shadowRoot.querySelector('[data-faq-menu]');
+
+    const resolveProfileSnapshot = () => {
+      try {
+        if (typeof window.getUserProfile === 'function') {
+          const profile = window.getUserProfile();
+          if (profile && typeof profile === 'object') {
+            return profile;
+          }
+        }
+      } catch (error) {
+        return null;
+      }
+      return null;
+    };
+
+    const syncOnboardingGateState = () => {
+      const profile = resolveProfileSnapshot();
+      hasCompletedPreferencesOnboarding = Boolean(profile?.preferences_onboarding_completed === true);
+      hasSeenTrialWelcome = Boolean(profile?.trial_welcome_seen === true);
+    };
+
+    const isFaqFabUnlocked = () => (
+      hasCompletedProfile
+      && hasCompletedPreferencesOnboarding
+      && hasSeenTrialWelcome
+    );
 
     const normalizeSpaTarget = (target) => {
       if (!target || typeof target !== 'string') {
@@ -752,7 +796,10 @@
     applyBottomNavState(hasCompletedProfile);
     window.addEventListener('profile-status-updated', (event) => {
       const profileCompleted = Boolean(event?.detail?.profileCompleted);
+      hasCompletedProfile = profileCompleted;
       applyBottomNavState(profileCompleted);
+      updateBottomNavVisibility();
+      updateActiveBottomLink();
     });
 
     const resolveCurrentPath = () => {
@@ -773,18 +820,20 @@
     };
 
     const updateBottomNavVisibility = () => {
+      syncOnboardingGateState();
       const currentPath = resolveCurrentPath();
-      const shouldHide = !hasCompletedProfile && currentPath.startsWith('/questionnaire');
+      const shouldHideBottomNav = !hasCompletedProfile && currentPath.startsWith('/questionnaire');
+      const shouldHideFaqFab = !isFaqFabUnlocked();
       if (bottomNav) {
-        bottomNav.style.display = shouldHide ? 'none' : '';
+        bottomNav.style.display = shouldHideBottomNav ? 'none' : '';
       }
       if (faqFab) {
-        faqFab.style.display = shouldHide ? 'none' : '';
+        faqFab.style.display = shouldHideFaqFab ? 'none' : '';
       }
       if (bottomSpacer) {
-        bottomSpacer.style.height = shouldHide ? '0' : '0';
+        bottomSpacer.style.height = shouldHideBottomNav ? '0' : '0';
       }
-      if (shouldHide) {
+      if (shouldHideBottomNav || shouldHideFaqFab) {
         closeFabMenu();
         closeFaqMenu();
       }
@@ -837,5 +886,4 @@
 }
 
 customElements.define('custom-footer', CustomFooter);
-
 

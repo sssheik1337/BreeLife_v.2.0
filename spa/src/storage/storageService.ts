@@ -1,8 +1,8 @@
 ﻿// @ts-nocheck
 import { ensureTelegramAuthSession } from '../platform/telegramAuth';
-// РҐСЂР°РЅРёР»РёС‰Рµ РїСЂРѕС„РёР»СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Рё РЅРѕСЂРјР°Р»РёР·Р°С†РёСЏ РґР°РЅРЅС‹С…
-// Р•РґРёРЅС‹Р№ canonical-С„РѕСЂРјР°С‚ РїСЂРѕС„РёР»СЏ РјРµР¶РґСѓ С„СЂРѕРЅС‚РµРЅРґРѕРј Рё Р±СЌРєРµРЅРґРѕРј.
-    // Р’СЃРµ С‡С‚РµРЅРёСЏ/Р·Р°РїРёСЃРё РїСЂРѕС„РёР»СЏ РґРѕР»Р¶РЅС‹ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ С‚РѕР»СЊРєРѕ СЌС‚Рё РєР»СЋС‡Рё.
+// Хранилище профиля пользователя и нормализация данных
+// Единый canonical-формат профиля между фронтендом и бэкендом.
+    // Все чтения/записи профиля должны использовать только эти ключи.
     const CANONICAL_PROFILE_KEYS = [
         'sex',
         'birth_date',
@@ -193,10 +193,10 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
         // Telegram initData is read from window.telegramInitData (normalized Telegram.WebApp.initData).
         // If initData is unavailable during SPA init, requests go out without X-Telegram-Init-Data.
         // No guard/fallback is used to keep legacy request semantics intact.
-        // Telegram initData Р±РµСЂС‘Рј РёР· window.telegramInitData.
-        // Р•РіРѕ РёСЃС‚РѕС‡РЅРёРє: Telegram.WebApp.initData РЅР° СЃС‚Р°СЂС‚Рµ + РѕР±РЅРѕРІР»РµРЅРёСЏ РёР· ui.js (initTelegramAuth).
-        // Р•СЃР»Рё initData РЅРµРґРѕСЃС‚СѓРїРµРЅ (СЂР°РЅРЅРёР№ SPA-init/РЅРµ Telegram), Р·Р°РїСЂРѕСЃС‹ СѓС…РѕРґСЏС‚ Р±РµР· X-Telegram-Init-Data.
-        // Guard/fallback РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚, С‡С‚РѕР±С‹ РЅРµ РјРµРЅСЏС‚СЊ СЃРµРјР°РЅС‚РёРєСѓ Р·Р°РїСЂРѕСЃРѕРІ (РєР°Рє РІ legacy storage.js).
+        // Telegram initData берём из window.telegramInitData.
+        // Его источник: Telegram.WebApp.initData на старте + обновления из ui.js (initTelegramAuth).
+        // Если initData недоступен (ранний SPA-init/не Telegram), запросы уходят без X-Telegram-Init-Data.
+        // Guard/fallback отсутствует, чтобы не менять семантику запросов (как в legacy storage.js).
         // Telegram initData source:
         // 1) window.telegramInitData cache;
         // 2) direct Telegram.WebApp.initData read if cache is empty.
@@ -249,7 +249,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
                 return value;
             }
         } catch (error) {
-            // Р•СЃР»Рё localStorage РЅРµРґРѕСЃС‚СѓРїРµРЅ (РЅР°РїСЂРёРјРµСЂ, СЂРµР¶РёРј РїСЂРёРІР°С‚РЅРѕСЃС‚Рё), РёСЃРїРѕР»СЊР·СѓРµРј С‚РѕР»СЊРєРѕ РїР°РјСЏС‚СЊ.
+            // Если localStorage недоступен (например, режим приватности), используем только память.
         }
         return null;
     }
@@ -261,7 +261,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
                 localStorage.setItem(key, value);
             }
         } catch (error) {
-            // Р•СЃР»Рё localStorage РЅРµРґРѕСЃС‚СѓРїРµРЅ, СЃРѕС…СЂР°РЅСЏРµРј С…РѕС‚СЏ Р±С‹ РІ РїР°РјСЏС‚Рё С‚РµРєСѓС‰РµР№ РІРєР»Р°РґРєРё.
+            // Если localStorage недоступен, сохраняем хотя бы в памяти текущей вкладки.
         }
     }
 
@@ -272,7 +272,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
                 localStorage.removeItem(key);
             }
         } catch (error) {
-            // РћС€РёР±РєСѓ СѓРґР°Р»РµРЅРёСЏ localStorage РёРіРЅРѕСЂРёСЂСѓРµРј, С‡С‚РѕР±С‹ РЅРµ Р»РѕРјР°С‚СЊ РїРѕС‚РѕРє РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ.
+            // Ошибку удаления localStorage игнорируем, чтобы не ломать поток пользователя.
         }
     }
 
@@ -354,13 +354,13 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
             const sexMap = {
                 male: 'male',
                 man: 'male',
-                'РјСѓР¶СЃРєРѕР№': 'male',
-                'РјСѓР¶': 'male',
+                'мужской': 'male',
+                'муж': 'male',
                 'Рј': 'male',
                 female: 'female',
                 woman: 'female',
-                'Р¶РµРЅСЃРєРёР№': 'female',
-                'Р¶РµРЅ': 'female',
+                'женский': 'female',
+                'жен': 'female',
                 'Р¶': 'female'
             };
             const mapped = sexMap[normalized] || null;
@@ -410,7 +410,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
                 blocking: true,
                 warning: false,
                 code: 'GAIN_TARGET_NOT_ABOVE_CURRENT',
-                message: 'Р¦РµР»СЊ РЅР°Р±РѕСЂР° РјР°СЃСЃС‹ РїСЂРѕС‚РёРІРѕСЂРµС‡РёС‚ РІС‹Р±СЂР°РЅРЅРѕРјСѓ Р¶РµР»Р°РµРјРѕРјСѓ РІРµСЃСѓ'
+                message: 'Цель набора массы противоречит выбранному желаемому весу'
             };
         }
 
@@ -420,7 +420,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
                 blocking: true,
                 warning: false,
                 code: 'LOSE_TARGET_NOT_BELOW_CURRENT',
-                message: 'Р¦РµР»СЊ СЃРЅРёР¶РµРЅРёСЏ РІРµСЃР° РїСЂРѕС‚РёРІРѕСЂРµС‡РёС‚ РІС‹Р±СЂР°РЅРЅРѕРјСѓ Р¶РµР»Р°РµРјРѕРјСѓ РІРµСЃСѓ'
+                message: 'Цель снижения веса противоречит выбранному желаемому весу'
             };
         }
 
@@ -544,7 +544,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
         merged.target_weight_kg = parseNumber(merged.target_weight_kg);
         merged.goal = normalizeGoal(merged.goal);
         if (merged.goal === 'maintain') {
-            // Р”Р»СЏ РїРѕРґРґРµСЂР¶Р°РЅРёСЏ РІРµСЃР° С†РµР»РµРІРѕР№ РІРµСЃ Рё РґРµРґР»Р°Р№РЅ РЅРµ РёСЃРїРѕР»СЊР·СѓСЋС‚СЃСЏ.
+            // Для поддержания веса целевой вес и дедлайн не используются.
             merged.target_weight_kg = null;
             merged.goal_deadline = null;
         }
@@ -967,7 +967,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
                 })
             });
             if (!response.ok) {
-                throw new Error('РќРµ СѓРґР°Р»РѕСЃСЊ СЃРёРЅС…СЂРѕРЅРёР·РёСЂРѕРІР°С‚СЊ СЃС‚Р°СЂС‚ РїСЂРѕР±РЅРѕРіРѕ РїРµСЂРёРѕРґР°.');
+                throw new Error('Не удалось синхронизировать старт пробного периода.');
             }
             return await response.json();
         } catch (error) {
@@ -990,8 +990,8 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
             mergedCandidate.target_weight_kg
         );
         if (consistency.blocking) {
-            // РџСЂРё РєРѕРЅС„Р»РёРєС‚Рµ С†РµР»Рё Рё РІРµСЃР° РЅРµ С‚РµСЂСЏРµРј РѕСЃС‚Р°Р»СЊРЅС‹Рµ РѕР±РЅРѕРІР»РµРЅРёСЏ РїСЂРѕС„РёР»СЏ:
-            // РѕС‚РєР°С‚С‹РІР°РµРј С‚РѕР»СЊРєРѕ РєРѕРЅС„Р»РёРєС‚СѓСЋС‰РёРµ РїРѕР»СЏ РґРѕ РїРѕСЃР»РµРґРЅРµРіРѕ РІР°Р»РёРґРЅРѕРіРѕ СЃРѕСЃС‚РѕСЏРЅРёСЏ.
+            // При конфликте цели и веса не теряем остальные обновления профиля:
+            // откатываем только конфликтующие поля до последнего валидного состояния.
             const fallback = { ...(fallbackProfile || {}) };
             return {
                 ...mergedCandidate,
@@ -1009,7 +1009,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
         try {
             memorySet(getProfileStorageKey(), JSON.stringify(profile));
         } catch (error) {
-            // РРіРЅРѕСЂРёСЂСѓРµРј РѕС€РёР±РєСѓ СЃРѕС…СЂР°РЅРµРЅРёСЏ, РґР°РЅРЅС‹Рµ РѕСЃС‚Р°СЋС‚СЃСЏ РІ РїР°РјСЏС‚Рё.
+            // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
     }
 
@@ -1081,7 +1081,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
             try {
                 await lastProfilePatchPromise;
             } catch {
-                // РћС€РёР±РєРё patch РЅРµ Р±Р»РѕРєРёСЂСѓСЋС‚ РґР°Р»СЊРЅРµР№С€РёРµ Р·Р°РїСЂРѕСЃС‹, РєР°Рє Рё РІ legacy.
+                // Ошибки patch не блокируют дальнейшие запросы, как и в legacy.
             }
         }
     }
@@ -1125,7 +1125,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
         try {
             memorySet(HABITS_STORAGE_KEY, JSON.stringify(cachedHabitEntries));
         } catch (error) {
-            // РРіРЅРѕСЂРёСЂСѓРµРј РѕС€РёР±РєСѓ СЃРѕС…СЂР°РЅРµРЅРёСЏ, РґР°РЅРЅС‹Рµ РѕСЃС‚Р°СЋС‚СЃСЏ РІ РїР°РјСЏС‚Рё.
+            // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
         if (!skipBackend) {
             void saveHabitEntriesToBackend(cachedHabitEntries);
@@ -1141,7 +1141,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
         try {
             memorySet(key, 'true');
         } catch (error) {
-            // РРіРЅРѕСЂРёСЂСѓРµРј РѕС€РёР±РєСѓ СЃРѕС…СЂР°РЅРµРЅРёСЏ, РґР°РЅРЅС‹Рµ РѕСЃС‚Р°СЋС‚СЃСЏ РІ РїР°РјСЏС‚Рё.
+            // Игнорируем ошибку сохранения, данные остаются в памяти.
         }
     }
 
@@ -1174,14 +1174,14 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
                         const value = requiredFields[index];
                         return value === null || value === undefined || value === '';
                     });
-                    console.log('РџСЂРѕРІРµСЂРєР° payload РїРµСЂРµРґ /api/profile/save', {
+                    console.log('Проверка payload перед /api/profile/save', {
                         mode,
                         payload,
                         missing_required_fields: missingFieldNames
                     });
                 }
                 if (missingFields.length > 0) {
-                    console.error('РџСЂРѕС„РёР»СЊ РЅРµ РѕС‚РїСЂР°РІР»РµРЅ: РѕС‚СЃСѓС‚СЃС‚РІСѓСЋС‚ РѕР±СЏР·Р°С‚РµР»СЊРЅС‹Рµ РїРѕР»СЏ', {
+                    console.error('Профиль не отправлен: отсутствуют обязательные поля', {
                         mode,
                         payload,
                         missingFieldsCount: missingFields.length
@@ -1191,7 +1191,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
             }
 
             if (window.appDebug) {
-                console.log('РћС‚РїСЂР°РІРєР° payload РІ /api/profile/save', {
+                console.log('Отправка payload в /api/profile/save', {
                     mode,
                     payload_keys: Object.keys(payload)
                 });
@@ -1211,7 +1211,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
             try {
                 localStorage.removeItem('userData');
             } catch (error) {
-                console.warn('РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‡РёСЃС‚РёС‚СЊ userData', error);
+                console.warn('Не удалось очистить userData', error);
             }
             const data = responseData && typeof responseData === 'object'
                 ? responseData
@@ -1229,7 +1229,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
             }
             return normalized;
         } catch (error) {
-            // РћС€РёР±РєРё СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё РёРіРЅРѕСЂРёСЂСѓРµРј, РґР°РЅРЅС‹Рµ РѕСЃС‚Р°СЋС‚СЃСЏ Р»РѕРєР°Р»СЊРЅРѕ.
+            // Ошибки синхронизации игнорируем, данные остаются локально.
             return null;
         }
     }
@@ -1264,7 +1264,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
             if (data && typeof data === 'object') {
                 const validation = validateCanonicalProfilePayload(data);
                 if (!validation.isCanonical) {
-                    console.warn('[PROFILE_CANONICAL] РџРѕР»СѓС‡РµРЅ РЅРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ С„РѕСЂРјР°С‚ РїСЂРѕС„РёР»СЏ РѕС‚ СЃРµСЂРІРµСЂР°', {
+                    console.warn('[PROFILE_CANONICAL] Получен некорректный формат профиля от сервера', {
                         reason: validation.reason,
                         conflictingKeys: validation.conflictingKeys,
                         payload: data
@@ -1279,7 +1279,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
                 try {
                     memorySet(getProfileStorageKey(), JSON.stringify(normalized));
                 } catch (error) {
-                    // РРіРЅРѕСЂРёСЂСѓРµРј РѕС€РёР±РєСѓ СЃРѕС…СЂР°РЅРµРЅРёСЏ, РґР°РЅРЅС‹Рµ РѕСЃС‚Р°СЋС‚СЃСЏ РІ РїР°РјСЏС‚Рё.
+                    // Игнорируем ошибку сохранения, данные остаются в памяти.
                 }
                 if (
                     typeof window.mergeUserDataWithoutLosingAnswers === 'function'
@@ -1351,7 +1351,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
                 })
             });
         } catch (error) {
-            // РћС€РёР±РєРё СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё РёРіРЅРѕСЂРёСЂСѓРµРј, РґР°РЅРЅС‹Рµ РѕСЃС‚Р°СЋС‚СЃСЏ Р»РѕРєР°Р»СЊРЅРѕ.
+            // Ошибки синхронизации игнорируем, данные остаются локально.
         }
     }
 
@@ -1389,7 +1389,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
                 })
             });
         } catch (error) {
-            // РћС€РёР±РєРё СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё РёРіРЅРѕСЂРёСЂСѓРµРј, РґР°РЅРЅС‹Рµ РѕСЃС‚Р°СЋС‚СЃСЏ Р»РѕРєР°Р»СЊРЅРѕ.
+            // Ошибки синхронизации игнорируем, данные остаются локально.
         }
     }
 
@@ -1427,7 +1427,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
                 })
             });
         } catch (error) {
-            // РћС€РёР±РєРё СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё РёРіРЅРѕСЂРёСЂСѓРµРј, РґР°РЅРЅС‹Рµ РѕСЃС‚Р°СЋС‚СЃСЏ Р»РѕРєР°Р»СЊРЅРѕ.
+            // Ошибки синхронизации игнорируем, данные остаются локально.
         }
     }
 
@@ -1454,12 +1454,12 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
     }
 
     async function syncDiaryEntriesWithBackend() {
-        // РќР° iOS Telegram СЃС‚Р°С‚СѓСЃ Р°РІС‚РѕСЂРёР·Р°С†РёРё РјРѕР¶РµС‚ Р·Р°РїРѕР»РЅРёС‚СЊСЃСЏ РїРѕР·Р¶Рµ,
-        // РїРѕСЌС‚РѕРјСѓ РґР»СЏ С‡С‚РµРЅРёСЏ РґРЅРµРІРЅРёРєР° РЅРµ Р±Р»РѕРєРёСЂСѓРµРјСЃСЏ РЅР° window.serverUser.authorized.
+        // На iOS Telegram статус авторизации может заполниться позже,
+        // поэтому для чтения дневника не блокируемся на window.serverUser.authorized.
         let remoteEntries = await fetchDiaryEntriesFromBackend();
 
-        // Р”Р°С‘Рј РѕРґРёРЅ РїРѕРІС‚РѕСЂРЅС‹Р№ Р·Р°РїСЂРѕСЃ РїРѕСЃР»Рµ РєРѕСЂРѕС‚РєРѕР№ РїР°СѓР·С‹,
-        // С‡С‚РѕР±С‹ РёР·Р±РµР¶Р°С‚СЊ РіРѕРЅРєРё РјРµР¶РґСѓ init auth Рё РїРµСЂРІС‹Рј С‡С‚РµРЅРёРµРј РґРЅРµРІРЅРёРєР°.
+        // Даём один повторный запрос после короткой паузы,
+        // чтобы избежать гонки между init auth и первым чтением дневника.
         if (!Array.isArray(remoteEntries) && window.serverUser?.authorized !== true) {
             await new Promise((resolve) => setTimeout(resolve, 250));
             remoteEntries = await fetchDiaryEntriesFromBackend();
@@ -1517,7 +1517,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
                 })
             });
         } catch (error) {
-            // РћС€РёР±РєРё СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё РёРіРЅРѕСЂРёСЂСѓРµРј, РґР°РЅРЅС‹Рµ РѕСЃС‚Р°СЋС‚СЃСЏ Р»РѕРєР°Р»СЊРЅРѕ.
+            // Ошибки синхронизации игнорируем, данные остаются локально.
         }
     }
 

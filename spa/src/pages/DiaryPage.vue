@@ -11,8 +11,8 @@
         </div>
 
         <div id="diary-mode-day" class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100">
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
+          <div class="flex flex-col items-center justify-center gap-3 text-center">
+            <div class="max-w-sm">
               <h3 class="font-semibold text-slate-800">Приёмы пищи по дате</h3>
               <p class="text-sm text-slate-500">Выберите дату и добавляйте продукты в завтрак, обед, ужин или перекус.</p>
             </div>
@@ -20,12 +20,12 @@
               id="diary-day-date"
               v-model="selectedDate"
               type="date"
-              class="form-input w-auto"
+              class="form-input w-full max-w-[220px]"
               required
               @change="onDateChanged"
             >
           </div>
-          <p id="diary-day-hint" class="text-sm text-slate-500 mt-3">{{ dayHint }}</p>
+          <p id="diary-day-hint" class="text-sm text-slate-500 mt-3 text-center">{{ dayHint }}</p>
         </div>
 
         <section id="diary-month-calendar" class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100">
@@ -64,22 +64,22 @@
               <span class="font-semibold text-slate-800">{{ card.label }}</span>
               <span :id="`diary-meal-${card.key}-total`" class="text-xs text-slate-500">{{ card.totalText }}</span>
             </div>
-            <div :id="`diary-meal-${card.key}-list`" class="mt-3 space-y-2 text-sm text-slate-600">
+            <div :id="`diary-meal-${card.key}-list`" class="mt-3 space-y-2 text-slate-600">
               <template v-if="card.entry && card.entry.items.length">
                 <div
                   v-for="(item, index) in card.entry.items"
                   :key="`${card.key}-${index}-${item.name}`"
-                  class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2"
+                  class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm"
                 >
                   <span>{{ item.name }}</span>
                   <span class="text-xs text-slate-500">{{ Math.round(item.grams || 0) }} г</span>
                 </div>
                 <p class="text-xs text-slate-500">Б {{ Math.round(card.entry.totals.protein_g) }} • Ж {{ Math.round(card.entry.totals.fat_g) }} • У {{ Math.round(card.entry.totals.carbs_g) }}</p>
-                <button type="button" class="text-emerald-600 font-semibold" @click="openProductsForm(card.key, 'meal', true)">Редактировать</button>
+                <button type="button" class="diary-action-btn" @click="openProductsForm(card.key, 'meal', true)">Редактировать</button>
               </template>
               <template v-else>
-                <p class="text-slate-400">Нет записи за эту дату.</p>
-                <button type="button" class="text-emerald-600 font-semibold" @click="openProductsForm(card.key, 'meal', false)">Добавить</button>
+                <p class="text-sm text-slate-400">Нет записи за эту дату.</p>
+                <button type="button" class="diary-action-btn" @click="openProductsForm(card.key, 'meal', false)">Добавить</button>
               </template>
             </div>
           </div>
@@ -94,7 +94,7 @@
                   Выпито сегодня: {{ todayWaterText }} / цель {{ waterGoalText }}
                 </p>
               </div>
-              <button type="button" class="text-emerald-600 font-semibold" @click="handleFabAction('water')">Добавить</button>
+              <button type="button" class="diary-action-btn" @click="handleFabAction('water')">Добавить</button>
             </div>
           </div>
 
@@ -105,7 +105,7 @@
                 <p class="mt-1 text-sm text-slate-500">Отход ко сну: {{ sleepBedtimeText }}</p>
                 <p class="text-sm text-slate-500">Пробуждение: {{ sleepWakeTimeText }}</p>
               </div>
-              <button type="button" class="text-emerald-600 font-semibold" @click="openSleepMorningModal">Записать</button>
+              <button type="button" class="diary-action-btn" @click="openSleepMorningModal">Записать</button>
             </div>
           </div>
         </div>
@@ -1516,6 +1516,35 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.diary-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  margin-left: auto;
+  min-width: 124px;
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  background: linear-gradient(135deg, #34d399 0%, #3b82f6 100%);
+  color: #ffffff;
+  opacity: 1;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  box-shadow: 0 8px 16px rgba(52, 211, 153, 0.24);
+}
+
+.diary-action-btn:hover {
+  filter: brightness(1.03);
+}
+
+.diary-action-btn:active {
+  transform: scale(0.98);
+}
+
 .sleep-midnight-toggle-row {
   display: flex;
   align-items: center;

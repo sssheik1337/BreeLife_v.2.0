@@ -10,20 +10,53 @@
           <p class="text-slate-500 mt-2">Ваши персональные данные, статус и ориентиры</p>
         </div>
 
-        <div id="data-cards" class="space-y-4 mb-8">
-          <div v-for="(card, index) in dataCards" :key="`card-${index}`" class="card animate-slide-in" :style="{ animationDelay: `${index * 0.1}s` }">
-            <div class="flex items-center justify-between mb-4">
-              <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl flex items-center justify-center" :class="card.colorClass">
-                  <i :data-feather="card.icon" class="w-5 h-5"></i>
-                </div>
-                <h3 class="font-semibold text-slate-800">{{ card.label }}</h3>
-              </div>
-            </div>
-            <div class="text-xl font-semibold text-slate-800 mb-2">{{ card.value }}</div>
-            <div v-if="card.details" class="text-xs text-slate-500">{{ card.details }}</div>
+        <div id="recommendations-section" class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8" :class="{ hidden: trial.isExpired }">
+          <div class="mb-3 flex justify-center">
+            <span id="recommendations-state" class="assistant-title-chip" :class="recommendationsState.className">{{ recommendationsState.text }}</span>
+          </div>
+          <ul id="recommendations-list" class="space-y-2 text-slate-700">
+            <li v-for="(item, index) in recommendations" :key="`rec-${index}`" class="flex items-start space-x-2">
+              <span class="text-cyan-600">•</span>
+              <span>{{ item }}</span>
+            </li>
+          </ul>
+          <div class="mt-4 space-y-2 text-sm text-slate-500">
+            <p id="diary-explanation" :class="{ hidden: !displayedExplanations.diary }">{{ displayedExplanations.diary }}</p>
+            <p id="calories-explanation" :class="{ hidden: !displayedExplanations.calories }">{{ displayedExplanations.calories }}</p>
+            <p id="macros-explanation" :class="{ hidden: !displayedExplanations.macros }">{{ displayedExplanations.macros }}</p>
+            <p id="deadline-motivation" :class="{ hidden: !displayedExplanations.deadline }">{{ displayedExplanations.deadline }}</p>
+            <p id="deadline-warning" class="text-rose-600" :class="{ hidden: !deadlineWarning }">{{ deadlineWarning }}</p>
           </div>
         </div>
+
+        <section class="bg-white rounded-2xl p-5 shadow-lg border border-slate-100 mb-8">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="text-base font-semibold text-slate-800">Данные профиля</h2>
+            <button
+              type="button"
+              class="resume-toggle-btn"
+              :class="{ 'resume-toggle-btn--expanded': isProfileDetailsExpanded }"
+              :aria-expanded="isProfileDetailsExpanded ? 'true' : 'false'"
+              @click="isProfileDetailsExpanded = !isProfileDetailsExpanded"
+            >{{ isProfileDetailsExpanded ? 'Свернуть' : 'Развернуть' }}</button>
+          </div>
+          <div class="overflow-hidden transition-all duration-300 ease-out" :style="profileDetailsStyle">
+            <div id="data-cards" class="space-y-4 mt-4">
+              <div v-for="(card, index) in dataCards" :key="`card-${index}`" class="card animate-slide-in" :style="{ animationDelay: `${index * 0.1}s` }">
+                <div class="flex items-center justify-between mb-4">
+                  <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl flex items-center justify-center" :class="card.colorClass">
+                      <i :data-feather="card.icon" class="w-5 h-5"></i>
+                    </div>
+                    <h3 class="font-semibold text-slate-800">{{ card.label }}</h3>
+                  </div>
+                </div>
+                <div class="text-xl font-semibold text-slate-800 mb-2">{{ card.value }}</div>
+                <div v-if="card.details" class="text-xs text-slate-500">{{ card.details }}</div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8">
           <div class="space-y-3 text-slate-700">
@@ -47,25 +80,6 @@
           <div class="space-y-3 text-slate-700">
             <div class="flex items-center justify-between gap-3"><span class="text-left">Темп изменения веса</span><span id="weight-rate-value" class="font-semibold text-right tabular-nums shrink-0">{{ metrics.weightRate }}</span></div>
             <div class="flex items-center justify-between gap-3"><span class="text-left">Примерная дата достижения</span><span id="weight-date-value" class="font-semibold text-right tabular-nums shrink-0">{{ metrics.weightDate }}</span></div>
-          </div>
-        </div>
-
-        <div id="recommendations-section" class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8" :class="{ hidden: trial.isExpired }">
-          <div class="mb-3 flex justify-center">
-            <span id="recommendations-state" class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium" :class="recommendationsState.className">{{ recommendationsState.text }}</span>
-          </div>
-          <ul id="recommendations-list" class="space-y-2 text-slate-700">
-            <li v-for="(item, index) in recommendations" :key="`rec-${index}`" class="flex items-start space-x-2">
-              <span class="text-cyan-600">•</span>
-              <span>{{ item }}</span>
-            </li>
-          </ul>
-          <div class="mt-4 space-y-2 text-sm text-slate-500">
-            <p id="diary-explanation" :class="{ hidden: !displayedExplanations.diary }">{{ displayedExplanations.diary }}</p>
-            <p id="calories-explanation" :class="{ hidden: !displayedExplanations.calories }">{{ displayedExplanations.calories }}</p>
-            <p id="macros-explanation" :class="{ hidden: !displayedExplanations.macros }">{{ displayedExplanations.macros }}</p>
-            <p id="deadline-motivation" :class="{ hidden: !displayedExplanations.deadline }">{{ displayedExplanations.deadline }}</p>
-            <p id="deadline-warning" class="text-rose-600" :class="{ hidden: !deadlineWarning }">{{ deadlineWarning }}</p>
           </div>
         </div>
 
@@ -103,8 +117,9 @@ const appDebug = (window as { appDebug?: boolean }).appDebug === true;
 const loadedProfile = ref<Record<string, unknown>>({});
 const deadlineWarning = ref('');
 const aiText = ref('');
+const isProfileDetailsExpanded = ref(false);
 
-const recommendationsState = reactive({ text: 'Советы от ассистента', className: 'bg-slate-100 text-slate-600' });
+const recommendationsState = reactive({ text: 'Советы от ассистента', className: '' });
 const explanations = reactive({
   diary: 'Заполняйте дневник питания ежедневно, чтобы рекомендации уточнялись.',
   calories: 'Калорийность рассчитана с учётом цели и текущих параметров.',
@@ -275,16 +290,15 @@ const displayedExplanations = computed(() => {
     deadline: uniqueOrEmpty(explanations.deadline)
   };
 });
+const profileDetailsStyle = computed(() => (isProfileDetailsExpanded.value
+  ? { maxHeight: '2200px', opacity: '1', transform: 'translateY(0)' }
+  : { maxHeight: '0px', opacity: '0', transform: 'translateY(-8px)' }
+));
 const setRecommendationState = (state: 'loading' | 'partial' | 'ready' | 'error', text: string) => {
   void text;
+  void state;
   recommendationsState.text = 'Советы от ассистента';
-  recommendationsState.className = state === 'loading'
-    ? 'bg-amber-100 text-amber-700'
-    : state === 'ready'
-      ? 'bg-emerald-100 text-emerald-700'
-      : state === 'error'
-        ? 'bg-rose-100 text-rose-700'
-        : 'bg-slate-100 text-slate-600';
+  recommendationsState.className = '';
 };
 
 const loadAiRecommendation = async () => {
@@ -393,3 +407,46 @@ onMounted(async () => {
   if (typeof (window as { feather?: { replace?: () => void } }).feather?.replace === 'function') (window as { feather: { replace: () => void } }).feather.replace();
 });
 </script>
+
+<style scoped>
+.resume-toggle-btn {
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  min-height: 42px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  color: #ffffff;
+  background: linear-gradient(135deg, #34d399 0%, #3b82f6 100%);
+  box-shadow: 0 8px 20px rgba(52, 211, 153, 0.28);
+  transition: background-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+
+.resume-toggle-btn:active {
+  transform: scale(0.98);
+}
+
+.resume-toggle-btn--expanded {
+  color: #047857;
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.14);
+}
+
+.assistant-title-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 14px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, #34d399 0%, #3b82f6 100%);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 8px 16px rgba(52, 211, 153, 0.24);
+}
+</style>

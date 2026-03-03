@@ -16,19 +16,19 @@
                             <p class="text-sm text-slate-500">Диапазон</p>
                             <p id="meal-plan-desc" class="text-sm text-slate-500">Без медицинских обещаний.</p>
                         </div>
-                        <div class="flex items-center gap-2">
+                        <div class="meal-plan-toggle-group">
                             <button
                                 type="button"
                                 data-plan-range="day"
-                                class="text-xs font-semibold px-3 py-1 rounded-full"
-                                :class="activeRange === 'day' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                                class="meal-plan-toggle-btn"
+                                :class="{ 'meal-plan-toggle-btn--active': activeRange === 'day' }"
                                 @click="activeRange = 'day'"
                             >День</button>
                             <button
                                 type="button"
                                 data-plan-range="week"
-                                class="text-xs font-semibold px-3 py-1 rounded-full"
-                                :class="activeRange === 'week' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                                class="meal-plan-toggle-btn"
+                                :class="{ 'meal-plan-toggle-btn--active': activeRange === 'week' }"
                                 @click="activeRange = 'week'"
                             >Неделя</button>
                         </div>
@@ -89,27 +89,27 @@
                         </div>
                         <button
                             type="button"
-                            class="text-xs font-semibold px-3 py-1 rounded-full"
-                            :class="shoppingExpanded ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'"
+                            class="meal-plan-toggle-btn"
+                            :class="{ 'meal-plan-toggle-btn--active': !shoppingExpanded }"
                             @click="toggleShoppingList"
                         >{{ shoppingExpanded ? 'Свернуть' : 'Развернуть' }}</button>
                     </div>
 
                     <div v-if="shoppingExpanded" class="space-y-4">
-                        <div class="flex items-center gap-2">
+                        <div class="meal-plan-toggle-group">
                             <button
                                 type="button"
-                                class="text-xs font-semibold px-3 py-1 rounded-full"
-                                :class="shoppingRange === 'day' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                                class="meal-plan-toggle-btn"
+                                :class="{ 'meal-plan-toggle-btn--active': shoppingRange === 'day' }"
                                 @click="shoppingRange = 'day'"
                             >День</button>
                             <button
                                 type="button"
-                                class="text-xs font-semibold px-3 py-1 rounded-full"
-                                :class="shoppingRange === 'week' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                                class="meal-plan-toggle-btn"
+                                :class="{ 'meal-plan-toggle-btn--active': shoppingRange === 'week' }"
                                 @click="shoppingRange = 'week'"
                             >Неделя</button>
-                            <button type="button" class="btn-secondary ml-auto" @click="copyShoppingList">Скопировать список</button>
+                            <button type="button" class="meal-plan-copy-btn ml-auto" @click="copyShoppingList">Скопировать список</button>
                         </div>
 
                         <p v-if="shoppingLoading" class="text-center text-slate-400">Загрузка списка...</p>
@@ -639,3 +639,67 @@ onMounted(async () => {
     await loadMealPlan();
 });
 </script>
+
+<style scoped>
+.meal-plan-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+.meal-plan-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 14px;
+  border-radius: 9999px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.meal-plan-toggle-btn:active {
+  transform: scale(0.98);
+}
+
+.meal-plan-toggle-btn--active {
+  border-color: transparent;
+  background: linear-gradient(135deg, #34d399 0%, #3b82f6 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(52, 211, 153, 0.24);
+}
+
+.meal-plan-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: 9999px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.meal-plan-copy-btn:active {
+  transform: scale(0.98);
+}
+
+.meal-plan-copy-btn:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+</style>

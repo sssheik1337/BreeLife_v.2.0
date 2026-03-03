@@ -3,18 +3,15 @@
     <main class="flex-1 px-4 py-8">
       <div class="max-w-md mx-auto">
         <div class="text-center mb-10">
-          <div class="relative inline-block mb-6">
-            <div class="absolute inset-0 w-24 h-24 bg-gradient-to-r from-emerald-300 to-cyan-300 rounded-full blur-2xl opacity-50 animate-pulse"></div>
-            <div class="relative w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center shadow-lg animate-float">
-              <i data-feather="check" class="w-10 h-10 text-white"></i>
-            </div>
+          <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 mb-4 shadow-lg">
+            <i data-feather="check" class="w-7 h-7 text-white"></i>
           </div>
           <h1 class="text-2xl font-bold text-slate-800">Прогресс</h1>
           <p class="text-slate-500 mt-2">Ваш прогресс и динамика по ключевым показателям</p>
         </div>
 
         <section id="profile-today-summary" class="mb-6">
-          <div class="mb-3 px-1">
+          <div class="mb-3 px-1 text-center">
             <h2 class="text-lg font-bold text-slate-800">План на сегодня</h2>
           </div>
           <div class="profile-card p-5 mb-6" id="profile-today-kpi">
@@ -40,37 +37,64 @@
                 <div class="flex items-center justify-center gap-2 mt-1">
                   <button
                     type="button"
-                    class="text-xs font-semibold px-3 py-1 rounded-full"
-                    :class="macroRange === 'day' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                    class="progress-toggle-btn"
+                    :class="{ 'progress-toggle-btn--active': macroRange === 'day' }"
                     data-macro-range="day"
                     @click="macroRange = 'day'"
                   >Сегодня</button>
                   <button
                     type="button"
-                    class="text-xs font-semibold px-3 py-1 rounded-full"
-                    :class="macroRange === 'week' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                    class="progress-toggle-btn"
+                    :class="{ 'progress-toggle-btn--active': macroRange === 'week' }"
                     data-macro-range="week"
                     @click="macroRange = 'week'"
                   >Неделя</button>
                 </div>
               </div>
               <div class="flex flex-col items-center justify-center gap-4 text-center sm:flex-row sm:items-center sm:justify-center">
-                <div id="macro-balance-chart" class="relative w-36 h-36 min-w-[9rem] min-h-[9rem] shrink-0 rounded-full" :style="{ background: macroBalance.chartBackground }">
+                <div id="macro-balance-chart" class="relative w-36 h-36 min-w-[9rem] min-h-[9rem] shrink-0 rounded-full">
+                  <svg class="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 120 120" aria-hidden="true">
+                    <circle class="macro-ring-track" cx="60" cy="60" :r="macroChart.radius"></circle>
+                    <circle
+                      class="macro-ring-segment macro-ring-segment--protein"
+                      cx="60"
+                      cy="60"
+                      :r="macroChart.radius"
+                      :stroke-dasharray="macroChart.proteinDashArray"
+                      :stroke-dashoffset="macroChart.proteinDashOffset"
+                    ></circle>
+                    <circle
+                      class="macro-ring-segment macro-ring-segment--fat"
+                      cx="60"
+                      cy="60"
+                      :r="macroChart.radius"
+                      :stroke-dasharray="macroChart.fatDashArray"
+                      :stroke-dashoffset="macroChart.fatDashOffset"
+                    ></circle>
+                    <circle
+                      class="macro-ring-segment macro-ring-segment--carbs"
+                      cx="60"
+                      cy="60"
+                      :r="macroChart.radius"
+                      :stroke-dasharray="macroChart.carbsDashArray"
+                      :stroke-dashoffset="macroChart.carbsDashOffset"
+                    ></circle>
+                  </svg>
                   <div class="absolute inset-4 rounded-full bg-white/90"></div>
                   <div class="absolute inset-0 flex items-center justify-center text-sm font-semibold text-slate-700">БЖУ</div>
                 </div>
                 <div class="space-y-2 text-sm text-slate-600">
                   <div class="flex items-center justify-center gap-2">
                     <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-                    <span id="macro-balance-protein">Белки — {{ macroBalance.proteinPct }}%</span>
+                    <span id="macro-balance-protein">Белки — {{ macroBalance.proteinPct }}% · {{ macroBalance.proteinG }} г</span>
                   </div>
                   <div class="flex items-center justify-center gap-2">
                     <span class="h-2 w-2 rounded-full bg-amber-400"></span>
-                    <span id="macro-balance-fat">Жиры — {{ macroBalance.fatPct }}%</span>
+                    <span id="macro-balance-fat">Жиры — {{ macroBalance.fatPct }}% · {{ macroBalance.fatG }} г</span>
                   </div>
                   <div class="flex items-center justify-center gap-2">
                     <span class="h-2 w-2 rounded-full bg-sky-400"></span>
-                    <span id="macro-balance-carbs">Углеводы — {{ macroBalance.carbsPct }}%</span>
+                    <span id="macro-balance-carbs">Углеводы — {{ macroBalance.carbsPct }}% · {{ macroBalance.carbsG }} г</span>
                   </div>
                 </div>
               </div>
@@ -86,14 +110,12 @@
         </section>
 
         <section id="profile-weekly-review" class="profile-card profile-card--secondary p-4 mb-5">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <h2 class="text-lg font-bold text-slate-800">Итоги недели</h2>
-              <p id="weekly-review-status" class="text-sm text-slate-600">{{ weeklyReview.statusText }}</p>
-            </div>
+          <div class="flex flex-col items-center gap-2 text-center">
             <span id="weekly-review-indicator" class="inline-flex h-3 w-3 rounded-full" :class="weeklyReview.dotClass"></span>
+            <h2 class="text-lg font-bold text-slate-800">Итоги недели</h2>
+            <p id="weekly-review-status" class="text-sm text-slate-600">{{ weeklyReview.statusText }}</p>
           </div>
-          <p id="weekly-review-message" class="text-sm text-slate-600 mt-2">{{ weeklyReview.message }}</p>
+          <p id="weekly-review-message" class="text-sm text-slate-600 mt-2 text-center">{{ weeklyReview.message }}</p>
           <ul id="profile-weekly-adjustments-list" class="mt-3 space-y-2" :class="{ hidden: !weeklyAdjustments.length }">
             <li v-for="(item, index) in weeklyAdjustments" :key="`adj-${index}`" class="flex items-start gap-2">
               <span class="text-amber-500">•</span>
@@ -127,20 +149,20 @@
         </section>
 
         <section id="profile-calorie-trend" class="profile-card profile-card--secondary p-5 mb-4">
-          <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center justify-between gap-3 mb-3">
             <h2 class="text-lg font-bold text-slate-800">Динамика калорий</h2>
-            <div class="flex gap-2">
+            <div class="progress-toggle-group">
               <button
                 type="button"
-                class="text-xs font-semibold px-3 py-1 rounded-full"
-                :class="calorieRange === 7 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                class="progress-toggle-btn"
+                :class="{ 'progress-toggle-btn--active': calorieRange === 7 }"
                 data-calorie-range="7"
                 @click="calorieRange = 7"
               >7 дней</button>
               <button
                 type="button"
-                class="text-xs font-semibold px-3 py-1 rounded-full"
-                :class="calorieRange === 30 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                class="progress-toggle-btn"
+                :class="{ 'progress-toggle-btn--active': calorieRange === 30 }"
                 data-calorie-range="30"
                 @click="calorieRange = 30"
               >30 дней</button>
@@ -160,20 +182,20 @@
         </section>
 
         <section id="profile-water-history" class="profile-card profile-card--secondary p-5 mb-4">
-          <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center justify-between gap-3 mb-3">
             <h2 class="text-lg font-bold text-slate-800">Гидратация</h2>
-            <div class="flex gap-2">
+            <div class="progress-toggle-group">
               <button
                 type="button"
-                class="text-xs font-semibold px-3 py-1 rounded-full"
-                :class="waterRange === 7 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                class="progress-toggle-btn"
+                :class="{ 'progress-toggle-btn--active': waterRange === 7 }"
                 data-water-range="7"
                 @click="waterRange = 7"
               >7 дней</button>
               <button
                 type="button"
-                class="text-xs font-semibold px-3 py-1 rounded-full"
-                :class="waterRange === 30 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                class="progress-toggle-btn"
+                :class="{ 'progress-toggle-btn--active': waterRange === 30 }"
                 data-water-range="30"
                 @click="waterRange = 30"
               >30 дней</button>
@@ -209,6 +231,7 @@ interface DiaryEntry {
   date?: string;
   mode?: string;
   meal?: string;
+  items?: Array<Record<string, unknown>>;
   totals?: Record<string, unknown>;
   calories?: number;
   protein_g?: number;
@@ -385,18 +408,65 @@ const resolveCarbTotals = (totalValue: unknown, simpleValue: unknown, complexVal
     simple = total - complex;
   }
   if (simple > 0 || complex > 0) {
-    return { total: simple + complex, simple, complex };
+    return { total: simple + complex, simple, complex, splitKnown: true };
   }
   if (total > 0) {
-    return { total, simple: 0, complex: total };
+    return { total, simple: 0, complex: 0, splitKnown: false };
   }
-  return { total: 0, simple: 0, complex: 0 };
+  return { total: 0, simple: 0, complex: 0, splitKnown: false };
+};
+
+const resolveCarbTotalsFromItems = (entry: DiaryEntry): { total: number; simple: number; complex: number; splitKnown: boolean } | null => {
+  if (!Array.isArray(entry.items) || entry.items.length === 0) {
+    return null;
+  }
+  let total = 0;
+  let simple = 0;
+  let complex = 0;
+  let unknown = 0;
+
+  entry.items.forEach((rawItem) => {
+    const grams = toNumber(rawItem.grams);
+    const per100Carbs = toNumber(rawItem.per100_carbs);
+    const per100Simple = toNumber(rawItem.per100_carbs_simple);
+    const per100Complex = toNumber(rawItem.per100_carbs_complex);
+
+    const itemTotal = toNumber(rawItem.carbs) || (grams > 0 ? (per100Carbs * grams) / 100 : 0);
+    if (itemTotal <= 0) {
+      return;
+    }
+
+    total += itemTotal;
+
+    const hasSplitByBase = per100Simple > 0 || per100Complex > 0;
+    if (!hasSplitByBase) {
+      unknown += itemTotal;
+      return;
+    }
+
+    const itemSimple = toNumber(rawItem.carbs_simple) || (grams > 0 ? (per100Simple * grams) / 100 : 0);
+    const itemComplex = toNumber(rawItem.carbs_complex) || (grams > 0 ? (per100Complex * grams) / 100 : 0);
+    simple += itemSimple;
+    complex += itemComplex;
+  });
+
+  if (total <= 0) {
+    return null;
+  }
+
+  if (unknown > 0 || (simple <= 0 && complex <= 0)) {
+    return { total, simple: 0, complex: 0, splitKnown: false };
+  }
+
+  return { total, simple, complex, splitKnown: true };
 };
 
 const resolveEntryTotals = (entry: DiaryEntry) => {
+  const carbsFromItems = resolveCarbTotalsFromItems(entry);
+
   if (entry?.totals && typeof entry.totals === 'object') {
     const totals = entry.totals;
-    const carbs = resolveCarbTotals(totals.carbs_g, totals.carbs_simple_g, totals.carbs_complex_g);
+    const carbs = carbsFromItems || resolveCarbTotals(totals.carbs_g, totals.carbs_simple_g, totals.carbs_complex_g);
     return {
       calories: Number(totals.calories) || 0,
       protein_g: Number(totals.protein_g) || 0,
@@ -404,11 +474,12 @@ const resolveEntryTotals = (entry: DiaryEntry) => {
       carbs_g: carbs.total,
       carbs_simple_g: carbs.simple,
       carbs_complex_g: carbs.complex,
+      carbs_split_known: carbs.splitKnown,
       fiber_g: Number(totals.fiber_g) || 0,
       water_l: Number(entry.water_l) || 0
     };
   }
-  const carbs = resolveCarbTotals(entry?.carbs_g, entry?.carbs_simple_g, entry?.carbs_complex_g);
+  const carbs = carbsFromItems || resolveCarbTotals(entry?.carbs_g, entry?.carbs_simple_g, entry?.carbs_complex_g);
   return {
     calories: Number(entry?.calories) || 0,
     protein_g: Number(entry?.protein_g) || 0,
@@ -416,6 +487,7 @@ const resolveEntryTotals = (entry: DiaryEntry) => {
     carbs_g: carbs.total,
     carbs_simple_g: carbs.simple,
     carbs_complex_g: carbs.complex,
+    carbs_split_known: carbs.splitKnown,
     fiber_g: Number(entry?.fiber_g) || 0,
     water_l: Number(entry?.water_l) || 0
   };
@@ -436,17 +508,44 @@ const entriesByDate = computed(() => {
 });
 
 const dayTotalsByDate = computed(() => {
-  const totals = new Map<string, { calories: number; protein: number; fat: number; carbs: number; carbsSimple: number; carbsComplex: number; fiber: number; water: number }>();
+  const totals = new Map<string, {
+    calories: number;
+    protein: number;
+    fat: number;
+    carbs: number;
+    carbsSimple: number;
+    carbsComplex: number;
+    splitKnownCarbs: number;
+    splitUnknownCarbs: number;
+    fiber: number;
+    water: number;
+  }>();
   entriesByDate.value.forEach((items, dateKey) => {
-    const day = { calories: 0, protein: 0, fat: 0, carbs: 0, carbsSimple: 0, carbsComplex: 0, fiber: 0, water: 0 };
+    const day = {
+      calories: 0,
+      protein: 0,
+      fat: 0,
+      carbs: 0,
+      carbsSimple: 0,
+      carbsComplex: 0,
+      splitKnownCarbs: 0,
+      splitUnknownCarbs: 0,
+      fiber: 0,
+      water: 0
+    };
     items.forEach((entry) => {
       const t = resolveEntryTotals(entry);
       day.calories += t.calories;
       day.protein += t.protein_g;
       day.fat += t.fat_g;
       day.carbs += t.carbs_g;
-      day.carbsSimple += t.carbs_simple_g;
-      day.carbsComplex += t.carbs_complex_g;
+      if (t.carbs_split_known) {
+        day.carbsSimple += t.carbs_simple_g;
+        day.carbsComplex += t.carbs_complex_g;
+        day.splitKnownCarbs += t.carbs_g;
+      } else {
+        day.splitUnknownCarbs += t.carbs_g;
+      }
       day.fiber += t.fiber_g;
       day.water = Math.max(day.water, Number(entry.water_l) || 0);
     });
@@ -710,24 +809,16 @@ const macroBalance = computed(() => {
 
   if (macroRange.value === 'week') {
     const range = buildDateRange(7);
-    let daysWithData = 0;
+    const daysTotal = Math.max(range.length, 1);
     range.forEach((item) => {
       const day = dayTotalsByDate.value.get(item.key);
-      if (!day) {
-        return;
-      }
-      if (day.protein || day.fat || day.carbs) {
-        daysWithData += 1;
-        protein += day.protein;
-        fat += day.fat;
-        carbs += day.carbs;
-      }
+      protein += day?.protein || 0;
+      fat += day?.fat || 0;
+      carbs += day?.carbs || 0;
     });
-    if (daysWithData > 0) {
-      protein /= daysWithData;
-      fat /= daysWithData;
-      carbs /= daysWithData;
-    }
+    protein /= daysTotal;
+    fat /= daysTotal;
+    carbs /= daysTotal;
     desc = 'Средние значения за неделю.';
   } else {
     const day = dayTotalsByDate.value.get(todayKey);
@@ -740,10 +831,15 @@ const macroBalance = computed(() => {
   let proteinPct = 0;
   let fatPct = 0;
   let carbsPct = 0;
-  let chartBackground = '#e2e8f0';
+  let proteinArcPct = 0;
+  let fatArcPct = 0;
+  let carbsArcPct = 0;
   let insight = 'Пока нет записей для анализа.';
+  const proteinG = Math.round(protein);
+  const fatG = Math.round(fat);
+  const carbsG = Math.round(carbs);
 
-  if (macroRange.value === 'day' && targetProtein > 0 && targetFat > 0 && targetCarbs > 0) {
+  if (targetProtein > 0 && targetFat > 0 && targetCarbs > 0) {
     const p = Math.round(Math.max(0, Math.min(1, safeDivide(protein, targetProtein))) * 100);
     const f = Math.round(Math.max(0, Math.min(1, safeDivide(fat, targetFat))) * 100);
     const c = Math.round(Math.max(0, Math.min(1, safeDivide(carbs, targetCarbs))) * 100);
@@ -752,14 +848,28 @@ const macroBalance = computed(() => {
     carbsPct = c;
 
     const totalTarget = targetProtein + targetFat + targetCarbs;
-    const pArc = (Math.min(protein, targetProtein) / totalTarget) * 100;
-    const fArc = (Math.min(fat, targetFat) / totalTarget) * 100;
-    const cArc = (Math.min(carbs, targetCarbs) / totalTarget) * 100;
-    const usedArc = Math.max(0, Math.min(100, pArc + fArc + cArc));
-    chartBackground = `conic-gradient(#10b981 0 ${pArc}%, #f59e0b ${pArc}% ${pArc + fArc}%, #38bdf8 ${pArc + fArc}% ${usedArc}%, #e2e8f0 ${usedArc}% 100%)`;
-    desc = 'Процент выполнения целей БЖУ за сегодня.';
-    insight = 'Круг показывает прогресс по целям белков, жиров и углеводов.';
-    return { proteinPct, fatPct, carbsPct, chartBackground, desc, insight };
+    proteinArcPct = (Math.min(protein, targetProtein) / totalTarget) * 100;
+    fatArcPct = (Math.min(fat, targetFat) / totalTarget) * 100;
+    carbsArcPct = (Math.min(carbs, targetCarbs) / totalTarget) * 100;
+    desc = macroRange.value === 'week'
+      ? 'Среднее выполнение целей БЖУ за неделю.'
+      : 'Процент выполнения целей БЖУ за сегодня.';
+    insight = macroRange.value === 'week'
+      ? 'Круг показывает средний прогресс по целям белков, жиров и углеводов.'
+      : 'Круг показывает прогресс по целям белков, жиров и углеводов.';
+    return {
+      proteinPct,
+      fatPct,
+      carbsPct,
+      proteinArcPct,
+      fatArcPct,
+      carbsArcPct,
+      proteinG,
+      fatG,
+      carbsG,
+      desc,
+      insight
+    };
   }
 
   const total = protein + fat + carbs;
@@ -767,7 +877,9 @@ const macroBalance = computed(() => {
     proteinPct = Math.round((protein / total) * 100);
     fatPct = Math.round((fat / total) * 100);
     carbsPct = Math.max(0, 100 - proteinPct - fatPct);
-    chartBackground = `conic-gradient(#10b981 0 ${proteinPct}%, #f59e0b ${proteinPct}% ${proteinPct + fatPct}%, #38bdf8 ${proteinPct + fatPct}% 100%)`;
+    proteinArcPct = proteinPct;
+    fatArcPct = fatPct;
+    carbsArcPct = carbsPct;
 
     const maxPercent = Math.max(proteinPct, fatPct, carbsPct);
     if (maxPercent >= 55) {
@@ -777,28 +889,76 @@ const macroBalance = computed(() => {
     }
   }
 
-  return { proteinPct, fatPct, carbsPct, chartBackground, desc, insight };
+  return {
+    proteinPct,
+    fatPct,
+    carbsPct,
+    proteinArcPct,
+    fatArcPct,
+    carbsArcPct,
+    proteinG,
+    fatG,
+    carbsG,
+    desc,
+    insight
+  };
+});
+
+const macroChart = computed(() => {
+  const radius = 52;
+  const circumference = 2 * Math.PI * radius;
+  const proteinArc = clamp(macroBalance.value.proteinArcPct, 0, 100);
+  const fatArc = clamp(macroBalance.value.fatArcPct, 0, 100);
+  const carbsArc = clamp(macroBalance.value.carbsArcPct, 0, 100);
+  const proteinLen = (proteinArc / 100) * circumference;
+  const fatLen = (fatArc / 100) * circumference;
+  const carbsLen = (carbsArc / 100) * circumference;
+
+  return {
+    radius,
+    proteinDashArray: `${proteinLen} ${circumference}`,
+    fatDashArray: `${fatLen} ${circumference}`,
+    carbsDashArray: `${carbsLen} ${circumference}`,
+    proteinDashOffset: 0,
+    fatDashOffset: -proteinLen,
+    carbsDashOffset: -(proteinLen + fatLen)
+  };
 });
 
 const carbSplit = computed(() => {
   let simple = 0;
   let complex = 0;
+  let unknown = 0;
   if (macroRange.value === 'week') {
     buildDateRange(7).forEach((item) => {
       const day = dayTotalsByDate.value.get(item.key);
       simple += day?.carbsSimple || 0;
       complex += day?.carbsComplex || 0;
+      unknown += day?.splitUnknownCarbs || 0;
     });
   } else {
     const day = dayTotalsByDate.value.get(todayKey);
     simple = day?.carbsSimple || 0;
     complex = day?.carbsComplex || 0;
+    unknown = day?.splitUnknownCarbs || 0;
   }
   const total = simple + complex;
   if (total <= 0) {
     return {
       value: 'Нет данных',
       desc: 'Пока нет данных. Сложные углеводы дают более стабильную энергию.'
+    };
+  }
+  if (unknown > 0) {
+    return {
+      value: 'Нет данных',
+      desc: 'Для части продуктов нет разбивки на простые и сложные углеводы.'
+    };
+  }
+  if (simple <= 0 || complex <= 0) {
+    return {
+      value: 'Нет данных',
+      desc: 'Разбивка простых и сложных углеводов неполная для корректного вывода.'
     };
   }
   const simplePct = Math.round((simple / total) * 100);
@@ -890,6 +1050,31 @@ onMounted(async () => {
   padding: 1.25rem;
 }
 
+.macro-ring-track {
+  fill: none;
+  stroke: #e2e8f0;
+  stroke-width: 12;
+}
+
+.macro-ring-segment {
+  fill: none;
+  stroke-width: 12;
+  stroke-linecap: round;
+  transition: stroke-dasharray 320ms ease, stroke-dashoffset 320ms ease;
+}
+
+.macro-ring-segment--protein {
+  stroke: #10b981;
+}
+
+.macro-ring-segment--fat {
+  stroke: #f59e0b;
+}
+
+.macro-ring-segment--carbs {
+  stroke: #38bdf8;
+}
+
 .trend-day {
   border: 1px solid #f1f5f9;
   border-radius: 0.5rem;
@@ -900,5 +1085,41 @@ onMounted(async () => {
 .is-today {
   border-color: rgba(45, 212, 191, 0.95) !important;
   box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.2);
+}
+
+.progress-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+
+.progress-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 14px;
+  border-radius: 9999px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.progress-toggle-btn:active {
+  transform: scale(0.98);
+}
+
+.progress-toggle-btn--active {
+  border-color: transparent;
+  background: linear-gradient(135deg, #34d399 0%, #3b82f6 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(52, 211, 153, 0.24);
 }
 </style>
