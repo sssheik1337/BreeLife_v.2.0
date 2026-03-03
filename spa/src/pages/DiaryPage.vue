@@ -85,6 +85,31 @@
           </div>
         </div>
 
+        <div id="diary-health-cards" class="space-y-3">
+          <div class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h3 class="font-semibold text-slate-800">💧 Вода</h3>
+                <p class="mt-1 text-sm text-slate-500">
+                  Выпито сегодня: {{ todayWaterText }} / цель {{ waterGoalText }}
+                </p>
+              </div>
+              <button type="button" class="text-emerald-600 font-semibold" @click="handleFabAction('water')">Добавить</button>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h3 class="font-semibold text-slate-800">🌙 Сон</h3>
+                <p class="mt-1 text-sm text-slate-500">Отход ко сну: {{ sleepBedtimeText }}</p>
+                <p class="text-sm text-slate-500">Пробуждение: {{ sleepWakeTimeText }}</p>
+              </div>
+              <button type="button" class="text-emerald-600 font-semibold" @click="openSleepMorningModal">Записать</button>
+            </div>
+          </div>
+        </div>
+
         <div id="diary-products-panel" class="diary-panel" :class="{ hidden: !productsPanelOpen }">
           <div class="diary-panel__card">
             <div class="flex items-center justify-between">
@@ -96,17 +121,20 @@
               <input id="diary-products-date" v-model="form.date" type="date" class="form-input" required>
 
               <div id="diary-products-meta" :class="{ hidden: productsFormContext !== 'water' }">
-                <input id="diary-products-sleep" v-model="form.sleep_time" type="time" class="form-input" placeholder="Сон, время отхода">
-                <input id="diary-products-water" v-model="form.water_l" type="number" class="form-input" placeholder="Вода, л" min="0" step="0.01">
+                <input
+                  id="diary-products-water"
+                  v-model="form.water_l"
+                  type="number"
+                  class="form-input"
+                  placeholder="Добавить воды, л"
+                  min="0"
+                  step="0.01"
+                >
                 <div class="grid grid-cols-3 gap-2 mt-2">
                   <button type="button" class="btn-secondary text-xs" @click="applyQuickWater(0.25)">+250 мл</button>
                   <button type="button" class="btn-secondary text-xs" @click="applyQuickWater(0.5)">+500 мл</button>
                   <button type="button" class="btn-secondary text-xs" @click="applyQuickWater(1)">+1 л</button>
                 </div>
-                <label class="flex items-center gap-2 text-sm text-slate-600">
-                  <input id="diary-products-activity" v-model="form.activity" type="checkbox" class="form-checkbox">
-                  <span>Сегодня была активность</span>
-                </label>
               </div>
 
               <select id="diary-products-meal" v-model="form.meal" class="form-input" required @change="onMealChanged">
@@ -205,6 +233,62 @@
             </form>
           </div>
         </div>
+
+        <div
+          v-if="sleepMorningModalOpen"
+          class="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/40 px-4 py-6 backdrop-blur-sm"
+        >
+          <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <h3 class="text-lg font-semibold text-slate-800">Утренний чек сна</h3>
+                <p class="mt-1 text-sm text-slate-500">Во сколько вы сегодня проснулись и во сколько легли?</p>
+              </div>
+              <button
+                type="button"
+                class="btn-secondary whitespace-nowrap"
+                :disabled="sleepMorningSaving"
+                @click="closeSleepMorningModal"
+              >
+                Закрыть
+              </button>
+            </div>
+
+            <form class="mt-4 space-y-4" @submit.prevent="saveSleepMorningLog">
+              <label class="block text-sm text-slate-600">
+                <span class="mb-1 block">Во сколько сегодня проснулись?</span>
+                <input v-model="sleepMorningForm.wake_time" type="time" class="form-input" required>
+              </label>
+
+              <label class="block text-sm text-slate-600">
+                <span class="mb-1 block">Во сколько легли спать?</span>
+                <input v-model="sleepMorningForm.bed_time" type="time" class="form-input" required>
+              </label>
+
+              <label class="sleep-midnight-toggle-row">
+                <span class="text-sm text-slate-700">После полуночи</span>
+                <span class="sleep-midnight-switch">
+                  <input
+                    v-model="sleepMorningAfterMidnight"
+                    type="checkbox"
+                    class="sleep-midnight-switch__input"
+                  >
+                  <span class="sleep-midnight-switch__track">
+                    <span class="sleep-midnight-switch__thumb" />
+                  </span>
+                </span>
+              </label>
+
+              <p class="text-xs text-slate-500">
+                Если легли после 00:00, запись будет сохранена сегодняшней датой.
+              </p>
+
+              <button type="submit" class="btn-primary w-full" :disabled="sleepMorningSaving">
+                {{ sleepMorningSaving ? 'Сохраняем...' : 'Сохранить' }}
+              </button>
+            </form>
+          </div>
+        </div>
       </div>
     </main>
 
@@ -214,6 +298,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { diaryApi } from '../api/diaryApi';
 import { useStorageStore } from '../stores/storageStore';
 
 type MealKey = 'breakfast' | 'lunch' | 'dinner' | 'snack';
@@ -300,6 +385,7 @@ interface DiaryEntry {
   fiber_g?: number;
   water_l?: number;
   sleep_time?: string | null;
+  wake_time?: string | null;
   activity?: boolean;
 }
 
@@ -365,6 +451,14 @@ const selectedDate = ref('');
 const productsPanelOpen = ref(false);
 const productsFormContext = ref<'meal' | 'water'>('meal');
 const productsSubmitMode = ref<'append' | 'replace'>('replace');
+const sleepMorningModalOpen = ref(false);
+const sleepMorningSaving = ref(false);
+const sleepMorningAfterMidnight = ref(false);
+
+const sleepMorningForm = reactive({
+  wake_time: '',
+  bed_time: ''
+});
 
 const form = reactive({
   date: '',
@@ -377,10 +471,10 @@ const form = reactive({
 const productRows = ref<ProductRow[]>([]);
 
 const mealMeta: Array<{ key: MealKey; label: string }> = [
-  { key: 'breakfast', label: '☀️ Завтрак' },
-  { key: 'lunch', label: '🌤 Обед' },
-  { key: 'dinner', label: '🌙 Ужин' },
-  { key: 'snack', label: '🌗 Перекус' }
+  { key: 'breakfast', label: '🍳 Завтрак' },
+  { key: 'lunch', label: '🍲 Обед' },
+  { key: 'dinner', label: '🍽️ Ужин' },
+  { key: 'snack', label: '🍎 Перекус' }
 ];
 
 const dayHint = computed(() => {
@@ -410,6 +504,11 @@ const toNumber = (value: unknown): number => {
   return Number.isFinite(normalized) ? normalized : 0;
 };
 
+const toPositiveOrNull = (value: unknown): number | null => {
+  const normalized = Number(value);
+  return Number.isFinite(normalized) && normalized > 0 ? normalized : null;
+};
+
 const safeDivide = (left: number, right: number): number => {
   if (!Number.isFinite(left) || !Number.isFinite(right) || right === 0) {
     return 0;
@@ -434,6 +533,69 @@ const getFabProgressColor = (ratio: number): string => {
   const lightness = lerp(90, 49, t);
   return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 };
+
+const normalizeGoalValue = (value: unknown): 'lose' | 'maintain' | 'gain' | null => {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'lose' || normalized === 'maintain' || normalized === 'gain') {
+    return normalized;
+  }
+  if (normalized === 'loss' || normalized === 'weight_loss') {
+    return 'lose';
+  }
+  if (normalized === 'maintenance' || normalized === 'keep') {
+    return 'maintain';
+  }
+  if (normalized === 'muscle' || normalized === 'mass') {
+    return 'gain';
+  }
+  return null;
+};
+
+const calculateWaterTargetFromProfile = (profileInput: Record<string, unknown>): number | null => {
+  const weight = toPositiveOrNull(profileInput.weight_kg);
+  if (weight === null) {
+    return null;
+  }
+  const activityFactor = toNumber(profileInput.activity_factor);
+  const goal = normalizeGoalValue(profileInput.goal);
+
+  const base = weight * 0.033;
+  let activityBonus = 0;
+  if (activityFactor >= 1.725) {
+    activityBonus = 0.5;
+  } else if (activityFactor >= 1.55) {
+    activityBonus = 0.3;
+  }
+
+  let goalBonus = 0;
+  if (goal === 'gain') {
+    goalBonus = 0.2;
+  } else if (goal === 'lose') {
+    goalBonus = 0.1;
+  }
+
+  const target = clamp(base + activityBonus + goalBonus, 1.5, 4.5);
+  return Math.round(target * 10) / 10;
+};
+
+const getWaterTargetFromAdminConfig = (): number | null => {
+  const config = (window as { adminConfig?: Record<string, unknown> }).adminConfig;
+  if (!config || typeof config !== 'object') {
+    return null;
+  }
+  const reminders = config.reminders;
+  if (!reminders || typeof reminders !== 'object') {
+    return null;
+  }
+  return toPositiveOrNull((reminders as Record<string, unknown>).water_min_l);
+};
+
+const waterGoalL = computed(() => {
+  return calculateWaterTargetFromProfile(profile.value) ?? getWaterTargetFromAdminConfig();
+});
 
 const mealCards = computed(() => {
   return mealMeta.map(({ key, label }) => {
@@ -467,6 +629,194 @@ const normalizeDate = (value: unknown): string => {
 };
 
 const todayDate = (): string => normalizeDate(new Date().toISOString());
+const parseTimeToMinutes = (value: string): number | null => {
+  if (!/^\d{2}:\d{2}$/.test(value)) {
+    return null;
+  }
+  const [hoursRaw, minutesRaw] = value.split(':');
+  const hours = Number(hoursRaw);
+  const minutes = Number(minutesRaw);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return null;
+  }
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+    return null;
+  }
+  return (hours * 60) + minutes;
+};
+
+const shiftDateKey = (dateKey: string, daysDelta: number): string => {
+  const parsed = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return dateKey;
+  }
+  parsed.setDate(parsed.getDate() + daysDelta);
+  return normalizeDate(parsed.toISOString()) || dateKey;
+};
+
+const extractWakeTimeForDate = (dateKey: string): string => {
+  return getEntriesByDate(dateKey)
+    .map((entry) => (typeof entry.wake_time === 'string' ? entry.wake_time : ''))
+    .find((value) => value.length > 0) || '';
+};
+
+const extractSleepTimeForDate = (dateKey: string): string => {
+  return getEntriesByDate(dateKey)
+    .map((entry) => (typeof entry.sleep_time === 'string' ? entry.sleep_time : ''))
+    .find((value) => value.length > 0) || '';
+};
+
+const getMaxWaterForDate = (dateKey: string): number => {
+  return getEntriesByDate(dateKey).reduce((maxValue, entry) => {
+    return Math.max(maxValue, Number(entry.water_l) || 0);
+  }, 0);
+};
+
+const formatLiters = (value: number, precision = 2): string => {
+  return `${value.toFixed(precision).replace('.', ',')} л`;
+};
+
+const formatTimeOrDash = (value: string): string => {
+  return /^\d{2}:\d{2}$/.test(value) ? value : '—';
+};
+
+const todayWaterL = computed(() => getMaxWaterForDate(todayDate()));
+
+const todayWaterText = computed(() => formatLiters(todayWaterL.value, 2));
+
+const waterGoalText = computed(() => {
+  if (waterGoalL.value === null) {
+    return '—';
+  }
+  return formatLiters(waterGoalL.value, 1);
+});
+
+const sleepSummary = computed(() => {
+  const todayDateKey = todayDate();
+  const yesterdayDateKey = shiftDateKey(todayDateKey, -1);
+  const wakeToday = extractWakeTimeForDate(todayDateKey);
+  const bedYesterday = extractSleepTimeForDate(yesterdayDateKey);
+  const bedToday = extractSleepTimeForDate(todayDateKey);
+  return {
+    wakeTime: wakeToday,
+    bedTime: bedYesterday || bedToday
+  };
+});
+
+const sleepBedtimeText = computed(() => formatTimeOrDash(sleepSummary.value.bedTime));
+const sleepWakeTimeText = computed(() => formatTimeOrDash(sleepSummary.value.wakeTime));
+
+const upsertSummaryEntry = (
+  entries: DiaryEntry[],
+  dateKey: string,
+  patch: Partial<DiaryEntry>
+): DiaryEntry[] => {
+  const nextEntries = [...entries];
+  const existingIndex = nextEntries.findIndex((entry) => (
+    normalizeDate(entry.date) === dateKey && entry.mode === 'summary'
+  ));
+
+  if (existingIndex >= 0) {
+    nextEntries[existingIndex] = {
+      ...nextEntries[existingIndex],
+      ...patch,
+      date: dateKey,
+      mode: 'summary'
+    };
+    return nextEntries;
+  }
+
+  nextEntries.push({
+    date: dateKey,
+    mode: 'summary',
+    calories: 0,
+    protein_g: 0,
+    fat_g: 0,
+    carbs_g: 0,
+    carbs_simple_g: 0,
+    carbs_complex_g: 0,
+    fiber_g: 0,
+    water_l: 0,
+    sleep_time: null,
+    wake_time: null,
+    activity: false,
+    ...patch
+  });
+  return nextEntries;
+};
+
+const persistDiaryEntriesWithRoundtrip = async (entries: DiaryEntry[]): Promise<void> => {
+  storage.setDiaryEntries(entries as never[], { skipBackend: true });
+  try {
+    const saved = await diaryApi.saveDiaryEntries(entries as any);
+    storage.setDiaryEntries(saved as never[], { skipBackend: true });
+  } catch {
+    storage.setDiaryEntries(entries as never[]);
+  }
+};
+
+const closeSleepMorningModal = (): void => {
+  if (sleepMorningSaving.value) {
+    return;
+  }
+  sleepMorningModalOpen.value = false;
+};
+
+const openSleepMorningModal = (): void => {
+  const todayDateKey = todayDate();
+  const yesterdayDateKey = shiftDateKey(todayDateKey, -1);
+  const todayBedTime = extractSleepTimeForDate(todayDateKey);
+  const yesterdayBedTime = extractSleepTimeForDate(yesterdayDateKey);
+  sleepMorningForm.wake_time = extractWakeTimeForDate(todayDateKey);
+  sleepMorningForm.bed_time = yesterdayBedTime || todayBedTime;
+  sleepMorningAfterMidnight.value = Boolean(todayBedTime && !yesterdayBedTime);
+  sleepMorningModalOpen.value = true;
+};
+
+const clearSleepMorningTriggerFromQuery = async (): Promise<void> => {
+  const nextQuery: Record<string, unknown> = { ...(route.query as Record<string, unknown>) };
+  delete nextQuery.sleep_morning;
+  if (nextQuery.intent === 'sleep_morning_log') {
+    delete nextQuery.intent;
+  }
+  await router.replace({ path: '/diary', query: nextQuery });
+};
+
+const saveSleepMorningLog = async (): Promise<void> => {
+  if (sleepMorningSaving.value) {
+    return;
+  }
+  const wakeTime = sleepMorningForm.wake_time;
+  const bedTime = sleepMorningForm.bed_time;
+  if (!wakeTime || !bedTime) {
+    notify('Заполните время пробуждения и отхода ко сну.', 'error');
+    return;
+  }
+
+  const wakeMinutes = parseTimeToMinutes(wakeTime);
+  const bedMinutes = parseTimeToMinutes(bedTime);
+  if (wakeMinutes === null || bedMinutes === null) {
+    notify('Некорректный формат времени.', 'error');
+    return;
+  }
+
+  const todayDateKey = todayDate();
+  const bedDateKey = sleepMorningAfterMidnight.value
+    ? todayDateKey
+    : (bedMinutes > wakeMinutes ? shiftDateKey(todayDateKey, -1) : todayDateKey);
+
+  sleepMorningSaving.value = true;
+  try {
+    let nextEntries = [...diaryEntries.value];
+    nextEntries = upsertSummaryEntry(nextEntries, todayDateKey, { wake_time: wakeTime });
+    nextEntries = upsertSummaryEntry(nextEntries, bedDateKey, { sleep_time: bedTime });
+    await persistDiaryEntriesWithRoundtrip(nextEntries);
+    sleepMorningModalOpen.value = false;
+    notify('Сон сохранён.', 'success');
+  } finally {
+    sleepMorningSaving.value = false;
+  }
+};
 const weekDayLabels = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'ВС'];
 
 const calendarAnchorDate = computed(() => {
@@ -913,7 +1263,9 @@ const openProductsForm = async (meal: MealKey, context: 'meal' | 'water', prefil
   form.date = selectedDate.value;
   form.meal = context === 'water' ? 'water' : meal;
   if (context === 'water') {
-    hydrateFormMetaForDate(form.date);
+    form.water_l = '';
+    form.sleep_time = '';
+    form.activity = false;
   } else {
     hydrateFormFromExistingMeal(form.date, meal, prefillExisting);
   }
@@ -966,13 +1318,18 @@ const hydrateFormFromExistingMeal = (dateKey: string, meal: MealKey, prefillExis
   });
 };
 
-const persistDayMeta = async (dateKey: string, waterValue: number, sleepValue: string, activityValue: boolean) => {
+const persistWaterIntake = async (dateKey: string, addedWaterValue: number) => {
   if (!dateKey) {
     return;
   }
+  if (!Number.isFinite(addedWaterValue) || addedWaterValue <= 0) {
+    return;
+  }
+
   const entries = [...diaryEntries.value];
   const hasEntries = entries.some((entry) => normalizeDate(entry.date) === dateKey);
-  const normalizedSleep = sleepValue ? sleepValue : null;
+  const currentWater = getMaxWaterForDate(dateKey);
+  const nextWater = Number((currentWater + addedWaterValue).toFixed(2));
 
   let updated: DiaryEntry[];
   if (!hasEntries) {
@@ -988,9 +1345,10 @@ const persistDayMeta = async (dateKey: string, waterValue: number, sleepValue: s
         carbs_simple_g: 0,
         carbs_complex_g: 0,
         fiber_g: 0,
-        water_l: Number.isFinite(waterValue) ? waterValue : 0,
-        sleep_time: normalizedSleep,
-        activity: Boolean(activityValue)
+        water_l: nextWater,
+        sleep_time: null,
+        wake_time: null,
+        activity: false
       }
     ];
   } else {
@@ -1000,9 +1358,7 @@ const persistDayMeta = async (dateKey: string, waterValue: number, sleepValue: s
       }
       return {
         ...entry,
-        water_l: Number.isFinite(waterValue) ? waterValue : Number(entry.water_l) || 0,
-        sleep_time: normalizedSleep || entry.sleep_time || null,
-        activity: typeof activityValue === 'boolean' ? activityValue : Boolean(entry.activity)
+        water_l: nextWater
       };
     });
   }
@@ -1017,7 +1373,12 @@ const submitProductsForm = async () => {
   }
 
   if (productsFormContext.value === 'water') {
-    await persistDayMeta(dateKey, Number(form.water_l) || 0, form.sleep_time, form.activity);
+    const addedWater = Number(form.water_l);
+    if (!Number.isFinite(addedWater) || addedWater <= 0) {
+      notify('Введите объём воды больше 0.', 'error');
+      return;
+    }
+    await persistWaterIntake(dateKey, addedWater);
     notify('Вода сохранена.', 'success');
     await closeProductsPanel();
     return;
@@ -1072,17 +1433,22 @@ const deleteCurrentMeal = async () => {
   await closeProductsPanel();
 };
 
-const handleFabAction = async (action: 'meal' | 'water', meal: MealKey = 'breakfast') => {
+const handleFabAction = async (action: 'meal' | 'water' | 'sleep', meal: MealKey = 'breakfast') => {
   if (action === 'water') {
     await openProductsForm('breakfast', 'water', false);
+    return;
+  }
+  if (action === 'sleep') {
+    openSleepMorningModal();
     return;
   }
   await openProductsForm(meal, 'meal', false);
 };
 
 const onDiaryFabAction = async (event: Event) => {
-  const customEvent = event as CustomEvent<{ action?: 'meal' | 'water'; meal?: string }>;
-  const action = customEvent.detail?.action === 'water' ? 'water' : 'meal';
+  const customEvent = event as CustomEvent<{ action?: 'meal' | 'water' | 'sleep'; meal?: string }>;
+  const rawAction = customEvent.detail?.action;
+  const action = rawAction === 'water' || rawAction === 'sleep' ? rawAction : 'meal';
   const mealValue = customEvent.detail?.meal || 'breakfast';
   const meal = (['breakfast', 'lunch', 'dinner', 'snack'] as string[]).includes(mealValue)
     ? (mealValue as MealKey)
@@ -1111,6 +1477,10 @@ onMounted(async () => {
   const meal = typeof route.query.meal === 'string' ? route.query.meal : 'breakfast';
   const action = typeof route.query.action === 'string' ? route.query.action : '';
   const fab = route.query.fab === '1';
+  const hasSleepMorningTrigger = (
+    route.query.sleep_morning === '1'
+    || route.query.intent === 'sleep_morning_log'
+  );
 
   if (mode === 'products') {
     const mealKey = (['breakfast', 'lunch', 'dinner', 'snack'] as string[]).includes(meal) ? (meal as MealKey) : 'breakfast';
@@ -1122,10 +1492,17 @@ onMounted(async () => {
   if (fab) {
     if (action === 'water') {
       await handleFabAction('water');
+    } else if (action === 'sleep') {
+      await handleFabAction('sleep');
     } else {
       const mealKey = (['breakfast', 'lunch', 'dinner', 'snack'] as string[]).includes(meal) ? (meal as MealKey) : 'breakfast';
       await handleFabAction('meal', mealKey);
     }
+  }
+
+  if (hasSleepMorningTrigger) {
+    openSleepMorningModal();
+    await clearSleepMorningTriggerFromQuery();
   }
 
   if (typeof (window as { feather?: { replace?: () => void } }).feather?.replace === 'function') {
@@ -1137,3 +1514,81 @@ onBeforeUnmount(() => {
   window.removeEventListener('diary-fab-action', onDiaryFabAction as EventListener);
 });
 </script>
+
+<style scoped>
+.sleep-midnight-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  padding: 0.5rem 0.75rem;
+}
+
+.sleep-midnight-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+  min-height: 28px;
+}
+
+.sleep-midnight-switch__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sleep-midnight-switch__track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 46px;
+  height: 28px;
+  border-radius: 9999px;
+  background-color: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.sleep-midnight-switch__thumb {
+  position: absolute;
+  top: 50%;
+  left: 1px;
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+  transform: translateY(-50%);
+  transition: transform 0.2s ease, width 0.2s ease;
+}
+
+.sleep-midnight-switch__input:checked + .sleep-midnight-switch__track {
+  background-color: #34d399;
+  border-color: #34d399;
+}
+
+.sleep-midnight-switch__input:checked + .sleep-midnight-switch__track .sleep-midnight-switch__thumb {
+  transform: translate(18px, -50%);
+}
+
+.sleep-midnight-switch:active .sleep-midnight-switch__thumb {
+  width: 27px;
+}
+
+.sleep-midnight-switch__input:focus-visible + .sleep-midnight-switch__track {
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.35);
+}
+</style>

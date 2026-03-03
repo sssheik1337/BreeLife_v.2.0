@@ -104,17 +104,123 @@
           border: none;
           background: linear-gradient(135deg, #34d399, #06b6d4);
           color: white;
-          font-size: 32px;
-          line-height: 1;
+          font-size: 0;
+          line-height: 0;
+          padding: 0;
           display: flex;
           align-items: center;
           justify-content: center;
           text-decoration: none;
           box-shadow: 0 12px 24px rgba(16, 185, 129, 0.3);
+          isolation: isolate;
           z-index: 2;
         }
 
+        .bottom-fab::before,
+        .faq-fab::before {
+          content: '';
+          position: absolute;
+          inset: -2px;
+          border-radius: inherit;
+          padding: 2px;
+          pointer-events: none;
+          -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+          animation: fab-ring-spin 4s linear infinite;
+          z-index: 0;
+        }
+
+        .bottom-fab::before {
+          background: conic-gradient(
+            from 180deg,
+            #6ee7b7,
+            #34d399,
+            #22d3ee,
+            #34d399,
+            #6ee7b7
+          );
+        }
+
+        .bottom-fab__plus {
+          position: relative;
+          display: inline-flex;
+          width: 22px;
+          height: 22px;
+          align-items: center;
+          justify-content: center;
+          z-index: 1;
+        }
+
+        .bottom-fab__plus::before,
+        .bottom-fab__plus::after {
+          content: '';
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          background: #ffffff;
+          border-radius: 999px;
+        }
+
+        .bottom-fab__plus::before {
+          width: 18px;
+          height: 3px;
+        }
+
+        .bottom-fab__plus::after {
+          width: 3px;
+          height: 18px;
+        }
+
         .bottom-fab:active {
+          transform: scale(0.98);
+        }
+
+        .faq-fab {
+          position: fixed;
+          right: max(20px, calc((100vw - 420px) / 2 + 12px));
+          bottom: 104px;
+          width: 52px;
+          height: 52px;
+          border-radius: 999px;
+          border: none;
+          background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+          color: #ffffff;
+          font-size: 28px;
+          font-weight: 700;
+          line-height: 1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          text-decoration: none;
+          box-shadow: 0 10px 24px rgba(14, 165, 233, 0.28);
+          isolation: isolate;
+          z-index: 58;
+        }
+
+        .faq-fab::before {
+          background: conic-gradient(
+            from 180deg,
+            #7dd3fc,
+            #38bdf8,
+            #22d3ee,
+            #0ea5e9,
+            #7dd3fc
+          );
+        }
+
+        .faq-fab__icon {
+          position: relative;
+          z-index: 1;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          line-height: 1;
+        }
+
+        .faq-fab:active {
           transform: scale(0.98);
         }
 
@@ -123,41 +229,205 @@
           inset: 0;
           background: rgba(15, 23, 42, 0.35);
           z-index: 55;
+          opacity: 0;
+          visibility: hidden;
+          pointer-events: none;
+          transition: opacity 0.24s ease, visibility 0ms linear 0.24s;
         }
 
         .fab-overlay.hidden {
-          display: none;
+          opacity: 0;
+          visibility: hidden;
+          pointer-events: none;
+        }
+
+        .fab-overlay:not(.hidden) {
+          opacity: 1;
+          visibility: visible;
+          pointer-events: auto;
+          transition-delay: 0ms;
+        }
+
+        .faq-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.35);
+          z-index: 55;
+          opacity: 0;
+          visibility: hidden;
+          pointer-events: none;
+          transition: opacity 0.24s ease, visibility 0ms linear 0.24s;
+        }
+
+        .faq-overlay.hidden {
+          opacity: 0;
+          visibility: hidden;
+          pointer-events: none;
+        }
+
+        .faq-overlay:not(.hidden) {
+          opacity: 1;
+          visibility: visible;
+          pointer-events: auto;
+          transition-delay: 0ms;
         }
 
         .fab-menu {
           position: fixed;
           left: 50%;
           bottom: 90px;
-          transform: translateX(-50%);
+          transform: translate(-50%, 24px) scale(0.86);
           z-index: 60;
           background: #ffffff;
           border-radius: 18px;
-          padding: 8px;
-          min-width: 240px;
+          padding: 12px;
+          width: min(380px, calc(100vw - 48px));
           box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 10px;
+          opacity: 0;
+          visibility: hidden;
+          pointer-events: none;
         }
 
         .fab-menu.hidden {
-          display: none;
+          animation: fab-menu-hide 0.24s ease forwards;
+        }
+
+        .fab-menu:not(.hidden) {
+          visibility: visible;
+          pointer-events: auto;
+          animation: fab-menu-show 0.3s ease forwards;
         }
 
         .fab-menu__item {
           border: none;
           background: #f8fafc;
           border-radius: 12px;
-          padding: 10px 12px;
-          text-align: left;
-          font-size: 14px;
+          min-height: 58px;
+          width: 100%;
+          padding: 14px 18px;
+          text-align: center;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+          font-weight: 600;
+          line-height: 1.2;
           color: #0f172a;
           cursor: pointer;
+        }
+
+        .fab-menu__item:active {
+          transform: scale(0.99);
+        }
+
+        .faq-menu {
+          position: fixed;
+          left: 50%;
+          bottom: 90px;
+          transform: translate(-50%, 24px) scale(0.86);
+          z-index: 60;
+          background: #ffffff;
+          border-radius: 18px;
+          padding: 12px;
+          width: min(380px, calc(100vw - 48px));
+          box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          opacity: 0;
+          visibility: hidden;
+          pointer-events: none;
+        }
+
+        .faq-menu.hidden {
+          animation: fab-menu-hide 0.24s ease forwards;
+        }
+
+        .faq-menu:not(.hidden) {
+          visibility: visible;
+          pointer-events: auto;
+          animation: fab-menu-show 0.3s ease forwards;
+        }
+
+        .faq-menu__item {
+          border: none;
+          background: #f8fafc;
+          border-radius: 12px;
+          min-height: 58px;
+          width: 100%;
+          padding: 14px 18px;
+          text-align: center;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+          font-weight: 600;
+          line-height: 1.2;
+          color: #0f172a;
+          cursor: pointer;
+        }
+
+        .faq-menu__item:active {
+          transform: scale(0.99);
+        }
+
+        @keyframes fab-ring-spin {
+          0% {
+            transform: rotate(0deg);
+          }
+          100% {
+            transform: rotate(360deg);
+          }
+        }
+
+        @keyframes fab-menu-show {
+          0% {
+            transform: translate(-50%, 24px) scale(0.86);
+            opacity: 0;
+          }
+          50% {
+            transform: translate(-50%, -2px) scale(1.03);
+            opacity: 1;
+          }
+          80% {
+            transform: translate(-50%, 1px) scale(0.98);
+            opacity: 1;
+          }
+          100% {
+            transform: translate(-50%, 0) scale(1);
+            opacity: 1;
+          }
+        }
+
+        @keyframes fab-menu-hide {
+          0% {
+            transform: translate(-50%, 0) scale(1);
+            opacity: 1;
+            visibility: visible;
+          }
+          100% {
+            transform: translate(-50%, 24px) scale(0.86);
+            opacity: 0;
+            visibility: hidden;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .fab-overlay,
+          .fab-menu,
+          .faq-overlay,
+          .faq-menu {
+            transition: none;
+            animation: none;
+          }
+
+          .bottom-fab::before,
+          .faq-fab::before {
+            animation: none;
+          }
         }
 
         @media (min-width: 768px) {
@@ -193,7 +463,9 @@
             <span class="bottom-link__icon" aria-hidden="true">🍽️</span>
             <span>Дневник</span>
           </a>
-          <a href="#" class="bottom-fab" aria-label="Добавить запись">+</a>
+          <a href="#" class="bottom-fab" aria-label="Добавить запись">
+            <span class="bottom-fab__plus" aria-hidden="true"></span>
+          </a>
           <a href="/meal-plan" class="bottom-link" data-bottom-link="meal-plan">
             <span class="bottom-link__icon" aria-hidden="true">📋</span>
             <span>Рацион</span>
@@ -207,11 +479,23 @@
 
       <div class="fab-overlay hidden" data-fab-overlay></div>
       <div class="fab-menu hidden" data-fab-menu>
-        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="breakfast">➕ Добавить завтрак</button>
-        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="lunch">➕ Добавить обед</button>
-        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="dinner">➕ Добавить ужин</button>
-        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="snack">➕ Добавить перекус</button>
+        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="breakfast">🍳 Добавить завтрак</button>
+        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="lunch">🍲 Добавить обед</button>
+        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="dinner">🍽️ Добавить ужин</button>
+        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="snack">🍎 Добавить перекус</button>
         <button type="button" class="fab-menu__item" data-fab-action="water">💧 Добавить воду</button>
+        <button type="button" class="fab-menu__item" data-fab-action="sleep">🌙 Записать сон</button>
+      </div>
+
+      <a href="#" class="faq-fab" aria-label="Открыть разделы помощи и настроек">
+        <span class="faq-fab__icon" aria-hidden="true">?</span>
+      </a>
+      <div class="faq-overlay hidden" data-faq-overlay></div>
+      <div class="faq-menu hidden" data-faq-menu>
+        <button type="button" class="faq-menu__item" data-faq-href="/settings/reminders">🔔 Напоминания</button>
+        <button type="button" class="faq-menu__item" data-faq-href="/plans">💳 Тарифы</button>
+        <button type="button" class="faq-menu__item" data-faq-href="/references">📚 Справочники</button>
+        <button type="button" class="faq-menu__item" data-faq-href="/support">🛟 Помощь</button>
       </div>
     `;
 
@@ -229,6 +513,9 @@
     const bottomSpacer = this.shadowRoot.querySelector('.bottom-spacer');
     const fabOverlay = this.shadowRoot.querySelector('[data-fab-overlay]');
     const fabMenu = this.shadowRoot.querySelector('[data-fab-menu]');
+    const faqFab = this.shadowRoot.querySelector('.faq-fab');
+    const faqOverlay = this.shadowRoot.querySelector('[data-faq-overlay]');
+    const faqMenu = this.shadowRoot.querySelector('[data-faq-menu]');
 
     const normalizeSpaTarget = (target) => {
       if (!target || typeof target !== 'string') {
@@ -278,9 +565,21 @@
       fabOverlay?.classList.add('hidden');
     };
 
+    const closeFaqMenu = () => {
+      faqMenu?.classList.add('hidden');
+      faqOverlay?.classList.add('hidden');
+    };
+
     const openFabMenu = () => {
+      closeFaqMenu();
       fabMenu?.classList.remove('hidden');
       fabOverlay?.classList.remove('hidden');
+    };
+
+    const openFaqMenu = () => {
+      closeFabMenu();
+      faqMenu?.classList.remove('hidden');
+      faqOverlay?.classList.remove('hidden');
     };
 
     const toggleFabMenu = () => {
@@ -292,6 +591,18 @@
         openFabMenu();
       } else {
         closeFabMenu();
+      }
+    };
+
+    const toggleFaqMenu = () => {
+      if (!faqMenu || !faqOverlay) {
+        return;
+      }
+      const isHidden = faqMenu.classList.contains('hidden');
+      if (isHidden) {
+        openFaqMenu();
+      } else {
+        closeFaqMenu();
       }
     };
 
@@ -357,6 +668,29 @@
         closeFabMenu();
       });
     }
+
+    if (faqFab) {
+      faqFab.addEventListener('click', (event) => {
+        event.preventDefault();
+        toggleFaqMenu();
+      });
+    }
+
+    if (faqOverlay) {
+      faqOverlay.addEventListener('click', () => {
+        closeFaqMenu();
+      });
+    }
+
+    this.shadowRoot.querySelectorAll('[data-faq-href]').forEach((item) => {
+      item.addEventListener('click', () => {
+        closeFaqMenu();
+        const target = item.getAttribute('data-faq-href');
+        if (target) {
+          navigateTo(target);
+        }
+      });
+    });
 
     this.shadowRoot.querySelectorAll('[data-fab-action]').forEach((item) => {
       item.addEventListener('click', () => {
@@ -444,8 +778,15 @@
       if (bottomNav) {
         bottomNav.style.display = shouldHide ? 'none' : '';
       }
+      if (faqFab) {
+        faqFab.style.display = shouldHide ? 'none' : '';
+      }
       if (bottomSpacer) {
         bottomSpacer.style.height = shouldHide ? '0' : '0';
+      }
+      if (shouldHide) {
+        closeFabMenu();
+        closeFaqMenu();
       }
     };
 
@@ -484,8 +825,14 @@
 
     updateBottomNavVisibility();
     updateActiveBottomLink();
-    window.addEventListener('popstate', updateActiveBottomLink);
-    window.addEventListener('spa-route-changed', updateActiveBottomLink);
+    window.addEventListener('popstate', () => {
+      updateBottomNavVisibility();
+      updateActiveBottomLink();
+    });
+    window.addEventListener('spa-route-changed', () => {
+      updateBottomNavVisibility();
+      updateActiveBottomLink();
+    });
   }
 }
 

@@ -29,6 +29,7 @@ def normalize_diary_entries(entries: object) -> list[dict[str, object]]:
     - meals: list
     - water_l: int | float | None
     - sleep_time: str | None
+    - wake_time: str | None
     - activity: bool | None
     """
     if not isinstance(entries, list):
@@ -51,6 +52,9 @@ def normalize_diary_entries(entries: object) -> list[dict[str, object]]:
 
         sleep_value = entry.get("sleep_time")
         entry["sleep_time"] = sleep_value if isinstance(sleep_value, str) else None
+
+        wake_value = entry.get("wake_time")
+        entry["wake_time"] = wake_value if isinstance(wake_value, str) else None
 
         activity_value = entry.get("activity")
         entry["activity"] = activity_value if isinstance(activity_value, bool) else None

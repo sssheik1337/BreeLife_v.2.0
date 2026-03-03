@@ -36,7 +36,30 @@ const appStateStore = useAppStateStore();
 appStateStore.hydrateFromLegacyWindow(window as any);
 const storageStore = useStorageStore();
 installStorageBridge(window, storageStore);
-void ensureTelegramAuthSession({ reason: 'app-start' });
+
+const buildTimezonePayload = (): { tz_name: string | null; tz_offset_minutes: number } => {
+  const tzNameRaw = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const tzName = typeof tzNameRaw === 'string' && tzNameRaw.trim().length > 0 ? tzNameRaw.trim() : null;
+  return {
+    tz_name: tzName,
+    tz_offset_minutes: new Date().getTimezoneOffset(),
+  };
+};
+
+const syncUserTimezone = async (): Promise<void> => {
+  try {
+    await storageStore.apiFetch('/api/user/timezone', {
+      method: 'POST',
+      body: JSON.stringify(buildTimezonePayload()),
+    });
+  } catch {
+    // Ignore timezone sync errors; reminders service has UTC fallback.
+  }
+};
+
+void ensureTelegramAuthSession({ reason: 'app-start' }).finally(() => {
+  void syncUserTimezone();
+});
 const runtimeWindow = window as SpaNavigationWindow;
 
 const installNotificationBridge = (): void => {

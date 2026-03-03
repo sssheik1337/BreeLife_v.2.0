@@ -63,6 +63,33 @@ TABLES = {
             updated_at TEXT NOT NULL
         )
     """,
+    "user_settings": """
+        CREATE TABLE IF NOT EXISTS user_settings (
+            telegram_user_id INTEGER PRIMARY KEY,
+            tz_name TEXT,
+            tz_offset_minutes INTEGER,
+            write_access_allowed INTEGER,
+            write_access_updated_at TEXT,
+            updated_at TEXT NOT NULL
+        )
+    """,
+    "reminders": """
+        CREATE TABLE IF NOT EXISTS reminders (
+            id TEXT PRIMARY KEY,
+            telegram_user_id INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            enabled INTEGER NOT NULL DEFAULT 1,
+            time_local TEXT NOT NULL,
+            frequency TEXT NOT NULL DEFAULT 'daily',
+            timezone TEXT,
+            next_run_at_utc TEXT,
+            last_sent_at_utc TEXT,
+            fail_count INTEGER NOT NULL DEFAULT 0,
+            last_error TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+    """,
     "telegram_users": """
         CREATE TABLE IF NOT EXISTS telegram_users (
             telegram_user_id INTEGER PRIMARY KEY,
@@ -139,6 +166,22 @@ def init_db() -> None:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_payments_status_created ON payments(status, created_at)"
         )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_settings_user ON user_settings(telegram_user_id)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_reminders_user ON reminders(telegram_user_id)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_reminders_next_run ON reminders(next_run_at_utc)"
+        )
+        user_settings_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(user_settings)").fetchall()
+        }
+        if "write_access_allowed" not in user_settings_columns:
+            connection.execute("ALTER TABLE user_settings ADD COLUMN write_access_allowed INTEGER")
+        if "write_access_updated_at" not in user_settings_columns:
+            connection.execute("ALTER TABLE user_settings ADD COLUMN write_access_updated_at TEXT")
 
 
 def read_payload(table: str, telegram_user_id: int) -> dict | list | None:

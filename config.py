@@ -41,6 +41,22 @@ SPA_PHASE_3_ENABLED = env_flag('SPA_PHASE_3_ENABLED', False)
 SPA_PHASE_4_ENABLED = env_flag('SPA_PHASE_4_ENABLED', False)
 
 REMINDERS_ENABLED = os.getenv("REMINDERS_ENABLED", "false").lower() in {"1", "true", "yes"}
+REMINDERS_INLINE_WORKER_ENABLED = os.getenv(
+    "REMINDERS_INLINE_WORKER_ENABLED",
+    "1" if IS_DEV else "0",
+).lower() in {"1", "true", "yes"}
+try:
+    REMINDERS_WORKER_POLL_SECONDS = max(15, int(os.getenv("REMINDERS_WORKER_POLL_SECONDS", "60")))
+except ValueError:
+    REMINDERS_WORKER_POLL_SECONDS = 60
+try:
+    WATER_REMINDER_INTERVAL_MINUTES = max(15, int(os.getenv("WATER_REMINDER_INTERVAL_MINUTES", "90")))
+except ValueError:
+    WATER_REMINDER_INTERVAL_MINUTES = 90
+try:
+    WAKE_WATER_DELAY_MINUTES = max(0, int(os.getenv("WAKE_WATER_DELAY_MINUTES", "45")))
+except ValueError:
+    WAKE_WATER_DELAY_MINUTES = 45
 MEAL_PLAN_ALGO_VERSION = os.getenv("MEAL_PLAN_ALGO_VERSION", "v1")
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")

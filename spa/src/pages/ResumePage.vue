@@ -71,6 +71,7 @@
 
         <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8">
           <div class="text-center py-4">
+            <h3 class="font-semibold text-slate-800 mb-3">Индекс массы тела</h3>
             <div id="bmi-value" class="text-5xl font-bold text-slate-800 mb-2">{{ bmi.value }}</div>
             <div id="bmi-category" class="text-slate-500">{{ bmi.category }}</div>
           </div>
