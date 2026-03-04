@@ -1,0 +1,19 @@
+.git
+.idea
+.venv
+__pycache__
+**/__pycache__/
+**/*.pyc
+
+.env
+.env.*
+
+# Локальные артефакты и мусор
+_tmp_*.sqlite3
+_tmp_*.sqlite3-*
+_tmp_*.db
+
+# Фронтенд: зависимости и собранные артефакты на локальной машине не нужны в build context
+spa/node_modules
+spa/dist
+
