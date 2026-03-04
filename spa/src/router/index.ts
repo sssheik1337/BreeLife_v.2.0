@@ -26,7 +26,6 @@ interface RouteMetaPolicy {
     requiresCompletedProfile?: boolean;
     onboardingStep?: 'choice' | 'preferences' | 'trial';
     requiresProductsOnboarding?: boolean;
-    migrationPhase?: 1 | 2 | 3 | 4;
 }
 
 interface SessionStatusPayload {
@@ -39,22 +38,9 @@ interface SessionStatusPayload {
     photo_url: string | null;
 }
 
-interface SpaRolloutConfig {
-    spa_enabled: boolean;
-    phase_1_enabled: boolean;
-    phase_2_enabled: boolean;
-    phase_3_enabled: boolean;
-    phase_4_enabled: boolean;
-}
-
-interface AppConfigPayload {
-    spa_rollout?: Partial<SpaRolloutConfig>;
-}
-
 interface RouterGuardContext {
     session: SessionStatusPayload;
     profile: ProfileState | null;
-    rollout: SpaRolloutConfig;
 }
 
 const ROUTE_META = {
@@ -80,7 +66,7 @@ const routes: RouteRecordRaw[] = [
         path: '/questionnaire',
         name: 'questionnaire',
         component: QuestionnairePage,
-        meta: { ...ROUTE_META.questionnaire, migrationPhase: 3 } satisfies RouteMetaPolicy
+        meta: { ...ROUTE_META.questionnaire } satisfies RouteMetaPolicy
     },
     {
         path: '/preferences-onboarding-choice',
@@ -89,7 +75,6 @@ const routes: RouteRecordRaw[] = [
         meta: {
             ...ROUTE_META.completedOnly,
             onboardingStep: 'choice',
-            migrationPhase: 2
         } satisfies RouteMetaPolicy
     },
     {
@@ -99,7 +84,6 @@ const routes: RouteRecordRaw[] = [
         meta: {
             ...ROUTE_META.completedOnly,
             onboardingStep: 'preferences',
-            migrationPhase: 2
         } satisfies RouteMetaPolicy
     },
     {
@@ -109,20 +93,19 @@ const routes: RouteRecordRaw[] = [
         meta: {
             ...ROUTE_META.completedOnly,
             onboardingStep: 'trial',
-            migrationPhase: 2
         } satisfies RouteMetaPolicy
     },
     {
         path: '/resume',
         name: 'resume',
         component: ResumePage,
-        meta: { ...ROUTE_META.completedOnly, migrationPhase: 3 } satisfies RouteMetaPolicy
+        meta: { ...ROUTE_META.completedOnly } satisfies RouteMetaPolicy
     },
     {
         path: '/profile',
         name: 'profile-progress',
         component: ProfilePage,
-        meta: { ...ROUTE_META.completedOnly, migrationPhase: 4 } satisfies RouteMetaPolicy
+        meta: { ...ROUTE_META.completedOnly } satisfies RouteMetaPolicy
     },
     {
         path: '/profile.html',
@@ -132,7 +115,7 @@ const routes: RouteRecordRaw[] = [
         path: '/diary',
         name: 'diary',
         component: DiaryPage,
-        meta: { ...ROUTE_META.completedOnly, migrationPhase: 4 } satisfies RouteMetaPolicy
+        meta: { ...ROUTE_META.completedOnly } satisfies RouteMetaPolicy
     },
     {
         path: '/food-diary',
@@ -142,13 +125,13 @@ const routes: RouteRecordRaw[] = [
         path: '/foods',
         name: 'foods',
         component: FoodsPage,
-        meta: { ...ROUTE_META.completedOnly, migrationPhase: 2 } satisfies RouteMetaPolicy
+        meta: { ...ROUTE_META.completedOnly } satisfies RouteMetaPolicy
     },
     {
         path: '/my-products',
         name: 'my-products',
         component: MyProductsPage,
-        meta: { ...ROUTE_META.completedOnly, migrationPhase: 2 } satisfies RouteMetaPolicy
+        meta: { ...ROUTE_META.completedOnly } satisfies RouteMetaPolicy
     },
     {
         path: '/meal-plan',
@@ -157,7 +140,6 @@ const routes: RouteRecordRaw[] = [
         meta: {
             ...ROUTE_META.completedOnly,
             requiresProductsOnboarding: true,
-            migrationPhase: 3
         } satisfies RouteMetaPolicy
     },
     {
@@ -167,38 +149,37 @@ const routes: RouteRecordRaw[] = [
         meta: {
             ...ROUTE_META.completedOnly,
             requiresProductsOnboarding: true,
-            migrationPhase: 2
         } satisfies RouteMetaPolicy
     },
     {
         path: '/menu',
         name: 'menu',
         component: MenuPage,
-        meta: { ...ROUTE_META.completedOnly, migrationPhase: 1 } satisfies RouteMetaPolicy
+        meta: { ...ROUTE_META.completedOnly } satisfies RouteMetaPolicy
     },
     {
         path: '/references',
         name: 'references',
         component: ReferencesPage,
-        meta: { ...ROUTE_META.completedOnly, migrationPhase: 1 } satisfies RouteMetaPolicy
+        meta: { ...ROUTE_META.completedOnly } satisfies RouteMetaPolicy
     },
     {
         path: '/support',
         name: 'support',
         component: SupportPage,
-        meta: { ...ROUTE_META.completedOnly, migrationPhase: 1 } satisfies RouteMetaPolicy
+        meta: { ...ROUTE_META.completedOnly } satisfies RouteMetaPolicy
     },
     {
         path: '/plans',
         name: 'plans',
         component: PlansPage,
-        meta: { ...ROUTE_META.completedOnly, migrationPhase: 1 } satisfies RouteMetaPolicy
+        meta: { ...ROUTE_META.completedOnly } satisfies RouteMetaPolicy
     },
     {
         path: '/settings/reminders',
         name: 'settings-reminders',
         component: RemindersSettingsPage,
-        meta: { ...ROUTE_META.completedOnly, migrationPhase: 1 } satisfies RouteMetaPolicy
+        meta: { ...ROUTE_META.completedOnly } satisfies RouteMetaPolicy
     }
 ];
 
@@ -308,47 +289,9 @@ const loadProfileForGuards = async (): Promise<ProfileState | null> => {
     }
 };
 
-const DEFAULT_ROLLOUT_CONFIG: SpaRolloutConfig = {
-    spa_enabled: false,
-    phase_1_enabled: false,
-    phase_2_enabled: false,
-    phase_3_enabled: false,
-    phase_4_enabled: false
-};
-
-let cachedRolloutConfig: SpaRolloutConfig | null = null;
 const onboardingDebugLog = createOnboardingDebugLogger();
 
-const loadRolloutConfig = async (): Promise<SpaRolloutConfig> => {
-    if (cachedRolloutConfig) {
-        return cachedRolloutConfig;
-    }
-
-    const fetcher = resolveApiFetch();
-    const response = await fetcher('/api/app/config');
-    if (!response.ok) {
-        cachedRolloutConfig = { ...DEFAULT_ROLLOUT_CONFIG };
-        return cachedRolloutConfig;
-    }
-
-    const data = (await response.json()) as AppConfigPayload;
-    const rollout = data?.spa_rollout || {};
-    cachedRolloutConfig = {
-        spa_enabled: rollout.spa_enabled === true,
-        phase_1_enabled: rollout.phase_1_enabled === true,
-        phase_2_enabled: rollout.phase_2_enabled === true,
-        phase_3_enabled: rollout.phase_3_enabled === true,
-        phase_4_enabled: rollout.phase_4_enabled === true
-    };
-    return cachedRolloutConfig;
-};
-
-const redirectToLegacyRoute = (targetPath: string): void => {
-    window.location.replace(targetPath);
-};
-
 const buildGuardContext = async (to: RouteLocationNormalized): Promise<RouterGuardContext> => {
-    const rollout = await loadRolloutConfig();
     const session = await loadSessionStatus();
     const needsProfile = Boolean(
         to.meta.onboardingStep
@@ -374,17 +317,12 @@ const buildGuardContext = async (to: RouteLocationNormalized): Promise<RouterGua
         appStateStore.setProfile(profile);
     }
 
-    return { session, profile, rollout };
+    return { session, profile };
 };
 
 router.beforeEach(async (to: RouteLocationNormalized, _from: RouteLocationNormalized, next: NavigationGuardNext) => {
     try {
-        const { session, profile, rollout } = await buildGuardContext(to);
-
-        if (!rollout.spa_enabled) {
-            redirectToLegacyRoute(to.path);
-            return;
-        }
+        const { session, profile } = await buildGuardContext(to);
 
         const onboardingDecision = evaluateOnboardingState(
             {

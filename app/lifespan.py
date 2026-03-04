@@ -12,8 +12,6 @@ from config import (
     DEBUG,
     PUBLIC_APP_URL,
     PUBLIC_BASE_URL,
-    REMINDERS_ENABLED,
-    REMINDERS_INLINE_WORKER_ENABLED,
     REMINDERS_WORKER_POLL_SECONDS,
     TELEGRAM_BOT_TOKEN,
     TELEGRAM_HIDDEN_ADMIN_COMMAND,
@@ -161,16 +159,10 @@ async def lifespan(app: FastAPI):
         return
     logger.info("INFO: Telegram bot started (webhook): %s", webhook_url)
 
-    if REMINDERS_INLINE_WORKER_ENABLED:
-        reminders_worker_stop_event = asyncio.Event()
-        reminders_worker_task = asyncio.create_task(
-            run_inline_reminders_worker_loop(reminders_worker_stop_event)
-        )
-    elif REMINDERS_ENABLED:
-        logger.info(
-            "Reminders enabled, but inline worker is off. "
-            "Run 'python -m services.reminders_worker' via cron/Task Scheduler."
-        )
+    reminders_worker_stop_event = asyncio.Event()
+    reminders_worker_task = asyncio.create_task(
+        run_inline_reminders_worker_loop(reminders_worker_stop_event)
+    )
 
     yield
 

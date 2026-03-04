@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Локальный шаг для CI/CD: собираем SPA до запуска backend-деплоя.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SPA_DIR="$REPO_ROOT/spa"
 
@@ -14,10 +13,14 @@ cd "$SPA_DIR"
 
 if [ ! -d node_modules ]; then
   echo "Устанавливаем зависимости SPA..."
-  npm install
+  if [ -f package-lock.json ]; then
+    npm ci
+  else
+    npm install
+  fi
 fi
 
 echo "Собираем SPA..."
 npm run build
 
-echo "SPA собрана. Артефакты доступны в $SPA_DIR/dist"
+echo "SPA собрана. Артефакты: $SPA_DIR/dist"

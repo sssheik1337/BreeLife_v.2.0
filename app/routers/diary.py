@@ -1,17 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
-
-from config import AI_ENABLED
-from app.context import templates
+from fastapi import APIRouter, HTTPException, Request, Response
 from app.dependencies import (
-    get_profile_and_admin_config,
     load_profile,
-    optional_current_user,
-    require_completed_profile,
     require_telegram_user_id,
     update_profile,
 )
-from app.spa_rollout import maybe_redirect_to_spa_shell
 from app.schemas import FoodDiaryAddRequest
 from app.utils import build_food_diary_aggregates
 from services.ai_profile import generate_food_diary_recommendation
@@ -104,35 +96,6 @@ def migrate_legacy_diary_if_needed(telegram_user_id: int) -> list[dict[str, obje
 
     write_payload("profiles", telegram_user_id, updated_profile)
     return normalized_legacy_entries
-
-
-@router.get("/diary", response_class=HTMLResponse)
-async def diary(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
-    spa_redirect = maybe_redirect_to_spa_shell(request)
-    if spa_redirect:
-        return spa_redirect
-    payload = get_profile_and_admin_config(telegram_user_id)
-    if telegram_user_id is None:
-        return templates.TemplateResponse(
-            "diary.html",
-            {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
-        )
-    require_completed_profile(telegram_user_id)
-    return templates.TemplateResponse(
-        "diary.html",
-        {"request": request, "admin_config": payload["admin_config"], "ai_enabled": AI_ENABLED},
-    )
-
-
-@router.get("/food-diary")
-async def food_diary(request: Request, telegram_user_id: int | None = Depends(optional_current_user)):
-    spa_redirect = maybe_redirect_to_spa_shell(request)
-    if spa_redirect:
-        return spa_redirect
-    if telegram_user_id is None:
-        return RedirectResponse(url="/diary")
-    require_completed_profile(telegram_user_id)
-    return RedirectResponse(url="/diary")
 
 
 @router.get("/api/diary")

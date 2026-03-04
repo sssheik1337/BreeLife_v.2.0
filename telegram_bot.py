@@ -1,9 +1,9 @@
 import asyncio
 import logging
 import os
-from urllib.parse import urlsplit, urlunsplit
 from dataclasses import dataclass
 from typing import Final
+from urllib.parse import urlsplit, urlunsplit
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -23,10 +23,16 @@ HIDDEN_ADMIN_COMMAND: Final[str] = (
 def normalize_webapp_url(raw_url: str) -> str:
     if not raw_url:
         return ""
-    parsed = urlsplit(raw_url)
+    raw_value = raw_url.strip()
+    parsed = urlsplit(raw_value)
     if not parsed.scheme or not parsed.netloc:
-        return raw_url
-    normalized = parsed._replace(path="/", query="", fragment="")
+        return raw_value
+
+    normalized_path = parsed.path or "/"
+    if not normalized_path.startswith("/"):
+        normalized_path = f"/{normalized_path}"
+
+    normalized = parsed._replace(path=normalized_path, query="", fragment="")
     return urlunsplit(normalized)
 
 
@@ -65,9 +71,7 @@ def build_dispatcher() -> Dispatcher:
     async def start(message: types.Message) -> None:
         user_id = message.from_user.id if message.from_user else "unknown"
         logger.info("INFO: /start received from user %s", user_id)
-        await message.answer(
-            "Откройте приложение через кнопку меню бота",
-        )
+        await message.answer("Откройте приложение через кнопку меню бота.")
 
     @dispatcher.message(Command(HIDDEN_ADMIN_COMMAND))
     async def hidden_admin(message: types.Message) -> None:
@@ -83,10 +87,7 @@ def build_dispatcher() -> Dispatcher:
                 ]
             ]
         )
-        await message.answer(
-            "Доступ в админ-панель:",
-            reply_markup=keyboard,
-        )
+        await message.answer("Доступ в админ-панель:", reply_markup=keyboard)
 
     return dispatcher
 
@@ -104,6 +105,7 @@ async def run_bot() -> BotState:
         logger.info("INFO: Кнопка приложения установлена в меню чата")
     except Exception as exc:
         logger.error("Не удалось установить кнопку приложения в меню чата: %s", exc)
+
     dispatcher = build_dispatcher()
     task = asyncio.create_task(dispatcher.start_polling(bot))
     logger.info("INFO: Telegram bot started (aiogram)")

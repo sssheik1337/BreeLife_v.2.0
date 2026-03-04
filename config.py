@@ -9,13 +9,6 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent
 
 
-def resolve_project_path(raw_path: str) -> str:
-    path = Path(raw_path)
-    if path.is_absolute():
-        return str(path)
-    return str((BASE_DIR / path).resolve())
-
-
 APP_NAME = os.getenv("APP_NAME", "BreeLife")
 APP_ENV = os.getenv("APP_ENV", "development").lower()
 IS_DEV = APP_ENV == "development"
@@ -29,22 +22,12 @@ AI_ENABLED = os.getenv("AI_ENABLED", "false").lower() in {"1", "true", "yes"}
 
 
 def env_flag(name: str, default: bool = False) -> bool:
-    return os.getenv(name, '1' if default else '0').lower() in {'1', 'true', 'yes'}
+    return os.getenv(name, "1" if default else "0").lower() in {"1", "true", "yes"}
 
 
 DEV_AUTH_ENABLED = env_flag("DEV_AUTH_ENABLED", False)
-SPA_ENABLED = env_flag('SPA_ENABLED', False)
-SPA_PRIMARY_ROUTES_TO_SHELL_ENABLED = env_flag('SPA_PRIMARY_ROUTES_TO_SHELL_ENABLED', False)
-SPA_PHASE_1_ENABLED = env_flag('SPA_PHASE_1_ENABLED', False)
-SPA_PHASE_2_ENABLED = env_flag('SPA_PHASE_2_ENABLED', False)
-SPA_PHASE_3_ENABLED = env_flag('SPA_PHASE_3_ENABLED', False)
-SPA_PHASE_4_ENABLED = env_flag('SPA_PHASE_4_ENABLED', False)
 
-REMINDERS_ENABLED = os.getenv("REMINDERS_ENABLED", "false").lower() in {"1", "true", "yes"}
-REMINDERS_INLINE_WORKER_ENABLED = os.getenv(
-    "REMINDERS_INLINE_WORKER_ENABLED",
-    "1" if IS_DEV else "0",
-).lower() in {"1", "true", "yes"}
+# Напоминания включены всегда; настраиваются только интервалы.
 try:
     REMINDERS_WORKER_POLL_SECONDS = max(15, int(os.getenv("REMINDERS_WORKER_POLL_SECONDS", "60")))
 except ValueError:
@@ -57,6 +40,7 @@ try:
     WAKE_WATER_DELAY_MINUTES = max(0, int(os.getenv("WAKE_WATER_DELAY_MINUTES", "45")))
 except ValueError:
     WAKE_WATER_DELAY_MINUTES = 45
+
 MEAL_PLAN_ALGO_VERSION = os.getenv("MEAL_PLAN_ALGO_VERSION", "v2")
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
@@ -68,10 +52,16 @@ TELEGRAM_HIDDEN_ADMIN_COMMAND = (
 def normalize_webapp_url(raw_url: str) -> str:
     if not raw_url:
         return ""
-    parsed = urlsplit(raw_url)
+    raw_value = raw_url.strip()
+    parsed = urlsplit(raw_value)
     if not parsed.scheme or not parsed.netloc:
-        return raw_url
-    normalized = parsed._replace(path="/", query="", fragment="")
+        return raw_value
+
+    normalized_path = parsed.path or "/"
+    if not normalized_path.startswith("/"):
+        normalized_path = f"/{normalized_path}"
+
+    normalized = parsed._replace(path=normalized_path, query="", fragment="")
     return urlunsplit(normalized)
 
 
@@ -86,18 +76,19 @@ PAYMENT_SECRET_KEY = os.getenv("PAYMENT_SECRET_KEY", "")
 YANDEX_GPT_API_KEY = os.getenv("YANDEX_GPT_API_KEY", "")
 YANDEX_GPT_FOLDER_ID = os.getenv("YANDEX_GPT_FOLDER_ID", "")
 
-# Путь к базе данных SQLite (обязателен через переменные окружения).
+# Путь к базе данных приложения SQLite (обязателен). Не храните БД внутри репозитория.
 DB_PATH = os.getenv("DB_PATH")
 if not DB_PATH:
     raise RuntimeError("DB_PATH is required. Set it in the environment.")
+if not Path(DB_PATH).is_absolute():
+    raise RuntimeError("DB_PATH must be an absolute path.")
 
-# Путь к базе данных продуктов.
-PRODUCTS_DB_PATH = resolve_project_path(
-    os.getenv("PRODUCTS_DB_PATH", "static/data/products.db")
-)
-
-# Путь к файлу с тарифами.
-PLANS_PATH = resolve_project_path(os.getenv("PLANS_PATH", "config/plans.json"))
+# Путь к базе данных продуктов (обязателен). Не храните БД внутри репозитория.
+PRODUCTS_DB_PATH = os.getenv("PRODUCTS_DB_PATH")
+if not PRODUCTS_DB_PATH:
+    raise RuntimeError("PRODUCTS_DB_PATH is required. Set it in the environment.")
+if not Path(PRODUCTS_DB_PATH).is_absolute():
+    raise RuntimeError("PRODUCTS_DB_PATH must be an absolute path.")
 
 # Данные доступа в админку.
 ADMIN_LOGIN = os.getenv("ADMIN_LOGIN", "")

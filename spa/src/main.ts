@@ -4,7 +4,7 @@ import { createApp } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
-import { installStorageBridge } from './legacyBridge/storageBridge';
+import { installStorageBridge } from './bridge/storageBridge';
 import { ensureTelegramAuthSession } from './platform/telegramAuth';
 import { useAppStateStore } from './stores/appStateStore';
 import { useStorageStore } from './stores/storageStore';
@@ -19,7 +19,7 @@ type SpaNavigationWindow = Window & {
   showNotification?: (message: string, tone?: string) => void;
 };
 
-// Let legacy scripts detect that they are running inside the SPA shell.
+// Let global scripts detect that they are running inside the SPA shell.
 (window as any).__SPA_MODE__ = true;
 (window as any).__SPA_BASE__ = '/app';
 (window as any).feather = (window as any).feather || feather;

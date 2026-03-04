@@ -143,6 +143,17 @@ MEAL_PLANS_TABLE_SQL = """
     )
 """
 
+APP_KV_TABLE_SQL = """
+    CREATE TABLE IF NOT EXISTS app_kv (
+        key TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )
+"""
+
+APP_KV_ADMIN_CONFIG_KEY = "admin_config"
+APP_KV_PLANS_CONFIG_KEY = "plans_config"
+
 
 def init_db() -> None:
     """Инициализировать базу данных и таблицы."""
@@ -153,6 +164,7 @@ def init_db() -> None:
         for statement in TABLES.values():
             connection.execute(statement)
         connection.execute(MEAL_PLANS_TABLE_SQL)
+        connection.execute(APP_KV_TABLE_SQL)
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_telegram_users_username ON telegram_users(username)"
         )
@@ -192,6 +204,9 @@ def init_db() -> None:
         )
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_meal_plans_updated_at ON meal_plans(updated_at)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_app_kv_updated_at ON app_kv(updated_at)"
         )
         user_settings_columns = {
             row[1] for row in connection.execute("PRAGMA table_info(user_settings)").fetchall()
@@ -238,6 +253,64 @@ def write_payload(table: str, telegram_user_id: int, payload: dict | list) -> No
             (telegram_user_id, serialized, updated_at),
         )
         connection.commit()
+
+
+def read_app_kv_json(key: str) -> object | None:
+    """Прочитать JSON-значение из app_kv."""
+    if not isinstance(key, str) or not key.strip():
+        return None
+    normalized_key = key.strip()
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.row_factory = sqlite3.Row
+        cursor = connection.execute(
+            "SELECT data FROM app_kv WHERE key = ?",
+            (normalized_key,),
+        )
+        row = cursor.fetchone()
+    if not row:
+        return None
+    try:
+        return json.loads(row["data"])
+    except json.JSONDecodeError:
+        return None
+
+
+def write_app_kv_json(key: str, payload: object) -> None:
+    """Записать JSON-значение в app_kv."""
+    if not isinstance(key, str) or not key.strip():
+        raise ValueError("Некорректный ключ app_kv.")
+    normalized_key = key.strip()
+    updated_at = datetime.now(timezone.utc).isoformat()
+    serialized = json.dumps(payload, ensure_ascii=False)
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.execute(
+            """
+            INSERT INTO app_kv (key, data, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(key)
+            DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at
+            """,
+            (normalized_key, serialized, updated_at),
+        )
+        connection.commit()
+
+
+def load_admin_config_kv() -> dict[str, object]:
+    payload = read_app_kv_json(APP_KV_ADMIN_CONFIG_KEY)
+    return payload if isinstance(payload, dict) else {}
+
+
+def save_admin_config_kv(data: dict[str, object]) -> None:
+    write_app_kv_json(APP_KV_ADMIN_CONFIG_KEY, data)
+
+
+def load_plans_config_kv() -> list[dict[str, object]]:
+    payload = read_app_kv_json(APP_KV_PLANS_CONFIG_KEY)
+    return payload if isinstance(payload, list) else []
+
+
+def save_plans_config_kv(plans: list[dict[str, object]]) -> None:
+    write_app_kv_json(APP_KV_PLANS_CONFIG_KEY, plans)
 
 
 def upsert_telegram_user(

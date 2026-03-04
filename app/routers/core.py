@@ -10,15 +10,8 @@ from config import (
     DEBUG,
     IS_PROD,
     PUBLIC_APP_URL,
-    SPA_ENABLED,
-    SPA_PRIMARY_ROUTES_TO_SHELL_ENABLED,
-    SPA_PHASE_1_ENABLED,
-    SPA_PHASE_2_ENABLED,
-    SPA_PHASE_3_ENABLED,
-    SPA_PHASE_4_ENABLED,
 )
-from app.context import TELEGRAM_SESSION_COOKIE, load_admin_config, load_plans_config, templates
-from app.spa_rollout import maybe_redirect_to_spa_shell
+from app.context import TELEGRAM_SESSION_COOKIE, load_admin_config, load_plans_config
 from services.storage_db import get_session_user, read_payload
 
 router = APIRouter()
@@ -144,18 +137,7 @@ def _render_spa_shell_index(spa_index_path: Path) -> HTMLResponse:
 
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    spa_redirect = maybe_redirect_to_spa_shell(request)
-    if spa_redirect:
-        return spa_redirect
-    if IS_PROD and not DEBUG:
-        return templates.TemplateResponse(
-            "index.html",
-            {"request": request, "APP_NAME": APP_NAME},
-        )
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "APP_NAME": APP_NAME},
-    )
+    return RedirectResponse(url="/app/", status_code=307)
 
 
 @router.get("/index", response_class=HTMLResponse)
@@ -165,10 +147,6 @@ async def index_alias(request: Request):
 
 @router.get("/app", response_class=HTMLResponse)
 async def spa_shell(request: Request):
-    if not SPA_ENABLED:
-        # Быстрый rollback: при выключенном SPA возвращаем пользователя в legacy-вход.
-        return RedirectResponse(url="/", status_code=307)
-
     spa_index_path = Path("spa/dist/index.html")
     if spa_index_path.exists():
         return _render_spa_shell_index(spa_index_path)
@@ -233,14 +211,6 @@ async def get_app_config():
         "app_env": APP_ENV,
         "app_host": APP_HOST,
         "app_port": APP_PORT,
-        "spa_rollout": {
-            "spa_enabled": SPA_ENABLED,
-            "spa_primary_routes_to_shell_enabled": SPA_PRIMARY_ROUTES_TO_SHELL_ENABLED,
-            "phase_1_enabled": SPA_PHASE_1_ENABLED,
-            "phase_2_enabled": SPA_PHASE_2_ENABLED,
-            "phase_3_enabled": SPA_PHASE_3_ENABLED,
-            "phase_4_enabled": SPA_PHASE_4_ENABLED,
-        },
     }
 
 

@@ -12,7 +12,11 @@ if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
 
 if (-not (Test-Path 'node_modules')) {
     Write-Host 'Installing SPA dependencies...'
-    npm install
+    if (Test-Path 'package-lock.json') {
+        npm ci
+    } else {
+        npm install
+    }
 }
 
 Write-Host 'Building SPA...'
