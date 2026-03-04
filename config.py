@@ -96,19 +96,59 @@ PAYMENT_SECRET_KEY = os.getenv("PAYMENT_SECRET_KEY", "")
 YANDEX_GPT_API_KEY = os.getenv("YANDEX_GPT_API_KEY", "")
 YANDEX_GPT_FOLDER_ID = os.getenv("YANDEX_GPT_FOLDER_ID", "")
 
+
+def _looks_like_rooted_posix_path(path_value: str) -> bool:
+    """
+    На Windows строка вида "/data/app.sqlite3" не считается абсолютной через Path(...).is_absolute(),
+    но по факту это "путь от корня текущего диска" и нормально резолвится в "C:\\data\\...".
+    """
+    return isinstance(path_value, str) and path_value.startswith("/") and len(path_value) > 1
+
+
+def _normalize_db_path(value: str) -> str:
+    """
+    Нормализовать путь к БД.
+
+    Правила:
+    - относительные пути запрещены (чтобы не создавать файлы в корне репозитория);
+    - на Windows разрешаем "/data/..." и приводим к "C:\\data\\...";
+    - абсолютные Windows/UNC и обычные абсолютные пути оставляем как есть.
+    """
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+
+    candidate = Path(raw)
+    if candidate.is_absolute():
+        return raw
+
+    if os.name == "nt":
+        # UNC / rooted path: "\data\file" или "\\server\share\file"
+        if raw.startswith("\\"):
+            return raw
+        # POSIX-rooted path on Windows: "/data/file" -> "C:\data\file"
+        if _looks_like_rooted_posix_path(raw):
+            drive = Path.cwd().drive or os.getenv("SystemDrive", "C:")
+            return str(Path(f"{drive}{raw}"))
+
+    return ""
+
+
 # Путь к базе данных приложения SQLite (обязателен). Не храните БД внутри репозитория.
 DB_PATH = os.getenv("DB_PATH")
 if not DB_PATH:
     raise RuntimeError("DB_PATH is required. Set it in the environment.")
-if not Path(DB_PATH).is_absolute():
-    raise RuntimeError("DB_PATH must be an absolute path.")
+DB_PATH = _normalize_db_path(DB_PATH)
+if not DB_PATH:
+    raise RuntimeError("DB_PATH must be an absolute (or rooted) path.")
 
 # Путь к базе данных продуктов (обязателен). Не храните БД внутри репозитория.
 PRODUCTS_DB_PATH = os.getenv("PRODUCTS_DB_PATH")
 if not PRODUCTS_DB_PATH:
     raise RuntimeError("PRODUCTS_DB_PATH is required. Set it in the environment.")
-if not Path(PRODUCTS_DB_PATH).is_absolute():
-    raise RuntimeError("PRODUCTS_DB_PATH must be an absolute path.")
+PRODUCTS_DB_PATH = _normalize_db_path(PRODUCTS_DB_PATH)
+if not PRODUCTS_DB_PATH:
+    raise RuntimeError("PRODUCTS_DB_PATH must be an absolute (or rooted) path.")
 
 # Данные доступа в админку.
 ADMIN_LOGIN = os.getenv("ADMIN_LOGIN", "")
