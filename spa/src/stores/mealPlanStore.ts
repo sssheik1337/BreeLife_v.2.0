@@ -5,6 +5,11 @@ export interface MealPlanItem {
     product_id?: number;
     name?: string;
     grams?: number;
+    amount?: number;
+    unit?: 'g' | 'ml';
+    ml?: number;
+    portion_is_dry?: boolean;
+    cooked_grams_est?: number;
 }
 
 export interface MealPlanMeal {

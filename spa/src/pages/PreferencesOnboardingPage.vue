@@ -272,12 +272,35 @@ const loadProducts = async (): Promise<void> => {
 };
 
 const resetProductsScroll = (): void => {
-    const scrollingRoot = document.scrollingElement as HTMLElement | null;
-    if (scrollingRoot && typeof scrollingRoot.scrollTo === 'function') {
-        scrollingRoot.scrollTo({ top: 0, behavior: 'auto' });
-        return;
+    const candidates = new Set<(Element | null)>([
+        document.scrollingElement,
+        document.documentElement,
+        document.body,
+        document.querySelector('custom-layout.app-content'),
+        document.querySelector('custom-layout[data-spa-layout]'),
+        document.querySelector('[data-spa-layout]')
+    ]);
+
+    candidates.forEach((candidate) => {
+        if (!(candidate instanceof HTMLElement)) {
+            return;
+        }
+        candidate.scrollTop = 0;
+        if (typeof candidate.scrollTo === 'function') {
+            candidate.scrollTo({ top: 0, behavior: 'auto' });
+        }
+    });
+
+    if (typeof window.scrollTo === 'function') {
+        window.scrollTo({ top: 0, behavior: 'auto' });
     }
-    window.scrollTo({ top: 0, behavior: 'auto' });
+};
+
+const resetProductsScrollDeferred = (): void => {
+    resetProductsScroll();
+    window.requestAnimationFrame(() => {
+        resetProductsScroll();
+    });
 };
 
 const setActiveCategory = (category: string): void => {
@@ -300,14 +323,14 @@ const goToNextCategory = (): void => {
     const currentIndex = categories.indexOf(activeCategory.value);
     if (currentIndex < 0) {
         activeCategory.value = categories[0];
-        resetProductsScroll();
+        resetProductsScrollDeferred();
         return;
     }
     if (currentIndex >= categories.length - 1) {
         return;
     }
     activeCategory.value = categories[currentIndex + 1];
-    resetProductsScroll();
+    resetProductsScrollDeferred();
 };
 
 const handleNextCategoryAction = (): void => {

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
     <section class="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#f0f9ff] to-[#f0fdf4]" data-spa-shopping-list>
         <main class="flex-1 px-4 py-8">
             <div class="max-w-md mx-auto space-y-8">
@@ -7,26 +7,24 @@
                         <i data-feather="shopping-cart" class="w-7 h-7 text-white"></i>
                     </div>
                     <h1 class="text-2xl font-bold text-slate-800">Список покупок</h1>
-                    <p class="text-slate-500 mt-2">Собираем продукты по вашему рациону на день или неделю.</p>
+                    <p class="text-slate-500 mt-2">Собираем продукты по сохраненному рациону на день или неделю.</p>
                 </div>
 
                 <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-3">
                     <div class="flex items-start justify-between gap-3">
                         <div>
                             <p class="text-sm text-slate-500">Диапазон</p>
-                            <p class="text-sm text-slate-500">Список формируется из текущего плана питания.</p>
+                            <p class="text-sm text-slate-500">Список формируется только из сохраненного плана питания.</p>
                         </div>
                         <div class="flex items-center gap-2">
                             <button
                                 type="button"
-                                data-shopping-range="day"
                                 class="text-xs font-semibold px-3 py-1 rounded-full"
                                 :class="activeRange === 'day' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
                                 @click="activeRange = 'day'"
                             >День</button>
                             <button
                                 type="button"
-                                data-shopping-range="week"
                                 class="text-xs font-semibold px-3 py-1 rounded-full"
                                 :class="activeRange === 'week' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
                                 @click="activeRange = 'week'"
@@ -43,27 +41,50 @@
                     <p v-else-if="loadError" class="text-center text-slate-400">{{ loadError }}</p>
 
                     <template v-else>
-                        <p v-if="groupNames.length === 0" class="text-center text-slate-400">Сначала выберите продукты в рационе.</p>
+                        <p v-if="!hasAnyItems" class="text-center text-slate-400">Сначала сохраните рацион, чтобы собрать список покупок.</p>
 
                         <section
-                            v-for="groupName in groupNames"
-                            :key="groupName"
+                            v-for="group in foodGroups"
+                            :key="group.name"
                             class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-4"
                         >
                             <div class="flex items-center justify-between">
-                                <h2 class="text-base font-semibold text-slate-800">{{ groupName }}</h2>
-                                <span class="text-xs text-slate-400">{{ groupedShoppingList[groupName].length }} поз.</span>
+                                <h2 class="text-base font-semibold text-slate-800">{{ group.name }}</h2>
+                                <span class="text-xs text-slate-400">{{ group.items.length }} поз.</span>
                             </div>
 
                             <div class="space-y-3">
                                 <div
-                                    v-for="item in groupedShoppingList[groupName]"
-                                    :key="`${item.group}::${item.name}`"
+                                    v-for="item in group.items"
+                                    :key="`${group.name}::${item.name}`"
                                     class="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3"
                                 >
                                     <div>
                                         <div class="text-sm font-semibold text-slate-800">{{ item.name }}</div>
-                                        <div class="text-xs text-slate-500">≈ {{ item.weight }} г • {{ item.count }} раз</div>
+                                        <div class="text-xs text-slate-500">≈ {{ item.amount }} {{ item.unit }} • {{ item.count }} раз</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section
+                            v-if="beverageItems.length > 0"
+                            class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-4"
+                        >
+                            <div class="flex items-center justify-between">
+                                <h2 class="text-base font-semibold text-slate-800">Напитки</h2>
+                                <span class="text-xs text-slate-400">{{ beverageItems.length }} поз.</span>
+                            </div>
+
+                            <div class="space-y-3">
+                                <div
+                                    v-for="item in beverageItems"
+                                    :key="`beverage::${item.name}`"
+                                    class="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-4 py-3"
+                                >
+                                    <div>
+                                        <div class="text-sm font-semibold text-slate-800">{{ item.name }}</div>
+                                        <div class="text-xs text-slate-500">≈ {{ item.amount }} мл • {{ item.count }} раз</div>
                                     </div>
                                 </div>
                             </div>
@@ -76,139 +97,62 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useStorageStore } from '../stores/storageStore';
 
-interface Product {
-    id: number;
+interface ShoppingListItem {
+    product_id?: number | null;
     name: string;
-    group?: string;
-}
-
-interface ShoppingAggregateItem {
-    name: string;
-    group: string;
-    weight: number;
+    amount: number;
+    unit: 'g' | 'ml';
     count: number;
 }
 
-const SHOPPING_PRODUCTS_ENDPOINT = '/api/products';
-const SHOPPING_DEFAULT_WEIGHT = 100;
+interface ShoppingListGroup {
+    name: string;
+    items: ShoppingListItem[];
+}
 
-const SHOPPING_MEAL_DISTRIBUTION = [
-    { key: 'breakfast', title: 'Завтрак', share: 0.25, items: 2 },
-    { key: 'lunch', title: 'Обед', share: 0.35, items: 3 },
-    { key: 'snack', title: 'Перекус', share: 0.1, items: 2 },
-    { key: 'dinner', title: 'Ужин', share: 0.3, items: 3 }
-] as const;
+interface ShoppingListResponse {
+    range: 'day' | 'week';
+    date?: string;
+    week_start?: string;
+    days_used: number;
+    missing_dates: string[];
+    groups: ShoppingListGroup[];
+    beverages: ShoppingListItem[];
+}
+
+const SHOPPING_LIST_V2_ENDPOINT = '/api/shopping-list/v2';
 
 const storageStore = useStorageStore();
-
 const activeRange = ref<'day' | 'week'>('day');
-const products = ref<Product[]>([]);
-
+const shoppingData = ref<ShoppingListResponse | null>(null);
 const isLoading = ref(true);
 const loadError = ref('');
 
-const normalizeProfileIdSet = (value: unknown): Set<number> => {
-    if (!Array.isArray(value)) {
-        return new Set();
-    }
-    const normalized = value
-        .map((item) => Number(item))
-        .filter((item) => Number.isInteger(item));
-    return new Set(normalized);
+const foodGroups = computed(() => shoppingData.value?.groups ?? []);
+const beverageItems = computed(() => shoppingData.value?.beverages ?? []);
+const hasAnyItems = computed(() => foodGroups.value.length > 0 || beverageItems.value.length > 0);
+
+const buildTodayIsoDate = (): string => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 };
 
-const buildPreferredProducts = (items: Product[]): Product[] => {
-    const profile = storageStore.getUserProfile() as Record<string, unknown>;
-    const favorites = normalizeProfileIdSet(profile?.favorite_product_ids);
-    const excluded = normalizeProfileIdSet(profile?.excluded_product_ids);
-
-    const available = items.filter((product) => !excluded.has(product.id));
-    if (favorites.size > 0) {
-        const favoriteProducts = available.filter((product) => favorites.has(product.id));
-        if (favoriteProducts.length > 0) {
-            return favoriteProducts;
-        }
-    }
-    return available;
+const buildCurrentWeekStartIso = (): string => {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    now.setDate(now.getDate() + diffToMonday);
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 };
-
-const pickItems = (list: Product[], startIndex: number, count: number): Product[] => {
-    if (list.length === 0) {
-        return [];
-    }
-    const items: Product[] = [];
-    for (let index = 0; index < count; index += 1) {
-        const itemIndex = (startIndex + index) % list.length;
-        items.push(list[itemIndex]);
-    }
-    return items;
-};
-
-const buildDayPlan = (items: Product[], dayIndex: number) => {
-    const sorted = [...items].sort((left, right) => {
-        const leftGroup = left.group || '';
-        const rightGroup = right.group || '';
-        if (leftGroup === rightGroup) {
-            return (left.name || '').localeCompare(right.name || '');
-        }
-        return leftGroup.localeCompare(rightGroup);
-    });
-
-    return SHOPPING_MEAL_DISTRIBUTION.map((meal, mealIndex) => {
-        const startIndex = (dayIndex * 7 + mealIndex * 3) % Math.max(sorted.length, 1);
-        return {
-            title: meal.title,
-            items: pickItems(sorted, startIndex, meal.items)
-        };
-    });
-};
-
-const buildShoppingList = (items: Product[], range: 'day' | 'week'): Record<string, ShoppingAggregateItem[]> => {
-    const preferred = buildPreferredProducts(items);
-    const days = range === 'week' ? 7 : 1;
-    const totals = new Map<string, ShoppingAggregateItem>();
-
-    for (let dayIndex = 0; dayIndex < days; dayIndex += 1) {
-        const dayPlan = buildDayPlan(preferred, dayIndex);
-        dayPlan.forEach((meal) => {
-            meal.items.forEach((item) => {
-                if (!item) {
-                    return;
-                }
-                const key = `${item.group || 'Без группы'}::${item.name}`;
-                const current = totals.get(key) || {
-                    name: item.name,
-                    group: item.group || 'Без группы',
-                    weight: 0,
-                    count: 0
-                };
-                current.weight += SHOPPING_DEFAULT_WEIGHT;
-                current.count += 1;
-                totals.set(key, current);
-            });
-        });
-    }
-
-    const grouped: Record<string, ShoppingAggregateItem[]> = {};
-    totals.forEach((item) => {
-        if (!grouped[item.group]) {
-            grouped[item.group] = [];
-        }
-        grouped[item.group].push(item);
-    });
-
-    Object.keys(grouped).forEach((groupName) => {
-        grouped[groupName].sort((left, right) => left.name.localeCompare(right.name));
-    });
-
-    return grouped;
-};
-
-const groupedShoppingList = computed(() => buildShoppingList(products.value, activeRange.value));
-const groupNames = computed(() => Object.keys(groupedShoppingList.value));
 
 const notify = (message: string, type: 'success' | 'error'): void => {
     const showNotification = (window as any).showNotification;
@@ -242,15 +186,27 @@ const fallbackCopy = (text: string): void => {
 
 const copyShoppingList = async (): Promise<void> => {
     const lines: string[] = [];
-    groupNames.value.forEach((groupName) => {
-        lines.push(groupName);
-        groupedShoppingList.value[groupName].forEach((item) => {
-            lines.push(`- ${item.name}: ≈ ${item.weight} г`);
+    foodGroups.value.forEach((group) => {
+        lines.push(group.name);
+        group.items.forEach((item) => {
+            lines.push(`- ${item.name}: ≈ ${item.amount} ${item.unit}`);
         });
         lines.push('');
     });
 
+    if (beverageItems.value.length > 0) {
+        lines.push('Напитки');
+        beverageItems.value.forEach((item) => {
+            lines.push(`- ${item.name}: ≈ ${item.amount} мл`);
+        });
+        lines.push('');
+    }
+
     const text = lines.join('\n').trim();
+    if (!text) {
+        notify('Список пуст.', 'error');
+        return;
+    }
 
     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
         try {
@@ -262,7 +218,6 @@ const copyShoppingList = async (): Promise<void> => {
             return;
         }
     }
-
     fallbackCopy(text);
 };
 
@@ -274,28 +229,42 @@ const refreshIcons = async (): Promise<void> => {
     }
 };
 
-const fetchProducts = async (): Promise<void> => {
+const fetchShoppingList = async (): Promise<void> => {
     isLoading.value = true;
     loadError.value = '';
 
+    const params = new URLSearchParams();
+    if (activeRange.value === 'week') {
+        params.set('week_start', buildCurrentWeekStartIso());
+    } else {
+        params.set('date', buildTodayIsoDate());
+    }
+
     try {
-        const response = await storageStore.apiFetch(SHOPPING_PRODUCTS_ENDPOINT);
+        const response = await storageStore.apiFetch(`${SHOPPING_LIST_V2_ENDPOINT}?${params.toString()}`);
         if (!response.ok) {
             throw new Error('load_failed');
         }
         const payload = await response.json();
-        products.value = Array.isArray(payload) ? payload as Product[] : [];
+        shoppingData.value = (payload && typeof payload === 'object')
+            ? payload as ShoppingListResponse
+            : null;
         await refreshIcons();
     } catch {
         loadError.value = 'Не удалось загрузить список покупок.';
+        shoppingData.value = null;
     } finally {
         isLoading.value = false;
     }
 };
 
+watch(activeRange, () => {
+    void fetchShoppingList();
+});
+
 onMounted(async () => {
     document.body.dataset.preservePageTheme = 'true';
     storageStore.getUserProfile();
-    await fetchProducts();
+    await fetchShoppingList();
 });
 </script>

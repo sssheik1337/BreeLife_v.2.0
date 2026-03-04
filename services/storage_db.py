@@ -1,7 +1,8 @@
 import json
 import sqlite3
 import uuid
-from datetime import datetime, timezone
+import hashlib
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from config import DB_PATH
@@ -129,6 +130,19 @@ TABLES = {
     """,
 }
 
+MEAL_PLANS_TABLE_SQL = """
+    CREATE TABLE IF NOT EXISTS meal_plans (
+        telegram_user_id INTEGER NOT NULL,
+        plan_date TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        inputs_hash TEXT NOT NULL,
+        regen_nonce INTEGER NOT NULL DEFAULT 0,
+        algo_version TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (telegram_user_id, plan_date)
+    )
+"""
+
 
 def init_db() -> None:
     """Инициализировать базу данных и таблицы."""
@@ -138,6 +152,7 @@ def init_db() -> None:
         connection.execute("PRAGMA journal_mode=WAL;")
         for statement in TABLES.values():
             connection.execute(statement)
+        connection.execute(MEAL_PLANS_TABLE_SQL)
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_telegram_users_username ON telegram_users(username)"
         )
@@ -174,6 +189,9 @@ def init_db() -> None:
         )
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_reminders_next_run ON reminders(next_run_at_utc)"
+        )
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_meal_plans_updated_at ON meal_plans(updated_at)"
         )
         user_settings_columns = {
             row[1] for row in connection.execute("PRAGMA table_info(user_settings)").fetchall()
@@ -391,4 +409,154 @@ def delete_cache_keys(cache_keys: list[str]) -> None:
     query = f"DELETE FROM meal_plan_cache WHERE cache_key IN ({placeholders})"
     with sqlite3.connect(DB_PATH) as connection:
         connection.execute(query, keys)
+        connection.commit()
+
+
+def _normalize_plan_date(plan_date: date | str) -> str:
+    """Normalize plan date to ISO yyyy-mm-dd."""
+    if isinstance(plan_date, date):
+        return plan_date.isoformat()
+    if isinstance(plan_date, str):
+        normalized = plan_date.strip()
+        if not normalized:
+            raise ValueError("plan_date must not be empty")
+        try:
+            return date.fromisoformat(normalized).isoformat()
+        except ValueError as exc:
+            raise ValueError("plan_date must be ISO date in format yyyy-mm-dd") from exc
+    raise TypeError("plan_date must be date or ISO date string")
+
+
+def _normalize_id_list(value: object) -> list[int]:
+    """Normalize profile product ids to sorted unique int list."""
+    if not isinstance(value, list):
+        return []
+    normalized: set[int] = set()
+    for item in value:
+        if isinstance(item, bool):
+            continue
+        try:
+            normalized.add(int(item))
+        except (TypeError, ValueError):
+            continue
+    return sorted(normalized)
+
+
+def _normalize_goal_inputs(profile: dict[str, object] | None) -> dict[str, object]:
+    """Extract profile goal inputs that affect meal-plan generation."""
+    if not isinstance(profile, dict):
+        return {}
+    return {
+        "goal": profile.get("goal"),
+        "calories_target": profile.get("calories_target"),
+        "macros_target": profile.get("macros_target"),
+        "weight_kg": profile.get("weight_kg"),
+        "desired_weight_kg": profile.get("desired_weight_kg"),
+        "target_weight_kg": profile.get("target_weight_kg"),
+    }
+
+
+def build_meal_plan_inputs_hash(
+    profile: dict[str, object] | None,
+    algo_version: str,
+    products_catalog_hash: str | None = None,
+) -> str:
+    """Build deterministic inputs hash for day meal-plan source-of-truth record."""
+    safe_profile = profile if isinstance(profile, dict) else {}
+    hash_payload: dict[str, object] = {
+        "profile_goals": _normalize_goal_inputs(safe_profile),
+        "favorite_product_ids": _normalize_id_list(safe_profile.get("favorite_product_ids")),
+        "excluded_product_ids": _normalize_id_list(safe_profile.get("excluded_product_ids")),
+        "preferences_onboarding_completed": safe_profile.get("preferences_onboarding_completed") is True,
+        "algo_version": str(algo_version or ""),
+    }
+    if isinstance(products_catalog_hash, str) and products_catalog_hash.strip():
+        hash_payload["products_catalog_hash"] = products_catalog_hash.strip()
+    serialized = json.dumps(hash_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def read_meal_plan_day(telegram_user_id: int, plan_date: date | str) -> dict[str, object] | None:
+    """Read stored day meal plan by user and date."""
+    plan_date_iso = _normalize_plan_date(plan_date)
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.row_factory = sqlite3.Row
+        cursor = connection.execute(
+            """
+            SELECT telegram_user_id, plan_date, payload_json, inputs_hash, regen_nonce, algo_version, updated_at
+            FROM meal_plans
+            WHERE telegram_user_id = ? AND plan_date = ?
+            """,
+            (telegram_user_id, plan_date_iso),
+        )
+        row = cursor.fetchone()
+
+    if not row:
+        return None
+
+    try:
+        payload = json.loads(row["payload_json"])
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+    return {
+        "telegram_user_id": int(row["telegram_user_id"]),
+        "plan_date": row["plan_date"],
+        "payload": payload,
+        "inputs_hash": row["inputs_hash"],
+        "regen_nonce": int(row["regen_nonce"]),
+        "algo_version": row["algo_version"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def upsert_meal_plan_day(
+    telegram_user_id: int,
+    plan_date: date | str,
+    payload: dict[str, object] | list[object],
+    inputs_hash: str,
+    regen_nonce: int,
+    algo_version: str,
+) -> None:
+    """Insert or update day meal plan source-of-truth row."""
+    plan_date_iso = _normalize_plan_date(plan_date)
+    updated_at = datetime.now(timezone.utc).isoformat()
+    serialized_payload = json.dumps(payload, ensure_ascii=False)
+
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.execute(
+            """
+            INSERT INTO meal_plans (
+                telegram_user_id, plan_date, payload_json, inputs_hash, regen_nonce, algo_version, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(telegram_user_id, plan_date)
+            DO UPDATE SET
+                payload_json = excluded.payload_json,
+                inputs_hash = excluded.inputs_hash,
+                regen_nonce = excluded.regen_nonce,
+                algo_version = excluded.algo_version,
+                updated_at = excluded.updated_at
+            """,
+            (
+                telegram_user_id,
+                plan_date_iso,
+                serialized_payload,
+                str(inputs_hash or ""),
+                int(regen_nonce),
+                str(algo_version or ""),
+                updated_at,
+            ),
+        )
+        connection.commit()
+
+
+def delete_meal_plan_day(telegram_user_id: int, plan_date: date | str) -> None:
+    """Delete stored day meal plan by user and date."""
+    plan_date_iso = _normalize_plan_date(plan_date)
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.execute(
+            "DELETE FROM meal_plans WHERE telegram_user_id = ? AND plan_date = ?",
+            (telegram_user_id, plan_date_iso),
+        )
         connection.commit()

@@ -20,6 +20,7 @@ from app.routers import (
     diary,
     foods,
     meal_plan_api,
+    meal_plan_v2,
     pages,
     products_api,
     profile,
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
     app.include_router(diary.router)
     app.include_router(foods.router)
     app.include_router(meal_plan_api.router)
+    app.include_router(meal_plan_v2.router)
     app.include_router(pages.router)
     app.include_router(admin.router)
     app.include_router(products_api.router)

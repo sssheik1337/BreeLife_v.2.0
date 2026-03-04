@@ -191,7 +191,7 @@
           font-size: 28px;
           font-weight: 700;
           line-height: 1;
-          display: inline-flex;
+          display: none;
           align-items: center;
           justify-content: center;
           text-decoration: none;
@@ -292,7 +292,11 @@
         }
 
         .fab-menu.hidden {
-          animation: fab-menu-hide 0.24s ease forwards;
+          transform: translate(-50%, 24px) scale(0.86);
+          opacity: 0;
+          visibility: hidden;
+          pointer-events: none;
+          animation: none;
         }
 
         .fab-menu:not(.hidden) {
@@ -351,7 +355,11 @@
         }
 
         .faq-menu.hidden {
-          animation: fab-menu-hide 0.24s ease forwards;
+          transform: translate(-50%, 24px) scale(0.86);
+          opacity: 0;
+          visibility: hidden;
+          pointer-events: none;
+          animation: none;
         }
 
         .faq-menu:not(.hidden) {
@@ -551,6 +559,16 @@
 
     const syncOnboardingGateState = () => {
       const profile = resolveProfileSnapshot();
+      const profileCompletedFromGetter = typeof window.getProfileCompleted === 'function'
+        ? window.getProfileCompleted() === true
+        : false;
+      const profileCompletedFromSnapshot = Boolean(profile?.is_completed === true);
+      hasCompletedProfile = Boolean(
+        hasCompletedProfile
+        || window.profileCompleted === true
+        || profileCompletedFromGetter
+        || profileCompletedFromSnapshot
+      );
       hasCompletedPreferencesOnboarding = Boolean(profile?.preferences_onboarding_completed === true);
       hasSeenTrialWelcome = Boolean(profile?.trial_welcome_seen === true);
     };
@@ -828,7 +846,7 @@
         bottomNav.style.display = shouldHideBottomNav ? 'none' : '';
       }
       if (faqFab) {
-        faqFab.style.display = shouldHideFaqFab ? 'none' : '';
+        faqFab.style.display = shouldHideFaqFab ? 'none' : 'inline-flex';
       }
       if (bottomSpacer) {
         bottomSpacer.style.height = shouldHideBottomNav ? '0' : '0';
@@ -874,6 +892,16 @@
 
     updateBottomNavVisibility();
     updateActiveBottomLink();
+    // Profile snapshot can arrive asynchronously after component mount.
+    window.setTimeout(updateBottomNavVisibility, 120);
+    window.setTimeout(updateBottomNavVisibility, 500);
+    window.setTimeout(updateBottomNavVisibility, 1200);
+    window.addEventListener('focus', updateBottomNavVisibility);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        updateBottomNavVisibility();
+      }
+    });
     window.addEventListener('popstate', () => {
       updateBottomNavVisibility();
       updateActiveBottomLink();
@@ -886,4 +914,3 @@
 }
 
 customElements.define('custom-footer', CustomFooter);
-

@@ -33,6 +33,15 @@
                             >Неделя</button>
                         </div>
                     </div>
+                    <div class="flex items-center justify-end">
+                        <button
+                            v-if="activeRange === 'day'"
+                            type="button"
+                            class="meal-plan-copy-btn"
+                            :disabled="isLoading || isRebuildingDay"
+                            @click="rebuildTodayMealPlan"
+                        >{{ isRebuildingDay ? 'Пересобираем...' : 'Пересобрать рацион' }}</button>
+                    </div>
                     <div class="grid grid-cols-3 gap-4 text-center">
                         <div>
                             <p class="text-xs text-slate-500">Калории</p>
@@ -50,7 +59,13 @@
                 </div>
 
                 <div id="meal-plan-container" class="space-y-6">
-                    <p v-if="isLoading" class="text-center text-slate-400">Загрузка...</p>
+                    <div
+                        v-if="showMealPlanPendingCard"
+                        class="rounded-2xl border border-emerald-100 bg-white px-5 py-6 text-center shadow-sm"
+                    >
+                        <p class="text-sm font-semibold text-slate-700">Собираем ваш рацион, осталось совсем чуть-чуть...</p>
+                    </div>
+                    <p v-else-if="isLoading" class="text-center text-slate-400">Загрузка...</p>
                     <p v-else-if="loadError" class="text-center text-slate-400">{{ loadError }}</p>
                     <div
                         v-for="day in dayCards"
@@ -116,26 +131,47 @@
                         <p v-else-if="shoppingLoadError" class="text-center text-slate-400">{{ shoppingLoadError }}</p>
 
                         <template v-else>
-                            <p v-if="shoppingGroupNames.length === 0" class="text-center text-slate-400">Сначала выберите продукты в рационе.</p>
+                            <p v-if="shoppingGroupNames.length === 0 && beverageShoppingItems.length === 0" class="text-center text-slate-400">Сначала сохраните рацион, чтобы собрать список покупок.</p>
 
                             <section
-                                v-for="groupName in shoppingGroupNames"
-                                :key="groupName"
+                                v-for="group in foodShoppingGroups"
+                                :key="group.name"
                                 class="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3"
                             >
                                 <div class="flex items-center justify-between">
-                                    <h3 class="text-sm font-semibold text-slate-800">{{ groupName }}</h3>
-                                    <span class="text-xs text-slate-400">{{ groupedShoppingList[groupName].length }} поз.</span>
+                                    <h3 class="text-sm font-semibold text-slate-800">{{ group.name }}</h3>
+                                    <span class="text-xs text-slate-400">{{ group.items.length }} поз.</span>
                                 </div>
 
                                 <div class="space-y-2">
                                     <div
-                                        v-for="item in groupedShoppingList[groupName]"
-                                        :key="`${item.group}::${item.name}`"
+                                        v-for="item in group.items"
+                                        :key="`${group.name}::${item.name}`"
                                         class="rounded-xl border border-slate-100 bg-white px-3 py-2"
                                     >
                                         <div class="text-sm font-semibold text-slate-800">{{ item.name }}</div>
-                                        <div class="text-xs text-slate-500">≈ {{ item.weight }} г • {{ item.count }} раз</div>
+                                        <div class="text-xs text-slate-500">≈ {{ item.amount }} {{ item.unit }} • {{ item.count }} раз</div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section
+                                v-if="beverageShoppingItems.length > 0"
+                                class="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-3"
+                            >
+                                <div class="flex items-center justify-between">
+                                    <h3 class="text-sm font-semibold text-slate-800">Напитки</h3>
+                                    <span class="text-xs text-slate-400">{{ beverageShoppingItems.length }} поз.</span>
+                                </div>
+
+                                <div class="space-y-2">
+                                    <div
+                                        v-for="item in beverageShoppingItems"
+                                        :key="`beverage::${item.name}`"
+                                        class="rounded-xl border border-slate-100 bg-white px-3 py-2"
+                                    >
+                                        <div class="text-sm font-semibold text-slate-800">{{ item.name }}</div>
+                                        <div class="text-xs text-slate-500">≈ {{ item.amount }} мл • {{ item.count }} раз</div>
                                     </div>
                                 </div>
                             </section>
@@ -153,21 +189,31 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useMealPlanStore, type MealPlanItem, type MealPlanMeal, type MealPlanPayload } from '../stores/mealPlanStore';
 import { useStorageStore } from '../stores/storageStore';
 
-const MEAL_PLAN_ENDPOINT = '/api/meal-plan';
-const SHOPPING_PRODUCTS_ENDPOINT = '/api/products';
-const SHOPPING_DEFAULT_WEIGHT = 100;
-
-interface Product {
-    id: number;
-    name: string;
-    group?: string;
-}
+const MEAL_PLAN_ENDPOINT = '/api/meal-plan/v2';
+const MEAL_PLAN_REBUILD_ENDPOINT = '/api/meal-plan/v2/rebuild';
+const SHOPPING_LIST_V2_ENDPOINT = '/api/shopping-list/v2';
 
 interface ShoppingAggregateItem {
+    product_id?: number | null;
     name: string;
-    group: string;
-    weight: number;
+    amount: number;
+    unit: 'g' | 'ml';
     count: number;
+}
+
+interface ShoppingGroup {
+    name: string;
+    items: ShoppingAggregateItem[];
+}
+
+interface ShoppingListResponse {
+    range: 'day' | 'week';
+    date?: string;
+    week_start?: string;
+    days_used: number;
+    missing_dates: string[];
+    groups: ShoppingGroup[];
+    beverages: ShoppingAggregateItem[];
 }
 
 const DEFAULT_MEALS: Array<{ key: string; title: string }> = [
@@ -177,22 +223,17 @@ const DEFAULT_MEALS: Array<{ key: string; title: string }> = [
     { key: 'dinner', title: 'Ужин' }
 ];
 
-const SHOPPING_MEAL_DISTRIBUTION = [
-    { key: 'breakfast', title: 'Завтрак', items: 2 },
-    { key: 'lunch', title: 'Обед', items: 3 },
-    { key: 'snack', title: 'Перекус', items: 2 },
-    { key: 'dinner', title: 'Ужин', items: 3 }
-] as const;
-
 const storageStore = useStorageStore();
 const mealPlanStore = useMealPlanStore();
 const { activeRange, plans, isLoading, loadError } = storeToRefs(mealPlanStore);
 const shoppingExpanded = ref(false);
 const shoppingRange = ref<'day' | 'week'>('day');
-const shoppingProducts = ref<Product[]>([]);
+const shoppingData = ref<ShoppingListResponse | null>(null);
 const shoppingLoading = ref(false);
 const shoppingLoadError = ref('');
 const shoppingLoaded = ref(false);
+const isRebuildingDay = ref(false);
+const hasLoadedMealPlanOnce = ref(false);
 
 const isFrontendDebugEnabled = (): boolean => Boolean((window as any)?.appDebug);
 
@@ -369,102 +410,30 @@ const summaryProducts = computed(() => {
     return String(countUniqueProductsInMeals(primaryPlan?.meals));
 });
 
-const normalizeProfileIdSet = (value: unknown): Set<number> => {
-    if (!Array.isArray(value)) {
-        return new Set();
-    }
-    const normalized = value
-        .map((item) => Number(item))
-        .filter((item) => Number.isInteger(item));
-    return new Set(normalized);
+const showMealPlanPendingCard = computed(() => isRebuildingDay.value || (isLoading.value && !hasLoadedMealPlanOnce.value));
+
+const foodShoppingGroups = computed(() => shoppingData.value?.groups ?? []);
+const shoppingGroupNames = computed(() => foodShoppingGroups.value.map((group) => group.name));
+const beverageShoppingItems = computed(() => shoppingData.value?.beverages ?? []);
+
+const buildTodayIsoDate = (): string => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 };
 
-const buildPreferredProducts = (items: Product[]): Product[] => {
-    const profile = storageStore.getUserProfile() as Record<string, unknown>;
-    const favorites = normalizeProfileIdSet(profile?.favorite_product_ids);
-    const excluded = normalizeProfileIdSet(profile?.excluded_product_ids);
-
-    const available = items.filter((product) => !excluded.has(product.id));
-    if (favorites.size > 0) {
-        const favoriteProducts = available.filter((product) => favorites.has(product.id));
-        if (favoriteProducts.length > 0) {
-            return favoriteProducts;
-        }
-    }
-    return available;
+const buildCurrentWeekStartIso = (): string => {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    now.setDate(now.getDate() + diffToMonday);
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 };
-
-const pickItems = (list: Product[], startIndex: number, count: number): Product[] => {
-    if (list.length === 0) {
-        return [];
-    }
-    const items: Product[] = [];
-    for (let index = 0; index < count; index += 1) {
-        const itemIndex = (startIndex + index) % list.length;
-        items.push(list[itemIndex]);
-    }
-    return items;
-};
-
-const buildDayPlanForShopping = (items: Product[], dayIndex: number) => {
-    const sorted = [...items].sort((left, right) => {
-        const leftGroup = left.group || '';
-        const rightGroup = right.group || '';
-        if (leftGroup === rightGroup) {
-            return (left.name || '').localeCompare(right.name || '');
-        }
-        return leftGroup.localeCompare(rightGroup);
-    });
-
-    return SHOPPING_MEAL_DISTRIBUTION.map((meal, mealIndex) => {
-        const startIndex = (dayIndex * 7 + mealIndex * 3) % Math.max(sorted.length, 1);
-        return pickItems(sorted, startIndex, meal.items);
-    });
-};
-
-const buildShoppingList = (items: Product[], range: 'day' | 'week'): Record<string, ShoppingAggregateItem[]> => {
-    const preferred = buildPreferredProducts(items);
-    const days = range === 'week' ? 7 : 1;
-    const totals = new Map<string, ShoppingAggregateItem>();
-
-    for (let dayIndex = 0; dayIndex < days; dayIndex += 1) {
-        const dayPlan = buildDayPlanForShopping(preferred, dayIndex);
-        dayPlan.forEach((mealItems) => {
-            mealItems.forEach((item) => {
-                if (!item) {
-                    return;
-                }
-                const key = `${item.group || 'Без группы'}::${item.name}`;
-                const current = totals.get(key) || {
-                    name: item.name,
-                    group: item.group || 'Без группы',
-                    weight: 0,
-                    count: 0
-                };
-                current.weight += SHOPPING_DEFAULT_WEIGHT;
-                current.count += 1;
-                totals.set(key, current);
-            });
-        });
-    }
-
-    const grouped: Record<string, ShoppingAggregateItem[]> = {};
-    totals.forEach((item) => {
-        if (!grouped[item.group]) {
-            grouped[item.group] = [];
-        }
-        grouped[item.group].push(item);
-    });
-
-    Object.keys(grouped).forEach((groupName) => {
-        grouped[groupName].sort((left, right) => left.name.localeCompare(right.name));
-    });
-
-    return grouped;
-};
-
-const groupedShoppingList = computed(() => buildShoppingList(shoppingProducts.value, shoppingRange.value));
-const shoppingGroupNames = computed(() => Object.keys(groupedShoppingList.value));
 
 const notify = (message: string, type: 'success' | 'error'): void => {
     const showNotification = (window as any).showNotification;
@@ -498,13 +467,21 @@ const fallbackCopy = (text: string): void => {
 
 const copyShoppingList = async (): Promise<void> => {
     const lines: string[] = [];
-    shoppingGroupNames.value.forEach((groupName) => {
-        lines.push(groupName);
-        groupedShoppingList.value[groupName].forEach((item) => {
-            lines.push(`- ${item.name}: ≈ ${item.weight} г`);
+    foodShoppingGroups.value.forEach((group) => {
+        lines.push(group.name);
+        group.items.forEach((item) => {
+            lines.push(`- ${item.name}: ≈ ${item.amount} ${item.unit}`);
         });
         lines.push('');
     });
+
+    if (beverageShoppingItems.value.length > 0) {
+        lines.push('Напитки');
+        beverageShoppingItems.value.forEach((item) => {
+            lines.push(`- ${item.name}: ≈ ${item.amount} мл`);
+        });
+        lines.push('');
+    }
 
     const text = lines.join('\n').trim();
     if (!text) {
@@ -526,29 +503,77 @@ const copyShoppingList = async (): Promise<void> => {
     fallbackCopy(text);
 };
 
-const loadShoppingProducts = async (): Promise<void> => {
+const loadShoppingList = async (): Promise<void> => {
     shoppingLoading.value = true;
     shoppingLoadError.value = '';
+    const params = new URLSearchParams();
+    if (shoppingRange.value === 'week') {
+        params.set('week_start', buildCurrentWeekStartIso());
+    } else {
+        params.set('date', buildTodayIsoDate());
+    }
 
     try {
-        const response = await storageStore.apiFetch(SHOPPING_PRODUCTS_ENDPOINT);
+        const response = await storageStore.apiFetch(`${SHOPPING_LIST_V2_ENDPOINT}?${params.toString()}`);
         if (!response.ok) {
             throw new Error('load_failed');
         }
         const payload = await response.json();
-        shoppingProducts.value = Array.isArray(payload) ? payload as Product[] : [];
+        shoppingData.value = (payload && typeof payload === 'object')
+            ? payload as ShoppingListResponse
+            : null;
         shoppingLoaded.value = true;
     } catch {
         shoppingLoadError.value = 'Не удалось загрузить список покупок.';
+        shoppingData.value = null;
     } finally {
         shoppingLoading.value = false;
+    }
+};
+
+const rebuildTodayMealPlan = async (): Promise<void> => {
+    if (activeRange.value !== 'day' || isRebuildingDay.value) {
+        return;
+    }
+
+    isRebuildingDay.value = true;
+    loadError.value = '';
+
+    try {
+        const params = new URLSearchParams({ date: buildTodayIsoDate() });
+        if (isFrontendDebugEnabled()) {
+            params.set('app_debug', '1');
+        }
+
+        const response = await storageStore.apiFetch(`${MEAL_PLAN_REBUILD_ENDPOINT}?${params.toString()}`, {
+            method: 'POST',
+        });
+        if (!response.ok) {
+            throw new Error('rebuild_failed');
+        }
+
+        const reloaded = await loadMealPlan();
+        if (!reloaded) {
+            throw new Error('reload_failed');
+        }
+
+        if (shoppingExpanded.value || shoppingLoaded.value) {
+            await loadShoppingList();
+        }
+        notify('Рацион пересобран.', 'success');
+    } catch {
+        loadError.value = 'Не удалось пересобрать рацион.';
+        notify('Не удалось пересобрать рацион.', 'error');
+    } finally {
+        isRebuildingDay.value = false;
+        await refreshIcons();
     }
 };
 
 const toggleShoppingList = async (): Promise<void> => {
     shoppingExpanded.value = !shoppingExpanded.value;
     if (shoppingExpanded.value && !shoppingLoaded.value) {
-        await loadShoppingProducts();
+        await loadShoppingList();
     }
     await refreshIcons();
 };
@@ -570,6 +595,23 @@ const dayCards = computed(() => {
                 ? items
                     .map((item) => {
                         const itemName = String(item?.name || 'Продукт');
+                        const amount = Number(item?.amount);
+                        const unitRaw = String(item?.unit || '').trim().toLowerCase();
+                        if (Number.isFinite(amount) && amount > 0 && (unitRaw === 'g' || unitRaw === 'ml')) {
+                            const displayUnit = unitRaw === 'ml' ? 'мл' : 'г';
+                            if (unitRaw === 'g') {
+                                const isDry = Boolean((item as any)?.portion_is_dry);
+                                const cookedEst = Number((item as any)?.cooked_grams_est);
+                                if (isDry && Number.isFinite(cookedEst) && cookedEst > 0) {
+                                    return `${itemName} (${Math.round(amount)} г сух. ≈ ${Math.round(cookedEst)} г готов.)`;
+                                }
+                            }
+                            return `${itemName} (${Math.round(amount)} ${displayUnit})`;
+                        }
+                        const ml = Number(item?.ml);
+                        if (Number.isFinite(ml) && ml > 0) {
+                            return `${itemName} (${Math.round(ml)} мл)`;
+                        }
                         const grams = Number(item?.grams);
                         return Number.isFinite(grams) && grams > 0
                             ? `${itemName} (${Math.round(grams)} г)`
@@ -603,15 +645,17 @@ const refreshIcons = async (): Promise<void> => {
     }
 };
 
-const loadMealPlan = async (): Promise<void> => {
+const loadMealPlan = async (): Promise<boolean> => {
     isLoading.value = true;
     loadError.value = '';
+    let loadedSuccessfully = false;
 
     const days = activeRange.value === 'week' ? 7 : 1;
     const dates = Array.from({ length: days }, (_, index) => getIsoDateWithOffset(index));
 
     try {
         plans.value = await Promise.all(dates.map((isoDate) => loadMealPlanByDate(isoDate)));
+        loadedSuccessfully = true;
     } catch (error) {
         plans.value = [];
         if (error instanceof Error && error.message === 'Заполните профиль для расчёта плана питания') {
@@ -620,13 +664,25 @@ const loadMealPlan = async (): Promise<void> => {
             loadError.value = 'Не удалось загрузить рацион.';
         }
     } finally {
+        if (loadedSuccessfully) {
+            hasLoadedMealPlanOnce.value = true;
+        }
         isLoading.value = false;
         await refreshIcons();
     }
+
+    return loadedSuccessfully;
 };
 
 watch(activeRange, () => {
     void loadMealPlan();
+});
+
+watch(shoppingRange, () => {
+    if (!shoppingExpanded.value && !shoppingLoaded.value) {
+        return;
+    }
+    void loadShoppingList();
 });
 
 onMounted(async () => {
@@ -701,5 +757,12 @@ onMounted(async () => {
 .meal-plan-copy-btn:hover {
   border-color: #94a3b8;
   background: #f8fafc;
+}
+
+.meal-plan-copy-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 </style>
