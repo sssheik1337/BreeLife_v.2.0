@@ -2,7 +2,6 @@
 <html lang="ru">
   <head>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/static/js/telegram_fullscreen.js"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Админка — продукты</title>
@@ -12,7 +11,6 @@
         background: #f8fafc;
         margin: 0;
         padding: 24px;
-        padding-top: 75px;
         color: #0f172a;
       }
       .toolbar {
@@ -143,7 +141,6 @@
       @media (max-width: 768px) {
         body {
           padding: 14px;
-          padding-top: 75px;
         }
         .toolbar {
           flex-direction: column;
@@ -218,9 +215,7 @@
         <div class="toolbar-links">
           <a href="/admin">Главная</a>
           <a href="/admin/groups">Группы</a>
-          <a href="/admin/plans">Тарифы</a>
-          <a href="/admin/monitor">Мониторинг</a>
-          <a href="/admin/users">Пользователи</a>
+          <a href="/admin/norms">Нормы</a>
         </div>
       </div>
       <form class="logout" method="post" action="/admin/logout">
@@ -450,5 +445,3 @@
     </script>
   </body>
 </html>
-
-

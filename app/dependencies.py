@@ -1,10 +1,10 @@
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import logging
 
 from fastapi import HTTPException, Request, Response
 
-from services.storage_db import get_session_user, read_payload, write_payload
+from services.storage_db import delete_cache_keys, get_session_user, read_payload, write_payload
 from app.context import (
     ADMIN_SESSION_COOKIE,
     ADMIN_SESSION_TTL,
@@ -13,6 +13,7 @@ from app.context import (
     load_admin_config,
 )
 from services.targets import calculate_fiber_target_g, calculate_tdee_kcal, calculate_water_target_l
+from config import MEAL_PLAN_ALGO_VERSION
 
 
 logger = logging.getLogger(__name__)
@@ -153,8 +154,24 @@ def load_profile(telegram_user_id: int) -> dict[str, object]:
     return normalize_profile_payload_shape(read_payload("profiles", telegram_user_id))
 
 
+def invalidate_meal_plan_cache_for_today_and_week(telegram_user_id: int) -> None:
+    """Сбросить кэш рациона на текущий день и текущую неделю для пользователя."""
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    cache_keys = [
+        # Актуальные ключи с версией алгоритма.
+        f"mealplan:day:{telegram_user_id}:{today.isoformat()}:{MEAL_PLAN_ALGO_VERSION}",
+        f"mealplan:week:{telegram_user_id}:{week_start.isoformat()}:{MEAL_PLAN_ALGO_VERSION}",
+        # Legacy-ключи без версии удаляем для обратной совместимости.
+        f"mealplan:day:{telegram_user_id}:{today.isoformat()}",
+        f"mealplan:week:{telegram_user_id}:{week_start.isoformat()}",
+    ]
+    delete_cache_keys(cache_keys)
+
+
 def update_profile(telegram_user_id: int, data: dict[str, object]) -> None:
     write_payload("profiles", telegram_user_id, normalize_profile_payload_shape(data))
+    invalidate_meal_plan_cache_for_today_and_week(telegram_user_id)
 
 
 def should_apply_canonical_patch_key(canonical_key: str, raw_patch: dict[str, object]) -> bool:

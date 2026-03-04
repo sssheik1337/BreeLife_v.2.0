@@ -1,0 +1,28 @@
+{
+  "trial_days": 30,
+  "calorie_threshold": {
+    "overeat": 0.10,
+    "undereat": 0.10
+  },
+  "weekly_rules": {
+    "min_logged_days": 4
+  },
+  "default_macros": {
+    "protein_pct": 0.30,
+    "fat_pct": 0.25,
+    "carbs_pct": 0.45
+  },
+  "weight_rates": {
+    "lose": -0.5,
+    "gain": 0.3,
+    "muscle": 0.25,
+    "maintain": 0
+  },
+  "reminders": {
+    "water_min_l": 1.5,
+    "fiber_target_g": 25,
+    "sleep_target": "23:30",
+    "deadline_days": [7, 3, 1]
+  },
+  "paywall_enabled": true
+}

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru" data-app-name="{{ APP_NAME }}">
+<head>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{{ APP_NAME }}</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#f0f9ff] to-[#f0fdf4]">
+    <custom-layout>
+        <custom-navbar></custom-navbar>
+
+        <main class="flex-1 px-4 py-8">
+            <div class="max-w-md mx-auto space-y-8">
+                <div class="text-center">
+                    <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 mb-4 shadow-lg">
+                        <i data-feather="shopping-cart" class="w-7 h-7 text-white"></i>
+                    </div>
+                    <h1 class="text-2xl font-bold text-slate-800">Список покупок</h1>
+                    <p class="text-slate-500 mt-2">Собираем продукты по вашему рациону на день или неделю.</p>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-3">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-sm text-slate-500">Диапазон</p>
+                            <p class="text-sm text-slate-500">Список формируется из текущего плана питания.</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" class="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700" data-shopping-range="day">День</button>
+                            <button type="button" class="text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 text-slate-500" data-shopping-range="week">Неделя</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="btn-secondary w-full" id="shopping-copy">
+                            Скопировать список
+                        </button>
+                        <button type="button" class="btn-secondary w-full" id="shopping-clear">
+                            Очистить отметки
+                        </button>
+                    </div>
+                </div>
+
+                <div id="shopping-list-container" class="space-y-6">
+                    <p class="text-center text-slate-400">Загрузка списка...</p>
+                </div>
+            </div>
+        </main>
+
+        <custom-footer></custom-footer>
+    </custom-layout>
+
+    <script src="/static/components/layout.js"></script>
+    <script src="/static/components/navbar.js"></script>
+    <script src="/static/components/footer.js"></script>
+    <script src="/static/js/storage.js"></script>
+    <script src="/static/js/ui.js?v={{ static_mtime('js/ui.js') }}"></script>
+    <script src="/static/js/shopping_list.js"></script>
+    <script>
+        feather.replace();
+    </script>
+</body>
+</html>
