@@ -472,19 +472,6 @@ def write_cache_payload(cache_key: str, payload: dict[str, object], ttl_seconds:
         connection.commit()
 
 
-def delete_cache_keys(cache_keys: list[str]) -> None:
-    """Удалить набор ключей из SQLite-кэша."""
-    keys = [key for key in cache_keys if isinstance(key, str) and key]
-    if not keys:
-        return
-
-    placeholders = ",".join("?" for _ in keys)
-    query = f"DELETE FROM meal_plan_cache WHERE cache_key IN ({placeholders})"
-    with sqlite3.connect(DB_PATH) as connection:
-        connection.execute(query, keys)
-        connection.commit()
-
-
 def _normalize_plan_date(plan_date: date | str) -> str:
     """Normalize plan date to ISO yyyy-mm-dd."""
     if isinstance(plan_date, date):

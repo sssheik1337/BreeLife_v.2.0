@@ -7,10 +7,8 @@ from datetime import date, timedelta
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from app.dependencies import load_profile, require_telegram_user_id
-from app.routers.meal_plan_api import (
+from app.meal_plan_common import (
     build_seed_value,
-    build_meal_plan_payload_for_date,
-    build_products_pool,
     distribute_meal_targets,
     ensure_preferences_completed,
     normalize_profile_id_set,
@@ -541,7 +539,6 @@ def _generate_day_payload(
 ) -> dict[str, object]:
     raw_products = context["raw_products"]
     safe_profile = context["safe_profile"]
-    favorite_ids = context["favorite_ids"]
     base_excluded_ids = context["excluded_ids"]
     telegram_user_id = int(context["telegram_user_id"])
 
@@ -552,57 +549,40 @@ def _generate_day_payload(
         weekly_repeat_limit=weekly_repeat_limit,
     )
 
-    products_pool, used_favorites_only, products_pool_stats = build_products_pool(
-        raw_products,
-        favorite_ids,
-        effective_excluded_ids,
+    if extra_excluded_ids or weekly_blocked_ids:
+        has_available_food = False
+        for product in raw_products:
+            product_id = product.get("id")
+            if not isinstance(product_id, int):
+                continue
+            if product_id in effective_excluded_ids:
+                continue
+            if classify_kind(product) != "food":
+                continue
+            has_available_food = True
+            break
+        if not has_available_food:
+            raise HTTPException(
+                status_code=409,
+                detail={"reason": "rebuild_not_possible_with_current_constraints"},
+            )
+
+    payload = _build_v2_day_payload(
+        resolved_date=resolved_date,
+        safe_profile=safe_profile,
+        raw_products=raw_products,
+        telegram_user_id=telegram_user_id,
+        effective_excluded_ids=effective_excluded_ids,
+        weekly_usage_counts=weekly_usage_counts,
+        weekly_repeat_limit=weekly_repeat_limit,
+        date_parse_error=date_parse_error,
     )
-
-    if (extra_excluded_ids or weekly_blocked_ids) and not products_pool:
-        raise HTTPException(status_code=409, detail={"reason": "rebuild_not_possible_with_current_constraints"})
-
-    fallback_reason: str | None = None
-    try:
-        payload = _build_v2_day_payload(
-            resolved_date=resolved_date,
-            safe_profile=safe_profile,
-            raw_products=raw_products,
-            telegram_user_id=telegram_user_id,
-            effective_excluded_ids=effective_excluded_ids,
-            weekly_usage_counts=weekly_usage_counts,
-            weekly_repeat_limit=weekly_repeat_limit,
-            date_parse_error=date_parse_error,
-        )
-    except Exception as exc:
-        fallback_reason = f"{type(exc).__name__}: {exc}"
-        payload = build_meal_plan_payload_for_date(
-            resolved_date=resolved_date,
-            safe_profile=safe_profile,
-            raw_products=raw_products,
-            favorite_ids=favorite_ids,
-            excluded_ids=effective_excluded_ids,
-            products_pool=products_pool,
-            products_pool_stats=products_pool_stats,
-            used_favorites_only=used_favorites_only,
-            telegram_user_id=telegram_user_id,
-            debug_enabled=debug_enabled,
-            date_parse_error=date_parse_error,
-        )
 
     meta = payload.get("meta")
     if isinstance(meta, dict):
-        if fallback_reason is None:
-            meta["generator"] = "v2"
-            meta["fallback_reason"] = None
-        else:
-            meta["generator"] = "v1_fallback"
-            meta["fallback_reason"] = fallback_reason
         meta["regen_nonce"] = int(regen_nonce)
         meta["weekly_repeat_limit"] = int(weekly_repeat_limit)
         meta["weekly_blocked_products_count"] = len(weekly_blocked_ids)
-        meta["used_favorites_only"] = used_favorites_only
-        meta["pool_size"] = len(products_pool)
-        meta["pool"] = products_pool_stats
     return payload
 
 
