@@ -41,7 +41,8 @@ try:
 except ValueError:
     WAKE_WATER_DELAY_MINUTES = 45
 
-MEAL_PLAN_ALGO_VERSION = os.getenv("MEAL_PLAN_ALGO_VERSION", "v2")
+# Версия алгоритма рациона. В проекте используется только актуальная версия (переключателя через env нет).
+MEAL_PLAN_ALGO_VERSION = "v2"
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_HIDDEN_ADMIN_COMMAND = (
@@ -64,10 +65,29 @@ def normalize_webapp_url(raw_url: str) -> str:
     normalized = parsed._replace(path=normalized_path, query="", fragment="")
     return urlunsplit(normalized)
 
+def normalize_origin_url(raw_url: str) -> str:
+    if not raw_url:
+        return ""
+    raw_value = raw_url.strip()
+    parsed = urlsplit(raw_value)
+    if not parsed.scheme or not parsed.netloc:
+        return raw_value.rstrip("/")
+    return urlunsplit((parsed.scheme, parsed.netloc, "", "", "")).rstrip("/")
 
-TELEGRAM_WEBAPP_URL = normalize_webapp_url(os.getenv("TELEGRAM_WEBAPP_URL", ""))
-PUBLIC_APP_URL = normalize_webapp_url(os.getenv("PUBLIC_APP_URL", TELEGRAM_WEBAPP_URL))
-PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "")
+
+_RAW_TELEGRAM_WEBAPP_URL = os.getenv("TELEGRAM_WEBAPP_URL", "").strip()
+_RAW_PUBLIC_APP_URL = os.getenv("PUBLIC_APP_URL", "").strip()
+_RAW_PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").strip()
+
+# Можно указать адрес приложения только один раз:
+# - PUBLIC_APP_URL (рекомендуется) или
+# - TELEGRAM_WEBAPP_URL (обратная совместимость) или
+# - PUBLIC_BASE_URL (если указать только его, MiniApp откроется по / и попадёт в /app/ через редирект).
+PUBLIC_APP_URL = normalize_webapp_url(_RAW_PUBLIC_APP_URL or _RAW_TELEGRAM_WEBAPP_URL or _RAW_PUBLIC_BASE_URL)
+TELEGRAM_WEBAPP_URL = normalize_webapp_url(_RAW_TELEGRAM_WEBAPP_URL or PUBLIC_APP_URL)
+
+# PUBLIC_BASE_URL нужен для webhook и ссылок в сообщениях. Если не задан, берём origin из PUBLIC_APP_URL.
+PUBLIC_BASE_URL = normalize_origin_url(_RAW_PUBLIC_BASE_URL or PUBLIC_APP_URL)
 
 PAYMENT_PROVIDER = os.getenv("PAYMENT_PROVIDER", "")
 PAYMENT_PUBLIC_KEY = os.getenv("PAYMENT_PUBLIC_KEY", "")
