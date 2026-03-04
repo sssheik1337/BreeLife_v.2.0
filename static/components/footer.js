@@ -524,7 +524,6 @@
     `;
 
     let hasCompletedProfile = window.profileCompleted === true;
-    let hasCompletedPreferencesOnboarding = false;
     let hasPassedTrialGate = false;
     const isDevMode = window.appIsDev === true || window.appMode === 'development';
 
@@ -588,13 +587,11 @@
         || profileCompletedFromGetter
         || profileCompletedFromSnapshot
       );
-      hasCompletedPreferencesOnboarding = Boolean(profile?.preferences_onboarding_completed === true);
       hasPassedTrialGate = Boolean(hasPassedTrialGate || evaluateTrialGate(profile));
     };
 
     const isFaqFabUnlocked = () => (
       hasCompletedProfile
-      && hasCompletedPreferencesOnboarding
       && hasPassedTrialGate
     );
 
@@ -834,9 +831,6 @@
     window.addEventListener('profile-status-updated', (event) => {
       const profileCompleted = Boolean(event?.detail?.profileCompleted);
       hasCompletedProfile = profileCompleted;
-      if (typeof event?.detail?.preferencesOnboardingCompleted === 'boolean') {
-        hasCompletedPreferencesOnboarding = event.detail.preferencesOnboardingCompleted === true;
-      }
       if (typeof event?.detail?.trialGatePassed === 'boolean') {
         hasPassedTrialGate = event.detail.trialGatePassed === true;
       }
