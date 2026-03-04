@@ -1,29 +1,166 @@
+from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
-from config import APP_ENV, APP_HOST, APP_NAME, APP_PORT, DEBUG, IS_PROD, PUBLIC_APP_URL
-from app.context import TELEGRAM_SESSION_COOKIE, load_admin_config, load_plans_config, templates
+from config import (
+    APP_ENV,
+    APP_HOST,
+    APP_NAME,
+    APP_PORT,
+    DEBUG,
+    IS_PROD,
+    PUBLIC_APP_URL,
+)
+from app.context import TELEGRAM_SESSION_COOKIE, load_admin_config, load_plans_config
 from services.storage_db import get_session_user, read_payload
 
 router = APIRouter()
 
+SPA_NOTIFICATION_INLINE_SCRIPT = """
+<script>
+(function () {
+  function getCssPxVariable(name, fallback) {
+    var value = window.getComputedStyle(document.documentElement).getPropertyValue(name);
+    var parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function computeTopOffset() {
+    var safeTop = getCssPxVariable('--tg-safe-top', 0);
+    var uiTop = getCssPxVariable('--tg-ui-top', 0);
+    var rawTop = Math.round(72 + safeTop + uiTop + 12);
+    var maxTop = Math.max(12, window.innerHeight - 96);
+    return Math.min(Math.max(rawTop, 12), maxTop);
+  }
+
+  function applyContainerStyles(container) {
+    container.style.setProperty('position', 'fixed', 'important');
+    container.style.setProperty('top', String(computeTopOffset()) + 'px', 'important');
+    container.style.setProperty('right', '12px', 'important');
+    container.style.setProperty('left', 'auto', 'important');
+    container.style.setProperty('bottom', 'auto', 'important');
+    container.style.setProperty('z-index', '2147483647', 'important');
+    container.style.setProperty('width', 'min(320px, calc(100vw - 24px))', 'important');
+    container.style.setProperty('display', 'flex', 'important');
+    container.style.setProperty('flex-direction', 'column', 'important');
+    container.style.setProperty('align-items', 'flex-end', 'important');
+    container.style.setProperty('pointer-events', 'none', 'important');
+    container.style.setProperty('visibility', 'visible', 'important');
+    container.style.setProperty('opacity', '1', 'important');
+    container.style.setProperty('isolation', 'isolate', 'important');
+  }
+
+  if (typeof window.showNotification !== 'function') {
+    window.showNotification = function (message, type) {
+      var text = String(message || '').trim();
+      if (!text) return;
+      var tone = (type === 'error' || type === 'warning') ? type : 'success';
+      var bg = tone === 'success' ? '#10b981' : (tone === 'warning' ? '#f59e0b' : '#ef4444');
+      var container = document.getElementById('notification-container');
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'notification-container';
+        (document.documentElement || document.body).appendChild(container);
+      }
+      applyContainerStyles(container);
+      var toast = document.createElement('div');
+      toast.textContent = text;
+      toast.style.background = bg;
+      toast.style.color = '#fff';
+      toast.style.padding = '14px 16px';
+      toast.style.borderRadius = '14px';
+      toast.style.marginBottom = '10px';
+      toast.style.maxWidth = '100%';
+      toast.style.wordBreak = 'break-word';
+      toast.style.boxShadow = '0 10px 26px rgba(15,23,42,.28)';
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(-8px)';
+      toast.style.transition = 'transform 180ms ease,opacity 180ms ease';
+      toast.style.display = 'block';
+      toast.style.visibility = 'visible';
+      container.appendChild(toast);
+      requestAnimationFrame(function () {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+      });
+      setTimeout(function () {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-6px)';
+        setTimeout(function () { toast.remove(); }, 180);
+      }, 3000);
+      window.__lastSpaNotification = { message: text, tone: tone, at: Date.now() };
+    };
+  }
+
+  if (window.__notificationLogBridgeInstalled !== true) {
+    var originalConsoleLog = console.log.bind(console);
+    console.log = function () {
+      try {
+        var first = (typeof arguments[0] === 'string') ? String(arguments[0]).trim() : '';
+        if (first === 'Приём пищи сохранён.' || first === 'Вода сохранена.' || first === 'Добавьте хотя бы один продукт.') {
+          window.showNotification(first, first === 'Добавьте хотя бы один продукт.' ? 'error' : 'success');
+        }
+      } catch (e) {}
+      return originalConsoleLog.apply(console, arguments);
+    };
+    window.__notificationLogBridgeInstalled = true;
+  }
+
+  window.addEventListener('resize', function () {
+    var container = document.getElementById('notification-container');
+    if (container) {
+      applyContainerStyles(container);
+    }
+  }, { passive: true });
+})();
+</script>
+""".strip()
+
+
+def _cache_bypass_headers() -> dict[str, str]:
+    return {
+        "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
+
+
+def _render_spa_shell_index(spa_index_path: Path) -> HTMLResponse:
+    html = spa_index_path.read_text(encoding="utf-8")
+    if "window.showNotification" not in html:
+        if "</head>" in html:
+            html = html.replace("</head>", f"{SPA_NOTIFICATION_INLINE_SCRIPT}\n</head>", 1)
+        else:
+            html = f"{SPA_NOTIFICATION_INLINE_SCRIPT}\n{html}"
+    return HTMLResponse(content=html, status_code=200, headers=_cache_bypass_headers())
+
 
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    if IS_PROD and not DEBUG:
-        return templates.TemplateResponse(
-            "index.html",
-            {"request": request, "APP_NAME": APP_NAME},
-        )
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "APP_NAME": APP_NAME},
-    )
+    return RedirectResponse(url="/app/", status_code=307)
 
 
 @router.get("/index", response_class=HTMLResponse)
 async def index_alias(request: Request):
     return await index(request)
+
+
+@router.get("/app", response_class=HTMLResponse)
+async def spa_shell(request: Request):
+    spa_index_path = Path("spa/dist/index.html")
+    if spa_index_path.exists():
+        return _render_spa_shell_index(spa_index_path)
+
+    # Fallback: если SPA ещё не собрана, возвращаем понятный экран без поломки legacy-страниц.
+    return HTMLResponse(
+        "<h1>SPA не собрана</h1><p>Соберите фронтенд командой <code>cd spa && npm install && npm run build</code>.</p>",
+        status_code=503,
+    )
+
+
+@router.get("/app/{spa_path:path}", response_class=HTMLResponse)
+async def spa_shell_with_path(spa_path: str, request: Request):
+    return await spa_shell(request)
 
 
 @router.get("/healthz")
@@ -86,43 +223,31 @@ async def admin_config():
 
 @router.get("/api/plans")
 async def plans_public():
-    admin_config = load_admin_config()
+    def parse_price(value: object) -> int:
+        if isinstance(value, bool):
+            return 0
+        if isinstance(value, (int, float)):
+            return max(0, int(value))
+        digits = "".join(ch for ch in str(value) if ch.isdigit())
+        return int(digits) if digits else 0
+
     plans = load_plans_config()
-    trial_days = int(admin_config.get("trial_days", 30))
-    if not isinstance(plans, list) or not plans:
-        plans = [
-            {
-                "id": "trial",
-                "title": "Пробный период",
-                "duration_days": trial_days,
-                "price_current": "0 ₽",
-                "price_old": "",
-                "price_old_enabled": False,
-                "features": [],
-            },
-            {
-                "id": "premium",
-                "title": "Подписка",
-                "duration_days": 30,
-                "price_current": "399 ₽ / месяц",
-                "price_old": "",
-                "price_old_enabled": False,
-                "features": [],
-            },
-        ]
     normalized: list[dict[str, object]] = []
-    for plan in plans:
+    for plan in plans if isinstance(plans, list) else []:
         if not isinstance(plan, dict):
+            continue
+        plan_id = str(plan.get("id", "")).strip().lower()
+        title = str(plan.get("title", "")).strip()
+        if not plan_id or not title or plan_id == "trial":
             continue
         normalized.append(
             {
-                "id": plan.get("id"),
-                "title": plan.get("title"),
-                "duration_days": plan.get("duration_days", 0),
-                "price_current": plan.get("price_current", plan.get("price", "")),
-                "price_old": plan.get("price_old", ""),
-                "price_old_enabled": plan.get("price_old_enabled", False),
-                "features": plan.get("features", []),
+                "id": plan_id,
+                "title": title,
+                "duration_days": int(plan.get("duration_days", 0) or 0),
+                "price_current": parse_price(plan.get("price_current")),
+                "price_old": parse_price(plan.get("price_old")),
+                "price_old_enabled": bool(plan.get("price_old_enabled", False)),
             }
         )
     return normalized

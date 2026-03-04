@@ -29,15 +29,33 @@ class FoodDiaryAddRequest(BaseModel):
 
 
 class RemindersScheduleRequest(BaseModel):
-    timezone_offset: int = 0
+    type: str
+    time_local: str | None = None
+    when_iso: str | None = None
+    frequency: Literal["daily", "weekdays"] = "daily"
+    enabled: bool = True
+    timezone: str | None = None
+    tz_offset_minutes: int | None = None
 
 
 class CreateReminderPayload(BaseModel):
-    type: Literal["water", "sleep", "activity"]
+    type: Literal["water", "sleep", "sleep_reminder", "sleep_morning_log", "activity"]
     time: str
     enabled: bool = True
+    frequency: Literal["daily", "weekdays"] = "daily"
+    timezone: str | None = None
+    tz_offset_minutes: int | None = None
 
 
 class ReminderAutoGeneratePayload(BaseModel):
-    type: Literal["water", "sleep", "activity"]
+    type: Literal["water", "sleep", "sleep_reminder", "sleep_morning_log", "activity"]
     timezone_offset: int = 0
+
+
+class UserTimezonePayload(BaseModel):
+    tz_name: str | None = None
+    tz_offset_minutes: int | None = None
+
+
+class NotificationConsentPayload(BaseModel):
+    allowed: bool
