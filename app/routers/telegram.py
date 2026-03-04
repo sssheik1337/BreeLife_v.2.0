@@ -1,9 +1,4 @@
-import json
-import logging
-
 from fastapi import APIRouter, HTTPException, Request, Response
-from pydantic import ValidationError
-from starlette.requests import ClientDisconnect
 
 from aiogram import types
 from aiogram.utils.web_app import safe_parse_webapp_init_data
@@ -15,7 +10,6 @@ from app.schemas import TelegramAuthRequest
 from services.storage_db import create_session
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 @router.get("/api/telegram/bot-info")
@@ -89,22 +83,7 @@ async def telegram_webhook(request: Request):
     bot = get_bot()
     if not dispatcher or not bot:
         raise HTTPException(status_code=503, detail="TELEGRAM_DISABLED")
-
-    try:
-        payload = await request.json()
-    except ClientDisconnect:
-        logger.warning("Telegram webhook client disconnected before request body was read")
-        return Response(status_code=204)
-    except json.JSONDecodeError as error:
-        logger.warning("Telegram webhook received invalid JSON payload: %s", error)
-        raise HTTPException(status_code=400, detail="INVALID_JSON_PAYLOAD") from error
-
-    try:
-        update = types.Update.model_validate(payload)
-    except ValidationError as error:
-        logger.warning("Telegram webhook payload validation failed: %s", error)
-        raise HTTPException(status_code=400, detail="INVALID_TELEGRAM_UPDATE") from error
-
+    update = types.Update.model_validate(await request.json())
     await dispatcher.feed_update(bot=bot, update=update)
     return {"ok": True}
 

@@ -56,20 +56,34 @@ class CustomNavbar extends HTMLElement {
           -webkit-text-fill-color: transparent;
         }
 
-        .profile-summary {
+        .nav-actions {
+          display: flex;
+          align-items: center;
+          position: relative;
+        }
+
+        .menu-wrapper {
+          position: relative;
+        }
+
+        .profile-toggle {
+          border: 0;
+          background: transparent;
+          cursor: pointer;
           display: inline-flex;
           align-items: center;
           gap: 0.5rem;
-          text-decoration: none;
-          border-radius: 999px;
           padding: 0.25rem 0.5rem;
+          border-radius: 999px;
+          transition: background-color 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .profile-summary:hover {
+        .profile-toggle:hover {
           background: #f8fafc;
+          box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
         }
 
-        .profile-summary:focus-visible {
+        .profile-toggle:focus-visible {
           outline: 2px solid #34d399;
           outline-offset: 2px;
         }
@@ -112,6 +126,57 @@ class CustomNavbar extends HTMLElement {
           text-align: left;
         }
 
+        .menu-panel {
+          position: absolute;
+          right: 0;
+          top: calc(100% + 0.75rem);
+          width: 220px;
+          background: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 0.75rem;
+          box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+          padding: 0.5rem;
+          display: none;
+          visibility: hidden;
+          opacity: 0;
+          pointer-events: none;
+          transform: translateY(-4px);
+          transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+          z-index: 20;
+        }
+
+        .menu-panel.is-open {
+          display: block;
+          visibility: visible;
+          opacity: 1;
+          pointer-events: auto;
+          transform: translateY(0);
+        }
+
+        .menu-link {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.5rem;
+          padding: 0.5rem 0.75rem;
+          border-radius: 0.5rem;
+          color: #0f172a;
+          text-decoration: none;
+          font-size: 0.875rem;
+        }
+
+        .menu-link:hover {
+          background: #f1f5f9;
+        }
+
+        .menu-link__status {
+          margin-left: auto;
+          font-size: 0.7rem;
+          font-weight: 600;
+          color: #64748b;
+          white-space: nowrap;
+        }
+
         @media (max-width: 640px) {
           .navbar {
             padding: 1rem 1.25rem;
@@ -139,66 +204,37 @@ class CustomNavbar extends HTMLElement {
           .profile-first-name {
             max-width: 90px;
           }
+
+          .menu-panel {
+            width: min(240px, 90vw);
+          }
         }
       </style>
 
       <nav class="navbar">
-        <a href="/profile" class="logo" aria-label="Open profile">
+        <a href="/profile" class="logo" aria-label="На главную">
           <div class="logo-icon">🌿</div>
           <div class="logo-text">${appName}</div>
         </a>
 
-        <a href="/profile" class="profile-summary" data-nav-profile aria-label="Open profile">
-          <span class="profile-first-name" id="navbar-user-first-name" aria-live="polite">Profile</span>
-          <span class="profile-avatar" id="navbar-avatar" aria-hidden="true">
-            <span class="profile-avatar-fallback" id="navbar-avatar-fallback">U</span>
-          </span>
-        </a>
+        <div class="nav-actions">
+          <div class="menu-wrapper">
+            <button type="button" class="profile-toggle" data-nav="menu" aria-label="Открыть меню профиля" title="Профиль">
+              <span class="profile-first-name" id="navbar-user-first-name" aria-live="polite">Профиль</span>
+              <span class="profile-avatar" id="navbar-avatar" aria-hidden="true">
+                <span class="profile-avatar-fallback" id="navbar-avatar-fallback">U</span>
+              </span>
+            </button>
+            <div class="menu-panel" id="menu-panel">
+              <a href="/settings/reminders" class="menu-link">Напоминания <span id="navbar-reminders-status" class="menu-link__status">Проверяем...</span></a>
+              <a href="/plans" class="menu-link">Тарифы</a>
+              <a href="/references" class="menu-link">Справочники</a>
+              <a href="/support" class="menu-link">Помощь</a>
+            </div>
+          </div>
+        </div>
       </nav>
     `;
-
-    const normalizeSpaTarget = (target) => {
-      if (!target || typeof target !== 'string') {
-        return null;
-      }
-
-      try {
-        const resolved = new URL(target, window.location.origin);
-        if (resolved.origin !== window.location.origin) {
-          return null;
-        }
-
-        const resolvedPath = `${resolved.pathname}${resolved.search}${resolved.hash}`;
-        if (resolvedPath === '/app') {
-          return '/';
-        }
-        if (resolvedPath.startsWith('/app/')) {
-          return resolvedPath.slice(4);
-        }
-        return resolvedPath;
-      } catch (error) {
-        return null;
-      }
-    };
-
-    const navigateTo = (target, replace = false) => {
-      if (!target) {
-        return;
-      }
-
-      const method = replace ? window.spaReplace : window.spaNavigate;
-      const spaTarget = normalizeSpaTarget(target);
-      if (spaTarget && typeof method === 'function') {
-        method(spaTarget);
-        return;
-      }
-
-      if (replace) {
-        window.location.replace(target);
-      } else {
-        window.location.assign(target);
-      }
-    };
 
     const getTelegramFallback = () => {
       const user = window.Telegram?.WebApp?.initDataUnsafe?.user;
@@ -208,14 +244,14 @@ class CustomNavbar extends HTMLElement {
       return {
         first_name: typeof user.first_name === 'string' ? user.first_name.trim() : '',
         username: typeof user.username === 'string' ? user.username.trim() : '',
-        photo_url: typeof user.photo_url === 'string' ? user.photo_url.trim() : '',
+        photo_url: typeof user.photo_url === 'string' ? user.photo_url.trim() : ''
       };
     };
 
     const buildFirstName = (status) => {
       const firstName = typeof status?.first_name === 'string' ? status.first_name.trim() : '';
       const username = typeof status?.username === 'string' ? status.username.trim() : '';
-      return firstName || username || 'Profile';
+      return firstName || username || 'Профиль';
     };
 
     const buildAvatarUrl = (status) => {
@@ -234,7 +270,7 @@ class CustomNavbar extends HTMLElement {
       const identity = {
         first_name: status?.first_name || fallback.first_name,
         username: status?.username || fallback.username,
-        photo_url: status?.photo_url || fallback.photo_url,
+        photo_url: status?.photo_url || fallback.photo_url
       };
 
       const firstName = buildFirstName(identity);
@@ -251,7 +287,7 @@ class CustomNavbar extends HTMLElement {
       if (avatarUrl) {
         const image = document.createElement('img');
         image.src = avatarUrl;
-        image.alt = `Avatar ${firstName}`;
+        image.alt = `Аватар ${firstName}`;
         image.loading = 'lazy';
         image.referrerPolicy = 'no-referrer';
         avatarContainer.appendChild(image);
@@ -271,16 +307,64 @@ class CustomNavbar extends HTMLElement {
         const status = await response.json();
         applyUserIdentity(status);
       } catch (error) {
+        // Ошибку получения Telegram-профиля в шапке игнорируем.
         applyUserIdentity({});
       }
     };
 
-    const bindNavigation = () => {
-      this.shadowRoot.querySelectorAll('a[href]').forEach((link) => {
+
+    const renderRemindersStatus = () => {
+      const statusElement = this.shadowRoot.getElementById('navbar-reminders-status');
+      if (!statusElement) {
+        return;
+      }
+
+      const profile = typeof window.getUserProfile === 'function' ? window.getUserProfile() : {};
+      const settings = profile?.reminder_settings && typeof profile.reminder_settings === 'object'
+        ? profile.reminder_settings
+        : {};
+
+      const enabledCount = ['water', 'sleep', 'activity']
+        .filter((key) => settings?.[key]?.enabled === true)
+        .length;
+
+      if (enabledCount > 0) {
+        statusElement.textContent = `Вкл: ${enabledCount}`;
+        statusElement.style.color = '#059669';
+      } else {
+        statusElement.textContent = 'Выкл';
+        statusElement.style.color = '#64748b';
+      }
+    };
+
+    const bindMenu = () => {
+      const menuButton = this.shadowRoot.querySelector('[data-nav="menu"]');
+      const menuPanel = this.shadowRoot.getElementById('menu-panel');
+      if (!menuButton || !menuPanel) {
+        return;
+      }
+
+      menuButton.addEventListener('click', () => {
+        menuPanel.classList.toggle('is-open');
+      });
+
+      document.addEventListener('click', (event) => {
+        const clickInside = event.composedPath().includes(this);
+        if (!clickInside) {
+          menuPanel.classList.remove('is-open');
+        }
+      });
+
+      const menuLinks = menuPanel.querySelectorAll('a[href]');
+      menuLinks.forEach((link) => {
         link.addEventListener('click', (event) => {
+          // Явная навигация, чтобы исключить блокировку кликов в шадоу-доме.
           event.preventDefault();
+          menuPanel.classList.remove('is-open');
           const target = link.getAttribute('href');
-          navigateTo(target);
+          if (target) {
+            window.location.assign(target);
+          }
         });
       });
     };
@@ -290,15 +374,20 @@ class CustomNavbar extends HTMLElement {
     } else {
       applyUserIdentity({});
     }
-
     loadUserIdentity();
-    bindNavigation();
-
     window.addEventListener('profile-status-updated', (event) => {
       if (event?.detail) {
         applyUserIdentity(event.detail);
       }
+      renderRemindersStatus();
     });
+
+    window.addEventListener('focus', () => {
+      renderRemindersStatus();
+    });
+
+    bindMenu();
+    renderRemindersStatus();
   }
 }
 

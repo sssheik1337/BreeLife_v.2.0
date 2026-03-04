@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru" data-app-name="{{ APP_NAME }}">
+<head>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{{ APP_NAME }}</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#f0f9ff] to-[#f0fdf4]">
+    <custom-layout>
+        <custom-navbar></custom-navbar>
+
+        <main class="flex-1 px-4 py-8">
+            <div class="max-w-md mx-auto space-y-6">
+                <div class="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm space-y-4 text-center">
+                    <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 shadow-lg mx-auto">
+                        <i data-feather="heart" class="w-7 h-7 text-white"></i>
+                    </div>
+                    <h1 class="text-2xl font-bold text-slate-800">Хотите настроить любимые продукты сейчас?</h1>
+                    <p class="text-slate-500">Это поможет сразу собрать более точный рацион и список покупок под ваш вкус.</p>
+                    <div class="rounded-xl bg-slate-50 border border-slate-100 p-3 text-sm text-slate-600 text-left">
+                        Если выберете «Позже», приложение продолжит работу, а настройку можно будет пройти в любой момент в разделе «Мои продукты».
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-3">
+                    <a href="/preferences-onboarding" class="btn-primary w-full inline-flex items-center justify-center">Заполнить сейчас</a>
+                    <a href="/trial-start" class="btn-secondary w-full inline-flex items-center justify-center">Сделать позже</a>
+                </div>
+            </div>
+        </main>
+
+        <custom-footer></custom-footer>
+    </custom-layout>
+
+    <script src="/static/components/layout.js"></script>
+    <script src="/static/components/navbar.js"></script>
+    <script src="/static/components/footer.js"></script>
+    <script src="/static/js/ui.js?v={{ static_mtime('js/ui.js') }}"></script>
+    <script>
+        feather.replace();
+    </script>
+</body>
+</html>

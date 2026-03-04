@@ -2,7 +2,6 @@
 <html lang="ru">
   <head>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="/static/js/telegram_fullscreen.js"></script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Админка — тарифы</title>
@@ -12,7 +11,6 @@
         background: #f8fafc;
         margin: 0;
         padding: 24px;
-        padding-top: 75px;
         color: #0f172a;
       }
       .toolbar {
@@ -31,18 +29,22 @@
       input[type="text"],
       input[type="number"] {
         width: 100%;
-        padding: 8px 10px;
+        padding: 6px 8px;
         border: 1px solid #cbd5f5;
         border-radius: 6px;
         box-sizing: border-box;
       }
-      input.is-disabled {
-        background: #f1f5f9;
-        color: #94a3b8;
-        cursor: not-allowed;
+      textarea {
+        width: 100%;
+        min-height: 90px;
+        padding: 6px 8px;
+        border: 1px solid #cbd5f5;
+        border-radius: 6px;
+        box-sizing: border-box;
+        resize: vertical;
       }
       button {
-        padding: 8px 12px;
+        padding: 6px 12px;
         border: none;
         border-radius: 6px;
         cursor: pointer;
@@ -79,62 +81,17 @@
         gap: 6px;
         min-width: 0;
       }
-      .check-label {
-        flex-direction: row;
-        align-items: center;
-        gap: 10px;
-      }
-      .check-label input[type="checkbox"] {
-        width: auto;
+      .plan-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 16px;
+        margin-top: 12px;
       }
       .plan-actions {
         display: flex;
         gap: 8px;
         margin-top: 12px;
         flex-wrap: wrap;
-      }
-      .plan-item {
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        margin-top: 12px;
-        overflow: hidden;
-        background: #ffffff;
-      }
-      .plan-item[open] {
-        border-color: #cbd5f5;
-      }
-      .plan-summary {
-        cursor: pointer;
-        list-style: none;
-        padding: 14px 16px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-      }
-      .plan-summary::-webkit-details-marker {
-        display: none;
-      }
-      .plan-summary-main {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-      }
-      .plan-summary-title {
-        font-weight: 700;
-      }
-      .plan-summary-meta {
-        color: #475569;
-        font-size: 14px;
-      }
-      .plan-summary-toggle {
-        color: #2563eb;
-        font-weight: 600;
-        white-space: nowrap;
-      }
-      .plan-details {
-        border-top: 1px solid #e2e8f0;
-        padding: 16px;
       }
       @media (max-width: 1024px) {
         .plan-row {
@@ -144,7 +101,6 @@
       @media (max-width: 768px) {
         body {
           padding: 14px;
-          padding-top: 75px;
         }
         .toolbar {
           flex-direction: column;
@@ -173,7 +129,7 @@
           min-height: 44px;
         }
         .card,
-        .plan-details {
+        .plan-card {
           padding: 14px;
         }
         .plan-row {
@@ -182,6 +138,7 @@
         }
         input[type="text"],
         input[type="number"],
+        textarea,
         button {
           min-height: 42px;
           font-size: 16px;
@@ -215,8 +172,7 @@
           <a href="/admin">Главная</a>
           <a href="/admin/products">Продукты</a>
           <a href="/admin/groups">Группы</a>
-          <a href="/admin/monitor">Мониторинг</a>
-          <a href="/admin/users">Пользователи</a>
+          <a href="/admin/norms">Нормы</a>
         </div>
       </div>
       <form class="logout" method="post" action="/admin/logout">
@@ -232,24 +188,13 @@
     {% endif %}
 
     <div class="card">
-      <h2>Пробный период</h2>
-      <form method="post" action="/admin/trial/update">
+      <h2>Добавить тариф</h2>
+      <form method="post" action="/admin/plans/add">
         <div class="plan-row">
           <label>
-            Длительность, дней
-            <input type="number" name="trial_days" min="0" value="{{ trial_days }}" required />
+            ID
+            <input type="text" name="plan_id" required />
           </label>
-        </div>
-        <div style="margin-top: 12px;">
-          <button class="btn-primary" type="submit">Сохранить пробный период</button>
-        </div>
-      </form>
-    </div>
-
-    <div class="card">
-      <h2>Добавить тариф</h2>
-      <form method="post" action="/admin/plans/add" data-plan-form>
-        <div class="plan-row">
           <label>
             Название
             <input type="text" name="title" required />
@@ -260,17 +205,21 @@
           </label>
           <label>
             Текущая цена
-            <input type="number" name="price_current" min="0" step="1" required />
+            <input type="text" name="price_current" required />
           </label>
           <label>
             Старая цена
-            <input type="number" name="price_old" min="0" step="1" value="0" data-price-old />
+            <input type="text" name="price_old" />
           </label>
-          <label class="check-label">
-            <input type="checkbox" name="price_old_enabled" value="1" data-price-toggle />
+          <label>
             Старая цена активна
+            <input type="checkbox" name="price_old_enabled" value="1" />
           </label>
         </div>
+        <label style="display: block; margin-top: 12px;">
+          Преимущества (по одному на строку)
+          <textarea name="features"></textarea>
+        </label>
         <div style="margin-top: 12px;">
           <button class="btn-primary" type="submit">Добавить тариф</button>
         </div>
@@ -280,73 +229,47 @@
     <div class="card">
       <h2>Список тарифов</h2>
       {% for plan in plans %}
-        <details class="plan-item">
-          <summary class="plan-summary">
-            <div class="plan-summary-main">
-              <div class="plan-summary-title">{{ plan.title }}</div>
-              <div class="plan-summary-meta">{{ plan.price_current }} • {{ plan.duration_days }} дней</div>
+        <div class="plan-card">
+          <form method="post" action="/admin/plans/update">
+            <div class="plan-row">
+              <label>
+                ID
+                <input type="text" name="plan_id" value="{{ plan.id }}" readonly />
+              </label>
+              <label>
+                Название
+                <input type="text" name="title" value="{{ plan.title }}" required />
+              </label>
+              <label>
+                Длительность, дней
+                <input type="number" name="duration_days" min="0" value="{{ plan.duration_days }}" required />
+              </label>
+              <label>
+                Текущая цена
+                <input type="text" name="price_current" value="{{ plan.price_current }}" required />
+              </label>
+              <label>
+                Старая цена
+                <input type="text" name="price_old" value="{{ plan.price_old }}" />
+              </label>
+              <label>
+                Старая цена активна
+                <input type="checkbox" name="price_old_enabled" value="1" {% if plan.price_old_enabled %}checked{% endif %} />
+              </label>
             </div>
-            <div class="plan-summary-toggle">Подробнее</div>
-          </summary>
-          <div class="plan-details">
-            <form method="post" action="/admin/plans/update" data-plan-form>
-              <input type="hidden" name="plan_id" value="{{ plan.id }}" />
-              <div class="plan-row">
-                <label>
-                  Название
-                  <input type="text" name="title" value="{{ plan.title }}" required />
-                </label>
-                <label>
-                  Длительность, дней
-                  <input type="number" name="duration_days" min="0" value="{{ plan.duration_days }}" required />
-                </label>
-                <label>
-                  Текущая цена
-                  <input type="number" name="price_current" min="0" step="1" value="{{ plan.price_current }}" required />
-                </label>
-                <label>
-                  Старая цена
-                  <input type="number" name="price_old" min="0" step="1" value="{{ plan.price_old }}" data-price-old />
-                </label>
-                <label class="check-label">
-                  <input type="checkbox" name="price_old_enabled" value="1" data-price-toggle {% if plan.price_old_enabled %}checked{% endif %} />
-                  Старая цена активна
-                </label>
-              </div>
-              <div class="plan-actions">
-                <button class="btn-primary" type="submit">Сохранить</button>
-                <button class="btn-danger" type="submit" formaction="/admin/plans/delete" name="plan_id" value="{{ plan.id }}">
-                  Удалить
-                </button>
-              </div>
-            </form>
-          </div>
-        </details>
+            <label style="display: block; margin-top: 12px;">
+              Преимущества (по одному на строку)
+              <textarea name="features">{% if plan.features %}{{ plan.features | join('\n') }}{% endif %}</textarea>
+            </label>
+            <div class="plan-actions">
+              <button class="btn-primary" type="submit">Сохранить</button>
+              <button class="btn-danger" type="submit" formaction="/admin/plans/delete" name="plan_id" value="{{ plan.id }}">
+                Удалить
+              </button>
+            </div>
+          </form>
+        </div>
       {% endfor %}
     </div>
-
-    <script>
-      const syncOldPriceField = (form) => {
-        const toggle = form.querySelector('[data-price-toggle]');
-        const priceOld = form.querySelector('[data-price-old]');
-        if (!toggle || !priceOld) {
-          return;
-        }
-
-        const apply = () => {
-          const enabled = Boolean(toggle.checked);
-          priceOld.disabled = !enabled;
-          priceOld.classList.toggle('is-disabled', !enabled);
-          if (!enabled) {
-            priceOld.value = '0';
-          }
-        };
-
-        apply();
-        toggle.addEventListener('change', apply);
-      };
-
-      document.querySelectorAll('[data-plan-form]').forEach(syncOldPriceField);
-    </script>
   </body>
 </html>
