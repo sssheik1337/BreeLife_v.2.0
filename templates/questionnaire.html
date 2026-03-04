@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en" data-app-name="{{ APP_NAME }}">
+<head>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{{ APP_NAME }}</title>
+<link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+      #question-card { min-height: 360px; }
+      #next-btn:disabled,
+      #prev-btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+      .wheel-picker {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+        padding: 12px;
+        border-radius: 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+      }
+      .wheel-column {
+        position: relative;
+      }
+      .wheel-column::before,
+      .wheel-column::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 24px;
+        pointer-events: none;
+        z-index: 4;
+      }
+      .wheel-column::before {
+        top: 0;
+        background: linear-gradient(180deg, rgba(248, 250, 252, 0.98), rgba(248, 250, 252, 0));
+      }
+      .wheel-column::after {
+        bottom: 0;
+        background: linear-gradient(0deg, rgba(248, 250, 252, 0.98), rgba(248, 250, 252, 0));
+      }
+      .wheel-select {
+        width: 100%;
+        height: 48px;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        background: #ffffff;
+        font-size: 15px;
+        font-weight: 600;
+        color: #0f172a;
+        overflow: hidden;
+        text-align: center;
+        appearance: none;
+        -webkit-appearance: none;
+        padding: 0 12px;
+        background-clip: padding-box;
+        /* Оставляем стандартную обводку без изменений, добавляем только плавное затухание. */
+        transition: border-color 0.28s ease;
+      }
+      .wheel-select:focus {
+        outline: none;
+        border-color: #34d399;
+      }
+      .wheel-select option {
+        padding: 6px 0;
+      }
+      .wheel-select option.wheel-placeholder {
+        color: #94a3b8;
+        font-weight: 600;
+      }
+      .picker-panel {
+        margin-top: 12px;
+      }
+      .picker-panel.hidden {
+        display: none;
+      }
+      .picker-panel--inline {
+        margin-top: 0;
+      }
+      .number-picker {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px;
+        border-radius: 16px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+      }
+      .number-picker__label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
+      .ruler-value {
+        font-size: 26px;
+        font-weight: 700;
+        color: #0f766e;
+        margin-bottom: 16px;
+        text-align: center;
+        width: 100%;
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 6px;
+      }
+
+      .ruler {
+        position: relative;
+        overflow: auto;
+        background: transparent;
+        border: 0;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+      }
+      .ruler::-webkit-scrollbar {
+        display: none;
+      }
+      .ruler--vertical {
+        height: 280px;
+        overflow-x: hidden;
+        scroll-snap-type: y mandatory;
+        -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
+        mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
+      }
+      .ruler--horizontal {
+        height: 176px;
+        overflow-y: hidden;
+        scroll-snap-type: x mandatory;
+        -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
+        mask-image: linear-gradient(to right, transparent 0%, #000 16%, #000 84%, transparent 100%);
+      }
+      .ruler__track {
+        position: relative;
+        background: transparent;
+      }
+      .ruler--vertical .ruler__track {
+        width: max-content;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .ruler--horizontal .ruler__track {
+        height: 100%;
+        display: flex;
+        align-items: center;
+      }
+
+      .ruler__tick {
+        color: #64748b;
+        font-size: 12px;
+        opacity: 0.72;
+        transform: translateZ(0) scale(1);
+        filter: none;
+        scroll-snap-align: center;
+        transition: color 0.12s ease-out, opacity 0.12s ease-out, transform 0.12s ease-out, filter 0.12s ease-out;
+      }
+      .ruler--vertical .ruler__tick {
+        height: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .ruler--horizontal .ruler__tick {
+        position: relative;
+        width: 16px;
+        height: 18px;
+        display: inline-flex;
+        align-items: flex-end;
+        justify-content: center;
+        vertical-align: bottom;
+      }
+      .ruler__tick::before {
+        content: '';
+        display: block;
+        background: #cbd5e1;
+      }
+      .ruler--vertical .ruler__tick::before {
+        width: 24px;
+        height: 1px;
+      }
+      .ruler--horizontal .ruler__tick::before {
+        width: 1px;
+        height: 24px;
+      }
+      .ruler__tick--major {
+        color: #475569;
+        font-weight: 600;
+        opacity: 0.9;
+      }
+      .ruler--vertical .ruler__tick--major::before {
+        width: 44px;
+        background: #94a3b8;
+      }
+      .ruler--horizontal .ruler__tick--major::before {
+        height: 52px;
+        background: #94a3b8;
+      }
+      .ruler__tick--active {
+        color: #020617;
+        font-weight: 700;
+        opacity: 1;
+        transform: translateZ(0) scale(1.1);
+        filter: drop-shadow(0 2px 8px rgba(15, 23, 42, 0.24));
+      }
+      .ruler--vertical .ruler__tick--active::before {
+        background: #0f172a;
+        height: 2px;
+      }
+      .ruler--horizontal .ruler__tick--active::before {
+        background: #0f172a;
+        width: 2px;
+      }
+      .ruler__tick--active .ruler__tick-label {
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        text-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+      }
+      .ruler__tick-label {
+        transition: font-size 0.12s ease-out, transform 0.12s ease-out;
+      }
+      .ruler--vertical .ruler__tick-label {
+        margin-left: 10px;
+      }
+      .ruler--horizontal .ruler__tick-label {
+        position: absolute;
+        left: 50%;
+        transform: translate(-50%, 26px);
+        white-space: nowrap;
+      }
+
+      .ruler__indicator {
+        position: absolute;
+        background: #ef4444;
+        border-radius: 999px;
+        pointer-events: none;
+        z-index: 5;
+      }
+      .ruler--vertical .ruler__indicator {
+        left: 0;
+        right: 0;
+        top: 50%;
+        height: 2px;
+        transform: translateY(-1px);
+      }
+      .ruler--horizontal .ruler__indicator {
+        left: 50%;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        transform: translateX(-1px);
+      }
+
+      .ruler__fade {
+        position: absolute;
+        pointer-events: none;
+        z-index: 3;
+        opacity: 0.75;
+      }
+      .ruler--vertical .ruler__fade {
+        left: 0;
+        right: 0;
+        height: 56px;
+      }
+      .ruler--vertical .ruler__fade--start {
+        top: 0;
+        background: linear-gradient(to bottom, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
+      }
+      .ruler--vertical .ruler__fade--end {
+        bottom: 0;
+        background: linear-gradient(to top, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
+      }
+      .ruler--horizontal .ruler__fade {
+        top: 0;
+        bottom: 0;
+        width: 64px;
+      }
+      .ruler--horizontal .ruler__fade--start {
+        left: 0;
+        background: linear-gradient(to right, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
+      }
+      .ruler--horizontal .ruler__fade--end {
+        right: 0;
+        background: linear-gradient(to left, #f0f9ff 0%, rgba(240, 249, 255, 0) 100%);
+      }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#f0f9ff] to-[#f0fdf4]" data-preserve-page-theme="true">
+    <custom-layout>
+        <custom-navbar></custom-navbar>
+        
+        <main class="flex-1 px-4 py-8">
+            <div class="max-w-[420px] mx-auto">
+                <!-- Header -->
+                <div class="text-center mb-10">
+                    <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 mb-4 shadow-lg">
+                        <i data-feather="edit-3" class="w-7 h-7 text-white"></i>
+                    </div>
+                    <h1 class="text-2xl font-bold text-slate-800">Заполните личные данные</h1>
+                    <p class="text-slate-500 mt-2">Для расчёта суточной нормы калорий и рациона</p>
+</div>
+                
+                <!-- Progress Bar -->
+                <div class="mb-8">
+                    <div class="flex items-center justify-between text-sm text-slate-500 mb-2">
+                        <span class="inline-flex items-center gap-2">
+                            <span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold">
+                                Шаг <span id="current-step">1</span> из <span id="total-steps">8</span>
+                            </span>
+                        </span>
+                        <span id="progress-percent">11%</span>
+                    </div>
+                    <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div id="progress-bar" class="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 rounded-full transition-all duration-500 ease-out" style="width: 11%"></div>
+                    </div>
+                </div>
+                
+                <!-- Question Card -->
+                <div id="question-card" class="bg-white rounded-3xl p-6 shadow-xl border border-slate-100 mb-8 transform transition-all duration-300 ease-out">
+                    <div class="flex items-center space-x-3 mb-6">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                            <i data-feather="user" class="w-5 h-5"></i>
+                        </div>
+                    <h2 id="question-title" class="text-xl font-semibold text-slate-800">Какой ваш пол?</h2>
+</div>
+                    
+                    <!-- Options Container -->
+                    <div id="options-container" class="space-y-3">
+                        <!-- Options will be populated by JavaScript -->
+                    </div>
+                    
+                    <!-- Input Container (for date, number inputs) -->
+                    <div id="input-container" class="hidden">
+                        <!-- Inputs will be populated by JavaScript -->
+                    </div>
+                </div>
+                
+                <!-- Navigation -->
+                <div class="flex space-x-4">
+                    <button id="prev-btn" class="btn-secondary flex-1" disabled>
+                        <i data-feather="arrow-left" class="w-5 h-5"></i>
+                        <span>Назад</span>
+</button>
+                    <button id="next-btn" class="btn-primary flex-1" disabled>
+                        <span>Далее</span>
+<i data-feather="arrow-right" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                
+                <!-- Info -->
+                <p class="text-center text-sm text-slate-400 mt-8">
+                    Ваши данные остаются на устройстве • Зашифровано и приватно
+                </p>
+</div>
+        </main>
+        
+        <custom-footer></custom-footer>
+    </custom-layout>
+    
+    <script src="/static/components/layout.js"></script>
+    <script src="/static/components/navbar.js"></script>
+    <script src="/static/components/footer.js"></script>
+    <script src="/static/js/storage.js"></script>
+    <script src="/static/js/ui.js?v={{ static_mtime('js/ui.js') }}"></script>
+    <script>
+        window.adminConfig = {{ admin_config | tojson }};
+    </script>
+    <script src="/static/js/questionnaire.js"></script>
+    <script>
+        feather.replace();
+    </script>
+</body>
+</html>
