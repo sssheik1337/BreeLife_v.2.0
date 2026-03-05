@@ -40,26 +40,18 @@
                             <button
                                 type="button"
                                 data-action="toggle-group"
-                                class="sticky top-2 z-10 w-full flex items-center justify-between rounded-xl px-2 py-2 border border-slate-100 bg-white/90 backdrop-blur-sm shadow-sm transition-all duration-300 ease-out hover:bg-white active:scale-[0.99]"
+                                class="group-toggle sticky top-2 z-10 w-full flex items-center justify-between gap-3 rounded-xl px-3 py-2 border border-slate-100 bg-white/90 backdrop-blur-sm shadow-sm transition-all duration-300 ease-out hover:bg-white active:scale-[0.99]"
                                 :aria-expanded="isGroupExpanded(group.name) ? 'true' : 'false'"
                                 @click="toggleGroup(group.name)"
                             >
-                                <span class="flex items-center gap-3">
-                                    <span class="text-lg font-semibold text-slate-800">{{ group.name }}</span>
-                                    <span class="text-sm text-slate-400">{{ group.totalCount }} поз.</span>
-                                    <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-                                        Показано {{ group.visibleCount }} из {{ group.totalCount }}
-                                    </span>
+                                <span class="group-toggle__title">{{ group.name }}</span>
+                                <span class="group-toggle__pill">
+                                    <Transition name="group-pill-text" mode="out-in">
+                                        <span :key="isGroupExpanded(group.name) ? `expanded-${group.name}` : `collapsed-${group.name}`">
+                                            {{ isGroupExpanded(group.name) ? `Показано ${group.visibleCount} из ${group.totalCount}` : 'Показать' }}
+                                        </span>
+                                    </Transition>
                                 </span>
-                                <svg
-                                    class="h-4 w-4 text-slate-400 transition-transform duration-300 ease-out"
-                                    :class="{ 'rotate-180': isGroupExpanded(group.name) }"
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                    aria-hidden="true"
-                                >
-                                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.51a.75.75 0 01-1.08 0l-4.25-4.51a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-                                </svg>
                             </button>
 
                             <div
@@ -345,3 +337,49 @@ onBeforeUnmount(() => {
     }
 });
 </script>
+
+<style scoped>
+.group-toggle {
+    text-align: left;
+}
+
+.group-toggle__title {
+    flex: 1;
+    min-width: 0;
+    color: #0f172a;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.3;
+    text-align: left;
+}
+
+.group-toggle__pill {
+    flex-shrink: 0;
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    background: linear-gradient(135deg, #34d399 0%, #3b82f6 100%);
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    padding: 0.45rem 0.8rem;
+    min-height: 34px;
+    box-shadow: 0 8px 16px rgba(52, 211, 153, 0.24);
+}
+
+.group-pill-text-enter-active,
+.group-pill-text-leave-active {
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.group-pill-text-enter-from,
+.group-pill-text-leave-to {
+    opacity: 0;
+    transform: translateY(2px);
+}
+</style>

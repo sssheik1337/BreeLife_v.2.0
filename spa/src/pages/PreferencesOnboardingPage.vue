@@ -1,7 +1,7 @@
 <template>
     <section class="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#f0f9ff] to-[#f0fdf4]" data-spa-preferences-onboarding>
         <main class="flex-1 px-4 py-8">
-            <div class="max-w-5xl mx-auto space-y-6">
+            <div class="max-w-md mx-auto space-y-6">
                 <div class="text-center">
                     <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 mb-4 shadow-lg">
                         <i data-feather="heart" class="w-7 h-7 text-white"></i>
@@ -55,18 +55,16 @@
                     </div>
 
                     <section class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-4">
-                        <div class="overflow-x-auto flex-1">
-                            <div class="flex items-center gap-2 min-w-max">
-                                <button
-                                    v-for="category in selectedCategories"
-                                    :key="category"
-                                    type="button"
-                                    class="category-filter-chip rounded-full border px-3 py-1.5 text-sm font-semibold whitespace-nowrap transition-all duration-200"
-                                    :class="{ 'is-selected': category === activeCategory }"
-                                    @click="setActiveCategory(category)"
+                        <div class="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                            <div class="flex flex-col items-center justify-center gap-1.5 text-center">
+                                <span
+                                    class="category-filter-chip is-selected rounded-full border px-3 py-1.5 text-sm font-semibold whitespace-nowrap"
                                 >
-                                    {{ category }}
-                                </button>
+                                    {{ activeCategory || 'Без категории' }}
+                                </span>
+                                <span class="text-xs font-medium text-slate-500 whitespace-nowrap text-center">
+                                    Категория {{ activeCategoryPosition }} из {{ selectedCategories.length }}
+                                </span>
                             </div>
                         </div>
 
@@ -199,6 +197,7 @@ const remainingToMinimum = computed(() => Math.max(0, MIN_SELECTED_PRODUCTS - se
 const canProceedToProducts = computed(() => selectedCategories.value.length >= MIN_SELECTED_CATEGORIES);
 const canContinue = computed(() => selectedCount.value >= MIN_SELECTED_PRODUCTS);
 const activeCategoryIndex = computed(() => selectedCategories.value.indexOf(activeCategory.value));
+const activeCategoryPosition = computed(() => (activeCategoryIndex.value >= 0 ? activeCategoryIndex.value + 1 : 1));
 const hasNextCategory = computed(() => activeCategoryIndex.value >= 0 && activeCategoryIndex.value < selectedCategories.value.length - 1);
 const nextCategoryActionLabel = computed(() => (hasNextCategory.value ? 'Следующая категория' : 'Продолжить'));
 const nextCategoryActionDisabled = computed(() => {
@@ -301,17 +300,6 @@ const resetProductsScrollDeferred = (): void => {
     window.requestAnimationFrame(() => {
         resetProductsScroll();
     });
-};
-
-const setActiveCategory = (category: string): void => {
-    if (!selectedCategorySet.value.has(category)) {
-        return;
-    }
-    if (activeCategory.value === category) {
-        return;
-    }
-    activeCategory.value = category;
-    resetProductsScroll();
 };
 
 const goToNextCategory = (): void => {

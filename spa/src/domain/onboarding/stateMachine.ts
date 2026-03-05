@@ -36,14 +36,10 @@ export const shouldRedirectToTrialStart = (profile: ProfileState | null): boolea
     if (!profile || typeof profile !== 'object') {
         return false;
     }
+    if (profile.is_completed !== true) {
+        return false;
+    }
     if (profile.trial_welcome_seen === true) {
-        return false;
-    }
-    if (profile.trial_started_at) {
-        return false;
-    }
-    const subscriptionStatus = typeof profile.subscription_status === 'string' ? profile.subscription_status : '';
-    if (['trial', 'active', 'expired'].includes(subscriptionStatus)) {
         return false;
     }
     return true;

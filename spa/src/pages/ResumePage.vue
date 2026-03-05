@@ -76,7 +76,7 @@
           </div>
         </div>
 
-        <div class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8">
+        <div v-if="!isMaintainGoal" class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8">
           <div class="space-y-3 text-slate-700">
             <div class="flex items-center justify-between gap-3"><span class="text-left">Темп изменения веса</span><span id="weight-rate-value" class="font-semibold text-right tabular-nums shrink-0">{{ metrics.weightRate }}</span></div>
             <div class="flex items-center justify-between gap-3"><span class="text-left">Примерная дата достижения</span><span id="weight-date-value" class="font-semibold text-right tabular-nums shrink-0">{{ metrics.weightDate }}</span></div>
@@ -140,6 +140,14 @@ const trial = reactive({
 const profile = computed(() => {
   if (Object.keys(loadedProfile.value).length > 0) return loadedProfile.value;
   return (storage.profile || {}) as Record<string, unknown>;
+});
+const isMaintainGoal = computed(() => {
+  const rawGoal = profile.value.goal;
+  if (typeof rawGoal !== 'string') {
+    return false;
+  }
+  const normalized = rawGoal.trim().toLowerCase();
+  return normalized === 'maintain' || normalized === 'maintenance' || normalized === 'поддержание' || normalized === 'поддержание веса';
 });
 const targets = computed(() => storage.computeTargetsForProfile(profile.value, new Date(), false) as Record<string, unknown>);
 const toNumber = (value: unknown): number | null => {

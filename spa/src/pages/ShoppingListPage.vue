@@ -124,6 +124,7 @@ interface ShoppingListResponse {
 }
 
 const SHOPPING_LIST_V2_ENDPOINT = '/api/shopping-list/v2';
+const MEAL_PLAN_WEEK_V2_ENDPOINT = '/api/meal-plan/v2/week';
 
 const storageStore = useStorageStore();
 const activeRange = ref<'day' | 'week'>('day');
@@ -229,13 +230,28 @@ const refreshIcons = async (): Promise<void> => {
     }
 };
 
+const ensureWeekMealPlan = async (weekStartIso: string): Promise<void> => {
+    try {
+        const response = await storageStore.apiFetch(
+            `${MEAL_PLAN_WEEK_V2_ENDPOINT}?week_start=${encodeURIComponent(weekStartIso)}`
+        );
+        if (!response.ok) {
+            console.warn('[shopping-list] failed to warm up week meal plan');
+        }
+    } catch {
+        console.warn('[shopping-list] failed to warm up week meal plan');
+    }
+};
+
 const fetchShoppingList = async (): Promise<void> => {
     isLoading.value = true;
     loadError.value = '';
 
     const params = new URLSearchParams();
     if (activeRange.value === 'week') {
-        params.set('week_start', buildCurrentWeekStartIso());
+        const weekStartIso = buildCurrentWeekStartIso();
+        await ensureWeekMealPlan(weekStartIso);
+        params.set('week_start', weekStartIso);
     } else {
         params.set('date', buildTodayIsoDate());
     }

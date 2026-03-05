@@ -60,12 +60,12 @@
             :key="card.key"
             class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100"
           >
-            <div class="flex items-center justify-between">
-              <span class="font-semibold text-slate-800">{{ card.label }}</span>
-              <span :id="`diary-meal-${card.key}-total`" class="text-xs text-slate-500">{{ card.totalText }}</span>
-            </div>
-            <div :id="`diary-meal-${card.key}-list`" class="mt-3 space-y-2 text-slate-600">
-              <template v-if="card.entry && card.entry.items.length">
+            <template v-if="card.entry && card.entry.items.length">
+              <div class="flex items-center justify-between">
+                <span class="font-semibold text-slate-800">{{ card.label }}</span>
+                <span :id="`diary-meal-${card.key}-total`" class="text-xs text-slate-500">{{ card.totalText }}</span>
+              </div>
+              <div :id="`diary-meal-${card.key}-list`" class="mt-3 space-y-2 text-slate-600">
                 <div
                   v-for="(item, index) in card.entry.items"
                   :key="`${card.key}-${index}-${item.name}`"
@@ -76,12 +76,17 @@
                 </div>
                 <p class="text-xs text-slate-500">Б {{ Math.round(card.entry.totals.protein_g) }} • Ж {{ Math.round(card.entry.totals.fat_g) }} • У {{ Math.round(card.entry.totals.carbs_g) }}</p>
                 <button type="button" class="diary-action-btn" @click="openProductsForm(card.key, 'meal', true)">Редактировать</button>
-              </template>
-              <template v-else>
-                <p class="text-sm text-slate-400">Нет записи за эту дату.</p>
+              </div>
+            </template>
+            <template v-else>
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <h3 class="font-semibold text-slate-800">{{ card.label }}</h3>
+                  <p class="mt-1 text-sm text-slate-500">Нет записи за эту дату.</p>
+                </div>
                 <button type="button" class="diary-action-btn" @click="openProductsForm(card.key, 'meal', false)">Добавить</button>
-              </template>
-            </div>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -1588,7 +1593,7 @@ onBeforeUnmount(() => {
   border-radius: 9999px;
   background-color: #e2e8f0;
   border: 1px solid #cbd5e1;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .sleep-midnight-switch__thumb {
@@ -1605,8 +1610,9 @@ onBeforeUnmount(() => {
 }
 
 .sleep-midnight-switch__input:checked + .sleep-midnight-switch__track {
-  background-color: #34d399;
-  border-color: #34d399;
+  background: linear-gradient(135deg, #34d399 0%, #3b82f6 100%);
+  border-color: transparent;
+  box-shadow: 0 8px 16px rgba(52, 211, 153, 0.24);
 }
 
 .sleep-midnight-switch__input:checked + .sleep-midnight-switch__track .sleep-midnight-switch__thumb {
@@ -1618,6 +1624,6 @@ onBeforeUnmount(() => {
 }
 
 .sleep-midnight-switch__input:focus-visible + .sleep-midnight-switch__track {
-  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.35);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.28);
 }
 </style>

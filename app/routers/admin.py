@@ -5,6 +5,7 @@ import sqlite3
 import json
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -60,6 +61,68 @@ def _coerce_price(value: object) -> int:
         digits = re.sub(r"\D+", "", value)
         return int(digits) if digits else 0
     return 0
+
+
+def _normalize_contact_text(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+    return value.strip()
+
+
+def _normalize_channel_url(value: object) -> str:
+    raw = _normalize_contact_text(value)
+    if not raw:
+        return ""
+    candidate = raw if "://" in raw else f"https://{raw}"
+    parsed = urlparse(candidate)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+    return candidate
+
+
+def _normalize_telegram_username(value: object) -> str:
+    raw = _normalize_contact_text(value)
+    if not raw:
+        return ""
+    candidate = raw
+    lowered = candidate.lower()
+    if lowered.startswith("http://") or lowered.startswith("https://"):
+        parsed = urlparse(candidate)
+        host = (parsed.netloc or "").lower()
+        if host.startswith("www."):
+            host = host[4:]
+        if host not in {"t.me", "telegram.me"}:
+            return ""
+        candidate = parsed.path
+    elif lowered.startswith("t.me/"):
+        candidate = candidate[5:]
+    elif lowered.startswith("telegram.me/"):
+        candidate = candidate[12:]
+
+    candidate = candidate.strip().lstrip("@")
+    if "/" in candidate:
+        candidate = candidate.split("/", maxsplit=1)[0]
+    if "?" in candidate:
+        candidate = candidate.split("?", maxsplit=1)[0]
+    if not re.fullmatch(r"[A-Za-z0-9_]+", candidate):
+        return ""
+    return candidate
+
+
+def _extract_support_contacts(config: dict[str, object]) -> dict[str, str]:
+    contacts = config.get("support_contacts")
+    if not isinstance(contacts, dict):
+        contacts = {}
+    normalized_username = _normalize_telegram_username(contacts.get("username"))
+    username = f"@{normalized_username}" if normalized_username else ""
+    username_url = f"https://t.me/{normalized_username}" if normalized_username else ""
+    return {
+        "phone": _normalize_contact_text(contacts.get("phone")),
+        "email": _normalize_contact_text(contacts.get("email")),
+        "username": username,
+        "username_url": username_url,
+        "channel_url": _normalize_channel_url(contacts.get("channel_url")),
+    }
 
 
 def _normalize_commercial_plans(plans: object) -> list[dict[str, object]]:
@@ -210,6 +273,7 @@ def render_admin_plans(
 ) -> HTMLResponse:
     config = load_admin_config()
     trial_days = int(config.get("trial_days", 30))
+    support_contacts = _extract_support_contacts(config if isinstance(config, dict) else {})
     normalized_plans = _normalize_commercial_plans(load_plans_config())
     return templates.TemplateResponse(
         "admin_plans.html",
@@ -217,6 +281,7 @@ def render_admin_plans(
             "request": request,
             "plans": normalized_plans,
             "trial_days": trial_days,
+            "support_contacts": support_contacts,
             "error": error,
             "success": success,
         },
@@ -953,6 +1018,40 @@ async def admin_trial_update(request: Request, trial_days: int = Form(...)):
     config["trial_days"] = max(0, trial_days)
     update_admin_config(config)
     return render_admin_plans(request, success="Пробный период обновлён.")
+
+
+@router.post("/admin/support/contacts/update", response_class=HTMLResponse)
+async def admin_support_contacts_update(
+    request: Request,
+    support_phone: str = Form(default=""),
+    support_email: str = Form(default=""),
+    support_username: str = Form(default=""),
+    support_channel_url: str = Form(default=""),
+):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    config = load_admin_config()
+    if not isinstance(config, dict):
+        config = {}
+
+    normalized_phone = _normalize_contact_text(support_phone)
+    normalized_email = _normalize_contact_text(support_email)
+    normalized_username = _normalize_telegram_username(support_username)
+    normalized_channel_url = _normalize_channel_url(support_channel_url)
+
+    contacts: dict[str, str] = {}
+    if normalized_phone:
+        contacts["phone"] = normalized_phone
+    if normalized_email:
+        contacts["email"] = normalized_email
+    if normalized_username:
+        contacts["username"] = normalized_username
+    if normalized_channel_url:
+        contacts["channel_url"] = normalized_channel_url
+
+    config["support_contacts"] = contacts
+    update_admin_config(config)
+    return render_admin_plans(request, success="Контакты поддержки обновлены.")
 
 
 @router.post("/admin/plans/add", response_class=HTMLResponse)

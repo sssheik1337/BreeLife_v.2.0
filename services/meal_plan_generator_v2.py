@@ -878,6 +878,10 @@ def _build_meal_from_template(
         weekly_usage_by_product_id=weekly_usage_by_product_id,
         weekly_repeat_limit=weekly_repeat_limit,
     )
+    missing_required_candidate_slots = [
+        slot_name for slot_name in required_slots
+        if not candidates_by_slot.get(slot_name)
+    ]
 
     yandex_attempted = False
     yandex_used = False
@@ -885,7 +889,7 @@ def _build_meal_from_template(
     yandex_attempt_exclude_ids = set(globally_excluded_ids)
     deterministic_attempts = 0
 
-    if use_yandex_picker and can_use_yandex_meal_picker():
+    if use_yandex_picker and can_use_yandex_meal_picker() and not missing_required_candidate_slots:
         yandex_attempted = True
         for _ in range(YandexPickerMaxAttemptsPerMeal):
             try:
@@ -943,6 +947,8 @@ def _build_meal_from_template(
                 yandex_fail_reason = str(exc)
                 logger.warning("Yandex meal picker unexpected failure for %s: %s", template.key, exc)
                 break
+    elif missing_required_candidate_slots:
+        yandex_fail_reason = f"missing_required_candidates:{','.join(missing_required_candidate_slots)}"
 
     deterministic_excluded_ids = set(yandex_attempt_exclude_ids)
     last_payload: dict[str, object] | None = None

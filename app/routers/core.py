@@ -1,4 +1,6 @@
+import re
 from pathlib import Path
+from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
@@ -125,6 +127,69 @@ def _cache_bypass_headers() -> dict[str, str]:
     }
 
 
+def _normalize_contact_text(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    return cleaned if cleaned else None
+
+
+def _normalize_channel_url(value: object) -> str | None:
+    raw = _normalize_contact_text(value)
+    if not raw:
+        return None
+    candidate = raw if "://" in raw else f"https://{raw}"
+    parsed = urlparse(candidate)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return candidate
+
+
+def _normalize_telegram_username(value: object) -> str | None:
+    raw = _normalize_contact_text(value)
+    if not raw:
+        return None
+    candidate = raw
+    lowered = candidate.lower()
+    if lowered.startswith("http://") or lowered.startswith("https://"):
+        parsed = urlparse(candidate)
+        host = (parsed.netloc or "").lower()
+        if host.startswith("www."):
+            host = host[4:]
+        if host not in {"t.me", "telegram.me"}:
+            return None
+        candidate = parsed.path
+    elif lowered.startswith("t.me/"):
+        candidate = candidate[5:]
+    elif lowered.startswith("telegram.me/"):
+        candidate = candidate[12:]
+
+    candidate = candidate.strip().lstrip("@")
+    if "/" in candidate:
+        candidate = candidate.split("/", maxsplit=1)[0]
+    if "?" in candidate:
+        candidate = candidate.split("?", maxsplit=1)[0]
+    if not re.fullmatch(r"[A-Za-z0-9_]+", candidate):
+        return None
+    return candidate
+
+
+def _load_support_contacts_payload(config: dict[str, object] | None) -> dict[str, str | None]:
+    contacts = config.get("support_contacts") if isinstance(config, dict) else {}
+    if not isinstance(contacts, dict):
+        contacts = {}
+    normalized_username = _normalize_telegram_username(contacts.get("username"))
+    username = f"@{normalized_username}" if normalized_username else None
+    username_url = f"https://t.me/{normalized_username}" if normalized_username else None
+    return {
+        "phone": _normalize_contact_text(contacts.get("phone")),
+        "email": _normalize_contact_text(contacts.get("email")),
+        "username": username,
+        "username_url": username_url,
+        "channel_url": _normalize_channel_url(contacts.get("channel_url")),
+    }
+
+
 def _render_spa_shell_index(spa_index_path: Path) -> HTMLResponse:
     html = spa_index_path.read_text(encoding="utf-8")
     if "window.showNotification" not in html:
@@ -219,6 +284,18 @@ async def admin_config():
     if IS_PROD and not DEBUG:
         raise HTTPException(status_code=403, detail="Доступ запрещён.")
     return load_admin_config()
+
+
+@router.get("/api/support/contacts")
+async def support_contacts(request: Request):
+    token = request.cookies.get(TELEGRAM_SESSION_COOKIE)
+    session = get_session_user(token) if token else None
+    if not session:
+        raise HTTPException(status_code=401, detail="Требуется авторизация.")
+    config = load_admin_config()
+    if not isinstance(config, dict):
+        config = {}
+    return _load_support_contacts_payload(config)
 
 
 @router.get("/api/plans")

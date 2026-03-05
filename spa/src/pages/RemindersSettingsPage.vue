@@ -620,7 +620,7 @@ onMounted(async () => {
     border-radius: 9999px;
     background-color: #e2e8f0;
     border: 1px solid #cbd5e1;
-    transition: background-color 0.2s ease, border-color 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .ios-switch__thumb {
@@ -636,8 +636,9 @@ onMounted(async () => {
 }
 
 .ios-switch__input:checked + .ios-switch__track {
-    background-color: #34d399;
-    border-color: #34d399;
+    background: linear-gradient(135deg, #34d399 0%, #3b82f6 100%);
+    border-color: transparent;
+    box-shadow: 0 8px 16px rgba(52, 211, 153, 0.24);
 }
 
 .ios-switch__input:checked + .ios-switch__track .ios-switch__thumb {
@@ -649,7 +650,7 @@ onMounted(async () => {
 }
 
 .ios-switch__input:focus-visible + .ios-switch__track {
-    box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.35);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.28);
 }
 
 .reminders-consent-button {

@@ -86,15 +86,15 @@
                 <div class="space-y-2 text-sm text-slate-600">
                   <div class="flex items-center justify-center gap-2">
                     <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-                    <span id="macro-balance-protein">Белки — {{ macroBalance.proteinPct }}% · {{ macroBalance.proteinG }} г</span>
+                    <span id="macro-balance-protein">Белки — {{ macroBalance.proteinPct }}% цели · {{ macroBalance.proteinG }} г</span>
                   </div>
                   <div class="flex items-center justify-center gap-2">
                     <span class="h-2 w-2 rounded-full bg-amber-400"></span>
-                    <span id="macro-balance-fat">Жиры — {{ macroBalance.fatPct }}% · {{ macroBalance.fatG }} г</span>
+                    <span id="macro-balance-fat">Жиры — {{ macroBalance.fatPct }}% цели · {{ macroBalance.fatG }} г</span>
                   </div>
                   <div class="flex items-center justify-center gap-2">
                     <span class="h-2 w-2 rounded-full bg-sky-400"></span>
-                    <span id="macro-balance-carbs">Углеводы — {{ macroBalance.carbsPct }}% · {{ macroBalance.carbsG }} г</span>
+                    <span id="macro-balance-carbs">Углеводы — {{ macroBalance.carbsPct }}% цели · {{ macroBalance.carbsG }} г</span>
                   </div>
                 </div>
               </div>
@@ -411,7 +411,7 @@ const resolveCarbTotals = (totalValue: unknown, simpleValue: unknown, complexVal
     return { total: simple + complex, simple, complex, splitKnown: true };
   }
   if (total > 0) {
-    return { total, simple: 0, complex: 0, splitKnown: false };
+    return { total, simple: 0, complex: total, splitKnown: false };
   }
   return { total: 0, simple: 0, complex: 0, splitKnown: false };
 };
@@ -455,7 +455,13 @@ const resolveCarbTotalsFromItems = (entry: DiaryEntry): { total: number; simple:
   }
 
   if (unknown > 0 || (simple <= 0 && complex <= 0)) {
-    return { total, simple: 0, complex: 0, splitKnown: false };
+    const unresolved = Math.max(0, total - (simple + complex));
+    return {
+      total,
+      simple,
+      complex: complex + unresolved,
+      splitKnown: false
+    };
   }
 
   return { total, simple, complex, splitKnown: true };
@@ -942,27 +948,28 @@ const carbSplit = computed(() => {
     complex = day?.carbsComplex || 0;
     unknown = day?.splitUnknownCarbs || 0;
   }
-  const total = simple + complex;
+  const knownTotal = simple + complex;
+  const total = knownTotal + unknown;
   if (total <= 0) {
     return {
       value: 'Нет данных',
       desc: 'Пока нет данных. Сложные углеводы дают более стабильную энергию.'
     };
   }
+  if (knownTotal <= 0 && unknown > 0) {
+    return {
+      value: 'Нет разбивки',
+      desc: `По ${Math.round(unknown)} г углеводов нет данных о простых/сложных.`
+    };
+  }
+  const simplePct = Math.round((simple / knownTotal) * 100);
+  const complexPct = Math.max(0, 100 - simplePct);
   if (unknown > 0) {
     return {
-      value: 'Нет данных',
-      desc: 'Для части продуктов нет разбивки на простые и сложные углеводы.'
+      value: `${simplePct}% / ${complexPct}%`,
+      desc: `Разбивка показана по размеченной части: ${Math.round(knownTotal)} г из ${Math.round(total)} г углеводов.`
     };
   }
-  if (simple <= 0 || complex <= 0) {
-    return {
-      value: 'Нет данных',
-      desc: 'Разбивка простых и сложных углеводов неполная для корректного вывода.'
-    };
-  }
-  const simplePct = Math.round((simple / total) * 100);
-  const complexPct = Math.max(0, 100 - simplePct);
   return {
     value: `${simplePct}% / ${complexPct}%`,
     desc: macroRange.value === 'week'

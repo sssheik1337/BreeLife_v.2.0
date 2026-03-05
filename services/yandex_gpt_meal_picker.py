@@ -102,6 +102,15 @@ def _extract_json_strict(raw_text: str) -> dict[str, object]:
     text = (raw_text or "").strip()
     if not text:
         raise MealPickerError("Empty YandexGPT response text.")
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if len(lines) >= 3 and lines[0].startswith("```") and lines[-1].startswith("```"):
+            text = "\n".join(lines[1:-1]).strip()
+    if not text.startswith("{") or not text.endswith("}"):
+        first = text.find("{")
+        last = text.rfind("}")
+        if first != -1 and last != -1 and last > first:
+            text = text[first:last + 1].strip()
     if not text.startswith("{") or not text.endswith("}"):
         raise MealPickerError("YandexGPT response is not a strict JSON object.")
     try:

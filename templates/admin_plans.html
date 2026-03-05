@@ -29,6 +29,9 @@
         margin-bottom: 20px;
       }
       input[type="text"],
+      input[type="email"],
+      input[type="tel"],
+      input[type="url"],
       input[type="number"] {
         width: 100%;
         padding: 8px 10px;
@@ -181,6 +184,9 @@
           gap: 10px;
         }
         input[type="text"],
+        input[type="email"],
+        input[type="tel"],
+        input[type="url"],
         input[type="number"],
         button {
           min-height: 42px;
@@ -246,6 +252,32 @@
       </form>
     </div>
 
+    <div class="card">
+      <h2>Контакты поддержки</h2>
+      <form method="post" action="/admin/support/contacts/update">
+        <div class="plan-row">
+          <label>
+            Номер телефона
+            <input type="tel" name="support_phone" value="{{ support_contacts.phone }}" placeholder="+7 999 123-45-67" />
+          </label>
+          <label>
+            Почтовый адрес
+            <input type="email" name="support_email" value="{{ support_contacts.email }}" placeholder="support@example.com" />
+          </label>
+          <label>
+            Telegram аккаунт (@username)
+            <input type="text" name="support_username" value="{{ support_contacts.username }}" placeholder="@support_name или https://t.me/support_name" />
+          </label>
+          <label>
+            Ссылка на канал
+            <input type="text" name="support_channel_url" value="{{ support_contacts.channel_url }}" placeholder="https://t.me/your_channel" />
+          </label>
+        </div>
+        <div style="margin-top: 12px;">
+          <button class="btn-primary" type="submit">Сохранить контакты</button>
+        </div>
+      </form>
+    </div>
     <div class="card">
       <h2>Добавить тариф</h2>
       <form method="post" action="/admin/plans/add" data-plan-form>
