@@ -25,7 +25,7 @@ def env_flag(name: str, default: bool = False) -> bool:
     return os.getenv(name, "1" if default else "0").lower() in {"1", "true", "yes"}
 
 
-DEV_AUTH_ENABLED = env_flag("DEV_AUTH_ENABLED", False)
+DEV_AUTH_ENABLED = env_flag("DEV_AUTH_ENABLED", IS_DEV)
 
 # Напоминания включены всегда; настраиваются только интервалы.
 try:
@@ -40,6 +40,24 @@ try:
     WAKE_WATER_DELAY_MINUTES = max(0, int(os.getenv("WAKE_WATER_DELAY_MINUTES", "45")))
 except ValueError:
     WAKE_WATER_DELAY_MINUTES = 45
+
+
+def _parse_hhmm_env(name: str, default: str) -> tuple[int, int]:
+    raw_value = os.getenv(name, default).strip()
+    try:
+        hours_raw, minutes_raw = raw_value.split(":", 1)
+        hours = int(hours_raw)
+        minutes = int(minutes_raw)
+    except (AttributeError, TypeError, ValueError):
+        fallback_hours, fallback_minutes = default.split(":", 1)
+        return int(fallback_hours), int(fallback_minutes)
+    if not (0 <= hours <= 23 and 0 <= minutes <= 59):
+        fallback_hours, fallback_minutes = default.split(":", 1)
+        return int(fallback_hours), int(fallback_minutes)
+    return hours, minutes
+
+
+SUBSCRIPTIONS_AUDIT_RUN_AT = _parse_hhmm_env("SUBSCRIPTIONS_AUDIT_RUN_AT", "03:15")
 
 # Версия алгоритма рациона. В проекте используется только актуальная версия (переключателя через env нет).
 MEAL_PLAN_ALGO_VERSION = "v2"

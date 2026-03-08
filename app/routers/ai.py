@@ -6,20 +6,29 @@ from fastapi import APIRouter, HTTPException, Request, Response
 
 from app.dependencies import load_profile, require_telegram_user_id
 from config import AI_ENABLED, YANDEX_GPT_API_KEY, YANDEX_GPT_FOLDER_ID
-from services.ai_profile import generate_profile_recommendation, generate_yandex_recommendation
+from services.ai_profile import build_ai_context, generate_profile_recommendation, generate_yandex_recommendation
 from services.storage_db import read_cache_payload, write_cache_payload
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 AI_RECOMMENDATION_CACHE_TTL_SECONDS = 24 * 60 * 60
+AI_RECOMMENDATION_CACHE_SCHEMA_VERSION = "v2"
 
 
-def _build_profile_hash(profile: dict) -> str:
-    try:
-        serialized = json.dumps(profile, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    except TypeError:
-        serialized = json.dumps(str(profile), ensure_ascii=False)
+def _build_ai_cache_fingerprint(profile: dict) -> str:
+    """
+    Cache only on the normalized AI input, not on the whole profile.
+
+    Full profile includes volatile fields like last_updated, subscription metadata,
+    weekly stats and other service fields that should not invalidate the advice.
+    """
+    normalized_context = build_ai_context(profile)
+    payload = {
+        "schema": AI_RECOMMENDATION_CACHE_SCHEMA_VERSION,
+        "context": normalized_context,
+    }
+    serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
@@ -39,7 +48,7 @@ async def ai_recommendation(request: Request, response: Response):
     if isinstance(diary, list):
         profile = {**profile, "diary": diary}
 
-    profile_hash = _build_profile_hash(profile)
+    profile_hash = _build_ai_cache_fingerprint(profile)
     cache_key = f"ai_recommendation:{telegram_user_id}"
     cached_payload = read_cache_payload(cache_key)
     if isinstance(cached_payload, dict):
@@ -51,7 +60,9 @@ async def ai_recommendation(request: Request, response: Response):
             and isinstance(cached_recommendation, str)
             and cached_recommendation.strip()
         ):
+            logger.debug("AI recommendation cache hit for telegram_user_id=%s", telegram_user_id)
             return {"recommendation": cached_recommendation, "cached": True}
+    logger.debug("AI recommendation cache miss for telegram_user_id=%s", telegram_user_id)
 
     recommendation = generate_profile_recommendation(profile)
     can_use_yandex = AI_ENABLED and YANDEX_GPT_API_KEY and YANDEX_GPT_FOLDER_ID

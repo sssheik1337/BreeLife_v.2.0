@@ -46,6 +46,22 @@
         padding: 16px;
         margin-bottom: 16px;
       }
+      .flash {
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
+        font-weight: 600;
+      }
+      .flash-error {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #b91c1c;
+      }
+      .flash-success {
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        color: #047857;
+      }
       .user-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -66,6 +82,81 @@
         font-size: 15px;
         font-weight: 600;
         word-break: break-word;
+      }
+      .danger-card {
+        border-color: #fecaca;
+        background: linear-gradient(180deg, #fff7f7 0%, #ffffff 100%);
+      }
+      .success-card {
+        border-color: #a7f3d0;
+        background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);
+      }
+      .danger-title {
+        margin: 0 0 10px;
+        color: #991b1b;
+      }
+      .success-title {
+        margin: 0 0 10px;
+        color: #047857;
+      }
+      .danger-text {
+        margin: 0;
+        color: #475569;
+        line-height: 1.5;
+      }
+      .danger-form {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 16px;
+        max-width: 420px;
+      }
+      .danger-form label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #0f172a;
+      }
+      .danger-form input {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-size: 15px;
+        color: #0f172a;
+        background: #ffffff;
+      }
+      .danger-form input:focus {
+        outline: 2px solid rgba(239, 68, 68, 0.18);
+        border-color: #ef4444;
+      }
+      .danger-button {
+        align-self: flex-start;
+        background: #dc2626;
+        color: #ffffff;
+        border: none;
+        border-radius: 999px;
+        padding: 12px 18px;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .danger-button:hover {
+        background: #b91c1c;
+      }
+      .success-button {
+        align-self: flex-start;
+        background: #059669;
+        color: #ffffff;
+        border: none;
+        border-radius: 999px;
+        padding: 12px 18px;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .success-button:hover {
+        background: #047857;
       }
       table {
         width: 100%;
@@ -124,6 +215,12 @@
           padding: 14px;
           overflow-x: auto;
         }
+        .danger-button {
+          width: 100%;
+        }
+        .success-button {
+          width: 100%;
+        }
         table {
           min-width: 860px;
         }
@@ -145,6 +242,13 @@
       </form>
     </div>
 
+    {% if error %}
+      <div class="flash flash-error">{{ error }}</div>
+    {% endif %}
+    {% if success %}
+      <div class="flash flash-success">{{ success }}</div>
+    {% endif %}
+
     <section class="card">
       <div class="user-grid">
         <div class="kv">
@@ -164,7 +268,7 @@
           <div class="kv-value">{{ user.registered_at_display }}</div>
         </div>
         <div class="kv">
-          <div class="kv-label">Триал до</div>
+          <div class="kv-label">Пробный период до</div>
           <div class="kv-value">{{ user.trial_until_display }}</div>
         </div>
         <div class="kv">
@@ -184,6 +288,77 @@
           <div class="kv-value">{{ user.payments_count }}</div>
         </div>
       </div>
+    </section>
+
+    <section class="card danger-card">
+      <h2 class="danger-title">Обнулить пробный период</h2>
+      <p class="danger-text">
+        Действие принудительно переводит пользователя в состояние истёкшего trial и позволяет проверить реальный полноэкранный экран ограничения доступа.
+      </p>
+      <form class="danger-form" method="post" action="/admin/users/{{ user.telegram_id }}/reset-trial">
+        <label for="confirmation_value">Введите {{ user.telegram_id }} чтобы подтвердить обнуление</label>
+        <input
+          id="confirmation_value"
+          name="confirmation_value"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          value="{{ reset_confirmation_value or '' }}"
+          placeholder="{{ user.telegram_id }}"
+          required
+        />
+        <button class="danger-button" type="submit">Обнулить пробный период</button>
+      </form>
+    </section>
+
+    <section class="card success-card">
+      <h2 class="success-title">Выдать супердоступ</h2>
+      <p class="danger-text">
+        Действие выдаёт пользователю бессрочный доступ к приложению без ограничения по сроку использования.
+      </p>
+      <form class="danger-form" method="post" action="/admin/users/{{ user.telegram_id }}/grant-lifetime">
+        <label for="confirmation_value_lifetime">Введите {{ user.telegram_id }} чтобы подтвердить выдачу супердоступа</label>
+        <input
+          id="confirmation_value_lifetime"
+          name="confirmation_value"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          value="{{ lifetime_confirmation_value or '' }}"
+          placeholder="{{ user.telegram_id }}"
+          required
+        />
+        <button class="success-button" type="submit">Выдать супердоступ</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2 class="success-title">Установить срок trial вручную</h2>
+      <p class="danger-text">
+        Действие устанавливает дату окончания пробного периода для пользователя. Время окончания фиксируется как 23:59 МСК выбранного дня.
+      </p>
+      <form class="danger-form" method="post" action="/admin/users/{{ user.telegram_id }}/set-trial-until">
+        <label for="trial_until_date">Дата окончания trial</label>
+        <input
+          id="trial_until_date"
+          name="trial_until_date"
+          type="date"
+          value="{{ trial_until_value or '' }}"
+          required
+        />
+        <label for="confirmation_value_trial">Введите {{ user.telegram_id }} чтобы подтвердить установку срока trial</label>
+        <input
+          id="confirmation_value_trial"
+          name="confirmation_value"
+          type="text"
+          inputmode="numeric"
+          autocomplete="off"
+          value="{{ trial_confirmation_value or '' }}"
+          placeholder="{{ user.telegram_id }}"
+          required
+        />
+        <button class="success-button" type="submit">Установить срок trial</button>
+      </form>
     </section>
 
     <section class="card">

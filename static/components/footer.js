@@ -79,8 +79,28 @@
         }
 
         .bottom-link__icon {
-          font-size: 1.15rem;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 1.4rem;
+          height: 1.4rem;
           line-height: 1;
+        }
+
+        .bottom-link__icon img,
+        .faq-fab__icon img,
+        .fab-menu__item-icon img,
+        .faq-menu__item-icon img {
+          display: block;
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+        }
+
+        .bottom-link__icon img {
+          width: 1.3rem;
+          height: 1.3rem;
+          opacity: 0.92;
         }
 
         .bottom-link--active {
@@ -197,7 +217,7 @@
           text-decoration: none;
           box-shadow: 0 10px 24px rgba(14, 165, 233, 0.28);
           isolation: isolate;
-          z-index: 58;
+          z-index: 2147483002;
         }
 
         .faq-fab::before {
@@ -217,6 +237,11 @@
           display: inline-flex;
           align-items: center;
           justify-content: center;
+          width: 1.5rem;
+          height: 1.5rem;
+          font-size: 28px;
+          font-weight: 700;
+          color: #ffffff;
           line-height: 1;
         }
 
@@ -226,12 +251,17 @@
 
         .fab-overlay {
           position: fixed;
-          inset: 0;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          left: 0;
           background: rgba(15, 23, 42, 0.35);
-          z-index: 55;
+          z-index: 2147483000;
           opacity: 0;
           visibility: hidden;
           pointer-events: none;
+          touch-action: none;
+          overscroll-behavior: contain;
           transition: opacity 0.24s ease, visibility 0ms linear 0.24s;
         }
 
@@ -250,12 +280,17 @@
 
         .faq-overlay {
           position: fixed;
-          inset: 0;
+          top: 0;
+          right: 0;
+          bottom: 0;
+          left: 0;
           background: rgba(15, 23, 42, 0.35);
-          z-index: 55;
+          z-index: 2147483000;
           opacity: 0;
           visibility: hidden;
           pointer-events: none;
+          touch-action: none;
+          overscroll-behavior: contain;
           transition: opacity 0.24s ease, visibility 0ms linear 0.24s;
         }
 
@@ -277,7 +312,7 @@
           left: 50%;
           bottom: 90px;
           transform: translate(-50%, 24px) scale(0.86);
-          z-index: 60;
+          z-index: 2147483001;
           background: #ffffff;
           border-radius: 18px;
           padding: 12px;
@@ -289,6 +324,30 @@
           opacity: 0;
           visibility: hidden;
           pointer-events: none;
+        }
+
+        .fab-menu__floating-logo,
+        .faq-menu__floating-logo {
+          position: absolute;
+          left: 50%;
+          top: -78px;
+          transform: translateX(-50%);
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 56px;
+          height: 56px;
+          border-radius: 18px;
+          background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+          box-shadow: 0 14px 30px rgba(15, 23, 42, 0.14);
+        }
+
+        .fab-menu__floating-logo img,
+        .faq-menu__floating-logo img {
+          display: block;
+          width: 32px;
+          height: 32px;
+          object-fit: contain;
         }
 
         .fab-menu.hidden {
@@ -312,10 +371,11 @@
           min-height: 58px;
           width: 100%;
           padding: 14px 18px;
-          text-align: center;
+          text-align: left;
           display: inline-flex;
           align-items: center;
-          justify-content: center;
+          justify-content: flex-start;
+          gap: 12px;
           font-size: 16px;
           font-weight: 600;
           line-height: 1.2;
@@ -335,12 +395,22 @@
           transform: scale(0.99);
         }
 
+        .fab-menu__item-icon,
+        .faq-menu__item-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 22px;
+          height: 22px;
+          flex: 0 0 22px;
+        }
+
         .faq-menu {
           position: fixed;
           left: 50%;
           bottom: 90px;
           transform: translate(-50%, 24px) scale(0.86);
-          z-index: 60;
+          z-index: 2147483001;
           background: #ffffff;
           border-radius: 18px;
           padding: 12px;
@@ -375,10 +445,11 @@
           min-height: 58px;
           width: 100%;
           padding: 14px 18px;
-          text-align: center;
+          text-align: left;
           display: inline-flex;
           align-items: center;
-          justify-content: center;
+          justify-content: flex-start;
+          gap: 12px;
           font-size: 16px;
           font-weight: 600;
           line-height: 1.2;
@@ -439,6 +510,14 @@
           }
         }
 
+        .fab-menu.no-flex-gap .fab-menu__item + .fab-menu__item {
+          margin-top: 10px;
+        }
+
+        .faq-menu.no-flex-gap .faq-menu__item + .faq-menu__item {
+          margin-top: 10px;
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .fab-overlay,
           .fab-menu,
@@ -480,22 +559,22 @@
       <nav class="bottom-nav" aria-label="Основная навигация">
         <div class="bottom-nav__inner">
           <a href="/resume" class="bottom-link" data-bottom-link="profile">
-            <span class="bottom-link__icon" aria-hidden="true">👤</span>
+            <span class="bottom-link__icon" aria-hidden="true"><img src="/ico/bust-in-silhouette-svgrepo-com.svg" alt="" /></span>
             <span>Профиль</span>
           </a>
           <a href="/diary" class="bottom-link" data-bottom-link="diary">
-            <span class="bottom-link__icon" aria-hidden="true">🍽️</span>
+            <span class="bottom-link__icon" aria-hidden="true"><img src="/ico/fork-and-knife-with-plate-svgrepo-com.svg" alt="" /></span>
             <span>Дневник</span>
           </a>
           <a href="#" class="bottom-fab" aria-label="Добавить запись">
             <span class="bottom-fab__plus" aria-hidden="true"></span>
           </a>
           <a href="/meal-plan" class="bottom-link" data-bottom-link="meal-plan">
-            <span class="bottom-link__icon" aria-hidden="true">📋</span>
+            <span class="bottom-link__icon" aria-hidden="true"><img src="/ico/clipboard-svgrepo-com.svg" alt="" /></span>
             <span>Рацион</span>
           </a>
           <a href="/profile" class="bottom-link" data-bottom-link="progress">
-            <span class="bottom-link__icon" aria-hidden="true">📊</span>
+            <span class="bottom-link__icon" aria-hidden="true"><img src="/ico/bar-chart-svgrepo-com.svg" alt="" /></span>
             <span>Прогресс</span>
           </a>
         </div>
@@ -503,12 +582,15 @@
 
       <div class="fab-overlay hidden" data-fab-overlay></div>
       <div class="fab-menu hidden" data-fab-menu>
-        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="breakfast">🍳 Добавить завтрак</button>
-        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="lunch">🍲 Добавить обед</button>
-        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="dinner">🍽️ Добавить ужин</button>
-        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="snack">🍎 Добавить перекус</button>
-        <button type="button" class="fab-menu__item" data-fab-action="water">💧 Добавить воду</button>
-        <button type="button" class="fab-menu__item" data-fab-action="sleep">🌙 Записать сон</button>
+        <div class="fab-menu__floating-logo" aria-hidden="true">
+          <img src="/static/emoji_u1f33f.svg" alt="" />
+        </div>
+        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="breakfast"><span class="fab-menu__item-icon" aria-hidden="true"><img src="/ico/cooking-svgrepo-com.svg" alt="" /></span><span>Добавить завтрак</span></button>
+        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="lunch"><span class="fab-menu__item-icon" aria-hidden="true"><img src="/ico/pot-of-food-svgrepo-com.svg" alt="" /></span><span>Добавить обед</span></button>
+        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="dinner"><span class="fab-menu__item-icon" aria-hidden="true"><img src="/ico/fork-and-knife-with-plate-svgrepo-com.svg" alt="" /></span><span>Добавить ужин</span></button>
+        <button type="button" class="fab-menu__item" data-fab-action="meal" data-meal="snack"><span class="fab-menu__item-icon" aria-hidden="true"><img src="/ico/red-apple-svgrepo-com.svg" alt="" /></span><span>Добавить перекус</span></button>
+        <button type="button" class="fab-menu__item" data-fab-action="water"><span class="fab-menu__item-icon" aria-hidden="true"><img src="/ico/droplet-svgrepo-com.svg" alt="" /></span><span>Добавить воду</span></button>
+        <button type="button" class="fab-menu__item" data-fab-action="sleep"><span class="fab-menu__item-icon" aria-hidden="true"><img src="/ico/crescent-moon-svgrepo-com.svg" alt="" /></span><span>Записать сон</span></button>
       </div>
 
       <a href="#" class="faq-fab" aria-label="Открыть разделы помощи и настроек">
@@ -516,10 +598,14 @@
       </a>
       <div class="faq-overlay hidden" data-faq-overlay></div>
       <div class="faq-menu hidden" data-faq-menu>
-        <button type="button" class="faq-menu__item" data-faq-href="/settings/reminders">🔔 Напоминания</button>
-        <button type="button" class="faq-menu__item" data-faq-href="/plans">💳 Тарифы</button>
-        <button type="button" class="faq-menu__item" data-faq-href="/references">📚 Справочники</button>
-        <button type="button" class="faq-menu__item" data-faq-href="/support">🛟 Помощь</button>
+        <div class="faq-menu__floating-logo" aria-hidden="true">
+          <img src="/static/emoji_u1f33f.svg" alt="" />
+        </div>
+        <button type="button" class="faq-menu__item" data-faq-href="/settings/reminders"><span class="faq-menu__item-icon" aria-hidden="true"><img src="/ico/bell-svgrepo-com.svg" alt="" /></span><span>Напоминания</span></button>
+        <button type="button" class="faq-menu__item" data-faq-href="/plans"><span class="faq-menu__item-icon" aria-hidden="true"><img src="/ico/credit-card-svgrepo-com.svg" alt="" /></span><span>Тарифы</span></button>
+        <button type="button" class="faq-menu__item" data-faq-href="/legal"><span class="faq-menu__item-icon" aria-hidden="true"><img src="/ico/clipboard-svgrepo-com.svg" alt="" /></span><span>Оферта</span></button>
+        <button type="button" class="faq-menu__item" data-faq-href="/references"><span class="faq-menu__item-icon" aria-hidden="true"><img src="/ico/books-svgrepo-com.svg" alt="" /></span><span>Справочники</span></button>
+        <button type="button" class="faq-menu__item" data-faq-href="/support"><span class="faq-menu__item-icon" aria-hidden="true"><img src="/ico/megaphone-svgrepo-com.svg" alt="" /></span><span>Помощь</span></button>
       </div>
     `;
 
@@ -541,6 +627,117 @@
     const faqFab = this.shadowRoot.querySelector('.faq-fab');
     const faqOverlay = this.shadowRoot.querySelector('[data-faq-overlay]');
     const faqMenu = this.shadowRoot.querySelector('[data-faq-menu]');
+    const globalBackdropId = 'fab-faq-global-backdrop';
+    const ensureGlobalBackdrop = () => {
+      let backdrop = document.getElementById(globalBackdropId);
+      if (backdrop) {
+        return backdrop;
+      }
+      backdrop = document.createElement('div');
+      backdrop.id = globalBackdropId;
+      backdrop.style.position = 'fixed';
+      backdrop.style.top = '0';
+      backdrop.style.right = '0';
+      backdrop.style.bottom = '0';
+      backdrop.style.left = '0';
+      backdrop.style.background = 'rgba(15, 23, 42, 0.35)';
+      backdrop.style.opacity = '0';
+      backdrop.style.visibility = 'hidden';
+      backdrop.style.pointerEvents = 'none';
+      backdrop.style.zIndex = '2147482999';
+      backdrop.style.transition = 'opacity 0.24s ease, visibility 0ms linear 0.24s';
+      document.body.appendChild(backdrop);
+      return backdrop;
+    };
+    const globalBackdrop = ensureGlobalBackdrop();
+    const detectFlexGapSupport = () => {
+      const test = document.createElement('div');
+      test.style.display = 'flex';
+      test.style.flexDirection = 'column';
+      test.style.rowGap = '1px';
+      test.style.position = 'absolute';
+      test.style.top = '-9999px';
+      test.style.left = '-9999px';
+      const childA = document.createElement('div');
+      const childB = document.createElement('div');
+      childA.style.height = '1px';
+      childB.style.height = '1px';
+      test.appendChild(childA);
+      test.appendChild(childB);
+      document.body.appendChild(test);
+      const supported = test.scrollHeight === 3;
+      test.remove();
+      return supported;
+    };
+    if (!detectFlexGapSupport()) {
+      fabMenu?.classList.add('no-flex-gap');
+      faqMenu?.classList.add('no-flex-gap');
+    }
+    const scrollLockState = {
+      active: false,
+      scrollY: 0,
+      htmlOverflow: '',
+      bodyOverflow: '',
+      bodyPosition: '',
+      bodyTop: '',
+      bodyWidth: '',
+      bodyTouchAction: '',
+    };
+
+    const lockPageScroll = () => {
+      if (scrollLockState.active) {
+        return;
+      }
+      scrollLockState.active = true;
+      scrollLockState.scrollY = window.scrollY || window.pageYOffset || 0;
+      scrollLockState.htmlOverflow = document.documentElement.style.overflow;
+      scrollLockState.bodyOverflow = document.body.style.overflow;
+      scrollLockState.bodyPosition = document.body.style.position;
+      scrollLockState.bodyTop = document.body.style.top;
+      scrollLockState.bodyWidth = document.body.style.width;
+      scrollLockState.bodyTouchAction = document.body.style.touchAction;
+
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollLockState.scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.touchAction = 'none';
+    };
+
+    const unlockPageScroll = () => {
+      if (!scrollLockState.active) {
+        return;
+      }
+      document.documentElement.style.overflow = scrollLockState.htmlOverflow;
+      document.body.style.overflow = scrollLockState.bodyOverflow;
+      document.body.style.position = scrollLockState.bodyPosition;
+      document.body.style.top = scrollLockState.bodyTop;
+      document.body.style.width = scrollLockState.bodyWidth;
+      document.body.style.touchAction = scrollLockState.bodyTouchAction;
+      const restoreY = scrollLockState.scrollY;
+      scrollLockState.active = false;
+      window.scrollTo(0, restoreY);
+    };
+
+    const syncPageLockByMenuState = () => {
+      const fabOpen = Boolean(fabMenu && !fabMenu.classList.contains('hidden'));
+      const faqOpen = Boolean(faqMenu && !faqMenu.classList.contains('hidden'));
+      const anyOpen = fabOpen || faqOpen;
+      if (anyOpen) {
+        lockPageScroll();
+      } else {
+        unlockPageScroll();
+      }
+      if (globalBackdrop) {
+        globalBackdrop.style.opacity = anyOpen ? '1' : '0';
+        globalBackdrop.style.visibility = anyOpen ? 'visible' : 'hidden';
+        globalBackdrop.style.pointerEvents = anyOpen ? 'auto' : 'none';
+        globalBackdrop.style.transition = anyOpen
+          ? 'opacity 0.24s ease'
+          : 'opacity 0.24s ease, visibility 0ms linear 0.24s';
+      }
+    };
 
     const resolveProfileSnapshot = () => {
       try {
@@ -572,7 +769,7 @@
       const subscriptionStatus = typeof profile.subscription_status === 'string'
         ? profile.subscription_status.trim().toLowerCase()
         : '';
-      return ['trial', 'active', 'expired', 'paid'].includes(subscriptionStatus);
+      return ['trial', 'active', 'expired', 'paid', 'lifetime'].includes(subscriptionStatus);
     };
 
     const syncOnboardingGateState = () => {
@@ -641,23 +838,27 @@
     const closeFabMenu = () => {
       fabMenu?.classList.add('hidden');
       fabOverlay?.classList.add('hidden');
+      syncPageLockByMenuState();
     };
 
     const closeFaqMenu = () => {
       faqMenu?.classList.add('hidden');
       faqOverlay?.classList.add('hidden');
+      syncPageLockByMenuState();
     };
 
     const openFabMenu = () => {
       closeFaqMenu();
       fabMenu?.classList.remove('hidden');
       fabOverlay?.classList.remove('hidden');
+      syncPageLockByMenuState();
     };
 
     const openFaqMenu = () => {
       closeFabMenu();
       faqMenu?.classList.remove('hidden');
       faqOverlay?.classList.remove('hidden');
+      syncPageLockByMenuState();
     };
 
     const toggleFabMenu = () => {
@@ -745,6 +946,14 @@
       fabOverlay.addEventListener('click', () => {
         closeFabMenu();
       });
+      fabOverlay.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        closeFabMenu();
+      });
+      fabOverlay.addEventListener('touchstart', (event) => {
+        event.preventDefault();
+        closeFabMenu();
+      }, { passive: false });
     }
 
     if (faqFab) {
@@ -758,7 +967,57 @@
       faqOverlay.addEventListener('click', () => {
         closeFaqMenu();
       });
+      faqOverlay.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        closeFaqMenu();
+      });
+      faqOverlay.addEventListener('touchstart', (event) => {
+        event.preventDefault();
+        closeFaqMenu();
+      }, { passive: false });
     }
+
+    if (globalBackdrop && !globalBackdrop.dataset.menuCloseBound) {
+      const closeFromBackdrop = (event) => {
+        event.preventDefault();
+        closeFabMenu();
+        closeFaqMenu();
+      };
+      globalBackdrop.addEventListener('click', closeFromBackdrop);
+      globalBackdrop.addEventListener('pointerdown', closeFromBackdrop);
+      globalBackdrop.addEventListener('touchstart', closeFromBackdrop, { passive: false });
+      globalBackdrop.dataset.menuCloseBound = 'true';
+    }
+
+    const closeMenusOnOutsideInteraction = (event) => {
+      const fabOpen = Boolean(fabMenu && !fabMenu.classList.contains('hidden'));
+      const faqOpen = Boolean(faqMenu && !faqMenu.classList.contains('hidden'));
+      if (!fabOpen && !faqOpen) {
+        return;
+      }
+      const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+      const clickedInsideFab =
+        path.includes(bottomFab)
+        || path.includes(fabMenu)
+        || path.includes(fabOverlay);
+      const clickedInsideFaq =
+        path.includes(faqFab)
+        || path.includes(faqMenu)
+        || path.includes(faqOverlay);
+      if (!clickedInsideFab && !clickedInsideFaq) {
+        closeFabMenu();
+        closeFaqMenu();
+      }
+    };
+
+    document.addEventListener('pointerdown', closeMenusOnOutsideInteraction, true);
+    document.addEventListener('touchstart', closeMenusOnOutsideInteraction, { capture: true, passive: true });
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        closeFabMenu();
+        closeFaqMenu();
+      }
+    });
 
     this.shadowRoot.querySelectorAll('[data-faq-href]').forEach((item) => {
       item.addEventListener('click', () => {
@@ -874,6 +1133,7 @@
         closeFabMenu();
         closeFaqMenu();
       }
+      syncPageLockByMenuState();
     };
 
     const updateActiveBottomLink = () => {

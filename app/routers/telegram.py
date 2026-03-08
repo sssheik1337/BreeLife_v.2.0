@@ -1,11 +1,11 @@
 import json
 import logging
 
+from aiogram import Bot, types
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import ValidationError
 from starlette.requests import ClientDisconnect
 
-from aiogram import types
 from aiogram.utils.web_app import safe_parse_webapp_init_data
 
 from config import APP_NAME, IS_DEV, TELEGRAM_BOT_TOKEN
@@ -16,11 +16,63 @@ from services.storage_db import create_session
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+_cached_bot_username: str | None = None
+
+
+async def _resolve_bot_username() -> str | None:
+    global _cached_bot_username
+    if _cached_bot_username:
+        return _cached_bot_username
+
+    bot = get_bot()
+    if bot is not None:
+        try:
+            me = await bot.get_me()
+            username = (me.username or "").strip()
+            if username:
+                _cached_bot_username = username
+                return username
+        except Exception as error:
+            logger.warning("Could not resolve bot username from running bot instance: %s", error)
+
+    if not TELEGRAM_BOT_TOKEN:
+        return None
+
+    temp_bot = Bot(token=TELEGRAM_BOT_TOKEN)
+    try:
+        me = await temp_bot.get_me()
+        username = (me.username or "").strip()
+        if username:
+            _cached_bot_username = username
+            return username
+    except Exception as error:
+        logger.warning("Could not resolve bot username from TELEGRAM_BOT_TOKEN: %s", error)
+    finally:
+        await temp_bot.session.close()
+
+    return None
 
 
 @router.get("/api/telegram/bot-info")
 async def telegram_bot_info():
     return {"bot_name": APP_NAME, "is_dev": IS_DEV}
+
+
+@router.get("/api/telegram/launch-link")
+async def telegram_launch_link():
+    username = await _resolve_bot_username()
+    if not username:
+        return {
+            "ok": False,
+            "bot_username": None,
+            "bot_url": None,
+        }
+    return {
+        "ok": True,
+        "bot_username": username,
+        "bot_url": f"https://t.me/{username}",
+        "bot_deep_link": f"tg://resolve?domain={username}",
+    }
 
 
 @router.post("/api/auth/telegram")

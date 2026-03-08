@@ -1,0 +1,478 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="/static/js/telegram_fullscreen.js"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Админка - оферта</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f8fafc;
+        margin: 0;
+        padding: 24px;
+        padding-top: 75px;
+        color: #0f172a;
+      }
+      .page-shell {
+        max-width: 1360px;
+        margin: 0 auto;
+        display: grid;
+        gap: 20px;
+      }
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 24px;
+      }
+      .toolbar-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+      }
+      .toolbar-links a {
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 20px;
+      }
+      .message {
+        margin-bottom: 12px;
+        padding: 10px 12px;
+        border-radius: 6px;
+      }
+      .message.error {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+      .message.success {
+        background: #dcfce7;
+        color: #166534;
+      }
+      .top-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
+      }
+      .versions {
+        display: grid;
+        gap: 12px;
+      }
+      .version-item {
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 14px;
+        display: grid;
+        gap: 10px;
+      }
+      .version-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        background: #dbeafe;
+        color: #1d4ed8;
+      }
+      .muted {
+        color: #64748b;
+      }
+      label {
+        display: grid;
+        gap: 6px;
+        font-weight: 600;
+      }
+      input[type="text"],
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font: inherit;
+        color: #0f172a;
+        background: #ffffff;
+      }
+      textarea {
+        min-height: 520px;
+        resize: vertical;
+        line-height: 1.55;
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      button,
+      .link-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 0 14px;
+        border: none;
+        border-radius: 8px;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      .btn-primary {
+        background: #2563eb;
+        color: #ffffff;
+      }
+      .btn-secondary {
+        background: #e2e8f0;
+        color: #0f172a;
+      }
+      .preview-wrap {
+        max-width: 960px;
+        margin: 0 auto;
+        display: grid;
+        gap: 16px;
+      }
+      .preview-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        background: #fcfdff;
+        padding: 24px;
+        line-height: 1.65;
+      }
+      .preview-title {
+        margin: 0;
+        font-size: 28px;
+        line-height: 1.2;
+      }
+      .preview-summary {
+        margin: 10px 0 0;
+        color: #475569;
+      }
+      .preview-body {
+        margin-top: 18px;
+      }
+      .preview-body h1,
+      .preview-body h2,
+      .preview-body h3 {
+        margin-top: 0;
+        margin-bottom: 12px;
+        line-height: 1.3;
+      }
+      .preview-body p,
+      .preview-body ul {
+        margin: 0 0 12px;
+      }
+      .preview-body ul {
+        padding-left: 20px;
+      }
+      .logout button {
+        background: #0f172a;
+        color: #ffffff;
+      }
+      .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+      }
+      .pagination a,
+      .pagination span {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 42px;
+        min-height: 42px;
+        padding: 0 14px;
+        border-radius: 8px;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        color: #0f172a;
+        text-decoration: none;
+        font-weight: 700;
+      }
+      .pagination .is-active {
+        background: #2563eb;
+        border-color: #2563eb;
+        color: #ffffff;
+      }
+      @media (max-width: 960px) {
+        .top-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 768px) {
+        body {
+          padding: 14px;
+          padding-top: 75px;
+        }
+        .toolbar {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+        .toolbar h1 {
+          margin: 0 0 8px;
+          font-size: 40px;
+          line-height: 1;
+        }
+        .logout {
+          width: 100%;
+        }
+        .logout button {
+          width: 100%;
+        }
+        .card,
+        .preview-card {
+          padding: 14px;
+        }
+        textarea {
+          min-height: 420px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-shell">
+      <div class="toolbar">
+        <div>
+          <h1>Оферта</h1>
+          <div class="toolbar-links">
+            <a href="/admin">Главная</a>
+            <a href="/admin/plans">Тарифы</a>
+            <a href="/admin/users">Пользователи</a>
+          </div>
+        </div>
+        <form class="logout" method="post" action="/admin/logout">
+          <button type="submit">Выйти</button>
+        </form>
+      </div>
+
+      {% if error %}
+        <div class="message error">{{ error }}</div>
+      {% endif %}
+      {% if success %}
+        <div class="message success">{{ success }}</div>
+      {% endif %}
+
+      {% if preview_payload %}
+        <div class="card">
+          <h2>Предпросмотр новой редакции</h2>
+          <p class="muted">Проверьте текст. После подтверждения будет опубликована новая версия, и пользователи увидят её при следующем входе.</p>
+
+          <div class="preview-wrap">
+            <div class="preview-card">
+              <h3 class="preview-title">{{ preview_payload.title }}</h3>
+              {% if preview_payload.summary %}
+                <p class="preview-summary">{{ preview_payload.summary }}</p>
+              {% endif %}
+              <div id="offer-preview-body" class="preview-body"></div>
+            </div>
+
+            <div class="actions">
+              <form method="post" action="/admin/legal/edit">
+                <input type="hidden" name="page" value="{{ current_page }}" />
+                <input type="hidden" name="title" value="{{ preview_payload.title }}" />
+                <input type="hidden" name="summary" value="{{ preview_payload.summary }}" />
+                <textarea hidden name="body_markdown">{{ preview_payload.body_markdown }}</textarea>
+                <button class="btn-secondary" type="submit">Вернуться в редактор</button>
+              </form>
+
+              <form method="post" action="/admin/legal/confirm">
+                <input type="hidden" name="page" value="{{ current_page }}" />
+                <input type="hidden" name="title" value="{{ preview_payload.title }}" />
+                <input type="hidden" name="summary" value="{{ preview_payload.summary }}" />
+                <textarea hidden name="body_markdown">{{ preview_payload.body_markdown }}</textarea>
+                <button class="btn-primary" type="submit">Подтвердить</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="top-grid">
+          <div class="card">
+            <h2>Текущая версия</h2>
+            {% if current_offer %}
+              <div class="version-item">
+                <div class="version-top">
+                  <strong>v{{ current_offer.version }} - {{ current_offer.title }}</strong>
+                  <span class="badge">Активна</span>
+                </div>
+                {% if current_offer.summary %}
+                  <div>{{ current_offer.summary }}</div>
+                {% endif %}
+                <div class="muted">Опубликована: {{ current_offer.published_at_display or '—' }}</div>
+              </div>
+            {% else %}
+              <div class="muted">Оферта ещё не опубликована.</div>
+            {% endif %}
+          </div>
+
+          <div class="card">
+            <h2>История версий</h2>
+            <div class="versions">
+              {% for item in versions %}
+                <div class="version-item">
+                  <div class="version-top">
+                    <strong>v{{ item.version }} - {{ item.title }}</strong>
+                    {% if current_offer and item.version == current_offer.version %}
+                      <span class="badge">Активна</span>
+                    {% endif %}
+                  </div>
+                  {% if item.summary %}
+                    <div>{{ item.summary }}</div>
+                  {% endif %}
+                  <div class="muted">Опубликована: {{ item.published_at_display or '—' }}</div>
+                  <div>
+                    <a class="link-button btn-secondary" href="/admin/legal?page={{ current_page }}&source_version={{ item.version }}">Взять в редактор</a>
+                  </div>
+                </div>
+              {% endfor %}
+              {% if not versions %}
+                <div class="muted">Версий пока нет.</div>
+              {% endif %}
+            </div>
+            {% if total_pages > 1 %}
+              <div class="pagination">
+                {% if current_page > 1 %}
+                  <a href="/admin/legal?page={{ current_page - 1 }}" aria-label="Предыдущая страница">←</a>
+                {% endif %}
+                {% for page_number in page_numbers %}
+                  {% if page_number == current_page %}
+                    <span class="is-active">{{ page_number }}</span>
+                  {% else %}
+                    <a href="/admin/legal?page={{ page_number }}">{{ page_number }}</a>
+                  {% endif %}
+                {% endfor %}
+                {% if current_page < total_pages %}
+                  <a href="/admin/legal?page={{ current_page + 1 }}" aria-label="Следующая страница">→</a>
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Новая редакция</h2>
+          <p class="muted">
+            По умолчанию редактор пустой. Заполнение происходит только вручную или через кнопку «Взять в редактор» у нужной версии.
+          </p>
+          {% if source_version %}
+            <p class="muted">Редактор заполнен по версии v{{ source_version }}.</p>
+          {% endif %}
+
+          <form method="post" action="/admin/legal/publish">
+            <input type="hidden" name="page" value="{{ current_page }}" />
+            <label>
+              Заголовок
+              <input type="text" name="title" value="{{ editor_source.title }}" required />
+            </label>
+            <label style="margin-top: 12px;">
+              Краткое описание
+              <input type="text" name="summary" value="{{ editor_source.summary }}" placeholder="Что изменилось в этой редакции" />
+            </label>
+            <label style="margin-top: 12px;">
+              Текст оферты
+              <textarea name="body_markdown" required>{{ editor_source.body_markdown }}</textarea>
+            </label>
+            <div class="actions" style="margin-top: 14px;">
+              <button class="btn-primary" type="submit">Опубликовать новую версию</button>
+              <a class="link-button btn-secondary" href="/admin/legal?page={{ current_page }}&clear_editor=1">Очистить редактор</a>
+            </div>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+
+    <script>
+      (function () {
+        const previewBody = document.getElementById('offer-preview-body');
+        if (!previewBody) return;
+
+        const source = {{ (preview_payload.body_markdown if preview_payload else '') | tojson }};
+
+        const escapeHtml = (value) => String(value || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+
+        const renderInline = (value) => {
+          let html = escapeHtml(value);
+          html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+          html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+          html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+          return html;
+        };
+
+        const renderMarkdown = (rawSource) => {
+          const lines = String(rawSource || '').replace(/\r\n/g, '\n').split('\n');
+          const chunks = [];
+          let paragraph = [];
+          let listItems = [];
+
+          const flushParagraph = () => {
+            if (!paragraph.length) return;
+            chunks.push('<p>' + renderInline(paragraph.join('<br>')) + '</p>');
+            paragraph = [];
+          };
+
+          const flushList = () => {
+            if (!listItems.length) return;
+            chunks.push('<ul>' + listItems.map((item) => '<li>' + renderInline(item) + '</li>').join('') + '</ul>');
+            listItems = [];
+          };
+
+          lines.forEach((rawLine) => {
+            const trimmed = String(rawLine || '').trim();
+            if (!trimmed) {
+              flushParagraph();
+              flushList();
+              return;
+            }
+            const headingMatch = trimmed.match(/^(#{1,3})\s+(.*)$/);
+            if (headingMatch) {
+              flushParagraph();
+              flushList();
+              const level = headingMatch[1].length;
+              chunks.push('<h' + level + '>' + renderInline(headingMatch[2]) + '</h' + level + '>');
+              return;
+            }
+            const listMatch = trimmed.match(/^[-*]\s+(.*)$/);
+            if (listMatch) {
+              flushParagraph();
+              listItems.push(listMatch[1]);
+              return;
+            }
+            flushList();
+            paragraph.push(trimmed);
+          });
+
+          flushParagraph();
+          flushList();
+          return chunks.join('') || '<p class="muted">Текст оферты отсутствует.</p>';
+        };
+
+        previewBody.innerHTML = renderMarkdown(source);
+      })();
+    </script>
+  </body>
+</html>

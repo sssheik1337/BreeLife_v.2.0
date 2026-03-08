@@ -1,6 +1,8 @@
 <template>
     <custom-layout class="spa-layout" data-spa-layout>
-        <!-- Используем те же web-components, чтобы сохранить текущий внешний вид без регрессии. -->
+        <TelegramOnlyGate />
+        <OfferConsentGate />
+        <SubscriptionExpiredGate />
         <custom-navbar />
 
         <main class="spa-layout__main">
@@ -12,9 +14,12 @@
 </template>
 
 <script setup lang="ts">
+import OfferConsentGate from '../components/OfferConsentGate.vue';
+import SubscriptionExpiredGate from '../components/SubscriptionExpiredGate.vue';
+import TelegramOnlyGate from '../components/TelegramOnlyGate.vue';
 import { useTelegramRuntime } from '../composables/useTelegramRuntime';
 
-// Запускаем Telegram runtime в корневом layout, чтобы переменные темы/inset были актуальны на всех экранах.
+// Keep Telegram theme and safe-area CSS vars in sync for all SPA screens.
 useTelegramRuntime();
 </script>
 

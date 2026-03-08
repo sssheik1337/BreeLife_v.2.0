@@ -74,6 +74,8 @@ const resolveTelegramInitDataNow = (): string => {
     return '';
 };
 
+export const getTelegramInitDataSnapshot = (): string => resolveTelegramInitDataNow();
+
 const waitForTelegramInitData = async (timeoutMs: number): Promise<string> => {
     const startedAt = Date.now();
     let initData = resolveTelegramInitDataNow();

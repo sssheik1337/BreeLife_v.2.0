@@ -84,8 +84,11 @@ const refreshFeatherIcons = async (): Promise<void> => {
 const ensureTrialStatus = async (): Promise<Record<string, unknown> | null> => {
     try {
         const status = await subscriptionApi.getStatus();
-        if (status && typeof status === 'object' && status.subscription_until) {
-            return status as Record<string, unknown>;
+        if (status && typeof status === 'object') {
+            const normalizedStatus = String(status.subscription_status || '').toLowerCase();
+            if (status.subscription_until || status.status === 'active' || normalizedStatus === 'lifetime') {
+                return status as Record<string, unknown>;
+            }
         }
     } catch {
         // Ignore status errors and fall back to explicit trial start.
@@ -100,6 +103,11 @@ const ensureTrialStatus = async (): Promise<Record<string, unknown> | null> => {
 };
 
 const updateKeylineText = (subscription: Record<string, unknown> | null): void => {
+    const subscriptionStatus = String(subscription?.subscription_status || '').toLowerCase();
+    if (subscriptionStatus === 'lifetime') {
+        keylineText.value = 'Для вашего аккаунта уже активирован бессрочный супердоступ';
+        return;
+    }
     const trialEndDate = formatDateRu(subscription?.subscription_until);
     if (!trialEndDate) {
         keylineText.value = 'Пробный период уже активен для вашего аккаунта';

@@ -62,7 +62,10 @@
           >
             <template v-if="card.entry && card.entry.items.length">
               <div class="flex items-center justify-between">
-                <span class="font-semibold text-slate-800">{{ card.label }}</span>
+                <span class="diary-section-title">
+                  <img :src="mealIconUrls[card.key]" alt="" class="diary-section-title__icon" />
+                  <span>{{ card.label }}</span>
+                </span>
                 <span :id="`diary-meal-${card.key}-total`" class="text-xs text-slate-500">{{ card.totalText }}</span>
               </div>
               <div :id="`diary-meal-${card.key}-list`" class="mt-3 space-y-2 text-slate-600">
@@ -81,7 +84,10 @@
             <template v-else>
               <div class="flex items-center justify-between gap-3">
                 <div>
-                  <h3 class="font-semibold text-slate-800">{{ card.label }}</h3>
+                  <h3 class="diary-section-title">
+                    <img :src="mealIconUrls[card.key]" alt="" class="diary-section-title__icon" />
+                    <span>{{ card.label }}</span>
+                  </h3>
                   <p class="mt-1 text-sm text-slate-500">Нет записи за эту дату.</p>
                 </div>
                 <button type="button" class="diary-action-btn" @click="openProductsForm(card.key, 'meal', false)">Добавить</button>
@@ -94,7 +100,10 @@
           <div class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100">
             <div class="flex items-center justify-between gap-3">
               <div>
-                <h3 class="font-semibold text-slate-800">💧 Вода</h3>
+                <h3 class="diary-section-title">
+                  <img :src="waterIconUrl" alt="" class="diary-section-title__icon" />
+                  <span>Вода</span>
+                </h3>
                 <p class="mt-1 text-sm text-slate-500">
                   Выпито сегодня: {{ todayWaterText }} / цель {{ waterGoalText }}
                 </p>
@@ -106,7 +115,10 @@
           <div class="bg-white rounded-2xl p-4 shadow-lg border border-slate-100">
             <div class="flex items-center justify-between gap-3">
               <div>
-                <h3 class="font-semibold text-slate-800">🌙 Сон</h3>
+                <h3 class="diary-section-title">
+                  <img :src="sleepIconUrl" alt="" class="diary-section-title__icon" />
+                  <span>Сон</span>
+                </h3>
                 <p class="mt-1 text-sm text-slate-500">Отход ко сну: {{ sleepBedtimeText }}</p>
                 <p class="text-sm text-slate-500">Пробуждение: {{ sleepWakeTimeText }}</p>
               </div>
@@ -476,11 +488,21 @@ const form = reactive({
 const productRows = ref<ProductRow[]>([]);
 
 const mealMeta: Array<{ key: MealKey; label: string }> = [
-  { key: 'breakfast', label: '🍳 Завтрак' },
-  { key: 'lunch', label: '🍲 Обед' },
-  { key: 'dinner', label: '🍽️ Ужин' },
-  { key: 'snack', label: '🍎 Перекус' }
+  { key: 'breakfast', label: 'Завтрак' },
+  { key: 'lunch', label: 'Обед' },
+  { key: 'dinner', label: 'Ужин' },
+  { key: 'snack', label: 'Перекус' }
 ];
+
+const mealIconUrls: Record<MealKey, string> = {
+  breakfast: '/ico/cooking-svgrepo-com.svg',
+  lunch: '/ico/pot-of-food-svgrepo-com.svg',
+  dinner: '/ico/fork-and-knife-with-plate-svgrepo-com.svg',
+  snack: '/ico/red-apple-svgrepo-com.svg'
+};
+
+const waterIconUrl = '/ico/droplet-svgrepo-com.svg';
+const sleepIconUrl = '/ico/crescent-moon-svgrepo-com.svg';
 
 const dayHint = computed(() => {
   const entries = getEntriesByDate(selectedDate.value);
@@ -1521,6 +1543,21 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.diary-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.diary-section-title__icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex: 0 0 20px;
+}
+
 .diary-action-btn {
   display: flex;
   align-items: center;

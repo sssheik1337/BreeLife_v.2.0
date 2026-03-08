@@ -114,9 +114,13 @@ TABLES = {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             telegram_user_id INTEGER NOT NULL,
             created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
             amount_rub INTEGER NOT NULL DEFAULT 0,
             duration_days INTEGER NOT NULL DEFAULT 0,
-            status TEXT NOT NULL DEFAULT 'success',
+            provider TEXT NOT NULL DEFAULT '',
+            provider_payment_id TEXT,
+            idempotence_key TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
             meta_json TEXT
         )
     """,
@@ -153,6 +157,7 @@ APP_KV_TABLE_SQL = """
 
 APP_KV_ADMIN_CONFIG_KEY = "admin_config"
 APP_KV_PLANS_CONFIG_KEY = "plans_config"
+APP_KV_OFFER_DOCUMENT_KEY = "offer_document"
 
 
 def init_db() -> None:
@@ -193,6 +198,13 @@ def init_db() -> None:
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_payments_status_created ON payments(status, created_at)"
         )
+        try:
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_payments_provider_payment_id ON payments(provider_payment_id)"
+            )
+        except sqlite3.OperationalError:
+            # Legacy DB may not have provider_payment_id yet; create index after ALTER TABLE below.
+            pass
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_user_settings_user ON user_settings(telegram_user_id)"
         )
@@ -215,6 +227,21 @@ def init_db() -> None:
             connection.execute("ALTER TABLE user_settings ADD COLUMN write_access_allowed INTEGER")
         if "write_access_updated_at" not in user_settings_columns:
             connection.execute("ALTER TABLE user_settings ADD COLUMN write_access_updated_at TEXT")
+        payments_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(payments)").fetchall()
+        }
+        if "updated_at" not in payments_columns:
+            connection.execute("ALTER TABLE payments ADD COLUMN updated_at TEXT")
+            connection.execute("UPDATE payments SET updated_at = created_at WHERE updated_at IS NULL OR updated_at = ''")
+        if "provider" not in payments_columns:
+            connection.execute("ALTER TABLE payments ADD COLUMN provider TEXT NOT NULL DEFAULT ''")
+        if "provider_payment_id" not in payments_columns:
+            connection.execute("ALTER TABLE payments ADD COLUMN provider_payment_id TEXT")
+        if "idempotence_key" not in payments_columns:
+            connection.execute("ALTER TABLE payments ADD COLUMN idempotence_key TEXT")
+        connection.execute(
+            "CREATE INDEX IF NOT EXISTS idx_payments_provider_payment_id ON payments(provider_payment_id)"
+        )
 
 
 def read_payload(table: str, telegram_user_id: int) -> dict | list | None:
@@ -253,6 +280,162 @@ def write_payload(table: str, telegram_user_id: int, payload: dict | list) -> No
             (telegram_user_id, serialized, updated_at),
         )
         connection.commit()
+
+
+def _parse_payment_row(row: sqlite3.Row | None) -> dict[str, object] | None:
+    if row is None:
+        return None
+    meta_json_raw = row["meta_json"]
+    meta: dict[str, object] | None = None
+    if isinstance(meta_json_raw, str) and meta_json_raw.strip():
+        try:
+            parsed_meta = json.loads(meta_json_raw)
+            if isinstance(parsed_meta, dict):
+                meta = parsed_meta
+        except json.JSONDecodeError:
+            meta = None
+    return {
+        "id": int(row["id"]),
+        "telegram_user_id": int(row["telegram_user_id"]),
+        "created_at": str(row["created_at"] or ""),
+        "updated_at": str(row["updated_at"] or ""),
+        "amount_rub": int(row["amount_rub"] or 0),
+        "duration_days": int(row["duration_days"] or 0),
+        "provider": str(row["provider"] or ""),
+        "provider_payment_id": str(row["provider_payment_id"] or ""),
+        "idempotence_key": str(row["idempotence_key"] or ""),
+        "status": str(row["status"] or ""),
+        "meta": meta or {},
+    }
+
+
+def create_payment_record(
+    telegram_user_id: int,
+    amount_rub: int,
+    duration_days: int,
+    provider: str,
+    provider_payment_id: str,
+    idempotence_key: str,
+    status: str,
+    meta: dict[str, object] | None = None,
+) -> dict[str, object]:
+    now_iso = datetime.now(timezone.utc).isoformat()
+    serialized_meta = json.dumps(meta or {}, ensure_ascii=False)
+    with sqlite3.connect(DB_PATH) as connection:
+        cursor = connection.execute(
+            """
+            INSERT INTO payments (
+                telegram_user_id,
+                created_at,
+                updated_at,
+                amount_rub,
+                duration_days,
+                provider,
+                provider_payment_id,
+                idempotence_key,
+                status,
+                meta_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                telegram_user_id,
+                now_iso,
+                now_iso,
+                max(0, int(amount_rub)),
+                max(0, int(duration_days)),
+                str(provider or "").strip(),
+                str(provider_payment_id or "").strip(),
+                str(idempotence_key or "").strip(),
+                str(status or "").strip() or "pending",
+                serialized_meta,
+            ),
+        )
+        payment_id = int(cursor.lastrowid)
+        connection.commit()
+    payment = get_payment_record_by_id(payment_id)
+    if payment is None:
+        raise RuntimeError("payment_record_not_created")
+    return payment
+
+
+def get_payment_record_by_id(payment_id: int) -> dict[str, object] | None:
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.row_factory = sqlite3.Row
+        row = connection.execute(
+            "SELECT * FROM payments WHERE id = ?",
+            (int(payment_id),),
+        ).fetchone()
+    return _parse_payment_row(row)
+
+
+def get_payment_record_by_provider_payment_id(provider_payment_id: str) -> dict[str, object] | None:
+    normalized_payment_id = str(provider_payment_id or "").strip()
+    if not normalized_payment_id:
+        return None
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.row_factory = sqlite3.Row
+        row = connection.execute(
+            "SELECT * FROM payments WHERE provider_payment_id = ? ORDER BY id DESC LIMIT 1",
+            (normalized_payment_id,),
+        ).fetchone()
+    return _parse_payment_row(row)
+
+
+def get_latest_payment_for_user(
+    telegram_user_id: int,
+    statuses: tuple[str, ...] | None = None,
+) -> dict[str, object] | None:
+    params: list[object] = [int(telegram_user_id)]
+    where_sql = "WHERE telegram_user_id = ?"
+    normalized_statuses = tuple(
+        str(item).strip().lower()
+        for item in (statuses or tuple())
+        if isinstance(item, str) and item.strip()
+    )
+    if normalized_statuses:
+        placeholders = ", ".join("?" for _ in normalized_statuses)
+        where_sql += f" AND lower(status) IN ({placeholders})"
+        params.extend(normalized_statuses)
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.row_factory = sqlite3.Row
+        row = connection.execute(
+            f"SELECT * FROM payments {where_sql} ORDER BY id DESC LIMIT 1",
+            tuple(params),
+        ).fetchone()
+    return _parse_payment_row(row)
+
+
+def update_payment_record_by_provider_payment_id(
+    provider_payment_id: str,
+    *,
+    status: str | None = None,
+    meta: dict[str, object] | None = None,
+) -> dict[str, object] | None:
+    existing = get_payment_record_by_provider_payment_id(provider_payment_id)
+    if existing is None:
+        return None
+    merged_meta = dict(existing.get("meta") if isinstance(existing.get("meta"), dict) else {})
+    if isinstance(meta, dict):
+        merged_meta.update(meta)
+    updated_status = str(status).strip() if isinstance(status, str) and status.strip() else str(existing.get("status") or "")
+    updated_at = datetime.now(timezone.utc).isoformat()
+    with sqlite3.connect(DB_PATH) as connection:
+        connection.execute(
+            """
+            UPDATE payments
+            SET status = ?, meta_json = ?, updated_at = ?
+            WHERE provider_payment_id = ?
+            """,
+            (
+                updated_status,
+                json.dumps(merged_meta, ensure_ascii=False),
+                updated_at,
+                str(provider_payment_id).strip(),
+            ),
+        )
+        connection.commit()
+    return get_payment_record_by_provider_payment_id(provider_payment_id)
 
 
 def read_app_kv_json(key: str) -> object | None:
@@ -311,6 +494,15 @@ def load_plans_config_kv() -> list[dict[str, object]]:
 
 def save_plans_config_kv(plans: list[dict[str, object]]) -> None:
     write_app_kv_json(APP_KV_PLANS_CONFIG_KEY, plans)
+
+
+def load_offer_document_kv() -> dict[str, object]:
+    payload = read_app_kv_json(APP_KV_OFFER_DOCUMENT_KEY)
+    return payload if isinstance(payload, dict) else {}
+
+
+def save_offer_document_kv(data: dict[str, object]) -> None:
+    write_app_kv_json(APP_KV_OFFER_DOCUMENT_KEY, data)
 
 
 def upsert_telegram_user(

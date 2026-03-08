@@ -14,6 +14,7 @@ from app.routers import (
     core,
     dev,
     diary,
+    legal,
     meal_plan_v2,
     products_api,
     profile,
@@ -34,6 +35,7 @@ def create_app() -> FastAPI:
     app.include_router(telegram.router)
     app.include_router(profile.router)
     app.include_router(diary.router)
+    app.include_router(legal.router)
     app.include_router(meal_plan_v2.router)
     app.include_router(admin.router)
     app.include_router(products_api.router)
@@ -55,7 +57,7 @@ def create_app() -> FastAPI:
             return await call_next(request)
 
         request_path = request.url.path or '/'
-        if request_path.startswith(('/api', '/admin', '/telegram', '/static', '/fonts', '/spa-assets', '/app', '/healthz')):
+        if request_path.startswith(('/api', '/admin', '/telegram', '/static', '/ico', '/fonts', '/spa-assets', '/app', '/healthz')):
             return await call_next(request)
 
         query = request.url.query or ''
@@ -68,6 +70,7 @@ def create_app() -> FastAPI:
         return RedirectResponse(url=target, status_code=307)
 
     app.mount('/static', StaticFiles(directory='static'), name='static')
+    app.mount('/ico', StaticFiles(directory='ico'), name='ico')
     # Раздаём локальные файлы шрифтов по URL /fonts, чтобы @font-face не получал 404.
     app.mount('/fonts', StaticFiles(directory='fonts'), name='fonts')
 

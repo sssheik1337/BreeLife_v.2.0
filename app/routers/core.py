@@ -1,4 +1,5 @@
 import re
+from html import escape
 from pathlib import Path
 from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException, Request
@@ -192,6 +193,30 @@ def _load_support_contacts_payload(config: dict[str, object] | None) -> dict[str
 
 def _render_spa_shell_index(spa_index_path: Path) -> HTMLResponse:
     html = spa_index_path.read_text(encoding="utf-8")
+    escaped_app_name = escape(APP_NAME)
+    title_pattern = re.compile(r"<title>.*?</title>", flags=re.IGNORECASE | re.DOTALL)
+    if title_pattern.search(html):
+        html = title_pattern.sub(f"<title>{escaped_app_name}</title>", html, count=1)
+    elif "</head>" in html:
+        html = html.replace("</head>", f"<title>{escaped_app_name}</title>\n</head>", 1)
+
+    html_tag_pattern = re.compile(r"<html\b([^>]*)>", flags=re.IGNORECASE | re.DOTALL)
+
+    def _inject_data_app_name(match: re.Match[str]) -> str:
+        attrs = match.group(1) or ""
+        if re.search(r"\bdata-app-name\s*=", attrs, flags=re.IGNORECASE):
+            attrs = re.sub(
+                r"data-app-name\s*=\s*([\"']).*?\1",
+                f'data-app-name="{escaped_app_name}"',
+                attrs,
+                count=1,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            return f"<html{attrs}>"
+        return f'<html{attrs} data-app-name="{escaped_app_name}">'
+
+    html = html_tag_pattern.sub(_inject_data_app_name, html, count=1)
+
     if "window.showNotification" not in html:
         if "</head>" in html:
             html = html.replace("</head>", f"{SPA_NOTIFICATION_INLINE_SCRIPT}\n</head>", 1)

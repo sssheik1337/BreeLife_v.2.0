@@ -34,6 +34,10 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
         'subscription_until',
         'subscription_status',
         'subscription_started_at',
+        'subscription_auto_renew',
+        'subscription_cancelled_at',
+        'terms_offer_accepted_version',
+        'terms_offer_accepted_at',
         'trial_started_at',
         'trial_welcome_seen',
         'preferences_onboarding_completed',
@@ -573,6 +577,16 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
         merged.subscription_until = merged.subscription_until || null;
         merged.subscription_status = merged.subscription_status || null;
         merged.subscription_started_at = merged.subscription_started_at || null;
+        merged.subscription_auto_renew = parseBoolean(merged.subscription_auto_renew);
+        merged.subscription_cancelled_at = typeof merged.subscription_cancelled_at === 'string' && merged.subscription_cancelled_at.trim()
+            ? merged.subscription_cancelled_at
+            : null;
+        merged.terms_offer_accepted_version = typeof merged.terms_offer_accepted_version === 'number' && Number.isFinite(merged.terms_offer_accepted_version)
+            ? Math.trunc(merged.terms_offer_accepted_version)
+            : null;
+        merged.terms_offer_accepted_at = typeof merged.terms_offer_accepted_at === 'string' && merged.terms_offer_accepted_at.trim()
+            ? merged.terms_offer_accepted_at
+            : null;
         merged.trial_started_at = merged.trial_started_at || null;
         merged.trial_welcome_seen = parseBoolean(merged.trial_welcome_seen);
         merged.preferences_onboarding_completed = parseBoolean(merged.preferences_onboarding_completed);

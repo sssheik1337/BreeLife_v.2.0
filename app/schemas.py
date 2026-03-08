@@ -15,6 +15,10 @@ class SubscriptionRequest(BaseModel):
     plan_id: str | None = None
 
 
+class SubscriptionCancelRequest(BaseModel):
+    confirm: bool = True
+
+
 class PaymentRequest(BaseModel):
     plan_id: str
     target_date: str | None = None

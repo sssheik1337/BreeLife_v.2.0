@@ -10,7 +10,7 @@
           <p class="text-slate-500 mt-2">Ваши персональные данные, статус и ориентиры</p>
         </div>
 
-        <div id="recommendations-section" class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8" :class="{ hidden: trial.isExpired }">
+        <div id="recommendations-section" class="bg-white rounded-2xl p-6 shadow-lg border border-slate-100 mb-8">
           <div class="mb-3 flex justify-center">
             <span id="recommendations-state" class="assistant-title-chip" :class="recommendationsState.className">{{ recommendationsState.text }}</span>
           </div>
@@ -125,16 +125,6 @@ const explanations = reactive({
   calories: 'Калорийность рассчитана с учётом цели и текущих параметров.',
   macros: 'Баланс БЖУ рассчитывается от цели и плановой калорийности.',
   deadline: ''
-});
-const trial = reactive({
-  datesText: 'Проверяем даты...',
-  badgeText: 'Пробный период до --',
-  badgeClass: 'bg-emerald-100 text-emerald-700',
-  warningText: '',
-  showPaywall: false,
-  paymentMotivation: '',
-  isExpired: false,
-  payProcessing: false
 });
 
 const profile = computed(() => {
@@ -338,57 +328,6 @@ const loadAiRecommendation = async () => {
   }
 };
 
-const loadTrialStatus = async () => {
-  try {
-    let response = await storage.apiFetch('/api/subscription/status');
-    if (!response.ok) {
-      trial.datesText = 'Попробуйте обновить страницу.';
-      trial.badgeText = 'Пробный период до --';
-      trial.badgeClass = 'bg-slate-100 text-slate-600';
-      return;
-    }
-    let data = await response.json();
-    if (data?.subscription_status === 'none') {
-      const startResponse = await storage.apiFetch('/api/subscription/start_trial', { method: 'POST', body: JSON.stringify({}) });
-      if (startResponse.ok) data = await startResponse.json();
-    }
-    const until = typeof data?.subscription_until === 'string' ? data.subscription_until : null;
-    const untilDate = until ? new Date(until) : null;
-    const untilText = untilDate && !Number.isNaN(untilDate.getTime()) ? untilDate.toLocaleDateString('ru-RU') : '--';
-    trial.showPaywall = data?.subscription_status === 'expired';
-    trial.isExpired = trial.showPaywall;
-    if (trial.showPaywall) {
-      trial.datesText = `Пробный период закончился ${untilText}.`;
-      trial.badgeText = 'Пробный период завершён';
-      trial.badgeClass = 'bg-rose-100 text-rose-700';
-      trial.paymentMotivation = 'Оплата откроет персональные рекомендации и расширенную аналитику.';
-      return;
-    }
-    trial.badgeText = until ? `Максимальный доступ до ${untilText}` : 'Доступ активен';
-    trial.datesText = '';
-    trial.badgeClass = 'bg-emerald-100 text-emerald-700';
-    trial.warningText = '';
-    if (data?.subscription_status === 'trial' && untilDate && !Number.isNaN(untilDate.getTime())) {
-      const daysLeft = Math.ceil((untilDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-      if (daysLeft <= 3 && daysLeft >= 0) trial.warningText = 'Пробный период скоро закончится. Можно заранее оформить подписку.';
-    }
-  } catch {
-    trial.datesText = 'Попробуйте обновить страницу.';
-    trial.badgeText = 'Пробный период до --';
-    trial.badgeClass = 'bg-slate-100 text-slate-600';
-  }
-};
-
-const startPayment = async () => {
-  trial.payProcessing = true;
-  try {
-    const response = await storage.apiFetch('/api/payments/start', { method: 'POST', body: JSON.stringify({ days: 30 }) });
-    if (response.ok) await loadTrialStatus();
-  } finally {
-    trial.payProcessing = false;
-  }
-};
-
 const goProgress = async () => { await router.push('/profile'); };
 const goQuestionnaire = async () => { await router.push('/questionnaire?edit=1'); };
 const copyDiagnostics = async () => {
@@ -411,7 +350,6 @@ onMounted(async () => {
     if (!Number.isNaN(d.getTime()) && d < t) deadlineWarning.value = 'Дедлайн уже прошёл. Можно выбрать новую дату.';
   }
   await loadAiRecommendation();
-  await loadTrialStatus();
   if (typeof (window as { feather?: { replace?: () => void } }).feather?.replace === 'function') (window as { feather: { replace: () => void } }).feather.replace();
 });
 </script>

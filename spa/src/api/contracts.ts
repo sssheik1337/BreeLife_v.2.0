@@ -95,8 +95,28 @@ export interface MealPlanWeekResponse {
 
 export interface SubscriptionStatusResponse {
     status: 'active' | 'inactive' | string;
+    subscription_status: Nullable<string>;
     subscription_until: Nullable<ApiIsoDateTimeString>;
     subscription_started_at: Nullable<ApiIsoDateTimeString>;
+    subscription_auto_renew?: Nullable<boolean>;
+    subscription_cancelled_at?: Nullable<ApiIsoDateTimeString>;
+}
+
+export interface LegalOfferVersion {
+    version: number;
+    title: string;
+    summary?: Nullable<string>;
+    body_markdown?: Nullable<string>;
+    published_at?: Nullable<ApiIsoDateTimeString>;
+}
+
+export interface LegalOfferStatusResponse {
+    current_version?: Nullable<number>;
+    current_offer?: Nullable<LegalOfferVersion>;
+    accepted_version?: Nullable<number>;
+    accepted_at?: Nullable<ApiIsoDateTimeString>;
+    needs_acceptance?: Nullable<boolean>;
+    has_offer?: Nullable<boolean>;
 }
 
 export interface ReminderEntity {

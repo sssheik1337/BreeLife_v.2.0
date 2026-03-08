@@ -106,6 +106,7 @@ def _build_v2_day_payload(
     resolved_date: date,
     safe_profile: dict[str, object],
     raw_products: list[dict[str, object]],
+    total_products_count: int | None,
     telegram_user_id: int,
     effective_excluded_ids: set[int],
     weekly_usage_counts: dict[int, int] | None,
@@ -142,6 +143,8 @@ def _build_v2_day_payload(
             "missing_fields": targets_diagnostics.get("missing_fields", []),
             "date_parse_error": date_parse_error,
             "catalog_size": len(raw_products),
+            "catalog_size_total": int(total_products_count) if isinstance(total_products_count, int) else len(raw_products),
+            "catalog_size_favorites": len(raw_products),
             "excluded_ids_count": len(effective_excluded_ids),
             "generator": "v2",
             "fallback_reason": None,
@@ -194,6 +197,27 @@ def _build_products_catalog_hash(raw_products: list[dict[str, object]]) -> str:
     snapshot.sort(key=lambda row: int(row["id"]))
     serialized = json.dumps(snapshot, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _filter_products_by_ids(
+    raw_products: list[dict[str, object]],
+    allowed_ids: set[int],
+) -> list[dict[str, object]]:
+    if not allowed_ids:
+        return []
+
+    filtered: list[dict[str, object]] = []
+    for item in raw_products:
+        product_id = item.get("id")
+        if isinstance(product_id, bool):
+            continue
+        try:
+            normalized_id = int(product_id)
+        except (TypeError, ValueError):
+            continue
+        if normalized_id in allowed_ids:
+            filtered.append(item)
+    return filtered
 
 
 def _extract_product_ids_from_payload(payload: dict[str, object]) -> set[int]:
@@ -504,11 +528,15 @@ def _aggregate_shopping_items(
 def _load_generation_context(telegram_user_id: int) -> dict[str, object]:
     profile = load_profile(telegram_user_id)
     safe_profile = profile if isinstance(profile, dict) else {}
-    raw_products = load_admin_products()
+    admin_products = load_admin_products()
 
     favorite_ids = normalize_profile_id_set(safe_profile.get("favorite_product_ids"))
     excluded_ids = normalize_profile_id_set(safe_profile.get("excluded_product_ids"))
     ensure_preferences_completed(safe_profile, favorite_ids)
+
+    raw_products = _filter_products_by_ids(admin_products, favorite_ids)
+    if not raw_products:
+        raise HTTPException(status_code=422, detail={"reason": "favorite_products_not_found"})
 
     products_catalog_hash = _build_products_catalog_hash(raw_products)
     inputs_hash = build_meal_plan_inputs_hash(
@@ -521,6 +549,7 @@ def _load_generation_context(telegram_user_id: int) -> dict[str, object]:
         "telegram_user_id": telegram_user_id,
         "safe_profile": safe_profile,
         "raw_products": raw_products,
+        "total_products_count": len(admin_products),
         "favorite_ids": favorite_ids,
         "excluded_ids": excluded_ids,
         "inputs_hash": inputs_hash,
@@ -540,6 +569,7 @@ def _generate_day_payload(
     raw_products = context["raw_products"]
     safe_profile = context["safe_profile"]
     base_excluded_ids = context["excluded_ids"]
+    total_products_count = context.get("total_products_count")
     telegram_user_id = int(context["telegram_user_id"])
 
     effective_excluded_ids, _, weekly_blocked_ids = _build_effective_excluded_ids(
@@ -571,6 +601,7 @@ def _generate_day_payload(
         resolved_date=resolved_date,
         safe_profile=safe_profile,
         raw_products=raw_products,
+        total_products_count=int(total_products_count) if isinstance(total_products_count, int) else None,
         telegram_user_id=telegram_user_id,
         effective_excluded_ids=effective_excluded_ids,
         weekly_usage_counts=weekly_usage_counts,

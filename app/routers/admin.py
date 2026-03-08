@@ -21,6 +21,8 @@ from app.context import (
     update_plans_config,
     update_admin_config,
 )
+from app.dependencies import load_profile, update_profile
+from services.legal_offer import load_offer_document, publish_offer_version
 from services.products_db import (
     collect_product_groups,
     load_admin_groups,
@@ -33,6 +35,9 @@ router = APIRouter()
 ALLOWED_PAGE_SIZES = {10, 20, 50, 100}
 ALLOWED_USER_SORTS = {"registered_desc", "registered_asc", "payments_desc", "payments_asc"}
 MSK_TIMEZONE = timezone(timedelta(hours=3))
+SUCCESS_PAYMENT_STATUSES = ("success", "succeeded", "paid")
+LEGAL_VERSIONS_PAGE_SIZE = 5
+LEGAL_PAGINATION_WINDOW = 5
 
 
 def _slugify_plan_id(title: str) -> str:
@@ -288,6 +293,85 @@ def render_admin_plans(
     )
 
 
+def render_admin_legal(
+    request: Request,
+    error: str | None = None,
+    success: str | None = None,
+    form_data: dict[str, str] | None = None,
+    source_version: int | None = None,
+    clear_editor: bool = False,
+    preview_payload: dict[str, str] | None = None,
+    page: int = 1,
+) -> HTMLResponse:
+    document = load_offer_document()
+    raw_versions = document.get("versions") if isinstance(document.get("versions"), list) else []
+    versions: list[dict[str, object]] = []
+    for item in raw_versions:
+        if not isinstance(item, dict):
+            continue
+        prepared = dict(item)
+        prepared["published_at_display"] = _format_datetime(item.get("published_at"))
+        versions.append(prepared)
+    total_versions = len(versions)
+    total_pages = max(1, (total_versions + LEGAL_VERSIONS_PAGE_SIZE - 1) // LEGAL_VERSIONS_PAGE_SIZE)
+    current_page = min(max(1, int(page or 1)), total_pages)
+    start_idx = (current_page - 1) * LEGAL_VERSIONS_PAGE_SIZE
+    end_idx = start_idx + LEGAL_VERSIONS_PAGE_SIZE
+    versions_page = versions[start_idx:end_idx]
+    page_window_index = (current_page - 1) // LEGAL_PAGINATION_WINDOW
+    page_window_start = page_window_index * LEGAL_PAGINATION_WINDOW + 1
+    page_window_end = min(total_pages, page_window_start + LEGAL_PAGINATION_WINDOW - 1)
+    selected_version = next(
+        (
+            item for item in versions
+            if isinstance(item, dict) and int(item.get("version") or 0) == int(source_version or 0)
+        ),
+        None,
+    )
+    current_offer_raw = document.get("current_offer") if isinstance(document.get("current_offer"), dict) else None
+    current_offer = dict(current_offer_raw) if isinstance(current_offer_raw, dict) else None
+    if isinstance(current_offer, dict):
+        current_offer["published_at_display"] = _format_datetime(current_offer.get("published_at"))
+
+    if isinstance(form_data, dict):
+        editor_source = form_data
+    elif clear_editor:
+        editor_source = {
+            "title": "",
+            "summary": "",
+            "body_markdown": "",
+        }
+    elif isinstance(selected_version, dict):
+        editor_source = {
+            "title": str(selected_version.get("title") or "").strip(),
+            "summary": str(selected_version.get("summary") or "").strip(),
+            "body_markdown": str(selected_version.get("body_markdown") or "").strip(),
+        }
+    else:
+        editor_source = {
+            "title": "",
+            "summary": "",
+            "body_markdown": "",
+        }
+    return templates.TemplateResponse(
+        "admin_legal.html",
+        {
+            "request": request,
+            "offer_document": document,
+            "versions": versions_page,
+            "current_offer": current_offer,
+            "editor_source": editor_source,
+            "preview_payload": preview_payload,
+            "source_version": source_version,
+            "current_page": current_page,
+            "total_pages": total_pages,
+            "page_numbers": list(range(page_window_start, page_window_end + 1)),
+            "error": error,
+            "success": success,
+        },
+    )
+
+
 def _parse_iso_datetime(raw_value: object) -> datetime | None:
     if not isinstance(raw_value, str):
         return None
@@ -312,6 +396,31 @@ def _format_datetime(raw_value: object) -> str:
     return parsed.astimezone(MSK_TIMEZONE).strftime("%Y-%m-%d %H:%M МСК")
 
 
+def _translate_payment_status(raw_status: object, meta_payload: dict[str, object] | None = None) -> str:
+    status = str(raw_status or "").strip().lower()
+    if not status and isinstance(meta_payload, dict):
+        status = str(meta_payload.get("provider_status") or "").strip().lower()
+
+    mapping = {
+        "pending": "Ожидает оплаты",
+        "processing": "В обработке",
+        "waiting_for_capture": "Ожидает подтверждения",
+        "succeeded": "Успешно",
+        "success": "Успешно",
+        "paid": "Оплачено",
+        "canceled": "Отменён",
+        "cancelled": "Отменён",
+        "failed": "Ошибка",
+        "refunded": "Возврат",
+        "partially_refunded": "Частичный возврат",
+    }
+    return mapping.get(status, str(raw_status or "—"))
+
+
+def _is_success_payment_status(raw_status: object) -> bool:
+    return str(raw_status or "").strip().lower() in SUCCESS_PAYMENT_STATUSES
+
+
 def _extract_profile_value(profile: dict[str, object], key: str) -> str:
     direct = profile.get(key)
     if isinstance(direct, str) and direct.strip():
@@ -325,6 +434,8 @@ def _extract_profile_value(profile: dict[str, object], key: str) -> str:
 
 
 def _is_subscription_active_paid(subscription_status: str, subscription_until_raw: str, now_utc: datetime) -> bool:
+    if subscription_status == "lifetime":
+        return True
     if subscription_status != "paid":
         return False
     until_dt = _parse_iso_datetime(subscription_until_raw)
@@ -363,7 +474,7 @@ def _monitor_payload(trial_days: int) -> dict[str, object]:
                 """
                 SELECT COUNT(DISTINCT telegram_user_id)
                 FROM payments
-                WHERE lower(status) = 'success'
+                WHERE lower(status) IN ('success', 'succeeded', 'paid')
                 """
             ).fetchone()[0]
         )
@@ -371,7 +482,7 @@ def _monitor_payload(trial_days: int) -> dict[str, object]:
             """
             SELECT COALESCE(SUM(amount_rub), 0)
             FROM payments
-            WHERE lower(status) = 'success'
+            WHERE lower(status) IN ('success', 'succeeded', 'paid')
               AND created_at >= ?
             """,
             ((now_utc - timedelta(days=30)).isoformat(),),
@@ -474,7 +585,7 @@ def _query_admin_users_page(
         WITH payments_stats AS (
             SELECT
                 telegram_user_id,
-                SUM(CASE WHEN lower(status) = 'success' THEN 1 ELSE 0 END) AS payments_count
+                SUM(CASE WHEN lower(status) IN ('success', 'succeeded', 'paid') THEN 1 ELSE 0 END) AS payments_count
             FROM payments
             GROUP BY telegram_user_id
         ),
@@ -554,7 +665,7 @@ def _query_admin_users_page(
         params.append(max(0, int(payments_max)))
 
     if has_active_subscription in (0, 1):
-        active_expr = "(subscription_status = 'paid' AND subscription_until > ?)"
+        active_expr = "((subscription_status = 'paid' AND subscription_until > ?) OR subscription_status = 'lifetime')"
         if has_active_subscription == 1:
             where_parts.append(f"AND {active_expr}")
         else:
@@ -706,21 +817,28 @@ def _load_admin_user_detail(telegram_user_id: int, trial_days: int) -> dict[str,
     subscription_active = _is_subscription_active_paid(subscription_status, subscription_until_raw, now_utc)
 
     payments: list[dict[str, object]] = []
+    successful_payments_count = 0
     for row in payment_rows:
         raw_meta = row["meta_json"]
         pretty_meta = ""
+        meta_payload: dict[str, object] | None = None
         if isinstance(raw_meta, str) and raw_meta.strip():
             try:
-                pretty_meta = json.dumps(json.loads(raw_meta), ensure_ascii=False, indent=2)
+                parsed_meta = json.loads(raw_meta)
+                if isinstance(parsed_meta, dict):
+                    meta_payload = parsed_meta
+                pretty_meta = json.dumps(parsed_meta, ensure_ascii=False, indent=2)
             except (TypeError, json.JSONDecodeError):
                 pretty_meta = raw_meta.strip()
+        if _is_success_payment_status(row["status"]):
+            successful_payments_count += 1
         payments.append(
             {
                 "id": int(row["id"]),
                 "created_at_display": _format_datetime(row["created_at"]),
                 "amount_rub": int(row["amount_rub"] or 0),
                 "duration_days": int(row["duration_days"] or 0),
-                "status": str(row["status"] or ""),
+                "status": _translate_payment_status(row["status"], meta_payload),
                 "meta_json_pretty": pretty_meta,
             }
         )
@@ -732,12 +850,134 @@ def _load_admin_user_detail(telegram_user_id: int, trial_days: int) -> dict[str,
         "last_name": str(user_row["last_name"] or ""),
         "registered_at_display": _format_datetime(user_row["registered_at"]),
         "trial_until_display": _format_datetime(trial_until_dt.isoformat() if trial_until_dt else None),
+        "trial_until_input": trial_until_dt.astimezone(MSK_TIMEZONE).strftime("%Y-%m-%d") if trial_until_dt else "",
         "subscription_status": subscription_status or "inactive",
-        "subscription_until_display": _format_datetime(subscription_until_raw),
+        "subscription_until_display": "Без ограничения" if subscription_status == "lifetime" else _format_datetime(subscription_until_raw),
         "subscription_active": subscription_active,
-        "payments_count": len(payments),
+        "payments_count": successful_payments_count,
         "payments": payments,
     }
+
+
+def render_admin_user_detail(
+    request: Request,
+    telegram_user_id: int,
+    error: str | None = None,
+    success: str | None = None,
+    reset_confirmation_value: str = "",
+    lifetime_confirmation_value: str = "",
+    trial_confirmation_value: str = "",
+    trial_until_value: str = "",
+) -> HTMLResponse:
+    admin_config = load_admin_config()
+    trial_days = int(admin_config.get("trial_days", 30))
+    user_payload = _load_admin_user_detail(telegram_user_id, trial_days)
+    if user_payload is None:
+        return RedirectResponse(url="/admin/users", status_code=303)
+    return templates.TemplateResponse(
+        "admin_user_detail.html",
+        {
+            "request": request,
+            "user": user_payload,
+            "error": error,
+            "success": success,
+            "reset_confirmation_value": reset_confirmation_value,
+            "lifetime_confirmation_value": lifetime_confirmation_value,
+            "trial_confirmation_value": trial_confirmation_value,
+            "trial_until_value": trial_until_value or str(user_payload.get("trial_until_input") or ""),
+        },
+    )
+
+
+def _expire_trial_for_user(telegram_user_id: int, trial_days: int) -> None:
+    now_utc = datetime.now(timezone.utc)
+    expired_at = now_utc - timedelta(minutes=1)
+    trial_started_at = expired_at - timedelta(days=max(0, trial_days))
+
+    profile = load_profile(telegram_user_id)
+    updated = dict(profile)
+    subscription_payload = updated.get("subscription") if isinstance(updated.get("subscription"), dict) else {}
+    updated_subscription = dict(subscription_payload)
+    updated_subscription.update(
+        {
+            "subscription_started_at": trial_started_at.isoformat(),
+            "trial_started_at": trial_started_at.isoformat(),
+            "subscription_until": expired_at.isoformat(),
+            "subscription_status": "expired",
+        }
+    )
+
+    updated["subscription"] = updated_subscription
+    updated["subscription_started_at"] = trial_started_at.isoformat()
+    updated["trial_started_at"] = trial_started_at.isoformat()
+    updated["subscription_until"] = expired_at.isoformat()
+    updated["subscription_status"] = "expired"
+    update_profile(telegram_user_id, updated)
+
+
+def _grant_lifetime_access_for_user(telegram_user_id: int) -> None:
+    now_utc = datetime.now(timezone.utc)
+    profile = load_profile(telegram_user_id)
+    updated = dict(profile)
+    subscription_payload = updated.get("subscription") if isinstance(updated.get("subscription"), dict) else {}
+    updated_subscription = dict(subscription_payload)
+    updated_subscription.update(
+        {
+            "subscription_started_at": now_utc.isoformat(),
+            "subscription_until": None,
+            "subscription_status": "lifetime",
+        }
+    )
+
+    existing_trial_started_at = updated.get("trial_started_at")
+    if not isinstance(existing_trial_started_at, str) or not existing_trial_started_at.strip():
+        existing_trial_started_at = now_utc.isoformat()
+        updated_subscription["trial_started_at"] = existing_trial_started_at
+
+    updated["subscription"] = updated_subscription
+    updated["subscription_started_at"] = now_utc.isoformat()
+    updated["subscription_until"] = None
+    updated["subscription_status"] = "lifetime"
+    updated["trial_started_at"] = existing_trial_started_at
+    update_profile(telegram_user_id, updated)
+
+
+def _set_trial_until_for_user(telegram_user_id: int, trial_until_raw: str, trial_days: int) -> tuple[str, str]:
+    normalized = str(trial_until_raw or "").strip()
+    if not normalized:
+        raise ValueError("DATE_REQUIRED")
+
+    try:
+        until_local = datetime.fromisoformat(f"{normalized}T23:59:59+03:00")
+    except ValueError as exc:
+        raise ValueError("DATE_INVALID") from exc
+
+    until_utc = until_local.astimezone(timezone.utc)
+    trial_started_at = until_utc - timedelta(days=max(0, int(trial_days)))
+    now_utc = datetime.now(timezone.utc)
+    subscription_status = "trial" if until_utc > now_utc else "expired"
+
+    profile = load_profile(telegram_user_id)
+    updated = dict(profile)
+    subscription_payload = updated.get("subscription") if isinstance(updated.get("subscription"), dict) else {}
+    updated_subscription = dict(subscription_payload)
+    updated_subscription.update(
+        {
+            "subscription_started_at": trial_started_at.isoformat(),
+            "trial_started_at": trial_started_at.isoformat(),
+            "subscription_until": until_utc.isoformat(),
+            "subscription_status": subscription_status,
+        }
+    )
+
+    updated["subscription"] = updated_subscription
+    updated["subscription_started_at"] = trial_started_at.isoformat()
+    updated["trial_started_at"] = trial_started_at.isoformat()
+    updated["subscription_until"] = until_utc.isoformat()
+    updated["subscription_status"] = subscription_status
+    update_profile(telegram_user_id, updated)
+
+    return subscription_status, until_local.strftime("%Y-%m-%d 23:59 МСК")
 
 @router.get("/admin", response_class=HTMLResponse)
 async def admin(request: Request):
@@ -775,6 +1015,23 @@ async def admin_plans(request: Request):
     if not is_admin_authenticated(request):
         return RedirectResponse(url="/admin", status_code=303)
     return render_admin_plans(request)
+
+
+@router.get("/admin/legal", response_class=HTMLResponse)
+async def admin_legal(
+    request: Request,
+    source_version: int | None = Query(default=None),
+    clear_editor: bool = Query(default=False),
+    page: int = Query(default=1),
+):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+    return render_admin_legal(
+        request,
+        source_version=None if clear_editor else source_version,
+        clear_editor=clear_editor,
+        page=page,
+    )
 
 
 @router.get("/admin/monitor", response_class=HTMLResponse)
@@ -858,19 +1115,122 @@ async def admin_users(
 async def admin_user_detail(request: Request, telegram_user_id: int):
     if not is_admin_authenticated(request):
         return RedirectResponse(url="/admin", status_code=303)
+    return render_admin_user_detail(request, telegram_user_id)
+
+
+@router.post("/admin/users/{telegram_user_id}/reset-trial", response_class=HTMLResponse)
+async def admin_user_reset_trial(
+    request: Request,
+    telegram_user_id: int,
+    confirmation_value: str = Form(...),
+):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+
+    expected_value = str(telegram_user_id)
+    normalized_confirmation = confirmation_value.strip()
+    if normalized_confirmation != expected_value:
+        return render_admin_user_detail(
+            request,
+            telegram_user_id,
+            error=f"Введите {expected_value} чтобы подтвердить обнуление.",
+            reset_confirmation_value=normalized_confirmation,
+        )
+
     admin_config = load_admin_config()
     trial_days = int(admin_config.get("trial_days", 30))
-    user_payload = _load_admin_user_detail(telegram_user_id, trial_days)
-    if user_payload is None:
+    if _load_admin_user_detail(telegram_user_id, trial_days) is None:
         return RedirectResponse(url="/admin/users", status_code=303)
-    return templates.TemplateResponse(
-        "admin_user_detail.html",
-        {
-            "request": request,
-            "user": user_payload,
-            "error": None,
-            "success": None,
-        },
+
+    _expire_trial_for_user(telegram_user_id, trial_days)
+    return render_admin_user_detail(
+        request,
+        telegram_user_id,
+        success="Пробный период обнулён. Пользователь переведён в состояние истёкшего trial.",
+    )
+
+
+@router.post("/admin/users/{telegram_user_id}/grant-lifetime", response_class=HTMLResponse)
+async def admin_user_grant_lifetime(
+    request: Request,
+    telegram_user_id: int,
+    confirmation_value: str = Form(...),
+):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+
+    expected_value = str(telegram_user_id)
+    normalized_confirmation = confirmation_value.strip()
+    if normalized_confirmation != expected_value:
+        return render_admin_user_detail(
+            request,
+            telegram_user_id,
+            error=f"Введите {expected_value} чтобы подтвердить выдачу супердоступа.",
+            lifetime_confirmation_value=normalized_confirmation,
+        )
+
+    admin_config = load_admin_config()
+    trial_days = int(admin_config.get("trial_days", 30))
+    if _load_admin_user_detail(telegram_user_id, trial_days) is None:
+        return RedirectResponse(url="/admin/users", status_code=303)
+
+    _grant_lifetime_access_for_user(telegram_user_id)
+    return render_admin_user_detail(
+        request,
+        telegram_user_id,
+        success="Супердоступ выдан. Пользователь получил бессрочный доступ к приложению.",
+    )
+
+
+@router.post("/admin/users/{telegram_user_id}/set-trial-until", response_class=HTMLResponse)
+async def admin_user_set_trial_until(
+    request: Request,
+    telegram_user_id: int,
+    confirmation_value: str = Form(...),
+    trial_until_date: str = Form(...),
+):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+
+    expected_value = str(telegram_user_id)
+    normalized_confirmation = confirmation_value.strip()
+    normalized_trial_until = trial_until_date.strip()
+    if normalized_confirmation != expected_value:
+        return render_admin_user_detail(
+            request,
+            telegram_user_id,
+            error=f"Введите {expected_value} чтобы подтвердить установку срока trial.",
+            trial_confirmation_value=normalized_confirmation,
+            trial_until_value=normalized_trial_until,
+        )
+
+    admin_config = load_admin_config()
+    trial_days = int(admin_config.get("trial_days", 30))
+    if _load_admin_user_detail(telegram_user_id, trial_days) is None:
+        return RedirectResponse(url="/admin/users", status_code=303)
+
+    try:
+        status, until_display = _set_trial_until_for_user(telegram_user_id, normalized_trial_until, trial_days)
+    except ValueError as exc:
+        detail = str(exc)
+        if detail == "DATE_REQUIRED":
+            error_message = "Укажите дату окончания trial."
+        else:
+            error_message = "Неверный формат даты trial."
+        return render_admin_user_detail(
+            request,
+            telegram_user_id,
+            error=error_message,
+            trial_confirmation_value=normalized_confirmation,
+            trial_until_value=normalized_trial_until,
+        )
+
+    status_text = "активного trial" if status == "trial" else "истёкшего trial"
+    return render_admin_user_detail(
+        request,
+        telegram_user_id,
+        success=f"Срок trial установлен до {until_display}. Пользователь переведён в состояние {status_text}.",
+        trial_until_value=normalized_trial_until,
     )
 
 
@@ -1052,6 +1412,105 @@ async def admin_support_contacts_update(
     config["support_contacts"] = contacts
     update_admin_config(config)
     return render_admin_plans(request, success="Контакты поддержки обновлены.")
+
+
+@router.post("/admin/legal/publish", response_class=HTMLResponse)
+async def admin_legal_publish(
+    request: Request,
+    title: str = Form(default=""),
+    summary: str = Form(default=""),
+    body_markdown: str = Form(default=""),
+    page: int = Form(default=1),
+):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+
+    normalized_title = title.strip()
+    normalized_summary = summary.strip()
+    normalized_body = body_markdown.strip()
+    form_data = {
+        "title": normalized_title,
+        "summary": normalized_summary,
+        "body_markdown": normalized_body,
+    }
+    if not normalized_title:
+        return render_admin_legal(request, error="Укажите заголовок редакции.", form_data=form_data, page=page)
+    if len(normalized_body) < 80:
+        return render_admin_legal(
+            request,
+            error="Текст оферты слишком короткий. Нужен полный текст новой редакции.",
+            form_data=form_data,
+            page=page,
+        )
+
+    return render_admin_legal(
+        request,
+        preview_payload=form_data,
+        page=page,
+    )
+
+
+@router.post("/admin/legal/edit", response_class=HTMLResponse)
+async def admin_legal_edit(
+    request: Request,
+    title: str = Form(default=""),
+    summary: str = Form(default=""),
+    body_markdown: str = Form(default=""),
+    page: int = Form(default=1),
+):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+
+    return render_admin_legal(
+        request,
+        form_data={
+            "title": title.strip(),
+            "summary": summary.strip(),
+            "body_markdown": body_markdown.strip(),
+        },
+        page=page,
+    )
+
+
+@router.post("/admin/legal/confirm", response_class=HTMLResponse)
+async def admin_legal_confirm(
+    request: Request,
+    title: str = Form(default=""),
+    summary: str = Form(default=""),
+    body_markdown: str = Form(default=""),
+    page: int = Form(default=1),
+):
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin", status_code=303)
+
+    normalized_title = title.strip()
+    normalized_summary = summary.strip()
+    normalized_body = body_markdown.strip()
+    form_data = {
+        "title": normalized_title,
+        "summary": normalized_summary,
+        "body_markdown": normalized_body,
+    }
+    if not normalized_title:
+        return render_admin_legal(request, error="Укажите заголовок редакции.", form_data=form_data, page=page)
+    if len(normalized_body) < 80:
+        return render_admin_legal(
+            request,
+            error="Текст оферты слишком короткий. Нужен полный текст новой редакции.",
+            form_data=form_data,
+            page=page,
+        )
+
+    published = publish_offer_version(
+        title=normalized_title,
+        summary=normalized_summary,
+        body_markdown=normalized_body,
+    )
+    return render_admin_legal(
+        request,
+        success=f"Опубликована новая версия оферты: v{int(published['version'])}. Пользователи увидят её при следующем входе.",
+        page=page,
+    )
 
 
 @router.post("/admin/plans/add", response_class=HTMLResponse)

@@ -43,9 +43,19 @@ class CustomNavbar extends HTMLElement {
           display: flex;
           align-items: center;
           justify-content: center;
-          color: white;
-          font-weight: 700;
-          font-size: 18px;
+        }
+
+        .logo-icon svg {
+          width: 22px;
+          height: 22px;
+          display: block;
+        }
+
+        .logo-icon img {
+          width: 22px;
+          height: 22px;
+          display: block;
+          object-fit: contain;
         }
 
         .logo-text {
@@ -128,7 +138,16 @@ class CustomNavbar extends HTMLElement {
           .logo-icon {
             width: 32px;
             height: 32px;
-            font-size: 16px;
+          }
+
+          .logo-icon svg {
+            width: 20px;
+            height: 20px;
+          }
+
+          .logo-icon img {
+            width: 20px;
+            height: 20px;
           }
 
           .profile-avatar {
@@ -144,7 +163,9 @@ class CustomNavbar extends HTMLElement {
 
       <nav class="navbar">
         <a href="/profile" class="logo" aria-label="Open profile">
-          <div class="logo-icon">🌿</div>
+          <div class="logo-icon" aria-hidden="true">
+            <img src="/static/emoji_u1f33f.svg" alt="" />
+          </div>
           <div class="logo-text">${appName}</div>
         </a>
 

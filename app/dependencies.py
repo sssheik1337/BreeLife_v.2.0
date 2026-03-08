@@ -341,7 +341,9 @@ def normalize_profile_payload_shape(raw_profile: dict[str, object] | None) -> di
     - macros, weekly_stats, weekly_adjustments, weekly_review, subscription: object | null
     - preferences_onboarding_completed, food_diary, trial_welcome_seen, is_completed: bool | null
     - favorite_product_ids, excluded_product_ids: list[int]
-    - subscription_until/subscription_status/subscription_started_at/trial_started_at/last_updated: str | null
+    - subscription_until/subscription_status/subscription_started_at/trial_started_at/subscription_cancelled_at/terms_offer_accepted_at/last_updated: str | null
+    - subscription_auto_renew: bool | null
+    - terms_offer_accepted_version: int | null
 
     На выходе возвращаются только canonical-ключи.
     """
@@ -455,6 +457,10 @@ def normalize_profile_payload_shape(raw_profile: dict[str, object] | None) -> di
         "subscription_until": profile.get("subscription_until") if isinstance(profile.get("subscription_until"), str) else None,
         "subscription_status": profile.get("subscription_status") if isinstance(profile.get("subscription_status"), str) else None,
         "subscription_started_at": profile.get("subscription_started_at") if isinstance(profile.get("subscription_started_at"), str) else None,
+        "subscription_auto_renew": parse_bool(profile.get("subscription_auto_renew")),
+        "subscription_cancelled_at": profile.get("subscription_cancelled_at") if isinstance(profile.get("subscription_cancelled_at"), str) else None,
+        "terms_offer_accepted_version": int(profile.get("terms_offer_accepted_version")) if isinstance(profile.get("terms_offer_accepted_version"), (int, float)) and not isinstance(profile.get("terms_offer_accepted_version"), bool) else None,
+        "terms_offer_accepted_at": profile.get("terms_offer_accepted_at") if isinstance(profile.get("terms_offer_accepted_at"), str) else None,
         "trial_started_at": profile.get("trial_started_at") if isinstance(profile.get("trial_started_at"), str) else None,
         "trial_welcome_seen": parse_bool(profile.get("trial_welcome_seen")),
         "preferences_onboarding_completed": parse_bool(profile.get("preferences_onboarding_completed")),
@@ -501,6 +507,10 @@ CANONICAL_PROFILE_FIELDS = {
     "subscription_until",
     "subscription_status",
     "subscription_started_at",
+    "subscription_auto_renew",
+    "subscription_cancelled_at",
+    "terms_offer_accepted_version",
+    "terms_offer_accepted_at",
     "trial_started_at",
     "trial_welcome_seen",
     "preferences_onboarding_completed",

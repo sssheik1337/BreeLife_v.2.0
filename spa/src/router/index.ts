@@ -18,6 +18,7 @@ import ShoppingListPage from '../pages/ShoppingListPage.vue';
 import MenuPage from '../pages/MenuPage.vue';
 import ReferencesPage from '../pages/ReferencesPage.vue';
 import SupportPage from '../pages/SupportPage.vue';
+import LegalPage from '../pages/LegalPage.vue';
 import PlansPage from '../pages/PlansPage.vue';
 import RemindersSettingsPage from '../pages/RemindersSettingsPage.vue';
 
@@ -167,6 +168,12 @@ const routes: RouteRecordRaw[] = [
         path: '/support',
         name: 'support',
         component: SupportPage,
+        meta: { ...ROUTE_META.completedOnly } satisfies RouteMetaPolicy
+    },
+    {
+        path: '/legal',
+        name: 'legal',
+        component: LegalPage,
         meta: { ...ROUTE_META.completedOnly } satisfies RouteMetaPolicy
     },
     {
