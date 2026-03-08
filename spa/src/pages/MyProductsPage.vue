@@ -7,21 +7,17 @@
                         <i data-feather="shopping-bag" class="w-7 h-7 text-white"></i>
                     </div>
                     <h1 class="text-2xl font-bold text-slate-800">Мои продукты</h1>
-                    <p class="text-slate-500 mt-2">Отмечайте любимое и то, что не едите или вызывает аллергию.</p>
+                    <p class="text-slate-500 mt-2">Отмечайте лайком любимые продукты. Рацион собирается только из них.</p>
                     <RouterLink id="preferences-entrypoint" to="/preferences-onboarding" class="btn-secondary inline-flex items-center justify-center mt-4">
                         {{ preferencesEntrypointText }}
                     </RouterLink>
                 </div>
 
                 <div class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-3">
-                    <div class="flex items-center justify-between">
+                    <div class="grid grid-cols-2 gap-4 sm:grid-cols-2">
                         <div>
                             <p class="text-sm text-slate-500">Любимые</p>
                             <p id="favorites-count" class="text-lg font-semibold text-emerald-600">{{ favoriteIds.length }}</p>
-                        </div>
-                        <div>
-                            <p class="text-sm text-slate-500">Исключено</p>
-                            <p id="excluded-count" class="text-lg font-semibold text-rose-500">{{ excludedIds.length }}</p>
                         </div>
                         <div>
                             <p class="text-sm text-slate-500">В базе</p>
@@ -29,8 +25,37 @@
                         </div>
                     </div>
                     <p class="text-xs text-slate-500">
-                        Мы не используем отмеченные ограничения при составлении рациона и списка покупок.
+                        Всё, что без лайка, просто не участвует в составлении рациона.
                     </p>
+                </div>
+
+                <div class="bg-white rounded-2xl p-3 border border-slate-100 shadow-sm">
+                    <div class="grid grid-cols-3 gap-2">
+                        <button
+                            type="button"
+                            class="products-filter-chip"
+                            :class="{ 'products-filter-chip--active': activeViewMode === 'all' }"
+                            @click="activeViewMode = 'all'"
+                        >
+                            Все
+                        </button>
+                        <button
+                            type="button"
+                            class="products-filter-chip"
+                            :class="{ 'products-filter-chip--active': activeViewMode === 'favorites' }"
+                            @click="activeViewMode = 'favorites'"
+                        >
+                            Любимые
+                        </button>
+                        <button
+                            type="button"
+                            class="products-filter-chip"
+                            :class="{ 'products-filter-chip--active': activeViewMode === 'unselected' }"
+                            @click="activeViewMode = 'unselected'"
+                        >
+                            Невыбранные
+                        </button>
+                    </div>
                 </div>
 
                 <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
@@ -95,10 +120,6 @@
                                                 <div class="text-base font-semibold text-slate-800">{{ product.name }}</div>
                                                 <div class="text-sm text-slate-500">{{ product.group }}</div>
                                             </div>
-                                            <span
-                                                class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-                                                :class="healthIndicatorClass(product.health_level)"
-                                            ></span>
                                         </div>
 
                                         <div class="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm text-slate-600">
@@ -124,27 +145,19 @@
                                             >{{ tag }}</span>
                                         </div>
 
-                                        <div class="flex flex-col gap-3 mt-4 text-sm text-slate-600">
-                                            <label class="flex items-center gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    class="form-checkbox"
-                                                    :checked="favoriteSet.has(product.id)"
-                                                    data-preference="favorite"
-                                                    @change="onPreferenceToggle(product.id, 'favorite', ($event.target as HTMLInputElement).checked)"
-                                                >
-                                                <span>❤️ Люблю</span>
-                                            </label>
-                                            <label class="flex items-center gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    class="form-checkbox"
-                                                    :checked="excludedSet.has(product.id)"
-                                                    data-preference="excluded"
-                                                    @change="onPreferenceToggle(product.id, 'excluded', ($event.target as HTMLInputElement).checked)"
-                                                >
-                                                <span>🚫 Не ем / аллергия</span>
-                                            </label>
+                                        <div class="mt-5 flex justify-center">
+                                            <button
+                                                type="button"
+                                                class="product-like-button"
+                                                :class="{ 'product-like-button--active': favoriteSet.has(product.id) }"
+                                                :aria-pressed="favoriteSet.has(product.id) ? 'true' : 'false'"
+                                                :aria-label="favoriteSet.has(product.id) ? `Убрать ${product.name} из любимых` : `Добавить ${product.name} в любимые`"
+                                                @click="onFavoriteToggle(product.id)"
+                                            >
+                                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                                                </svg>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -207,7 +220,7 @@ const expandedGroups = ref<string[]>([]);
 const visibleCountByGroup = ref<Record<string, number>>({});
 
 const favoriteIds = ref<number[]>([]);
-const excludedIds = ref<number[]>([]);
+const activeViewMode = ref<'all' | 'favorites' | 'unselected'>('all');
 
 const isLoading = ref(true);
 const loadError = ref('');
@@ -243,20 +256,30 @@ const isInteger = (value: unknown): value is number => Number.isInteger(value);
 const hasActiveSearch = computed(() => appliedSearch.value.length > 0);
 
 const favoriteSet = computed(() => new Set(favoriteIds.value));
-const excludedSet = computed(() => new Set(excludedIds.value));
 
 const hasSelectedPreferences = computed(() => {
     const profile = storageStore.profile as Record<string, unknown>;
-    return profile?.preferences_onboarding_completed === true || favoriteIds.value.length > 0 || excludedIds.value.length > 0;
+    return profile?.preferences_onboarding_completed === true || favoriteIds.value.length > 0;
 });
 
 const preferencesEntrypointText = computed(() => (hasSelectedPreferences.value ? 'Изменить предпочтения' : 'Настроить предпочтения'));
 
 const filteredProducts = computed<Product[]>(() => {
+    const modeFiltered = allProducts.value.filter((product) => {
+        const isFavorite = favoriteSet.value.has(product.id);
+        if (activeViewMode.value === 'favorites') {
+            return isFavorite;
+        }
+        if (activeViewMode.value === 'unselected') {
+            return !isFavorite;
+        }
+        return true;
+    });
+
     if (!appliedSearch.value) {
-        return allProducts.value;
+        return modeFiltered;
     }
-    return allProducts.value.filter((product) => {
+    return modeFiltered.filter((product) => {
         const name = String(product?.name || '').toLowerCase();
         const group = String(product?.group || '').toLowerCase();
         const brand = String(product?.brand || '').toLowerCase();
@@ -388,13 +411,6 @@ const nutritionStats = (product: Product): Array<{ label: string; value: string 
     ];
 };
 
-const healthIndicatorClass = (level: string | undefined): string => {
-    if (level === 'good') return 'bg-emerald-100 text-emerald-700';
-    if (level === 'medium') return 'bg-amber-100 text-amber-700';
-    if (level === 'bad') return 'bg-rose-100 text-rose-700';
-    return 'bg-slate-100 text-slate-600';
-};
-
 const hasFiberTag = (product: Product): boolean => normalizeTags(product.tags).includes('клетчатка');
 
 const filteredTags = (tags: unknown): string[] => normalizeTags(tags).filter((tag) => tag !== 'клетчатка');
@@ -407,51 +423,47 @@ const hydratePreferencesFromProfile = async (): Promise<void> => {
     }
     const profile = storageStore.getUserProfile() as Record<string, unknown>;
     favoriteIds.value = normalizeIdArray(profile.favorite_product_ids);
-    excludedIds.value = normalizeIdArray(profile.excluded_product_ids);
+    const excludedProductIds = normalizeIdArray(profile.excluded_product_ids);
+    if (excludedProductIds.length > 0) {
+        storageStore.patchUserProfile({
+            excluded_product_ids: []
+        });
+        await storageStore.patchUserProfileWithBackend({
+            excluded_product_ids: []
+        }).catch(() => {
+            // Keep local cleanup even if backend is temporarily unavailable.
+        });
+    }
 };
 
 const savePreferences = async (): Promise<void> => {
     try {
         const savedProfile = await storageStore.patchUserProfileWithBackend({
             favorite_product_ids: [...favoriteIds.value],
-            excluded_product_ids: [...excludedIds.value],
+            excluded_product_ids: [],
             preferences_onboarding_completed: true
         });
         if (savedProfile && typeof savedProfile === 'object') {
             favoriteIds.value = normalizeIdArray((savedProfile as Record<string, unknown>).favorite_product_ids);
-            excludedIds.value = normalizeIdArray((savedProfile as Record<string, unknown>).excluded_product_ids);
         }
     } catch {
         // Keep optimistic state; backend reconciliation will happen on next sync.
     }
 };
 
-const onPreferenceToggle = (productId: number, mode: 'favorite' | 'excluded', checked: boolean): void => {
+const onFavoriteToggle = (productId: number): void => {
     const nextFavorites = new Set(favoriteIds.value);
-    const nextExcluded = new Set(excludedIds.value);
-
-    if (mode === 'favorite') {
-        if (checked) {
-            nextFavorites.add(productId);
-            nextExcluded.delete(productId);
-        } else {
-            nextFavorites.delete(productId);
-        }
+    if (nextFavorites.has(productId)) {
+        nextFavorites.delete(productId);
     } else {
-        if (checked) {
-            nextExcluded.add(productId);
-            nextFavorites.delete(productId);
-        } else {
-            nextExcluded.delete(productId);
-        }
+        nextFavorites.add(productId);
     }
 
     favoriteIds.value = Array.from(nextFavorites);
-    excludedIds.value = Array.from(nextExcluded);
 
     storageStore.patchUserProfile({
         favorite_product_ids: [...favoriteIds.value],
-        excluded_product_ids: [...excludedIds.value],
+        excluded_product_ids: [],
         preferences_onboarding_completed: true
     });
 
@@ -580,5 +592,58 @@ onBeforeUnmount(() => {
 .group-pill-text-leave-to {
     opacity: 0;
     transform: translateY(2px);
+}
+
+.product-like-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 9999px;
+    border: 1px solid rgba(226, 232, 240, 1);
+    background: rgba(255, 255, 255, 0.88);
+    color: rgba(239, 68, 68, 0.34);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.08);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease;
+}
+
+.product-like-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
+}
+
+.product-like-button:active {
+    transform: scale(0.97);
+}
+
+.product-like-button svg {
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+}
+
+.product-like-button--active {
+    color: #ef4444;
+    background: rgba(254, 226, 226, 0.92);
+    border-color: rgba(252, 165, 165, 0.9);
+}
+
+.products-filter-chip {
+    min-height: 42px;
+    border-radius: 9999px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #475569;
+    font-size: 0.9rem;
+    font-weight: 700;
+    transition: background-color 0.18s ease, color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.products-filter-chip--active {
+    border-color: #059669;
+    background: linear-gradient(135deg, #10b981, #06b6d4);
+    color: #ffffff;
+    box-shadow: 0 10px 22px rgba(16, 185, 129, 0.22);
 }
 </style>

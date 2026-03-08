@@ -1,4 +1,4 @@
-<template>
+﻿<template>
     <section class="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#f0f9ff] to-[#f0fdf4]" data-spa-preferences-onboarding>
         <main class="flex-1 px-4 py-8">
             <div class="max-w-md mx-auto space-y-6">
@@ -6,14 +6,14 @@
                     <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 mb-4 shadow-lg">
                         <i data-feather="heart" class="w-7 h-7 text-white"></i>
                     </div>
-                    <h1 class="text-2xl font-bold text-slate-800">Соберем ваши любимые продукты</h1>
-                    <p class="text-slate-500 mt-2">Это поможет собрать рацион, который действительно вам подходит.</p>
+                    <h1 class="text-2xl font-bold text-slate-800">РЎРѕР±РµСЂРµРј РІР°С€Рё Р»СЋР±РёРјС‹Рµ РїСЂРѕРґСѓРєС‚С‹</h1>
+                    <p class="text-slate-500 mt-2">Р­С‚Рѕ РїРѕРјРѕР¶РµС‚ СЃРѕР±СЂР°С‚СЊ СЂР°С†РёРѕРЅ, РєРѕС‚РѕСЂС‹Р№ РґРµР№СЃС‚РІРёС‚РµР»СЊРЅРѕ РІР°Рј РїРѕРґС…РѕРґРёС‚.</p>
                 </div>
 
                 <section v-if="step === 'categories'" class="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm space-y-4">
                     <div class="space-y-1 text-center">
-                        <p class="text-sm font-semibold text-slate-700">Шаг 1 из 2</p>
-                        <p class="text-slate-600">Выберите минимум 3 категории продуктов. Затем перейдете к выбору конкретных продуктов.</p>
+                        <p class="text-sm font-semibold text-slate-700">РЁР°Рі 1 РёР· 2</p>
+                        <p class="text-slate-600">Р’С‹Р±РµСЂРёС‚Рµ РјРёРЅРёРјСѓРј 3 РєР°С‚РµРіРѕСЂРёРё РїСЂРѕРґСѓРєС‚РѕРІ. Р—Р°С‚РµРј РїРµСЂРµР№РґРµС‚Рµ Рє РІС‹Р±РѕСЂСѓ РєРѕРЅРєСЂРµС‚РЅС‹С… РїСЂРѕРґСѓРєС‚РѕРІ.</p>
                     </div>
 
                     <div v-if="allCategories.length" class="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -30,26 +30,26 @@
                     </div>
 
                     <div v-else class="rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm text-slate-500 text-center">
-                        Не удалось загрузить категории продуктов.
+                        РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РєР°С‚РµРіРѕСЂРёРё РїСЂРѕРґСѓРєС‚РѕРІ.
                     </div>
 
                     <div class="flex items-center justify-between pt-2">
-                        <p class="text-sm text-slate-500">Выбрано категорий: {{ selectedCategories.length }}</p>
-                        <button type="button" class="btn-primary" :disabled="!canProceedToProducts" @click="goToProductsStep">Далее</button>
+                        <p class="text-sm text-slate-500">Р’С‹Р±СЂР°РЅРѕ РєР°С‚РµРіРѕСЂРёР№: {{ selectedCategories.length }}</p>
+                        <button type="button" class="btn-primary" :disabled="!canProceedToProducts" @click="goToProductsStep">Р”Р°Р»РµРµ</button>
                     </div>
                 </section>
 
                 <section v-else class="space-y-4">
                     <div class="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-3 text-center">
                         <div class="flex items-center justify-between">
-                            <p class="text-sm font-semibold text-slate-700">Шаг 2 из 2</p>
-                            <p class="text-sm text-slate-500">Выбрано {{ selectedCount }} из {{ MIN_SELECTED_PRODUCTS }}</p>
+                            <p class="text-sm font-semibold text-slate-700">РЁР°Рі 2 РёР· 2</p>
+                            <p class="text-sm text-slate-500">Р’С‹Р±СЂР°РЅРѕ {{ selectedCount }} РёР· {{ MIN_SELECTED_PRODUCTS }}</p>
                         </div>
                         <p class="text-sm text-slate-500" :class="{ 'text-cyan-700 font-medium': canContinue }">
                             {{
                                 canContinue
-                                    ? 'Можно продолжать.'
-                                    : `Для полноценного разнообразного рациона выберите еще ${remainingToMinimum}.`
+                                    ? 'РњРѕР¶РЅРѕ РїСЂРѕРґРѕР»Р¶Р°С‚СЊ.'
+                                    : `Р”Р»СЏ РїРѕР»РЅРѕС†РµРЅРЅРѕРіРѕ СЂР°Р·РЅРѕРѕР±СЂР°Р·РЅРѕРіРѕ СЂР°С†РёРѕРЅР° РІС‹Р±РµСЂРёС‚Рµ РµС‰Рµ ${remainingToMinimum}.`
                             }}
                         </p>
                     </div>
@@ -60,10 +60,10 @@
                                 <span
                                     class="category-filter-chip is-selected rounded-full border px-3 py-1.5 text-sm font-semibold whitespace-nowrap"
                                 >
-                                    {{ activeCategory || 'Без категории' }}
+                                    {{ activeCategory || 'Р‘РµР· РєР°С‚РµРіРѕСЂРёРё' }}
                                 </span>
                                 <span class="text-xs font-medium text-slate-500 whitespace-nowrap text-center">
-                                    Категория {{ activeCategoryPosition }} из {{ selectedCategories.length }}
+                                    РљР°С‚РµРіРѕСЂРёСЏ {{ activeCategoryPosition }} РёР· {{ selectedCategories.length }}
                                 </span>
                             </div>
                         </div>
@@ -87,13 +87,13 @@
                                         </svg>
                                     </span>
                                     <p class="product-title px-5 text-sm font-semibold leading-snug">{{ product.name }}</p>
-                                    <p class="product-meta mt-2 text-xs">{{ Math.round(Number(product.kcal) || 0) }} ккал / 100 г</p>
+                                    <p class="product-meta mt-2 text-xs">{{ Math.round(Number(product.kcal) || 0) }} РєРєР°Р» / 100 Рі</p>
                                 </button>
                             </TransitionGroup>
                         </div>
 
                         <div v-else class="rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm text-slate-500 text-center">
-                            В выбранной категории пока нет продуктов.
+                            Р’ РІС‹Р±СЂР°РЅРЅРѕР№ РєР°С‚РµРіРѕСЂРёРё РїРѕРєР° РЅРµС‚ РїСЂРѕРґСѓРєС‚РѕРІ.
                         </div>
                     </section>
 
@@ -115,10 +115,10 @@
                         >
                             {{ nextCategoryActionLabel }}
                         </button>
-                        <button type="button" class="btn-secondary" :disabled="isSaving" @click="goToCategoriesStep">Назад к категориям</button>
-                        <button type="button" class="btn-secondary" :disabled="isSaving" @click="openSkipConfirm">Заполнить позже</button>
+                        <button type="button" class="btn-secondary" :disabled="isSaving" @click="goToCategoriesStep">РќР°Р·Р°Рґ Рє РєР°С‚РµРіРѕСЂРёСЏРј</button>
+                        <button type="button" class="btn-secondary" :disabled="isSaving" @click="openSkipConfirm">Р—Р°РїРѕР»РЅРёС‚СЊ РїРѕР·Р¶Рµ</button>
                         <button v-if="false" type="button" class="btn-primary" :disabled="!canContinue || isSaving" @click="saveOnboardingChoices">
-                            {{ isSaving ? 'Сохраняем...' : 'Продолжить' }}
+                            {{ isSaving ? 'РЎРѕС…СЂР°РЅСЏРµРј...' : 'РџСЂРѕРґРѕР»Р¶РёС‚СЊ' }}
                         </button>
                     </div>
                 </section>
@@ -129,14 +129,14 @@
             <div v-if="skipConfirmVisible" class="fixed inset-0 z-[80] bg-slate-900/45 px-4 flex items-center justify-center">
                 <div class="w-full max-w-md rounded-2xl border border-slate-100 bg-white p-5 shadow-xl space-y-4">
                     <div class="space-y-1 text-center">
-                        <p class="text-lg font-semibold text-slate-800">Вы уверены?</p>
+                        <p class="text-lg font-semibold text-slate-800">Р’С‹ СѓРІРµСЂРµРЅС‹?</p>
                         <p class="text-sm text-slate-500">
-                            Если пропустить этот шаг, рацион не будет рассчитан. Онбординг продуктов можно пройти позже в разделе «Рацион».
+                            Р•СЃР»Рё РїСЂРѕРїСѓСЃС‚РёС‚СЊ СЌС‚РѕС‚ С€Р°Рі, СЂР°С†РёРѕРЅ РЅРµ Р±СѓРґРµС‚ СЂР°СЃСЃС‡РёС‚Р°РЅ. РћРЅР±РѕСЂРґРёРЅРі РїСЂРѕРґСѓРєС‚РѕРІ РјРѕР¶РЅРѕ РїСЂРѕР№С‚Рё РїРѕР·Р¶Рµ РІ СЂР°Р·РґРµР»Рµ В«Р Р°С†РёРѕРЅВ».
                         </p>
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <button type="button" class="btn-secondary" :disabled="isSaving" @click="closeSkipConfirm">Остаться</button>
-                        <button type="button" class="btn-primary" :disabled="isSaving" @click="skipOnboarding">Пропустить</button>
+                        <button type="button" class="btn-secondary" :disabled="isSaving" @click="closeSkipConfirm">РћСЃС‚Р°С‚СЊСЃСЏ</button>
+                        <button type="button" class="btn-primary" :disabled="isSaving" @click="skipOnboarding">РџСЂРѕРїСѓСЃС‚РёС‚СЊ</button>
                     </div>
                 </div>
             </div>
@@ -177,7 +177,7 @@ const continueRoute = computed(() => resolvePostQuestionnaireRoute({ preferences
 const allCategories = computed<string[]>(() => {
     const unique = new Set<string>();
     for (const item of products.value) {
-        const category = typeof item.group === 'string' && item.group.trim() ? item.group.trim() : 'Без группы';
+        const category = typeof item.group === 'string' && item.group.trim() ? item.group.trim() : 'Р‘РµР· РіСЂСѓРїРїС‹';
         unique.add(category);
     }
     return Array.from(unique).sort((a, b) => a.localeCompare(b, 'ru'));
@@ -199,7 +199,7 @@ const canContinue = computed(() => selectedCount.value >= MIN_SELECTED_PRODUCTS)
 const activeCategoryIndex = computed(() => selectedCategories.value.indexOf(activeCategory.value));
 const activeCategoryPosition = computed(() => (activeCategoryIndex.value >= 0 ? activeCategoryIndex.value + 1 : 1));
 const hasNextCategory = computed(() => activeCategoryIndex.value >= 0 && activeCategoryIndex.value < selectedCategories.value.length - 1);
-const nextCategoryActionLabel = computed(() => (hasNextCategory.value ? 'Следующая категория' : 'Продолжить'));
+const nextCategoryActionLabel = computed(() => (hasNextCategory.value ? 'РЎР»РµРґСѓСЋС‰Р°СЏ РєР°С‚РµРіРѕСЂРёСЏ' : 'РџСЂРѕРґРѕР»Р¶РёС‚СЊ'));
 const nextCategoryActionDisabled = computed(() => {
     if (isSaving.value) {
         return true;
@@ -238,7 +238,6 @@ const sendOnboardingEvent = async (eventName: string): Promise<void> => {
         await profileApi.sendPreferencesOnboardingEvent({
             event: eventName,
             favorites_count: selectedCount.value,
-            excluded_count: Math.max(0, products.value.length - selectedCount.value),
             viewed_count: filteredProducts.value.length
         });
     } catch {
@@ -250,7 +249,7 @@ const normalizeProducts = (items: OnboardingProduct[]): OnboardingProduct[] => {
     return items
         .map((item) => ({
             ...item,
-            group: typeof item.group === 'string' && item.group.trim() ? item.group.trim() : 'Без группы'
+            group: typeof item.group === 'string' && item.group.trim() ? item.group.trim() : 'Р‘РµР· РіСЂСѓРїРїС‹'
         }))
         .sort((left, right) => {
             const byGroup = left.group.localeCompare(right.group, 'ru');
@@ -266,8 +265,42 @@ const loadProducts = async (): Promise<void> => {
         products.value = normalizeProducts(await preferencesOnboardingApi.getCatalogProducts());
     } catch {
         products.value = [];
-        notify('Не удалось загрузить продукты. Попробуйте позже.', 'error');
+        notify('РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РїСЂРѕРґСѓРєС‚С‹. РџРѕРїСЂРѕР±СѓР№С‚Рµ РїРѕР·Р¶Рµ.', 'error');
     }
+};
+
+const hydrateSelectionsFromProfile = async (): Promise<void> => {
+    try {
+        await storageStore.syncProfileWithBackend();
+    } catch {
+        // Fall back to local cache if backend sync is unavailable.
+    }
+
+    const profile = storageStore.getUserProfile() as Record<string, unknown>;
+    const rawFavorites = Array.isArray(profile.favorite_product_ids) ? profile.favorite_product_ids : [];
+    const favoriteSet = new Set(
+        rawFavorites
+            .map((item) => Number(item))
+            .filter((item) => Number.isInteger(item))
+    );
+
+    selectedProductIds.value = products.value
+        .map((item) => item.id)
+        .filter((id) => favoriteSet.has(id));
+
+    const derivedCategories = Array.from(new Set(
+        products.value
+            .filter((item) => favoriteSet.has(item.id))
+            .map((item) => item.group)
+            .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    ));
+
+    selectedCategories.value = derivedCategories;
+    if (derivedCategories.length > 0) {
+        activeCategory.value = derivedCategories[0];
+        return;
+    }
+    activeCategory.value = allCategories.value[0] || '';
 };
 
 const resetProductsScroll = (): void => {
@@ -481,7 +514,7 @@ const showSelectionToast = (): void => {
         });
     }
 
-    toast.textContent = `Выбрано ${selectedCount.value} из ${MIN_SELECTED_PRODUCTS}`;
+    toast.textContent = `Р’С‹Р±СЂР°РЅРѕ ${selectedCount.value} РёР· ${MIN_SELECTED_PRODUCTS}`;
     toast.style.opacity = '1';
     toast.style.transform = 'translateY(0)';
 
@@ -538,15 +571,11 @@ const saveOnboardingChoices = async (): Promise<void> => {
     }
 
     isSaving.value = true;
-    const selectedSet = new Set(selectedProductIds.value);
-    const excludedIds = products.value
-        .map((item) => item.id)
-        .filter((id) => !selectedSet.has(id));
 
     try {
         const saved = await storageStore.patchUserProfileWithBackend({
             favorite_product_ids: selectedProductIds.value,
-            excluded_product_ids: excludedIds,
+            excluded_product_ids: [],
             preferences_onboarding_completed: true
         });
 
@@ -557,7 +586,7 @@ const saveOnboardingChoices = async (): Promise<void> => {
         await sendOnboardingEvent('completed_with_choices');
         await router.push(continueRoute.value);
     } catch {
-        notify('Не удалось сохранить выбор. Попробуйте еще раз.', 'error');
+        notify('РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕС…СЂР°РЅРёС‚СЊ РІС‹Р±РѕСЂ. РџРѕРїСЂРѕР±СѓР№С‚Рµ РµС‰Рµ СЂР°Р·.', 'error');
     } finally {
         isSaving.value = false;
     }
@@ -567,6 +596,7 @@ onMounted(() => {
     void (async () => {
         document.body.dataset.preservePageTheme = 'true';
         await loadProducts();
+        await hydrateSelectionsFromProfile();
         await sendOnboardingEvent('entered');
         await refreshIcons();
         await nextTick();
@@ -729,4 +759,6 @@ onBeforeUnmount(() => {
     width: 100%;
 }
 </style>
+
+
 

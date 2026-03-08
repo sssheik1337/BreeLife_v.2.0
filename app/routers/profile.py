@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request, Response
+﻿from fastapi import APIRouter, HTTPException, Request, Response
 import logging
 from app.dependencies import (
     apply_profile_patch,
@@ -9,6 +9,7 @@ from app.dependencies import (
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
 
 @router.post("/api/profile")
 async def api_profile(request: Request, response: Response):
@@ -30,7 +31,6 @@ async def api_profile_save(request: Request, response: Response):
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="INVALID_PAYLOAD")
 
-    # Диагностика PATCH-профиля: фиксируем, какие ключи пришли и есть ли продуктовые поля.
     product_patch = {
         "preferences_onboarding_completed": payload.get("preferences_onboarding_completed"),
         "favorite_product_ids": payload.get("favorite_product_ids"),
@@ -44,27 +44,22 @@ async def api_profile_save(request: Request, response: Response):
 
     profile = load_profile(telegram_user_id)
     updated = apply_profile_patch(profile, payload)
-    # update_profile также инвалидирует кэш рациона (день/неделя) для текущего пользователя.
     update_profile(telegram_user_id, updated)
 
     if payload.get("preferences_onboarding_completed") is True:
         favorites_count = len(updated.get("favorite_product_ids", [])) if isinstance(updated.get("favorite_product_ids"), list) else 0
-        excluded_count = len(updated.get("excluded_product_ids", [])) if isinstance(updated.get("excluded_product_ids"), list) else 0
-        completed_event = "completed_with_choices" if (favorites_count > 0 or excluded_count > 0) else "completed_without_choices"
+        completed_event = "completed_with_choices" if favorites_count > 0 else "completed_without_choices"
 
-        # Обратная совместимость: оставляем старый event=completed для существующих дашбордов/фильтров логов.
         logger.info(
-            "[analytics] preferences_onboarding_event event=completed telegram_user_id=%s favorites_count=%s excluded_count=%s",
+            "[analytics] preferences_onboarding_event event=completed telegram_user_id=%s favorites_count=%s",
             telegram_user_id,
             favorites_count,
-            excluded_count,
         )
         logger.info(
-            "[analytics] preferences_onboarding_event event=%s telegram_user_id=%s favorites_count=%s excluded_count=%s",
+            "[analytics] preferences_onboarding_event event=%s telegram_user_id=%s favorites_count=%s",
             completed_event,
             telegram_user_id,
             favorites_count,
-            excluded_count,
         )
 
     return updated
@@ -82,7 +77,6 @@ async def api_preferences_onboarding_event(request: Request, response: Response)
         raise HTTPException(status_code=400, detail="INVALID_EVENT")
 
     favorites_count = payload.get("favorites_count")
-    excluded_count = payload.get("excluded_count")
     viewed_count = payload.get("viewed_count")
 
     def _normalize_int(value: object) -> int | None:
@@ -93,11 +87,10 @@ async def api_preferences_onboarding_event(request: Request, response: Response)
         return None
 
     logger.info(
-        "[analytics] preferences_onboarding_event event=%s telegram_user_id=%s favorites_count=%s excluded_count=%s viewed_count=%s",
+        "[analytics] preferences_onboarding_event event=%s telegram_user_id=%s favorites_count=%s viewed_count=%s",
         event,
         telegram_user_id,
         _normalize_int(favorites_count),
-        _normalize_int(excluded_count),
         _normalize_int(viewed_count),
     )
     return {"ok": True}
