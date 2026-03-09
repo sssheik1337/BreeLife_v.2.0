@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any
 
@@ -8,6 +9,7 @@ import requests
 from config import PAYMENT_PUBLIC_KEY, PAYMENT_SECRET_KEY
 
 YOOKASSA_API_BASE = "https://api.yookassa.ru/v3"
+logger = logging.getLogger(__name__)
 
 
 class YooKassaError(RuntimeError):
@@ -37,6 +39,8 @@ def _request(
     secret_key = _resolve_secret_key()
     if not shop_id or not secret_key:
         raise YooKassaError("PAYMENT_CREDENTIALS_NOT_CONFIGURED")
+    if not shop_id.isdigit():
+        raise YooKassaError("PAYMENT_PUBLIC_KEY_MUST_BE_NUMERIC_SHOP_ID")
 
     headers = {"Content-Type": "application/json"}
     if idempotence_key:
@@ -60,10 +64,24 @@ def _request(
         raise YooKassaError(f"YOOKASSA_HTTP_{response.status_code}") from exc
 
     if response.status_code >= 400:
+        error_code = payload.get("code") if isinstance(payload, dict) else None
         description = payload.get("description") if isinstance(payload, dict) else None
+        parameter = payload.get("parameter") if isinstance(payload, dict) else None
+        logger.warning(
+            "YooKassa error: status=%s code=%s parameter=%s description=%s",
+            response.status_code,
+            error_code,
+            parameter,
+            description,
+        )
+        details: list[str] = [f"YOOKASSA_HTTP_{response.status_code}"]
+        if isinstance(error_code, str) and error_code.strip():
+            details.append(error_code.strip())
+        if isinstance(parameter, str) and parameter.strip():
+            details.append(f"parameter={parameter.strip()}")
         if isinstance(description, str) and description.strip():
-            raise YooKassaError(description.strip())
-        raise YooKassaError(f"YOOKASSA_HTTP_{response.status_code}")
+            details.append(description.strip())
+        raise YooKassaError(" | ".join(details))
 
     if not isinstance(payload, dict):
         raise YooKassaError("YOOKASSA_INVALID_RESPONSE")
