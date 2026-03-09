@@ -140,16 +140,16 @@ def _subscription_runtime_payload(payload: dict[str, object]) -> dict[str, objec
 
 
 def _describe_payment_method(payment_method: dict[str, object]) -> str | None:
+    method_type = _pick_first_non_empty(payment_method.get("type")) or ""
+    if method_type.strip().lower() == "sbp":
+        return "СБП"
+    card = payment_method.get("card") if isinstance(payment_method.get("card"), dict) else {}
+    last4 = _pick_first_non_empty(card.get("last4"))
+    if last4:
+        return f"**** {last4}"
     title = _pick_first_non_empty(payment_method.get("title"))
     if title:
         return title
-    card = payment_method.get("card") if isinstance(payment_method.get("card"), dict) else {}
-    first6 = _pick_first_non_empty(card.get("first6"))
-    last4 = _pick_first_non_empty(card.get("last4"))
-    if first6 and last4:
-        return f"{first6}******{last4}"
-    if last4:
-        return f"**** {last4}"
     return _pick_first_non_empty(payment_method.get("type"))
 
 
@@ -215,6 +215,7 @@ def compute_subscription_status(payload: dict[str, object]) -> dict[str, object]
         "subscription_cancelled_at": cancelled_at,
         "subscription_plan_id": _pick_first_non_empty(runtime.get("subscription_plan_id")),
         "subscription_payment_method_bound": payment_method_bound,
+        "subscription_payment_method_type": _pick_first_non_empty(runtime.get("subscription_payment_method_type")),
         "subscription_payment_method_title": _pick_first_non_empty(runtime.get("subscription_payment_method_title")),
         "subscription_renewal_last_error": _pick_first_non_empty(runtime.get("subscription_renewal_last_error")),
     }
@@ -676,6 +677,28 @@ async def cancel_subscription(request: Request, response: Response, payload: Sub
     }
     save_subscription(telegram_user_id, updated_payload)
     return compute_subscription_status(updated_payload)
+
+
+@router.post("/api/subscription/payment-method/remove")
+async def remove_subscription_payment_method(request: Request, response: Response):
+    telegram_user_id = require_telegram_user_id(request, response)
+    stored = load_subscription(telegram_user_id)
+    status_raw = str(stored.get("subscription_status") or "").strip().lower()
+    until_dt = _parse_iso_datetime(_pick_first_non_empty(stored.get("subscription_until")))
+    is_active_paid = status_raw == "paid" and until_dt is not None and until_dt > datetime.now(timezone.utc)
+
+    updates: dict[str, object] = {
+        "subscription_payment_method_id": None,
+        "subscription_payment_method_type": None,
+        "subscription_payment_method_title": None,
+        "subscription_payment_method_bound": False,
+        "subscription_auto_renew": False,
+    }
+    if is_active_paid:
+        updates["subscription_cancelled_at"] = datetime.now(timezone.utc).isoformat()
+
+    _set_subscription_fields(telegram_user_id, updates)
+    return compute_subscription_status(load_subscription(telegram_user_id))
 
 
 @router.post("/api/payments/start")

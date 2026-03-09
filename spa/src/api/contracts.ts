@@ -101,6 +101,9 @@ export interface SubscriptionStatusResponse {
     subscription_started_at: Nullable<ApiIsoDateTimeString>;
     subscription_auto_renew?: Nullable<boolean>;
     subscription_cancelled_at?: Nullable<ApiIsoDateTimeString>;
+    subscription_payment_method_bound?: Nullable<boolean>;
+    subscription_payment_method_type?: Nullable<string>;
+    subscription_payment_method_title?: Nullable<string>;
 }
 
 export interface LegalOfferVersion {

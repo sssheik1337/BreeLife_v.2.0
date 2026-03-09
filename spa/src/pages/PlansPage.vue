@@ -39,6 +39,24 @@
                             {{ cancelSubscriptionState.submitting ? 'Отключаем...' : 'Отменить подписку' }}
                         </button>
                     </div>
+                    <div class="rounded-xl border border-slate-100 bg-slate-50 px-4 py-4 space-y-3">
+                        <div class="flex items-center justify-between gap-3">
+                            <p class="font-semibold text-slate-800">Привязанный способ оплаты</p>
+                            <span class="plans-payment-method-chip" :class="hasBoundPaymentMethod ? 'plans-payment-method-chip--bound' : 'plans-payment-method-chip--none'">
+                                {{ hasBoundPaymentMethod ? 'Привязан' : 'Не привязан' }}
+                            </span>
+                        </div>
+                        <p class="text-sm text-slate-500">{{ paymentMethodDetailsText }}</p>
+                        <button
+                            v-if="hasBoundPaymentMethod"
+                            type="button"
+                            class="btn-secondary w-full"
+                            :disabled="removePaymentMethodState.submitting"
+                            @click="removeBoundPaymentMethod"
+                        >
+                            {{ removePaymentMethodState.submitting ? 'Удаляем...' : 'Удалить способ оплаты' }}
+                        </button>
+                    </div>
                     <div id="plans-container" class="space-y-4">
                         <p v-if="isLoading" class="text-center text-slate-400">Загрузка тарифов...</p>
                         <p v-else-if="loadError" class="text-center text-slate-400">{{ loadError }}</p>
@@ -197,6 +215,9 @@ const cancelSubscriptionState = reactive({
     dialogVisible: false,
     submitting: false,
 });
+const removePaymentMethodState = reactive({
+    submitting: false,
+});
 
 let widgetScriptPromise: Promise<void> | null = null;
 let widgetInstance: { render: (target: string | HTMLElement) => void; destroy?: () => void } | null = null;
@@ -254,6 +275,30 @@ const cancellationDetailsText = computed<string>(() => {
         return `Автопродление уже отключено. Доступ сохранится до ${until}, после этого подписка завершится без нового списания.`;
     }
     return 'Автопродление уже отключено. После завершения текущего оплаченного периода подписка завершится без нового списания.';
+});
+const hasBoundPaymentMethod = computed<boolean>(() => subscriptionStatusPayload.value?.subscription_payment_method_bound === true);
+const paymentMethodType = computed<string>(() => String(subscriptionStatusPayload.value?.subscription_payment_method_type || '').trim().toLowerCase());
+const paymentMethodTitle = computed<string>(() => String(subscriptionStatusPayload.value?.subscription_payment_method_title || '').trim());
+const paymentMethodDisplay = computed<string>(() => {
+    if (!hasBoundPaymentMethod.value) {
+        return 'Не привязан';
+    }
+    if (paymentMethodType.value === 'sbp') {
+        return 'СБП';
+    }
+    if (paymentMethodTitle.value) {
+        return paymentMethodTitle.value;
+    }
+    if (paymentMethodType.value.includes('card')) {
+        return '****';
+    }
+    return 'Привязанный способ оплаты';
+});
+const paymentMethodDetailsText = computed<string>(() => {
+    if (!hasBoundPaymentMethod.value) {
+        return 'После оплаты способ оплаты сохранится для автопродления.';
+    }
+    return `Текущий способ: ${paymentMethodDisplay.value}. При удалении автопродление будет отключено.`;
 });
 
 const planSubtitle = (plan: PlanDto): string => {
@@ -441,6 +486,24 @@ const openEmbeddedPaymentWidget = async (payment: StartPaymentResponse): Promise
     startPaymentStatusPolling(paymentId);
 };
 
+const requestOfferConsentBeforePayment = (): Promise<boolean> => {
+    return new Promise<boolean>((resolve) => {
+        let settled = false;
+        const finish = (accepted: boolean): void => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            resolve(accepted === true);
+        };
+        window.dispatchEvent(new CustomEvent('offer-consent-request', {
+            detail: { resolve: finish }
+        }));
+        // Safety fallback in case the gate component is not mounted for any reason.
+        window.setTimeout(() => finish(false), 10000);
+    });
+};
+
 const selectPlan = async (plan: PlanDto): Promise<void> => {
     if (isPlanSelectionDisabled(plan)) {
         return;
@@ -449,6 +512,10 @@ const selectPlan = async (plan: PlanDto): Promise<void> => {
     selectedPlanId.value = plan.id;
     try {
         if (isCommercialPlan(plan)) {
+            const offerAccepted = await requestOfferConsentBeforePayment();
+            if (!offerAccepted) {
+                return;
+            }
             const payment = await subscriptionApi.startPayment({ plan_id: plan.id });
             if (String(payment.confirmation_type || '').toLowerCase() !== 'embedded' || !payment.confirmation_token) {
                 throw new Error('payment_widget_missing');
@@ -587,6 +654,27 @@ const confirmCancelSubscription = async (): Promise<void> => {
     }
 };
 
+const removeBoundPaymentMethod = async (): Promise<void> => {
+    if (removePaymentMethodState.submitting || !hasBoundPaymentMethod.value) {
+        return;
+    }
+    const confirmedByUser = window.confirm('Удалить привязанный способ оплаты и отключить автопродление?');
+    if (!confirmedByUser) {
+        return;
+    }
+    removePaymentMethodState.submitting = true;
+    try {
+        const payload = await subscriptionApi.removePaymentMethod();
+        subscriptionStatusPayload.value = payload;
+        await fetchTrialStatus();
+        notify('Способ оплаты удалён. Автопродление отключено.', 'success');
+    } catch {
+        notify('Не удалось удалить способ оплаты. Попробуйте ещё раз.', 'error');
+    } finally {
+        removePaymentMethodState.submitting = false;
+    }
+};
+
 const syncLatestPayment = async (): Promise<void> => {
     try {
         await subscriptionApi.syncLastPayment();
@@ -639,6 +727,30 @@ onBeforeUnmount(() => {
   border-color: #e2e8f0;
   background: #f8fafc;
   color: #64748b;
+}
+
+.plans-payment-method-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.plans-payment-method-chip--bound {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.plans-payment-method-chip--none {
+  background: #f8fafc;
+  color: #64748b;
+  border-color: #e2e8f0;
 }
 
 .plans-payment-overlay {

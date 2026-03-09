@@ -1,22 +1,37 @@
 ﻿<template>
     <div v-if="visible" class="offer-gate" role="dialog" aria-modal="true" aria-label="Подтверждение оферты">
-        <div class="offer-gate__backdrop"></div>
+        <div class="offer-gate__backdrop" @click="cancelOffer"></div>
 
         <div class="offer-gate__shell">
             <div class="offer-gate__card">
                 <p class="offer-gate__eyebrow">Юридическая информация</p>
                 <h2 class="offer-gate__title">{{ offerTitle }}</h2>
                 <p class="offer-gate__subtitle">
-                    Опубликована новая версия оферты. Чтобы продолжить пользоваться приложением и повторными списаниями, подтвердите условия.
+                    Перед оплатой подтвердите, что ознакомились с условиями оферты.
                 </p>
 
                 <div v-if="offerSummary" class="offer-gate__summary">{{ offerSummary }}</div>
                 <div class="offer-gate__content" v-html="renderedBody"></div>
 
                 <div class="offer-gate__actions">
-                    <button type="button" class="btn-primary" :disabled="submitting" @click="acceptOffer">
-                        {{ submitting ? 'Сохраняем...' : 'Принимаю условия' }}
-                    </button>
+                    <label class="offer-gate__confirm">
+                        <input v-model="confirmed" type="checkbox" class="offer-gate__confirm-input" />
+                        <span>Я ознакомлен(а) с условиями оферты и согласен(на) продолжить.</span>
+                    </label>
+
+                    <div class="offer-gate__actions-row">
+                        <button type="button" class="btn-secondary" :disabled="submitting" @click="cancelOffer">
+                            Отмена
+                        </button>
+                        <button
+                            type="button"
+                            class="btn-primary"
+                            :disabled="submitting || !confirmed"
+                            @click="acceptOffer"
+                        >
+                            {{ submitting ? 'Сохраняем...' : 'Подтвердить и продолжить' }}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -24,59 +39,109 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { legalApi } from '../api/legalApi';
 import { renderLegalMarkdown } from '../utils/legalMarkdown';
 
-const route = useRoute();
-const router = useRouter();
-
 const visible = ref(false);
 const submitting = ref(false);
+const confirmed = ref(false);
 const offer = ref<Record<string, unknown> | null>(null);
+let pendingResolver: ((accepted: boolean) => void) | null = null;
 
 const offerTitle = computed(() => String(offer.value?.title || 'Публичная оферта'));
 const offerSummary = computed(() => String(offer.value?.summary || '').trim());
 const renderedBody = computed(() => renderLegalMarkdown(offer.value?.body_markdown) || '<p>Текст оферты отсутствует.</p>');
 
-const loadStatus = async (): Promise<void> => {
+const notifyError = (): void => {
+    const notify = (window as Window & { showNotification?: (message: string, tone?: string) => void }).showNotification;
+    if (typeof notify === 'function') {
+        notify('Не удалось подтвердить новую редакцию оферты.', 'error');
+    }
+};
+
+const resolvePending = (accepted: boolean): void => {
+    if (pendingResolver) {
+        pendingResolver(accepted);
+        pendingResolver = null;
+    }
+};
+
+const closeGate = (): void => {
+    visible.value = false;
+    submitting.value = false;
+    confirmed.value = false;
+    offer.value = null;
+};
+
+const openOfferByRequest = async (resolve?: (accepted: boolean) => void): Promise<void> => {
     try {
         const payload = await legalApi.getStatus();
         if (payload?.needs_acceptance === true && payload.current_offer && typeof payload.current_offer === 'object') {
             offer.value = payload.current_offer as Record<string, unknown>;
+            confirmed.value = false;
             visible.value = true;
+            pendingResolver = typeof resolve === 'function' ? resolve : null;
             return;
         }
+        if (typeof resolve === 'function') {
+            resolve(true);
+        }
     } catch {
-        // Ignore unauthorized/temporary failures. Gate will retry on next page load.
+        if (typeof resolve === 'function') {
+            resolve(false);
+        }
+        notifyError();
     }
-    visible.value = false;
 };
 
 const acceptOffer = async (): Promise<void> => {
-    if (submitting.value) {
+    if (submitting.value || !confirmed.value) {
         return;
     }
     submitting.value = true;
     try {
         await legalApi.acceptCurrent();
-        visible.value = false;
-        if (route.path === '/legal') {
-            await router.replace('/resume');
-        }
+        resolvePending(true);
+        closeGate();
     } catch {
-        const notify = (window as Window & { showNotification?: (message: string, tone?: string) => void }).showNotification;
-        if (typeof notify === 'function') {
-            notify('Не удалось подтвердить новую редакцию оферты.', 'error');
-        }
+        notifyError();
     } finally {
         submitting.value = false;
     }
 };
 
+const cancelOffer = (): void => {
+    if (submitting.value) {
+        return;
+    }
+    resolvePending(false);
+    closeGate();
+};
+
+const onOfferConsentRequest = (event: Event): void => {
+    const requestEvent = event as CustomEvent<{ resolve?: (accepted: boolean) => void }>;
+    const resolve = typeof requestEvent.detail?.resolve === 'function'
+        ? requestEvent.detail.resolve
+        : undefined;
+
+    if (visible.value) {
+        if (typeof resolve === 'function') {
+            resolve(false);
+        }
+        return;
+    }
+
+    void openOfferByRequest(resolve);
+};
+
 onMounted(() => {
-    void loadStatus();
+    window.addEventListener('offer-consent-request', onOfferConsentRequest as EventListener);
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('offer-consent-request', onOfferConsentRequest as EventListener);
+    resolvePending(false);
 });
 </script>
 
@@ -193,6 +258,28 @@ onMounted(() => {
   gap: 12px;
 }
 
+.offer-gate__confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #334155;
+}
+
+.offer-gate__confirm-input {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+.offer-gate__actions-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 @media (max-width: 768px) {
   .offer-gate__shell {
     padding: 12px;
@@ -206,6 +293,10 @@ onMounted(() => {
 
   .offer-gate__title {
     font-size: 24px;
+  }
+
+  .offer-gate__actions-row {
+    grid-template-columns: 1fr;
   }
 }
 </style>

@@ -43,6 +43,12 @@ export const subscriptionApi = {
         });
     },
 
+    removePaymentMethod: (): Promise<SubscriptionStatusResponse> => {
+        return api.request<SubscriptionStatusResponse>('/api/subscription/payment-method/remove', {
+            method: 'POST'
+        });
+    },
+
     startPayment: (payload: StartPaymentPayload): Promise<StartPaymentResponse> => {
         return api.request<StartPaymentResponse>('/api/payments/start', {
             method: 'POST',
