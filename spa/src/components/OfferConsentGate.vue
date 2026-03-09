@@ -156,6 +156,11 @@ onMounted(() => {
   background: #ffffff;
   color: #0f172a;
   line-height: 1.65;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow-x: hidden;
 }
 
 .offer-gate__content :deep(h1),
@@ -172,6 +177,13 @@ onMounted(() => {
 
 .offer-gate__content :deep(ul) {
   padding-left: 20px;
+}
+
+.offer-gate__content :deep(*) {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .offer-gate__actions {

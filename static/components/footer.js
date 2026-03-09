@@ -1068,19 +1068,7 @@
       if (!profile || typeof profile !== 'object') {
         return false;
       }
-      if (profile.trial_welcome_seen === true) {
-        return true;
-      }
-      if (profile.trial_started_at) {
-        return true;
-      }
-      if (profile.subscription_until) {
-        return true;
-      }
-      const subscriptionStatus = typeof profile.subscription_status === 'string'
-        ? profile.subscription_status.trim().toLowerCase()
-        : '';
-      return ['trial', 'active', 'expired', 'paid', 'lifetime'].includes(subscriptionStatus);
+      return profile.trial_welcome_seen === true;
     };
 
     const syncOnboardingGateState = () => {
@@ -1462,16 +1450,26 @@
       });
     }
 
-    const canStartFooterTour = () => (
-      isVisibleForTour(bottomNav)
-      && isVisibleForTour(bottomLinks.profile)
-      && isVisibleForTour(bottomLinks.diary)
-      && isVisibleForTour(bottomFab)
-      && isVisibleForTour(bottomLinks.mealPlan)
-      && isVisibleForTour(bottomLinks.progress)
-      && isVisibleForTour(faqFab)
-      && !hasBlockingOverlay()
-    );
+    const canStartFooterTour = () => {
+      const rawPath = window.location.pathname || '/';
+      const currentPath = rawPath === '/app' ? '/' : (rawPath.startsWith('/app/') ? rawPath.slice(4) : rawPath);
+      const isOnboardingPath = (
+        currentPath.startsWith('/questionnaire')
+        || currentPath.startsWith('/preferences-onboarding')
+        || currentPath.startsWith('/trial-start')
+      );
+      return (
+        !isOnboardingPath
+        && isVisibleForTour(bottomNav)
+        && isVisibleForTour(bottomLinks.profile)
+        && isVisibleForTour(bottomLinks.diary)
+        && isVisibleForTour(bottomFab)
+        && isVisibleForTour(bottomLinks.mealPlan)
+        && isVisibleForTour(bottomLinks.progress)
+        && isVisibleForTour(faqFab)
+        && !hasBlockingOverlay()
+      );
+    };
 
     const maybeStartFooterTour = (force = false) => {
       if (footerTourState.active) {

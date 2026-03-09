@@ -80,6 +80,11 @@ onMounted(async () => {
   padding: 18px 16px;
   line-height: 1.7;
   color: #0f172a;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow-x: hidden;
 }
 
 .legal-page__content :deep(h1),
@@ -96,5 +101,12 @@ onMounted(async () => {
 
 .legal-page__content :deep(ul) {
   padding-left: 20px;
+}
+
+.legal-page__content :deep(*) {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 </style>
