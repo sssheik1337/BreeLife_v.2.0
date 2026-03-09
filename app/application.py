@@ -29,6 +29,7 @@ logging.basicConfig(level=logging.DEBUG)
 def create_app() -> FastAPI:
     app = FastAPI(title=APP_NAME, lifespan=lifespan)
     init_db()
+    project_root = Path(__file__).resolve().parent.parent
 
     app.include_router(core.router)
     app.include_router(dev.router)
@@ -69,13 +70,13 @@ def create_app() -> FastAPI:
             target = f"{target}?{query}"
         return RedirectResponse(url=target, status_code=307)
 
-    app.mount('/static', StaticFiles(directory='static'), name='static')
-    app.mount('/ico', StaticFiles(directory='ico'), name='ico')
+    app.mount('/static', StaticFiles(directory=str(project_root / 'static')), name='static')
+    app.mount('/ico', StaticFiles(directory=str(project_root / 'ico')), name='ico')
     # Раздаём локальные файлы шрифтов по URL /fonts, чтобы @font-face не получал 404.
-    app.mount('/fonts', StaticFiles(directory='fonts'), name='fonts')
+    app.mount('/fonts', StaticFiles(directory=str(project_root / 'fonts')), name='fonts')
 
     # Статические SPA-ассеты (Vite build) отдаются по отдельному префиксу.
-    spa_dist_dir = Path('spa/dist')
+    spa_dist_dir = project_root / 'spa' / 'dist'
     if spa_dist_dir.exists():
         app.mount('/spa-assets', StaticFiles(directory=str(spa_dist_dir)), name='spa-assets')
     return app

@@ -30,6 +30,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ ./app/
 COPY services/ ./services/
 COPY static/ ./static/
+COPY ico/ ./ico/
 COPY fonts/ ./fonts/
 COPY templates/ ./templates/
 COPY config.py main.py telegram_bot.py ./
