@@ -5,7 +5,7 @@ from typing import Any
 
 import requests
 
-from config import PAYMENT_PROVIDER, PAYMENT_PUBLIC_KEY, PAYMENT_SECRET_KEY
+from config import PAYMENT_PUBLIC_KEY, PAYMENT_SECRET_KEY
 
 YOOKASSA_API_BASE = "https://api.yookassa.ru/v3"
 
@@ -14,17 +14,16 @@ class YooKassaError(RuntimeError):
     pass
 
 
+def _resolve_shop_id() -> str:
+    return str(PAYMENT_PUBLIC_KEY or "").strip()
+
+
 def _resolve_secret_key() -> str:
-    # Support the legacy env name used in this project.
-    if isinstance(PAYMENT_SECRET_KEY, str) and PAYMENT_SECRET_KEY.strip():
-        return PAYMENT_SECRET_KEY.strip()
-    if isinstance(PAYMENT_PUBLIC_KEY, str) and PAYMENT_PUBLIC_KEY.strip():
-        return PAYMENT_PUBLIC_KEY.strip()
-    return ""
+    return str(PAYMENT_SECRET_KEY or "").strip()
 
 
 def yookassa_is_configured() -> bool:
-    return bool(str(PAYMENT_PROVIDER or "").strip() and _resolve_secret_key())
+    return bool(_resolve_shop_id() and _resolve_secret_key())
 
 
 def _request(
@@ -34,10 +33,10 @@ def _request(
     json_payload: dict[str, Any] | None = None,
     idempotence_key: str | None = None,
 ) -> dict[str, Any]:
-    shop_id = str(PAYMENT_PROVIDER or "").strip()
+    shop_id = _resolve_shop_id()
     secret_key = _resolve_secret_key()
     if not shop_id or not secret_key:
-        raise YooKassaError("PAYMENT_PROVIDER_NOT_CONFIGURED")
+        raise YooKassaError("PAYMENT_CREDENTIALS_NOT_CONFIGURED")
 
     headers = {"Content-Type": "application/json"}
     if idempotence_key:

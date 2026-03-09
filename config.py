@@ -107,7 +107,6 @@ TELEGRAM_WEBAPP_URL = normalize_webapp_url(_RAW_TELEGRAM_WEBAPP_URL or PUBLIC_AP
 # PUBLIC_BASE_URL нужен для webhook и ссылок в сообщениях. Если не задан, берём origin из PUBLIC_APP_URL.
 PUBLIC_BASE_URL = normalize_origin_url(_RAW_PUBLIC_BASE_URL or PUBLIC_APP_URL)
 
-PAYMENT_PROVIDER = os.getenv("PAYMENT_PROVIDER", "")
 PAYMENT_PUBLIC_KEY = os.getenv("PAYMENT_PUBLIC_KEY", "")
 PAYMENT_SECRET_KEY = os.getenv("PAYMENT_SECRET_KEY", "")
 

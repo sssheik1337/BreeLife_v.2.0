@@ -685,7 +685,7 @@ async def start_payment(request: Request, response: Response, payload: PaymentRe
     if not plan_id:
         raise HTTPException(status_code=400, detail="PLAN_REQUIRED")
     if not yookassa_is_configured():
-        raise HTTPException(status_code=503, detail="PAYMENT_PROVIDER_NOT_CONFIGURED")
+        raise HTTPException(status_code=503, detail="PAYMENT_CREDENTIALS_NOT_CONFIGURED")
 
     plan = _resolve_payment_plan(plan_id)
     duration_days = max(0, int(plan.get("duration_days", 0) or 0))
