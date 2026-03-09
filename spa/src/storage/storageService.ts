@@ -41,6 +41,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
         'trial_started_at',
         'trial_welcome_seen',
         'preferences_onboarding_completed',
+        'footer_navigation_tour_seen',
         'favorite_product_ids',
         'excluded_product_ids',
         'is_completed',
@@ -324,6 +325,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
             trial_started_at: null,
             trial_welcome_seen: null,
             preferences_onboarding_completed: null,
+            footer_navigation_tour_seen: null,
             favorite_product_ids: [],
             excluded_product_ids: [],
             is_completed: false,
@@ -590,6 +592,7 @@ import { ensureTelegramAuthSession } from '../platform/telegramAuth';
         merged.trial_started_at = merged.trial_started_at || null;
         merged.trial_welcome_seen = parseBoolean(merged.trial_welcome_seen);
         merged.preferences_onboarding_completed = parseBoolean(merged.preferences_onboarding_completed);
+        merged.footer_navigation_tour_seen = parseBoolean(merged.footer_navigation_tour_seen);
         merged.is_completed = parseBoolean(merged.is_completed);
         merged.favorite_product_ids = normalizeIdList(merged.favorite_product_ids);
         merged.excluded_product_ids = normalizeIdList(merged.excluded_product_ids);

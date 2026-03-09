@@ -76,6 +76,8 @@
           font-size: 0.7rem;
           font-weight: 600;
           text-decoration: none;
+          position: relative;
+          isolation: isolate;
         }
 
         .bottom-link__icon {
@@ -106,6 +108,30 @@
         .bottom-link--active {
           color: #047857;
           background: #ecfdf3;
+        }
+
+        .bottom-link--active::before {
+          content: '';
+          position: absolute;
+          inset: -2px;
+          border-radius: inherit;
+          padding: 2px;
+          pointer-events: none;
+          background: linear-gradient(
+            120deg,
+            #6ee7b7,
+            #34d399,
+            #22d3ee,
+            #34d399,
+            #6ee7b7
+          );
+          background-size: 220% 220%;
+          -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+          animation: bottom-link-ring-flow 3.2s ease-in-out infinite;
+          z-index: -1;
         }
 
         .bottom-link--disabled {
@@ -469,12 +495,192 @@
           transform: scale(0.99);
         }
 
+        .footer-tour {
+          position: fixed;
+          inset: 0;
+          z-index: 2147483003;
+          pointer-events: none;
+        }
+
+        .footer-tour.hidden {
+          display: none;
+        }
+
+        .footer-tour__shell {
+          position: fixed;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          width: min(420px, calc(100vw - 48px));
+          max-height: calc(100vh - 32px);
+          pointer-events: none;
+        }
+
+        .footer-tour__spotlight-mask {
+          position: fixed;
+          left: 0;
+          top: 0;
+          width: 56px;
+          height: 56px;
+          box-sizing: border-box;
+          border-radius: 20px;
+          background: transparent;
+          box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.46);
+          pointer-events: none;
+        }
+
+        .footer-tour__spotlight-ring {
+          position: fixed;
+          left: 0;
+          top: 0;
+          width: 56px;
+          height: 56px;
+          box-sizing: border-box;
+          border-radius: 20px;
+          background: transparent;
+          border: 2px solid rgba(255, 255, 255, 0.96);
+          pointer-events: none;
+          animation: footer-tour-spotlight-pulse 1.8s ease-in-out infinite;
+        }
+
+        .footer-tour__card {
+          position: relative;
+          width: 100%;
+          max-height: calc(100vh - 96px);
+          overflow: auto;
+          box-sizing: border-box;
+          border-radius: 24px;
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(248, 250, 252, 0.98) 100%);
+          border: 1px solid rgba(226, 232, 240, 0.95);
+          box-shadow: 0 22px 48px rgba(15, 23, 42, 0.24);
+          padding: 22px 18px 16px;
+          pointer-events: auto;
+        }
+
+        .footer-tour__skip {
+          position: absolute;
+          top: -14px;
+          left: 50%;
+          transform: translate(-50%, -100%);
+          z-index: 1;
+          pointer-events: auto;
+        }
+
+        .footer-tour__skip:hover {
+          transform: translate(-50%, calc(-100% - 1px));
+        }
+
+        .footer-tour__skip:active {
+          transform: translate(-50%, -100%);
+        }
+
+        .footer-tour__eyebrow {
+          margin: 0 0 8px 0;
+          color: #0f766e;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          text-align: center;
+        }
+
+        .footer-tour__title {
+          margin: 0;
+          color: #0f172a;
+          font-size: 21px;
+          line-height: 1.15;
+          text-align: center;
+        }
+
+        .footer-tour__text {
+          margin: 10px 0 0 0;
+          color: #475569;
+          font-size: 14px;
+          line-height: 1.55;
+          text-align: center;
+        }
+
+        .footer-tour__actions {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          margin-top: 16px;
+        }
+
+        .footer-tour__button {
+          appearance: none;
+          border: none;
+          border-radius: 999px;
+          padding: 11px 16px;
+          font-family: inherit;
+          font-size: 14px;
+          font-weight: 700;
+          line-height: 1;
+          cursor: pointer;
+          transition: transform 0.18s ease, opacity 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+        }
+
+        .footer-tour__button:hover {
+          transform: translateY(-1px);
+        }
+
+        .footer-tour__button:active {
+          transform: translateY(0);
+        }
+
+        .footer-tour__button--ghost {
+          background: #e2e8f0;
+          color: #334155;
+        }
+
+        .footer-tour__button--secondary {
+          background: #f8fafc;
+          color: #475569;
+          border: 1px solid #cbd5e1;
+        }
+
+        .footer-tour__button--primary {
+          background: linear-gradient(135deg, #10b981, #06b6d4);
+          color: #ffffff;
+          box-shadow: 0 10px 20px rgba(16, 185, 129, 0.24);
+        }
+
+        @keyframes footer-tour-spotlight-pulse {
+          0%,
+          100% {
+            box-shadow:
+              0 0 0 2px rgba(255, 255, 255, 0.96),
+              0 0 0 8px rgba(16, 185, 129, 0.24);
+          }
+          50% {
+            box-shadow:
+              0 0 0 2px rgba(255, 255, 255, 0.96),
+              0 0 0 14px rgba(16, 185, 129, 0.16);
+          }
+        }
+
         @keyframes fab-ring-spin {
           0% {
             transform: rotate(0deg);
           }
           100% {
             transform: rotate(360deg);
+          }
+        }
+
+        @keyframes bottom-link-ring-flow {
+          0% {
+            background-position: 0% 50%;
+            filter: saturate(0.95) brightness(0.98);
+          }
+          50% {
+            background-position: 100% 50%;
+            filter: saturate(1.08) brightness(1.04);
+          }
+          100% {
+            background-position: 0% 50%;
+            filter: saturate(0.95) brightness(0.98);
           }
         }
 
@@ -522,7 +728,9 @@
           .fab-overlay,
           .fab-menu,
           .faq-overlay,
-          .faq-menu {
+          .faq-menu,
+          .footer-tour__button,
+          .footer-tour__spotlight-ring {
             transition: none;
             animation: none;
           }
@@ -601,11 +809,29 @@
         <div class="faq-menu__floating-logo" aria-hidden="true">
           <img src="/static/emoji_u1f33f.svg" alt="" />
         </div>
+        <button type="button" class="faq-menu__item" data-faq-action="guide"><span class="faq-menu__item-icon" aria-hidden="true"><img src="/ico/books-svgrepo-com.svg" alt="" /></span><span>Гид</span></button>
         <button type="button" class="faq-menu__item" data-faq-href="/settings/reminders"><span class="faq-menu__item-icon" aria-hidden="true"><img src="/ico/bell-svgrepo-com.svg" alt="" /></span><span>Напоминания</span></button>
         <button type="button" class="faq-menu__item" data-faq-href="/plans"><span class="faq-menu__item-icon" aria-hidden="true"><img src="/ico/credit-card-svgrepo-com.svg" alt="" /></span><span>Тарифы</span></button>
         <button type="button" class="faq-menu__item" data-faq-href="/legal"><span class="faq-menu__item-icon" aria-hidden="true"><img src="/ico/clipboard-svgrepo-com.svg" alt="" /></span><span>Оферта</span></button>
         <button type="button" class="faq-menu__item" data-faq-href="/references"><span class="faq-menu__item-icon" aria-hidden="true"><img src="/ico/books-svgrepo-com.svg" alt="" /></span><span>Справочники</span></button>
         <button type="button" class="faq-menu__item" data-faq-href="/support"><span class="faq-menu__item-icon" aria-hidden="true"><img src="/ico/megaphone-svgrepo-com.svg" alt="" /></span><span>Помощь</span></button>
+      </div>
+
+      <div class="footer-tour hidden" data-footer-tour aria-live="polite">
+        <div class="footer-tour__spotlight-mask" data-footer-tour-spotlight-mask aria-hidden="true"></div>
+        <div class="footer-tour__spotlight-ring" data-footer-tour-spotlight-ring aria-hidden="true"></div>
+        <div class="footer-tour__shell">
+          <button type="button" class="footer-tour__button footer-tour__button--ghost footer-tour__skip" data-footer-tour-skip>Пропустить</button>
+          <div class="footer-tour__card" role="dialog" aria-modal="false" aria-label="Навигация по приложению">
+            <p class="footer-tour__eyebrow" data-footer-tour-counter></p>
+            <h3 class="footer-tour__title" data-footer-tour-title></h3>
+            <p class="footer-tour__text" data-footer-tour-text></p>
+            <div class="footer-tour__actions">
+              <button type="button" class="footer-tour__button footer-tour__button--secondary" data-footer-tour-back>Назад</button>
+              <button type="button" class="footer-tour__button footer-tour__button--primary" data-footer-tour-next>Далее</button>
+            </div>
+          </div>
+        </div>
       </div>
     `;
 
@@ -627,7 +853,22 @@
     const faqFab = this.shadowRoot.querySelector('.faq-fab');
     const faqOverlay = this.shadowRoot.querySelector('[data-faq-overlay]');
     const faqMenu = this.shadowRoot.querySelector('[data-faq-menu]');
+    const faqGuideAction = this.shadowRoot.querySelector('[data-faq-action="guide"]');
+    const footerTour = {
+      root: this.shadowRoot.querySelector('[data-footer-tour]'),
+      shell: this.shadowRoot.querySelector('.footer-tour__shell'),
+      spotlightMask: this.shadowRoot.querySelector('[data-footer-tour-spotlight-mask]'),
+      spotlightRing: this.shadowRoot.querySelector('[data-footer-tour-spotlight-ring]'),
+      card: this.shadowRoot.querySelector('.footer-tour__card'),
+      counter: this.shadowRoot.querySelector('[data-footer-tour-counter]'),
+      title: this.shadowRoot.querySelector('[data-footer-tour-title]'),
+      text: this.shadowRoot.querySelector('[data-footer-tour-text]'),
+      next: this.shadowRoot.querySelector('[data-footer-tour-next]'),
+      back: this.shadowRoot.querySelector('[data-footer-tour-back]'),
+      skip: this.shadowRoot.querySelector('[data-footer-tour-skip]'),
+    };
     const globalBackdropId = 'fab-faq-global-backdrop';
+    const FOOTER_TOUR_START_DELAY_MS = 1100;
     const ensureGlobalBackdrop = () => {
       let backdrop = document.getElementById(globalBackdropId);
       if (backdrop) {
@@ -673,6 +914,76 @@
       fabMenu?.classList.add('no-flex-gap');
       faqMenu?.classList.add('no-flex-gap');
     }
+    const footerTourSteps = [
+      {
+        key: 'profile',
+        title: 'Профиль',
+        text: 'Здесь хранятся ваши данные, цели и настройки. Чем точнее профиль, тем лучше BreeLife подбирает рацион, нормы и рекомендации.',
+        getTarget: () => bottomLinks.profile,
+      },
+      {
+        key: 'diary',
+        title: 'Дневник',
+        text: 'Это ваш ежедневный центр контроля. Добавляйте еду, воду и сон, чтобы видеть реальную картину дня, а не действовать наугад.',
+        getTarget: () => bottomLinks.diary,
+      },
+      {
+        key: 'fab',
+        title: 'Быстрое добавление',
+        text: 'Самая быстрая кнопка в приложении. Через неё удобно сразу внести запись, не переходя по экранам и не тратя лишние касания.',
+        getTarget: () => bottomFab,
+      },
+      {
+        key: 'mealPlan',
+        title: 'Рацион',
+        text: 'Здесь BreeLife собирает персональный план питания. Он опирается на ваши цели, предпочтения и выбранные продукты, чтобы рацион был жизнеспособным.',
+        getTarget: () => bottomLinks.mealPlan,
+      },
+      {
+        key: 'progress',
+        title: 'Прогресс',
+        text: 'Тут видно, как меняются ваши привычки и результаты со временем. Полезно заглядывать сюда регулярно, чтобы замечать реальные сдвиги.',
+        getTarget: () => bottomLinks.progress,
+      },
+      {
+        key: 'faq',
+        title: 'FAQ, справка и тарифы',
+        text: 'Здесь вы найдёте не только ответы на вопросы, но и справочники, помощь по функциям приложения и всё, что связано с тарифами. Раздел пригодится, если хотите быстрее разобраться в возможностях BreeLife.',
+        placement: 'top-end',
+        getTarget: () => faqFab,
+        onNext: () => {
+          stopFooterTour(true);
+          scheduleFooterTourRefresh();
+        },
+      },
+    ];
+    const footerTourSkipHintStep = {
+      key: 'faq-guide-hint',
+      title: 'Гид можно открыть позже',
+      text: 'Если захотите вернуться к подсказкам, откройте FAQ и нажмите кнопку «Гид». Она заново запустит это обучение в любой момент.',
+      counter: 'Подсказка',
+      nextLabel: 'Понятно',
+      backLabel: 'Назад',
+      showSkip: false,
+      placement: 'top-end',
+      getTarget: () => faqFab,
+      onBack: () => {
+        openFooterTourStep(footerTourSteps.length - 1);
+      },
+      onNext: () => {
+        stopFooterTour(true);
+        scheduleFooterTourRefresh();
+      },
+    };
+    const footerTourState = {
+      active: false,
+      stepIndex: 0,
+      currentStep: null,
+      repositionFrame: 0,
+      startTimer: 0,
+      currentTarget: null,
+      seenPersisted: false,
+    };
     const scrollLockState = {
       active: false,
       scrollY: 0,
@@ -816,6 +1127,61 @@
       }
     };
 
+    const getProfileSnapshot = () => {
+      try {
+        if (typeof window.getUserProfile === 'function') {
+          const profile = window.getUserProfile();
+          if (profile && typeof profile === 'object') {
+            return profile;
+          }
+        }
+      } catch (error) {
+        return null;
+      }
+      return null;
+    };
+
+    const hasSeenFooterTour = () => getProfileSnapshot()?.footer_navigation_tour_seen === true;
+
+    const isFooterTourProfileReady = () => {
+      if (window.serverUser?.authorized !== true) {
+        return false;
+      }
+      const profile = getProfileSnapshot();
+      if (!profile || typeof profile !== 'object') {
+        return false;
+      }
+      if (typeof profile.footer_navigation_tour_seen === 'boolean') {
+        return true;
+      }
+      return Boolean(
+        profile.is_completed === true
+        || profile.sex
+        || profile.birth_date
+        || profile.goal
+        || profile.trial_welcome_seen === true
+        || profile.trial_started_at
+        || profile.subscription_status
+        || profile.subscription_until
+        || profile.last_updated
+      );
+    };
+
+    const persistFooterTourSeen = async (seen) => {
+      try {
+        if (typeof window.patchUserProfile === 'function') {
+          window.patchUserProfile({ footer_navigation_tour_seen: seen }, { skipBackend: true });
+        }
+      } catch (error) {
+      }
+      try {
+        if (typeof window.patchUserProfileWithBackend === 'function') {
+          await window.patchUserProfileWithBackend({ footer_navigation_tour_seen: seen });
+        }
+      } catch (error) {
+      }
+    };
+
     const navigateTo = (target, replace = false) => {
       if (!target) {
         return;
@@ -885,6 +1251,277 @@
       }
     };
 
+    const clearFooterTourHighlight = () => {
+      if (footerTourState.currentTarget && footerTourState.currentTarget.classList) {
+        footerTourState.currentTarget.classList.remove('footer-tour-target--active');
+      }
+      footerTourState.currentTarget = null;
+      [footerTour.spotlightMask, footerTour.spotlightRing].forEach((element) => {
+        if (!element) {
+          return;
+        }
+        element.style.width = '0px';
+        element.style.height = '0px';
+        element.style.left = '0px';
+        element.style.top = '0px';
+        element.style.borderRadius = '0px';
+      });
+    };
+
+    const isVisibleForTour = (element) => {
+      if (!(element instanceof HTMLElement)) {
+        return false;
+      }
+      const styles = window.getComputedStyle(element);
+      if (styles.display === 'none' || styles.visibility === 'hidden' || styles.opacity === '0') {
+        return false;
+      }
+      const rect = element.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    };
+
+    const hasBlockingOverlay = () => {
+      const selectors = [
+        '.telegram-gate',
+        '.subscription-gate',
+        '.offer-gate',
+        '.plans-payment-overlay',
+      ];
+      return selectors.some((selector) => {
+        const element = document.querySelector(selector);
+        if (!(element instanceof HTMLElement)) {
+          return false;
+        }
+        const styles = window.getComputedStyle(element);
+        if (styles.display === 'none' || styles.visibility === 'hidden' || styles.opacity === '0') {
+          return false;
+        }
+        const rect = element.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+    };
+
+    const cancelFooterTourReposition = () => {
+      if (footerTourState.repositionFrame) {
+        window.cancelAnimationFrame(footerTourState.repositionFrame);
+        footerTourState.repositionFrame = 0;
+      }
+    };
+
+    const scheduleFooterTourReposition = () => {
+      if (!footerTourState.active) {
+        return;
+      }
+      cancelFooterTourReposition();
+      footerTourState.repositionFrame = window.requestAnimationFrame(() => {
+        footerTourState.repositionFrame = 0;
+        renderFooterTourStep();
+      });
+    };
+
+    const scheduleFooterTourRefresh = () => {
+      window.requestAnimationFrame(() => {
+        updateBottomNavVisibility();
+        updateActiveBottomLink();
+      });
+    };
+
+    const closeAllFloatingMenus = () => {
+      closeFabMenu();
+      closeFaqMenu();
+    };
+
+    const getCurrentFooterTourStep = () => {
+      if (footerTourState.currentStep && typeof footerTourState.currentStep === 'object') {
+        return footerTourState.currentStep;
+      }
+      return footerTourSteps[footerTourState.stepIndex] || null;
+    };
+
+    const ensureFooterTourSeenPersisted = () => {
+      if (footerTourState.seenPersisted || hasSeenFooterTour()) {
+        return;
+      }
+      footerTourState.seenPersisted = true;
+      void persistFooterTourSeen(true);
+    };
+
+    const stopFooterTour = (completed = true) => {
+      cancelFooterTourReposition();
+      if (footerTourState.startTimer) {
+        window.clearTimeout(footerTourState.startTimer);
+        footerTourState.startTimer = 0;
+      }
+      footerTourState.active = false;
+      footerTourState.stepIndex = 0;
+      footerTourState.currentStep = null;
+      clearFooterTourHighlight();
+      footerTour.root?.classList.add('hidden');
+      closeAllFloatingMenus();
+    };
+
+    const openFooterTourStep = (stepOrIndex) => {
+      const resolvedStep = typeof stepOrIndex === 'number'
+        ? (footerTourSteps[stepOrIndex] || null)
+        : (stepOrIndex && typeof stepOrIndex === 'object' ? stepOrIndex : null);
+      if (!resolvedStep) {
+        stopFooterTour(true);
+        return;
+      }
+      footerTourState.active = true;
+      footerTourState.stepIndex = typeof stepOrIndex === 'number' ? stepOrIndex : -1;
+      footerTourState.currentStep = resolvedStep;
+      closeAllFloatingMenus();
+      ensureFooterTourSeenPersisted();
+      renderFooterTourStep();
+    };
+
+    const goToNextFooterTourStep = () => {
+      const step = getCurrentFooterTourStep();
+      if (step && typeof step.onNext === 'function') {
+        step.onNext();
+        return;
+      }
+      if (footerTourState.stepIndex < 0) {
+        stopFooterTour(true);
+        return;
+      }
+      openFooterTourStep(footerTourState.stepIndex + 1);
+    };
+
+    const goToPreviousFooterTourStep = () => {
+      const step = getCurrentFooterTourStep();
+      if (step && typeof step.onBack === 'function') {
+        step.onBack();
+        return;
+      }
+      if (footerTourState.stepIndex <= 0) {
+        return;
+      }
+      openFooterTourStep(footerTourState.stepIndex - 1);
+    };
+
+    function renderFooterTourStep() {
+      if (!footerTourState.active || !footerTour.root || !footerTour.spotlightMask || !footerTour.spotlightRing || !footerTour.card || !footerTour.counter || !footerTour.title || !footerTour.text || !footerTour.next || !footerTour.back) {
+        return;
+      }
+
+      const step = getCurrentFooterTourStep();
+      if (!step) {
+        stopFooterTour(true);
+        return;
+      }
+
+      const target = step.getTarget();
+      if (!isVisibleForTour(target)) {
+        stopFooterTour(false);
+        return;
+      }
+
+      clearFooterTourHighlight();
+      footerTourState.currentTarget = target;
+
+      footerTour.counter.textContent = typeof step.counter === 'string' && step.counter.trim()
+        ? step.counter
+        : `Навигация ${footerTourState.stepIndex + 1} из ${footerTourSteps.length}`;
+      footerTour.title.textContent = step.title;
+      footerTour.text.textContent = step.text;
+      footerTour.next.textContent = typeof step.nextLabel === 'string' && step.nextLabel.trim()
+        ? step.nextLabel
+        : (footerTourState.stepIndex === footerTourSteps.length - 1 ? 'Начать' : 'Далее');
+      footerTour.back.textContent = typeof step.backLabel === 'string' && step.backLabel.trim()
+        ? step.backLabel
+        : 'Назад';
+      footerTour.back.style.display = step.showBack === false ? 'none' : '';
+      footerTour.back.disabled = footerTourState.stepIndex === 0 && typeof step.onBack !== 'function';
+      if (footerTour.skip) {
+        footerTour.skip.style.display = step.showSkip === false ? 'none' : '';
+      }
+      footerTour.root.classList.remove('hidden');
+
+      const targetRect = target.getBoundingClientRect();
+      const isCircularTarget = target === bottomFab || target === faqFab;
+      const spotlightPadding = isCircularTarget ? 10 : 8;
+      const targetCenterX = targetRect.left + (targetRect.width / 2);
+      const targetCenterY = targetRect.top + (targetRect.height / 2);
+      const spotlightWidth = isCircularTarget
+        ? Math.max(targetRect.width, targetRect.height) + (spotlightPadding * 2)
+        : Math.max(targetRect.width + (spotlightPadding * 2), 48);
+      const spotlightHeight = isCircularTarget
+        ? spotlightWidth
+        : Math.max(targetRect.height + (spotlightPadding * 2), 48);
+      const spotlightLeft = Math.round(targetCenterX - (spotlightWidth / 2));
+      const spotlightTop = Math.round(targetCenterY - (spotlightHeight / 2));
+
+      [footerTour.spotlightMask, footerTour.spotlightRing].forEach((element) => {
+        element.style.width = `${Math.round(spotlightWidth)}px`;
+        element.style.height = `${Math.round(spotlightHeight)}px`;
+        element.style.left = `${spotlightLeft}px`;
+        element.style.top = `${spotlightTop}px`;
+        element.style.borderRadius = isCircularTarget ? '999px' : '18px';
+      });
+    }
+
+    const canStartFooterTour = () => (
+      isVisibleForTour(bottomNav)
+      && isVisibleForTour(bottomLinks.profile)
+      && isVisibleForTour(bottomLinks.diary)
+      && isVisibleForTour(bottomFab)
+      && isVisibleForTour(bottomLinks.mealPlan)
+      && isVisibleForTour(bottomLinks.progress)
+      && isVisibleForTour(faqFab)
+      && !hasBlockingOverlay()
+    );
+
+    const maybeStartFooterTour = (force = false) => {
+      if (footerTourState.active) {
+        scheduleFooterTourReposition();
+        return;
+      }
+      if (!force && !isFooterTourProfileReady()) {
+        return;
+      }
+      if (!force && hasSeenFooterTour()) {
+        return;
+      }
+      if (footerTourState.startTimer) {
+        window.clearTimeout(footerTourState.startTimer);
+      }
+      footerTourState.startTimer = window.setTimeout(() => {
+        footerTourState.startTimer = 0;
+        if (!canStartFooterTour()) {
+          return;
+        }
+        openFooterTourStep(0);
+      }, force ? 40 : FOOTER_TOUR_START_DELAY_MS);
+    };
+
+    const handleFooterTourTargetClick = (event) => {
+      if (!footerTourState.active) {
+        return;
+      }
+      if (event.currentTarget !== footerTourState.currentTarget) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === 'function') {
+        event.stopImmediatePropagation();
+      }
+      goToNextFooterTourStep();
+    };
+
+    footerTour.next?.addEventListener('click', () => {
+      goToNextFooterTourStep();
+    });
+    footerTour.back?.addEventListener('click', () => {
+      goToPreviousFooterTourStep();
+    });
+    footerTour.skip?.addEventListener('click', () => {
+      ensureFooterTourSeenPersisted();
+      openFooterTourStep(footerTourSkipHintStep);
+    });
+
     const applyBottomNavState = (profileCompleted) => {
       const shouldDisable = !profileCompleted;
       Object.values(bottomLinks).forEach((link) => {
@@ -940,6 +1577,7 @@
         // РЅРµ РїРµСЂРµРІРѕРґСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РЅР° СЌРєСЂР°РЅ РґРЅРµРІРЅРёРєР° Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё.
         toggleFabMenu();
       });
+      bottomFab.addEventListener('click', handleFooterTourTargetClick, true);
     }
 
     if (fabOverlay) {
@@ -961,6 +1599,7 @@
         event.preventDefault();
         toggleFaqMenu();
       });
+      faqFab.addEventListener('click', handleFooterTourTargetClick, true);
     }
 
     if (faqOverlay) {
@@ -1029,6 +1668,15 @@
       });
     });
 
+    this.shadowRoot.querySelectorAll('[data-faq-action="guide"]').forEach((item) => {
+      item.addEventListener('click', () => {
+        closeFaqMenu();
+        stopFooterTour(false);
+        openFooterTourStep(0);
+      });
+      item.addEventListener('click', handleFooterTourTargetClick, true);
+    });
+
     this.shadowRoot.querySelectorAll('[data-fab-action]').forEach((item) => {
       item.addEventListener('click', () => {
         const action = item.dataset.fabAction;
@@ -1084,6 +1732,7 @@
         event.preventDefault();
         navigateTo(target);
       });
+      link.addEventListener('click', handleFooterTourTargetClick, true);
     });
 
     applyBottomNavState(hasCompletedProfile);
@@ -1134,6 +1783,15 @@
         closeFaqMenu();
       }
       syncPageLockByMenuState();
+      if (footerTourState.active) {
+        if (!canStartFooterTour()) {
+          stopFooterTour(false);
+        } else {
+          scheduleFooterTourReposition();
+        }
+      } else {
+        maybeStartFooterTour(false);
+      }
     };
 
     const updateActiveBottomLink = () => {
@@ -1167,15 +1825,32 @@
         }
         link.classList.toggle('bottom-link--active', key === activeKey);
       });
+      if (footerTourState.active) {
+        scheduleFooterTourReposition();
+      }
+    };
+
+    window.startFooterNavigationTour = () => {
+      stopFooterTour(false);
+      openFooterTourStep(0);
+    };
+    window.resetFooterNavigationTour = () => {
+      stopFooterTour(false);
+      footerTourState.seenPersisted = false;
+      void persistFooterTourSeen(false).finally(() => {
+        openFooterTourStep(0);
+      });
     };
 
     updateBottomNavVisibility();
     updateActiveBottomLink();
+    maybeStartFooterTour(false);
     // Profile snapshot can arrive asynchronously after component mount.
     window.setTimeout(updateBottomNavVisibility, 120);
     window.setTimeout(updateBottomNavVisibility, 500);
     window.setTimeout(updateBottomNavVisibility, 1200);
     window.addEventListener('focus', updateBottomNavVisibility);
+    window.addEventListener('resize', scheduleFooterTourReposition, { passive: true });
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         updateBottomNavVisibility();

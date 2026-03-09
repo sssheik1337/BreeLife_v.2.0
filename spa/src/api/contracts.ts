@@ -41,6 +41,7 @@ export interface UserProfile {
 
     is_completed?: Nullable<boolean>;
     preferences_onboarding_completed?: Nullable<boolean>;
+    footer_navigation_tour_seen?: Nullable<boolean>;
     trial_welcome_seen?: Nullable<boolean>;
     trial_started_at?: Nullable<ApiIsoDateTimeString>;
     subscription_status?: Nullable<string>;

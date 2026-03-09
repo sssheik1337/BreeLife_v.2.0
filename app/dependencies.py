@@ -339,7 +339,7 @@ def normalize_profile_payload_shape(raw_profile: dict[str, object] | None) -> di
     - food_diary, trial_welcome_seen, is_completed: bool | null
     - вычисляемые поля калорий/динамики: float | null
     - macros, weekly_stats, weekly_adjustments, weekly_review, subscription: object | null
-    - preferences_onboarding_completed, food_diary, trial_welcome_seen, is_completed: bool | null
+    - preferences_onboarding_completed, footer_navigation_tour_seen, food_diary, trial_welcome_seen, is_completed: bool | null
     - favorite_product_ids, excluded_product_ids: list[int]
     - subscription_until/subscription_status/subscription_started_at/trial_started_at/subscription_cancelled_at/terms_offer_accepted_at/last_updated: str | null
     - subscription_auto_renew: bool | null
@@ -464,6 +464,7 @@ def normalize_profile_payload_shape(raw_profile: dict[str, object] | None) -> di
         "trial_started_at": profile.get("trial_started_at") if isinstance(profile.get("trial_started_at"), str) else None,
         "trial_welcome_seen": parse_bool(profile.get("trial_welcome_seen")),
         "preferences_onboarding_completed": parse_bool(profile.get("preferences_onboarding_completed")),
+        "footer_navigation_tour_seen": parse_bool(profile.get("footer_navigation_tour_seen")),
         "favorite_product_ids": parse_int_list(profile.get("favorite_product_ids")),
         "excluded_product_ids": parse_int_list(profile.get("excluded_product_ids")),
         "is_completed": parse_bool(
@@ -514,6 +515,7 @@ CANONICAL_PROFILE_FIELDS = {
     "trial_started_at",
     "trial_welcome_seen",
     "preferences_onboarding_completed",
+    "footer_navigation_tour_seen",
     "favorite_product_ids",
     "excluded_product_ids",
     "is_completed",

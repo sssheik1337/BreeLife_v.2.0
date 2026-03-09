@@ -79,6 +79,8 @@ export const installStorageBridge = (targetWindow: Window = window, store?: Stor
     targetWindow.__SPA_STORAGE__ = bridge;
     targetWindow.apiFetch = bridge.apiFetch;
     targetWindow.getUserProfile = bridge.getUserProfile;
+    targetWindow.patchUserProfile = bridge.patchUserProfile;
+    targetWindow.patchUserProfileWithBackend = bridge.patchUserProfileWithBackend;
     targetWindow.syncProfileWithBackend = bridge.syncProfileWithBackend;
     targetWindow.normalizeLocalDate = bridge.normalizeLocalDate;
     targetWindow.validateGoalWeightConsistency = bridge.validateGoalWeightConsistency;
