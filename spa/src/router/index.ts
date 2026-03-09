@@ -20,6 +20,7 @@ import ReferencesPage from '../pages/ReferencesPage.vue';
 import SupportPage from '../pages/SupportPage.vue';
 import LegalPage from '../pages/LegalPage.vue';
 import PlansPage from '../pages/PlansPage.vue';
+import SubscriptionManagementPage from '../pages/SubscriptionManagementPage.vue';
 import RemindersSettingsPage from '../pages/RemindersSettingsPage.vue';
 
 interface RouteMetaPolicy {
@@ -180,6 +181,12 @@ const routes: RouteRecordRaw[] = [
         path: '/plans',
         name: 'plans',
         component: PlansPage,
+        meta: { ...ROUTE_META.completedOnly } satisfies RouteMetaPolicy
+    },
+    {
+        path: '/subscription-management',
+        name: 'subscription-management',
+        component: SubscriptionManagementPage,
         meta: { ...ROUTE_META.completedOnly } satisfies RouteMetaPolicy
     },
     {

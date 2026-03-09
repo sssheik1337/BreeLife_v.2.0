@@ -7,5 +7,5 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    # Запуск приложения через единый входной файл.
+    # Запуск приложения через единый входной файл.раз
     uvicorn.run(app, host=APP_HOST, port=APP_PORT)

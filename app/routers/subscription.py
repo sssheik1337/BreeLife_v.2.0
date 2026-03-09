@@ -83,10 +83,14 @@ def _subscription_runtime_payload(payload: dict[str, object]) -> dict[str, objec
     payment_method_title = _pick_first_non_empty(
         subscription.get("subscription_payment_method_title"),
         subscription.get("payment_method_title"),
+        payload.get("subscription_payment_method_title"),
+        payload.get("payment_method_title"),
     )
     payment_method_id = _pick_first_non_empty(
         subscription.get("subscription_payment_method_id"),
         subscription.get("payment_method_id"),
+        payload.get("subscription_payment_method_id"),
+        payload.get("payment_method_id"),
     )
     return {
         "subscription_started_at": _pick_first_non_empty(
@@ -121,6 +125,8 @@ def _subscription_runtime_payload(payload: dict[str, object]) -> dict[str, objec
         "subscription_payment_method_type": _pick_first_non_empty(
             subscription.get("subscription_payment_method_type"),
             subscription.get("payment_method_type"),
+            payload.get("subscription_payment_method_type"),
+            payload.get("payment_method_type"),
         ),
         "subscription_payment_method_title": payment_method_title,
         "subscription_payment_method_bound": bool(payment_method_id),

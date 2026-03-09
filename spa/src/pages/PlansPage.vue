@@ -21,42 +21,9 @@
                         </div>
                         <p class="text-sm text-slate-500 mt-1">{{ trialStatus.detailsText }}</p>
                     </div>
-                    <div
-                        v-if="showCancellationCard"
-                        class="rounded-xl border border-rose-100 bg-rose-50/70 px-4 py-4 space-y-3"
-                    >
-                        <div>
-                            <p class="font-semibold text-slate-800">Управление продлением</p>
-                            <p class="text-sm text-slate-500 mt-1">{{ cancellationDetailsText }}</p>
-                        </div>
-                        <button
-                            v-if="canCancelSubscription"
-                            type="button"
-                            class="btn-secondary w-full"
-                            :disabled="cancelSubscriptionState.submitting"
-                            @click="openCancelSubscriptionDialog"
-                        >
-                            {{ cancelSubscriptionState.submitting ? 'Отключаем...' : 'Отменить подписку' }}
-                        </button>
-                    </div>
-                    <div class="rounded-xl border border-slate-100 bg-slate-50 px-4 py-4 space-y-3">
-                        <div class="flex items-center justify-between gap-3">
-                            <p class="font-semibold text-slate-800">Привязанный способ оплаты</p>
-                            <span class="plans-payment-method-chip" :class="hasBoundPaymentMethod ? 'plans-payment-method-chip--bound' : 'plans-payment-method-chip--none'">
-                                {{ hasBoundPaymentMethod ? 'Привязан' : 'Не привязан' }}
-                            </span>
-                        </div>
-                        <p class="text-sm text-slate-500">{{ paymentMethodDetailsText }}</p>
-                        <button
-                            v-if="hasBoundPaymentMethod"
-                            type="button"
-                            class="btn-secondary w-full"
-                            :disabled="removePaymentMethodState.submitting"
-                            @click="removeBoundPaymentMethod"
-                        >
-                            {{ removePaymentMethodState.submitting ? 'Удаляем...' : 'Удалить способ оплаты' }}
-                        </button>
-                    </div>
+                    <button type="button" class="btn-secondary w-full" @click="goToSubscriptionManagement">
+                        Управление подпиской
+                    </button>
                     <div id="plans-container" class="space-y-4">
                         <p v-if="isLoading" class="text-center text-slate-400">Загрузка тарифов...</p>
                         <p v-else-if="loadError" class="text-center text-slate-400">{{ loadError }}</p>
@@ -123,44 +90,14 @@
                 <div id="plans-payment-widget-host" ref="paymentWidgetHost" class="plans-payment-overlay__widget-host"></div>
             </div>
         </div>
-
-        <div
-            v-if="cancelSubscriptionState.dialogVisible"
-            class="plans-payment-overlay"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Подтверждение отмены подписки"
-        >
-            <div class="plans-payment-overlay__backdrop" @click="closeCancelSubscriptionDialog"></div>
-            <div class="plans-payment-overlay__card">
-                <div class="plans-payment-overlay__header">
-                    <div>
-                        <p class="plans-payment-overlay__eyebrow">Подтверждение</p>
-                        <h2 class="plans-payment-overlay__title">Отменить подписку?</h2>
-                    </div>
-                    <button type="button" class="plans-payment-overlay__close" aria-label="Закрыть" @click="closeCancelSubscriptionDialog">×</button>
-                </div>
-                <p class="plans-payment-overlay__status">
-                    Автопродление будет отключено. Доступ останется активным до конца уже оплаченного периода.
-                </p>
-                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <button type="button" class="btn-secondary w-full" :disabled="cancelSubscriptionState.submitting" @click="closeCancelSubscriptionDialog">
-                        Оставить как есть
-                    </button>
-                    <button type="button" class="btn-primary w-full" :disabled="cancelSubscriptionState.submitting" @click="confirmCancelSubscription">
-                        {{ cancelSubscriptionState.submitting ? 'Отключаем...' : 'Подтвердить отмену' }}
-                    </button>
-                </div>
-            </div>
-        </div>
     </section>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { useStorageStore } from '../stores/storageStore';
 import { subscriptionApi, type StartPaymentResponse } from '../api/subscriptionApi';
-import type { SubscriptionStatusResponse } from '../api/contracts';
 
 declare global {
     interface Window {
@@ -189,6 +126,7 @@ interface PlanDto {
 const PLANS_ENDPOINT = '/api/plans';
 
 const storageStore = useStorageStore();
+const router = useRouter();
 
 const plans = ref<PlanDto[]>([]);
 const activePlan = ref('free');
@@ -209,14 +147,6 @@ const paymentWidget = reactive({
     paymentId: '',
     statusText: '',
     errorText: ''
-});
-const subscriptionStatusPayload = ref<SubscriptionStatusResponse | null>(null);
-const cancelSubscriptionState = reactive({
-    dialogVisible: false,
-    submitting: false,
-});
-const removePaymentMethodState = reactive({
-    submitting: false,
 });
 
 let widgetScriptPromise: Promise<void> | null = null;
@@ -261,45 +191,6 @@ const currentPrice = (plan: PlanDto): number => toPriceNumber(plan.price_current
 const isCommercialPlan = (plan: PlanDto): boolean => currentPrice(plan) > 0;
 const isLifetimeAccessActive = (): boolean => trialStatus.value.kind === 'lifetime';
 const isPlanSelectionDisabled = (plan: PlanDto): boolean => selectedPlanId.value === plan.id || (isCommercialPlan(plan) && isLifetimeAccessActive());
-const isAutoRenewEnabled = computed<boolean>(() => subscriptionStatusPayload.value?.subscription_auto_renew === true);
-const canCancelSubscription = computed<boolean>(() => trialStatus.value.kind === 'paid' && isAutoRenewEnabled.value);
-const showCancellationCard = computed<boolean>(() => trialStatus.value.kind === 'paid');
-const cancellationDetailsText = computed<string>(() => {
-    const until = formatDateRu(subscriptionStatusPayload.value?.subscription_until);
-    if (isAutoRenewEnabled.value) {
-        return until
-            ? `Подписка продлевается автоматически. Если отключить продление сейчас, доступ сохранится до ${until}.`
-            : 'Подписка продлевается автоматически. Если отключить продление сейчас, доступ сохранится до конца уже оплаченного периода.';
-    }
-    if (until) {
-        return `Автопродление уже отключено. Доступ сохранится до ${until}, после этого подписка завершится без нового списания.`;
-    }
-    return 'Автопродление уже отключено. После завершения текущего оплаченного периода подписка завершится без нового списания.';
-});
-const hasBoundPaymentMethod = computed<boolean>(() => subscriptionStatusPayload.value?.subscription_payment_method_bound === true);
-const paymentMethodType = computed<string>(() => String(subscriptionStatusPayload.value?.subscription_payment_method_type || '').trim().toLowerCase());
-const paymentMethodTitle = computed<string>(() => String(subscriptionStatusPayload.value?.subscription_payment_method_title || '').trim());
-const paymentMethodDisplay = computed<string>(() => {
-    if (!hasBoundPaymentMethod.value) {
-        return 'Не привязан';
-    }
-    if (paymentMethodType.value === 'sbp') {
-        return 'СБП';
-    }
-    if (paymentMethodTitle.value) {
-        return paymentMethodTitle.value;
-    }
-    if (paymentMethodType.value.includes('card')) {
-        return '****';
-    }
-    return 'Привязанный способ оплаты';
-});
-const paymentMethodDetailsText = computed<string>(() => {
-    if (!hasBoundPaymentMethod.value) {
-        return 'После оплаты способ оплаты сохранится для автопродления.';
-    }
-    return `Текущий способ: ${paymentMethodDisplay.value}. При удалении автопродление будет отключено.`;
-});
 
 const planSubtitle = (plan: PlanDto): string => {
     const durationDays = Number(plan.duration_days);
@@ -392,15 +283,8 @@ const closePaymentWidget = (): void => {
     unlockBodyScroll();
 };
 
-const openCancelSubscriptionDialog = (): void => {
-    cancelSubscriptionState.dialogVisible = true;
-};
-
-const closeCancelSubscriptionDialog = (): void => {
-    if (cancelSubscriptionState.submitting) {
-        return;
-    }
-    cancelSubscriptionState.dialogVisible = false;
+const goToSubscriptionManagement = async (): Promise<void> => {
+    await router.push('/subscription-management');
 };
 
 const loadWidgetScript = async (): Promise<void> => {
@@ -568,7 +452,6 @@ const fetchTrialStatus = async (): Promise<void> => {
             throw new Error('status_failed');
         }
         const payload = await response.json();
-        subscriptionStatusPayload.value = payload as SubscriptionStatusResponse;
         const status = String(payload?.status || '').toLowerCase();
         const subscriptionStatus = String(payload?.subscription_status || '').toLowerCase();
         const until = formatDateRu(payload?.subscription_until);
@@ -626,52 +509,12 @@ const fetchTrialStatus = async (): Promise<void> => {
             detailsText: 'Пробный период пока не активирован.'
         };
     } catch {
-        subscriptionStatusPayload.value = null;
         trialStatus.value = {
             kind: 'error',
             badgeText: '—',
             badgeClass: 'plans-trial-chip--inactive',
             detailsText: 'Не удалось получить статус пробного периода.'
         };
-    }
-};
-
-const confirmCancelSubscription = async (): Promise<void> => {
-    if (cancelSubscriptionState.submitting) {
-        return;
-    }
-    cancelSubscriptionState.submitting = true;
-    try {
-        const payload = await subscriptionApi.cancelSubscription();
-        subscriptionStatusPayload.value = payload;
-        await fetchTrialStatus();
-        notify('Автопродление отключено. Доступ сохранится до конца оплаченного периода.', 'success');
-        cancelSubscriptionState.dialogVisible = false;
-    } catch {
-        notify('Не удалось отменить подписку. Попробуйте ещё раз.', 'error');
-    } finally {
-        cancelSubscriptionState.submitting = false;
-    }
-};
-
-const removeBoundPaymentMethod = async (): Promise<void> => {
-    if (removePaymentMethodState.submitting || !hasBoundPaymentMethod.value) {
-        return;
-    }
-    const confirmedByUser = window.confirm('Удалить привязанный способ оплаты и отключить автопродление?');
-    if (!confirmedByUser) {
-        return;
-    }
-    removePaymentMethodState.submitting = true;
-    try {
-        const payload = await subscriptionApi.removePaymentMethod();
-        subscriptionStatusPayload.value = payload;
-        await fetchTrialStatus();
-        notify('Способ оплаты удалён. Автопродление отключено.', 'success');
-    } catch {
-        notify('Не удалось удалить способ оплаты. Попробуйте ещё раз.', 'error');
-    } finally {
-        removePaymentMethodState.submitting = false;
     }
 };
 
@@ -727,30 +570,6 @@ onBeforeUnmount(() => {
   border-color: #e2e8f0;
   background: #f8fafc;
   color: #64748b;
-}
-
-.plans-payment-method-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: 9999px;
-  font-size: 12px;
-  font-weight: 600;
-  border: 1px solid transparent;
-}
-
-.plans-payment-method-chip--bound {
-  background: #dcfce7;
-  color: #166534;
-  border-color: #bbf7d0;
-}
-
-.plans-payment-method-chip--none {
-  background: #f8fafc;
-  color: #64748b;
-  border-color: #e2e8f0;
 }
 
 .plans-payment-overlay {
